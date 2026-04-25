@@ -1,4 +1,4 @@
-{{block "page_title" .}}Backup Config: {{.ServerName}} — Probaky{{end}}
+{{block "page_title" .}}Backup Config: {{.ServerName}} - Probaky{{end}}
 {{block "page_heading" .}}Backup Config: {{.ServerName}}{{end}}
 {{block "page_actions" .}}
 <a href="/servers/pve" class="btn btn-sm btn-secondary me-2"><i class="bi bi-arrow-left me-1"></i>Volver</a>
@@ -55,9 +55,9 @@
                 <i class="bi bi-{{if .IsExcluded}}eye{{else}}eye-slash{{end}}"></i>
               </button>
             </form>
-            <form method="POST" action="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/delete" class="d-inline"
-                  onsubmit="return confirm('¿Eliminar configuración de VM {{.VMID}}?')">
-              <button class="btn btn-sm btn-outline-danger" title="Eliminar">
+            <form id="del-vm-{{.VMID}}" method="POST" action="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/delete" class="d-inline">
+              <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
+                      data-confirm="¿Eliminar configuración de VM {{.VMID}}?" data-form="del-vm-{{.VMID}}">
                 <i class="bi bi-trash"></i>
               </button>
             </form>

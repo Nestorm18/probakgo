@@ -57,8 +57,9 @@ CREATE TABLE IF NOT EXISTS pve_storage_content (
     content    TEXT,
     volid      TEXT,
     ctime      INTEGER,
-    subtype    TEXT,
-    notes      TEXT
+    subtype      TEXT,
+    notes        TEXT,
+    verification TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS pbs_servers (

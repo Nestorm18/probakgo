@@ -20,7 +20,7 @@ type Config struct {
 }
 
 func loadConfig() *Config {
-	for _, p := range []string{"/opt/probaky/.env", ".env"} {
+	for _, p := range []string{"/opt/probakgo/.env", ".env"} {
 		if _, err := os.Stat(p); err == nil {
 			_ = godotenv.Load(p)
 			break

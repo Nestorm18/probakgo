@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"probaky/internal/domain"
-	"probaky/internal/store"
+	"probakgo/internal/domain"
+	"probakgo/internal/store"
 )
 
 //go:embed email_template.html
@@ -24,19 +24,28 @@ type serverRow struct {
 	StaleReason string
 }
 
+type diskAlertRow struct {
+	ServerName string
+	StoreName  string
+	UsedPct    int
+	Detail     string
+}
+
 type emailData struct {
-	ReportDate  string
-	SendTime    string
-	HeaderColor string
-	StatusText  string
-	TotalPVE    int
-	TotalPBS    int
-	TotalIssues int
-	TotalOK     int
-	PVEIssues   []serverRow
-	PBSIssues   []serverRow
-	PVEOk       []serverRow
-	PBSOk       []serverRow
+	ReportDate   string
+	SendTime     string
+	HeaderColor  string
+	StatusText   string
+	TotalPVE     int
+	TotalPBS     int
+	TotalIssues  int
+	TotalOK      int
+	PVEIssues    []serverRow
+	PBSIssues    []serverRow
+	PVEOk        []serverRow
+	PBSOk        []serverRow
+	DiskAlerts   []diskAlertRow
+	BackupErrors []serverRow
 }
 
 // SendDailyReport builds and sends the daily status email.
@@ -58,7 +67,7 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 		return fmt.Errorf("no email recipients configured")
 	}
 
-	data, err := buildEmailData(st, rep, cfg.SendTime)
+	data, err := buildEmailData(st, rep, cfg)
 	if err != nil {
 		return fmt.Errorf("build email data: %w", err)
 	}
@@ -76,7 +85,8 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 	return sendSMTP(cfg, recipients, subject, html)
 }
 
-func buildEmailData(st *store.Store, rep *ReportService, sendTime string) (emailData, error) {
+func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig) (emailData, error) {
+	sendTime := cfg.SendTime
 	pveServers, err := st.ListPVEServers()
 	if err != nil {
 		return emailData{}, err
@@ -126,28 +136,53 @@ func buildEmailData(st *store.Store, rep *ReportService, sendTime string) (email
 		}
 	}
 
+	// Alerts: disk usage and backup errors
+	var diskAlerts []diskAlertRow
+	var backupErrors []serverRow
+	if alerts, err := st.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr); err == nil {
+		for _, a := range alerts {
+			switch a.Type {
+			case "disk":
+				diskAlerts = append(diskAlerts, diskAlertRow{
+					ServerName: a.ServerName,
+					StoreName:  a.StoreName,
+					UsedPct:    a.UsedPct,
+					Detail:     a.Message,
+				})
+			case "backup_error":
+				backupErrors = append(backupErrors, serverRow{
+					Name:        a.ServerName,
+					StaleReason: a.Message,
+				})
+			}
+		}
+	}
+
 	totalIssues := len(pveIssues) + len(pbsIssues)
+	totalProblems := totalIssues + len(diskAlerts) + len(backupErrors)
 	totalOK := len(pveOk) + len(pbsOk)
 	headerColor := "#28a745"
 	statusText := "Todos los servidores operativos"
-	if totalIssues > 0 {
+	if totalProblems > 0 {
 		headerColor = "#dc3545"
-		statusText = fmt.Sprintf("%d problema(s) detectado(s)", totalIssues)
+		statusText = fmt.Sprintf("%d problema(s) detectado(s)", totalProblems)
 	}
 
 	return emailData{
-		ReportDate:  time.Now().In(rep.tz).Format("2006-01-02"),
-		SendTime:    sendTime,
-		HeaderColor: headerColor,
-		StatusText:  statusText,
-		TotalPVE:    len(pveServers),
-		TotalPBS:    len(pbsServers),
-		TotalIssues: totalIssues,
-		TotalOK:     totalOK,
-		PVEIssues:   pveIssues,
-		PBSIssues:   pbsIssues,
-		PVEOk:       pveOk,
-		PBSOk:       pbsOk,
+		ReportDate:   time.Now().In(rep.tz).Format("2006-01-02"),
+		SendTime:     sendTime,
+		HeaderColor:  headerColor,
+		StatusText:   statusText,
+		TotalPVE:     len(pveServers),
+		TotalPBS:     len(pbsServers),
+		TotalIssues:  totalProblems,
+		TotalOK:      totalOK,
+		PVEIssues:    pveIssues,
+		PBSIssues:    pbsIssues,
+		PVEOk:        pveOk,
+		PBSOk:        pbsOk,
+		DiskAlerts:   diskAlerts,
+		BackupErrors: backupErrors,
 	}, nil
 }
 

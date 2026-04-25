@@ -53,16 +53,17 @@ type PVEStorageInfo struct {
 }
 
 type PVEStorageContent struct {
-	ID        int64  `db:"id"`
-	StorageID int64  `db:"storage_id"`
-	VMID      int64  `db:"vmid"`
-	Format    string `db:"format"`
-	Size      int64  `db:"size"`
-	Content   string `db:"content"`
-	VolID     string `db:"volid"`
-	CTime     int64  `db:"ctime"`
-	Subtype   string `db:"subtype"`
-	Notes     string `db:"notes"`
+	ID           int64  `db:"id"`
+	StorageID    int64  `db:"storage_id"`
+	VMID         int64  `db:"vmid"`
+	Format       string `db:"format"`
+	Size         int64  `db:"size"`
+	Content      string `db:"content"`
+	VolID        string `db:"volid"`
+	CTime        int64  `db:"ctime"`
+	Subtype      string `db:"subtype"`
+	Notes        string `db:"notes"`
+	Verification string `db:"verification"`
 }
 
 type PBSServer struct {
@@ -161,12 +162,25 @@ type VMBackupConfig struct {
 }
 
 type EmailConfig struct {
-	ID         int64  `db:"id"`
-	SMTPHost   string `db:"smtp_host"`
-	SMTPPort   int    `db:"smtp_port"`
-	SMTPUser   string `db:"smtp_user"`
-	SMTPPass   string `db:"smtp_password"`
-	Recipients string `db:"recipients"` // JSON array
-	IsEnabled  bool   `db:"is_enabled"`
-	SendTime   string `db:"send_time"`
+	ID               int64  `db:"id"`
+	SMTPHost         string `db:"smtp_host"`
+	SMTPPort         int    `db:"smtp_port"`
+	SMTPUser         string `db:"smtp_user"`
+	SMTPPass         string `db:"smtp_password"`
+	Recipients       string `db:"recipients"`
+	IsEnabled        bool   `db:"is_enabled"`
+	SendTime         string `db:"send_time"`
+	RetentionMonths  int    `db:"retention_months"`
+	RetentionEnabled bool   `db:"retention_enabled"`
+	AlertDiskPct     int    `db:"alert_disk_pct"`   // 0 = disabled
+	AlertBackupErr   bool   `db:"alert_backup_err"`
+}
+
+// Alert represents a detected condition requiring attention.
+type Alert struct {
+	ServerName string
+	StoreName  string // empty for server-level alerts
+	Type       string // "disk" | "backup_error"
+	UsedPct    int    // filled for disk alerts
+	Message    string // human-readable description
 }

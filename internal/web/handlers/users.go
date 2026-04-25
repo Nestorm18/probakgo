@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"probaky/internal/session"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {

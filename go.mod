@@ -1,4 +1,4 @@
-module probaky
+module probakgo
 
 go 1.26
 

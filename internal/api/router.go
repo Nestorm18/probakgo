@@ -10,9 +10,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"probaky/internal/api/handlers"
-	"probaky/internal/service"
-	"probaky/internal/store"
+	"probakgo/internal/api/handlers"
+	"probakgo/internal/service"
+	"probakgo/internal/store"
 )
 
 type Server struct {

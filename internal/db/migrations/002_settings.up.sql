@@ -1,0 +1,4 @@
+ALTER TABLE email_config ADD COLUMN retention_months  INTEGER NOT NULL DEFAULT 3;
+ALTER TABLE email_config ADD COLUMN retention_enabled INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE email_config ADD COLUMN alert_disk_pct    INTEGER NOT NULL DEFAULT 85;
+ALTER TABLE email_config ADD COLUMN alert_backup_err  INTEGER NOT NULL DEFAULT 1;

@@ -43,6 +43,8 @@
       <div class="sidebar-label">Configuración</div>
       <ul class="nav flex-column gap-1">
         <li><a class="nav-link {{if eq .Active "email"}}active{{end}}" href="/settings/email"><i class="bi bi-envelope"></i>Email</a></li>
+        <li><a class="nav-link {{if eq .Active "maintenance"}}active{{end}}" href="/settings/maintenance"><i class="bi bi-trash3"></i>Mantenimiento</a></li>
+        <li><a class="nav-link {{if eq .Active "alerts"}}active{{end}}" href="/settings/alerts"><i class="bi bi-bell"></i>Alertas</a></li>
       </ul>
       {{end}}
     </div>
@@ -89,6 +91,27 @@
   <i class="bi" id="themeIcon"></i>
 </button>
 
+<!-- Confirm modal (shared across all pages) -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold">
+          <i class="bi bi-exclamation-triangle-fill me-2" style="color:var(--clr-danger)"></i>Confirmar acción
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-1">
+        <p id="confirmMsg" class="mb-0" style="font-size:.9rem;color:var(--txt-secondary)"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-danger" id="confirmOk">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Sidebar toggle
@@ -111,6 +134,22 @@
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme', next);
     applyTheme(next);
+  });
+
+  // Generic confirm dialog — triggered by buttons with data-confirm="message" data-form="formId"
+  let _confirmPendingForm = null;
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-confirm]');
+    if (!btn) return;
+    e.preventDefault();
+    document.getElementById('confirmMsg').textContent = btn.dataset.confirm;
+    document.getElementById('confirmOk').textContent = btn.dataset.confirmOk || 'Eliminar';
+    _confirmPendingForm = document.getElementById(btn.dataset.form);
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
+  });
+  document.getElementById('confirmOk').addEventListener('click', () => {
+    if (_confirmPendingForm) { _confirmPendingForm.submit(); _confirmPendingForm = null; }
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
   });
 </script>
 {{block "page_scripts" .}}{{end}}

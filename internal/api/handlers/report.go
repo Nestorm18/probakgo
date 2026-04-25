@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {

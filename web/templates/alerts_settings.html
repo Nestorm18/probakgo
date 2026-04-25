@@ -1,0 +1,54 @@
+{{block "page_title" .}}Alertas - Probaky{{end}}
+{{block "page_heading" .}}Alertas Automáticas{{end}}
+{{block "page_content" .}}
+
+<div class="row">
+  <div class="col-lg-7">
+
+    {{if .Flash}}
+    <div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
+      {{.Flash}}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {{end}}
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas automáticas
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/settings/alerts">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label">Alerta de disco</label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="alert_disk_pct"
+                       value="{{.Config.AlertDiskPct}}" min="0" max="99" style="max-width:100px">
+                <span class="input-group-text">%</span>
+              </div>
+              <div class="form-text">Alerta cuando el almacenamiento supere este porcentaje. 0 para desactivar.</div>
+            </div>
+            <div class="col-md-7 pt-md-3">
+              <div class="check-toggle-wrap">
+                <input class="form-check-input m-0" type="checkbox" name="alert_backup_err"
+                       id="alertBackup" {{if .Config.AlertBackupErr}}checked{{end}}>
+                <label class="form-check-label m-0" for="alertBackup"
+                       style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                  Alerta cuando el último backup falle
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-floppy me-1"></i>Guardar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{{end}}

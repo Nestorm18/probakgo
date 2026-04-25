@@ -5,9 +5,9 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"probaky/internal/service"
-	"probaky/internal/session"
-	"probaky/internal/store"
+	"probakgo/internal/service"
+	"probakgo/internal/session"
+	"probakgo/internal/store"
 )
 
 type WebH struct {

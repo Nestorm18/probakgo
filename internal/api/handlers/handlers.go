@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"probaky/internal/service"
-	"probaky/internal/store"
+	"probakgo/internal/service"
+	"probakgo/internal/store"
 )
 
 type H struct {

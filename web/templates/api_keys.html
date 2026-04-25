@@ -1,4 +1,4 @@
-{{block "page_title" .}}API Keys — Probaky{{end}}
+{{block "page_title" .}}API Keys - Probaky{{end}}
 {{block "page_heading" .}}API Keys{{end}}
 {{block "page_actions" .}}
 {{if isAdmin .Role}}
@@ -48,7 +48,7 @@
             <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i>
             <code title="{{.MachineID}}">{{slice .MachineID 0 8}}…</code>
           {{else}}
-            <span style="color:var(--txt-muted)">—</span>
+            <span style="color:var(--txt-muted)">-</span>
           {{end}}
         </td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">
@@ -85,9 +85,9 @@
                 <i class="bi bi-{{if .IsActive}}pause{{else}}play{{end}}-fill"></i>
               </button>
             </form>
-            <form method="POST" action="/api-keys/{{.ID}}/delete" class="d-inline"
-                  onsubmit="return confirm('¿Eliminar esta key?')">
-              <button class="btn btn-sm btn-outline-danger" title="Eliminar">
+            <form id="del-key-{{.ID}}" method="POST" action="/api-keys/{{.ID}}/delete" class="d-inline">
+              <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
+                      data-confirm="¿Eliminar esta key?" data-form="del-key-{{.ID}}">
                 <i class="bi bi-trash"></i>
               </button>
             </form>
@@ -121,9 +121,9 @@
           <div class="mb-3">
             <label class="form-label">Tipo</label>
             <select name="key_type" class="form-select" required>
-              <option value="server">server (pbk-) — cliente Proxmox</option>
-              <option value="mobile">mobile (app-) — app móvil</option>
-              <option value="admin">admin (adm-) — acceso completo</option>
+              <option value="server">server (pbk-) - cliente Proxmox</option>
+              <option value="mobile">mobile (app-) - app móvil</option>
+              <option value="admin">admin (adm-) - acceso completo</option>
             </select>
           </div>
           <div class="mb-3">

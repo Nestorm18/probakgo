@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"probaky/internal/session"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {

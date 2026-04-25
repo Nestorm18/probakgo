@@ -1,0 +1,35 @@
+{
+  "hostname": "pbs-test",
+  "ip_address": "192.168.1.248",
+  "public_ip": "203.0.113.10",
+  "client_version": "testdata-1.0",
+  "machine_id": "aabbccdd-eeff-0011-2233-445566778899",
+  "pbs_information": {
+    "data": [
+      {
+        "store": "synology",
+        "total": 2948636082176,
+        "used": 2701225492480,
+        "avail": 247410589696,
+        "estimated-full-date": 1800000000,
+        "mount-status": "nonremovable",
+        "history-start": 1745500000,
+        "history-delta": 1800,
+        "history": [0.82, 0.83, 0.84, 0.85, 0.86, 0.87, 0.88, 0.89, 0.90, 0.91],
+        "gc-status": {
+          "disk-bytes": 1917425818843,
+          "disk-chunks": 967294,
+          "index-data-bytes": 95412725514240,
+          "index-file-count": 717,
+          "pending-bytes": 10715476825,
+          "pending-chunks": 5963,
+          "removed-bad": 0,
+          "removed-bytes": 7624202312,
+          "removed-chunks": 3790,
+          "still-bad": 0,
+          "upid": "UPID:pbs:000002DE:00001122:000006A2:692518E0:garbage_collection:synology:root@pam:"
+        }
+      }
+    ]
+  }
+}

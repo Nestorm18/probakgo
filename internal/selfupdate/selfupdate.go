@@ -25,7 +25,7 @@ type githubRelease struct {
 // currentVersion is the running binary's version (e.g. "dev" or "v1.2.0").
 func Run(repo, binaryName, currentVersion string) error {
 	if currentVersion == "dev" {
-		fmt.Println("Dev build — skipping version check")
+		fmt.Println("Dev build - skipping version check")
 		return nil
 	}
 
@@ -123,7 +123,7 @@ func replace(downloadURL string) error {
 	}
 	f.Close()
 
-	// Atomic replace — on Linux the kernel keeps the old inode open, so this is safe
+	// Atomic replace - on Linux the kernel keeps the old inode open, so this is safe
 	if err := os.Rename(tmpPath, executable); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("replace binary: %w", err)

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"probaky/internal/domain"
-	"probaky/internal/store"
+	"probakgo/internal/domain"
+	"probakgo/internal/store"
 )
 
 type ReportService struct {

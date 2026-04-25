@@ -69,14 +69,15 @@ type StorageInfoPayload struct {
 }
 
 type ContentDataPayload struct {
-	VMID    int64  `json:"vmid"`
-	Format  string `json:"format"`
-	Size    int64  `json:"size"`
-	Content string `json:"content"`
-	VolID   string `json:"volid"`
-	CTime   int64  `json:"ctime"`
-	Subtype string `json:"subtype"`
-	Notes   string `json:"notes"`
+	VMID         int64  `json:"vmid"`
+	Format       string `json:"format"`
+	Size         int64  `json:"size"`
+	Content      string `json:"content"`
+	VolID        string `json:"volid"`
+	CTime        int64  `json:"ctime"`
+	Subtype      string `json:"subtype"`
+	Notes        string `json:"notes"`
+	Verification string `json:"verification"`
 }
 
 // --- PBS report payload (sent by client) ---

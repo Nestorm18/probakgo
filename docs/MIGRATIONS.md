@@ -1,60 +1,30 @@
-# Gestión de Migraciones de Base de Datos
+# Migraciones de Base de Datos
 
-Este proyecto utiliza **Alembic** para gestionar las migraciones de la base de datos. Esto permite actualizar la estructura de la base de datos en producción de manera segura y controlada.
+probakgo usa migraciones SQL embebidas en el binario que se aplican automáticamente al arrancar el servidor. No se requieren herramientas externas.
 
-## Configuración Inicial
+## Cómo funciona
 
-El sistema de migraciones ya ha sido inicializado. Los archivos de configuración se encuentran en la carpeta `alembic/` y el archivo `alembic.ini` en la raíz del proyecto.
+Los archivos de migración viven en `internal/db/migrations/` y se embeben en el binario en tiempo de compilación.
 
-## Comandos Básicos
+Al arrancar, el servidor aplica en orden todas las migraciones que aún no se hayan ejecutado. El estado se rastrea en la tabla `schema_migrations`.
 
-### 1. Crear una nueva migración
+## Migraciones actuales
 
-Cuando realices cambios en los modelos (`models.py`), debes generar un script de migración que refleje esos cambios en la base de datos.
+| Archivo | Descripción |
+|---------|-------------|
+| `001_initial.up.sql` | Esquema completo inicial: usuarios, api_keys, reportes PVE/PBS, backup_config, email_config |
 
-```bash
-uv run alembic revision --autogenerate -m "Descripción del cambio"
-```
+## Añadir una nueva migración
 
-Esto creará un nuevo archivo en `alembic/versions/` con las instrucciones SQL necesarias.
+1. Crear el archivo: `internal/db/migrations/002_descripcion.up.sql`
+2. Escribir el SQL del cambio de esquema.
+3. Recompilar y reiniciar el servidor - la migración se aplica sola al arrancar.
 
-**Importante:** Revisa siempre el archivo generado para asegurarte de que los cambios son correctos.
+**Convención de nombres:** `NNN_descripcion.up.sql` donde `NNN` es un número secuencial con ceros a la izquierda.
 
-### 2. Aplicar migraciones (Actualizar base de datos)
+## Rollback
 
-Para aplicar los cambios pendientes a la base de datos (tanto en desarrollo como en producción):
+No hay rollback automático. Para revertir:
 
-```bash
-uv run alembic upgrade head
-```
-
-Este comando ejecutará todas las migraciones que aún no se hayan aplicado.
-
-### 3. Ver historial de migraciones
-
-Para ver el historial de migraciones y cuál es la actual:
-
-```bash
-uv run alembic history
-uv run alembic current
-```
-
-## Flujo de Trabajo en Producción
-
-1.  **Desarrollo:**
-    *   Modifica `models.py`.
-    *   Genera la migración: `uv run alembic revision --autogenerate -m "..."`.
-    *   Aplica la migración localmente: `uv run alembic upgrade head`.
-    *   Verifica que todo funcione.
-    *   Haz commit de los cambios (incluyendo el nuevo archivo en `alembic/versions/`).
-
-2.  **Despliegue (Producción):**
-    *   Descarga el código actualizado (git pull).
-    *   Ejecuta las migraciones: `uv run alembic upgrade head`.
-    *   Reinicia el servidor si es necesario.
-
-## Estado Actual
-
-Se ha generado una migración inicial (`alembic/versions/...initial_migration.py`) que detecta el estado actual de la base de datos y lo sincroniza con los modelos definidos en `models.py`.
-
-Si ejecutas `uv run alembic upgrade head` ahora, se aplicarán estos cambios (por ejemplo, eliminando tablas antiguas no utilizadas como `backup_config` si existen).
+1. Restaura el backup de `probakgo_data.db` (haz backup antes de cada actualización).
+2. Despliega la versión anterior del binario.

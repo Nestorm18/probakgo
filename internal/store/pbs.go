@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (s *Store) UpsertPBSServer(name, ip, publicIP, clientVersion, machineID string) (int64, error) {
@@ -111,10 +111,12 @@ func (s *Store) GetLatestPBSReport(serverID int64) (*domain.PBSReport, error) {
 		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PBSReport
 	var isStale int
-	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason); err != nil {
+	var staleReason sql.NullString
+	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
 		return nil, err
 	}
 	r.IsStale = isStale != 0
+	r.StaleReason = staleReason.String
 	return &r, nil
 }
 
@@ -129,10 +131,12 @@ func (s *Store) ListPBSReports(serverID int64, limit int) ([]domain.PBSReport, e
 	for rows.Next() {
 		var r domain.PBSReport
 		var isStale int
-		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason); err != nil {
+		var staleReason sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
@@ -192,4 +196,39 @@ func (s *Store) GetPBSHistory(storeID int64) ([]*float64, error) {
 func (s *Store) DeletePBSServer(id int64) error {
 	_, err := s.db.Exec(`UPDATE pbs_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
 	return err
+}
+
+// DeleteOldPBSReports removes PBS reports (and their child rows) older than cutoff.
+// Returns the number of reports deleted.
+func (s *Store) DeleteOldPBSReports(cutoff time.Time) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	steps := []string{
+		`DELETE FROM pbs_store_history WHERE store_id IN (
+			SELECT st.id FROM pbs_stores st
+			JOIN pbs_reports r ON r.id = st.report_id
+			WHERE r.reported_at < ?)`,
+		`DELETE FROM pbs_gc_status WHERE store_id IN (
+			SELECT st.id FROM pbs_stores st
+			JOIN pbs_reports r ON r.id = st.report_id
+			WHERE r.reported_at < ?)`,
+		`DELETE FROM pbs_stores WHERE report_id IN (
+			SELECT id FROM pbs_reports WHERE reported_at < ?)`,
+	}
+	for _, q := range steps {
+		if _, err := tx.Exec(q, cutoff); err != nil {
+			return 0, err
+		}
+	}
+
+	res, err := tx.Exec(`DELETE FROM pbs_reports WHERE reported_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
 }

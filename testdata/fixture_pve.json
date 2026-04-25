@@ -1,0 +1,204 @@
+{
+  "hostname": "soporte1",
+  "ip_address": "192.168.1.20",
+  "public_ip": "203.0.113.10",
+  "client_version": "testdata-1.0",
+  "machine_id": "11223344-5566-7788-99aa-bbccddeeff00",
+  "last_backup_status": {
+    "status": "OK",
+    "starttime": 1745560800,
+    "endtime": 1745562034,
+    "duration": 1234
+  },
+  "storages": [
+    {
+      "storage": "NAS",
+      "type": "nfs",
+      "path": "/mnt/pve/NAS",
+      "content": "backup",
+      "status": "available",
+      "shared": true,
+      "server": "192.168.1.100",
+      "digest": "abc123def456",
+      "prune_backups": {"keep-daily": 7, "keep-weekly": 4, "keep-monthly": 3},
+      "storage_info": [
+        {
+          "total": 10737418240000,
+          "used": 4294967296000,
+          "avail": 6442450944000,
+          "used_percent": 40.0,
+          "active": true,
+          "enabled": true,
+          "lvl": 0
+        }
+      ],
+      "content_data": [
+        {
+          "vmid": 100,
+          "format": "vma.zst",
+          "size": 5368709120,
+          "content": "backup",
+          "volid": "NAS:backup/vzdump-qemu-100-2025_04_25-08_00_00.vma.zst",
+          "ctime": 1745560800,
+          "subtype": "qemu",
+          "notes": "servidor-web"
+        },
+        {
+          "vmid": 101,
+          "format": "vma.zst",
+          "size": 3221225472,
+          "content": "backup",
+          "volid": "NAS:backup/vzdump-qemu-101-2025_04_25-08_21_00.vma.zst",
+          "ctime": 1745562060,
+          "subtype": "qemu",
+          "notes": "base-de-datos"
+        },
+        {
+          "vmid": 102,
+          "format": "vma.zst",
+          "size": 8589934592,
+          "content": "backup",
+          "volid": "NAS:backup/vzdump-qemu-102-2025_04_25-08_45_00.vma.zst",
+          "ctime": 1745563500,
+          "subtype": "qemu",
+          "notes": "servidor-ldap"
+        },
+        {
+          "vmid": 200,
+          "format": "tar.zst",
+          "size": 1073741824,
+          "content": "backup",
+          "volid": "NAS:backup/vzdump-lxc-200-2025_04_25-09_00_00.vma.zst",
+          "ctime": 1745564400,
+          "subtype": "lxc",
+          "notes": "proxy-nginx"
+        }
+      ]
+    },
+    {
+      "storage": "NAS-GRANDE",
+      "type": "nfs",
+      "path": "/mnt/pve/NAS-GRANDE",
+      "content": "backup,iso",
+      "status": "available",
+      "shared": true,
+      "server": "192.168.1.101",
+      "digest": "fedcba987654",
+      "prune_backups": {"keep-daily": 14},
+      "storage_info": [
+        {
+          "total": 32212254720000,
+          "used": 9663676416000,
+          "avail": 22548578304000,
+          "used_percent": 30.0,
+          "active": true,
+          "enabled": true,
+          "lvl": 0
+        }
+      ],
+      "content_data": [
+        {
+          "vmid": 103,
+          "format": "vma.zst",
+          "size": 12884901888,
+          "content": "backup",
+          "volid": "NAS-GRANDE:backup/vzdump-qemu-103-2025_04_25-09_15_00.vma.zst",
+          "ctime": 1745565300,
+          "subtype": "qemu",
+          "notes": "servidor-erp"
+        }
+      ]
+    },
+    {
+      "storage": "pbs-backup",
+      "type": "pbs",
+      "path": "",
+      "content": "backup",
+      "status": "available",
+      "shared": false,
+      "server": "192.168.1.248",
+      "digest": "99887766554433",
+      "prune_backups": {"keep-daily": 7, "keep-weekly": 4},
+      "storage_info": [
+        {
+          "total": 2948636082176,
+          "used": 1572864000000,
+          "avail": 1375772082176,
+          "used_percent": 53.3,
+          "active": true,
+          "enabled": true,
+          "lvl": 0
+        }
+      ],
+      "content_data": [
+        {
+          "vmid": 100,
+          "format": "pxar.didx",
+          "size": 5368709120,
+          "content": "backup",
+          "volid": "pbs-backup:backup/vm/100/2025-04-25T08:00:00Z",
+          "ctime": 1745560800,
+          "subtype": "vm",
+          "notes": "servidor-web",
+          "verification": "ok"
+        },
+        {
+          "vmid": 101,
+          "format": "pxar.didx",
+          "size": 3221225472,
+          "content": "backup",
+          "volid": "pbs-backup:backup/vm/101/2025-04-25T08:21:00Z",
+          "ctime": 1745562060,
+          "subtype": "vm",
+          "notes": "base-de-datos",
+          "verification": "failed"
+        },
+        {
+          "vmid": 200,
+          "format": "pxar.didx",
+          "size": 1073741824,
+          "content": "backup",
+          "volid": "pbs-backup:backup/ct/200/2025-04-25T09:00:00Z",
+          "ctime": 1745564400,
+          "subtype": "ct",
+          "notes": "proxy-nginx",
+          "verification": "ok"
+        },
+        {
+          "vmid": 102,
+          "format": "pxar.didx",
+          "size": 8589934592,
+          "content": "backup",
+          "volid": "pbs-backup:backup/vm/102/2025-04-25T08:45:00Z",
+          "ctime": 1745563500,
+          "subtype": "vm",
+          "notes": "servidor-ldap",
+          "verification": ""
+        }
+      ]
+    },
+    {
+      "storage": "local-lvm",
+      "type": "lvmthin",
+      "path": "",
+      "content": "rootdir,images",
+      "status": "available",
+      "shared": false,
+      "server": "",
+      "digest": "111aaa222bbb",
+      "prune_backups": {},
+      "storage_info": [
+        {
+          "total": 107374182400,
+          "used": 53687091200,
+          "avail": 53687091200,
+          "used_percent": 50.0,
+          "active": true,
+          "enabled": true,
+          "lvl": 0
+        }
+      ],
+      "content_data": []
+    }
+  ]
+}
