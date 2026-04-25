@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build Linux amd64
+        run: |
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o probaky-linux-amd64 .
+
+      - name: Build Linux arm64
+        run: |
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o probaky-linux-arm64 .
+
+      - name: Create checksums
+        run: |
+          sha256sum probaky-linux-amd64 probaky-linux-arm64 client.py > SHA256SUMS
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            probaky-linux-amd64
+            probaky-linux-arm64
+            client.py
+            client_updater.py
+            SHA256SUMS

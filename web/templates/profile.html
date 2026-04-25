@@ -1,0 +1,63 @@
+{{block "page_title" .}}Mi Perfil — Probaky{{end}}
+{{block "page_heading" .}}Mi Perfil{{end}}
+{{block "page_content" .}}
+
+<div class="row">
+  <div class="col-lg-5">
+
+    {{if .Flash}}
+    <div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
+      {{.Flash}}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {{end}}
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-person-circle me-2" style="color:var(--clr-accent)"></i>Información de cuenta
+      </div>
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-3 p-3 mb-3" style="background:var(--body-bg);border-radius:.5rem;border:1px solid var(--card-border)">
+          <div class="sidebar-user-avatar" style="width:40px;height:40px;font-size:.9rem">{{slice .User.Username 0 1}}</div>
+          <div>
+            <div class="fw-semibold" style="color:var(--txt-primary)">{{.User.Username}}</div>
+            <div style="font-size:.75rem;color:var(--txt-muted);margin-top:.1rem">
+              {{if eq .User.Role "admin"}}<span class="status-pill warn">admin</span>
+              {{else if eq .User.Role "editor"}}<span class="status-pill ok">editor</span>
+              {{else}}<span class="status-pill muted">reader</span>{{end}}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-lock me-2" style="color:var(--clr-accent)"></i>Cambiar contraseña
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/profile">
+          <div class="mb-3">
+            <label class="form-label">Contraseña actual</label>
+            <input type="password" class="form-control" name="current_password" required autocomplete="current-password">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nueva contraseña</label>
+            <input type="password" class="form-control" name="new_password" required minlength="6" autocomplete="new-password">
+            <div class="form-text">Mínimo 6 caracteres.</div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label">Confirmar nueva contraseña</label>
+            <input type="password" class="form-control" name="password_confirm" required autocomplete="new-password">
+          </div>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-floppy me-1"></i>Cambiar contraseña
+          </button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{{end}}

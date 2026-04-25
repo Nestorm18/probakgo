@@ -1,0 +1,71 @@
+{{block "page_title" .}}Configuración de Email — Probaky{{end}}
+{{block "page_heading" .}}Configuración de Email{{end}}
+{{block "page_content" .}}
+
+<div class="row">
+  <div class="col-lg-7">
+
+    {{if .Flash}}
+    <div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
+      {{.Flash}}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {{end}}
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-envelope me-2" style="color:var(--clr-accent)"></i>Reporte Diario por Email
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/settings/email">
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">Host SMTP</label>
+              <input type="text" class="form-control" name="smtp_host" value="{{.Config.SMTPHost}}" placeholder="smtp.gmail.com">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Puerto</label>
+              <input type="number" class="form-control" name="smtp_port" value="{{.Config.SMTPPort}}" placeholder="587">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Usuario SMTP</label>
+              <input type="text" class="form-control" name="smtp_user" value="{{.Config.SMTPUser}}" placeholder="usuario@gmail.com" autocomplete="off">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Hora de envío</label>
+              <input type="text" class="form-control" name="send_time" value="{{.Config.SendTime}}" placeholder="08:00">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Contraseña SMTP</label>
+              <input type="password" class="form-control" name="smtp_pass" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
+              <div class="form-text">La contraseña actual no se muestra por seguridad.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Destinatarios <span style="font-weight:400;color:var(--txt-muted)">(separados por comas)</span></label>
+              <input type="text" class="form-control" name="recipients" value="{{.Config.Recipients}}" placeholder="admin@empresa.com, otro@empresa.com">
+            </div>
+            <div class="col-12">
+              <div class="check-toggle-wrap">
+                <input class="form-check-input m-0" type="checkbox" name="is_enabled" id="emailEnabled" {{if .Config.IsEnabled}}checked{{end}}>
+                <label class="form-check-label m-0" for="emailEnabled" style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                  Habilitar envío de reportes diarios
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-floppy me-1"></i>Guardar
+            </button>
+            <a href="/settings/email/test" class="btn btn-secondary">
+              <i class="bi bi-send me-1"></i>Enviar prueba ahora
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{{end}}

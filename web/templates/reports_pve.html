@@ -1,0 +1,240 @@
+{{block "page_title" .}}Reportes {{.Server.Name}} — Probaky{{end}}
+{{block "page_heading" .}}Reportes: {{.Server.Name}}{{end}}
+{{block "page_actions" .}}
+<a href="/servers/pve/{{.Server.ID}}" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al servidor</a>
+{{end}}
+{{block "page_content" .}}
+
+<!-- Filter -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="GET" action="/servers/pve/{{.Server.ID}}/reports" class="d-flex align-items-center gap-3">
+      <label for="days" style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap"><i class="bi bi-funnel me-1"></i>Período</label>
+      <select class="form-select form-select-sm" id="days" name="days" style="max-width:180px" onchange="this.form.submit()">
+        <option value="1"   {{if eq .Days 1}}selected{{end}}>Último día</option>
+        <option value="3"   {{if eq .Days 3}}selected{{end}}>Últimos 3 días</option>
+        <option value="7"   {{if eq .Days 7}}selected{{end}}>Últimos 7 días</option>
+        <option value="14"  {{if eq .Days 14}}selected{{end}}>Últimos 14 días</option>
+        <option value="31"  {{if eq .Days 31}}selected{{end}}>Últimos 31 días</option>
+        <option value="60"  {{if eq .Days 60}}selected{{end}}>Últimos 60 días</option>
+        <option value="90"  {{if eq .Days 90}}selected{{end}}>Últimos 90 días</option>
+        <option value="180" {{if eq .Days 180}}selected{{end}}>Últimos 180 días</option>
+        <option value="365" {{if eq .Days 365}}selected{{end}}>Últimos 365 días</option>
+      </select>
+    </form>
+  </div>
+</div>
+
+{{if .Reports}}
+
+<!-- Server info -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">IP Local</div>
+      <div class="fw-semibold" style="color:var(--txt-primary)">{{.Server.IP}}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">IP Pública</div>
+      <div class="fw-semibold" style="color:var(--txt-primary)">{{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">Versión cliente</div>
+      <div><code>{{if .Server.ClientVersion}}{{.Server.ClientVersion}}{{else}}–{{end}}</code></div>
+    </div></div>
+  </div>
+  {{with index .Reports 0}}
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">Último backup</div>
+      {{if eq .BackupStatus "OK"}}
+        <span class="status-pill ok">OK</span>
+      {{else if .BackupStatus}}
+        <span class="status-pill bad">{{.BackupStatus}}</span>
+      {{else}}
+        <span style="color:var(--txt-muted)">–</span>
+      {{end}}
+      {{if .BackupDuration}}
+        <div style="font-size:.78rem;color:var(--txt-muted);margin-top:.25rem">{{formatDuration .BackupDuration}}</div>
+      {{end}}
+    </div></div>
+  </div>
+  {{end}}
+</div>
+
+<!-- Storages summary -->
+{{if .Storages}}
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Almacenamientos
+    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">{{len .Storages}} storages · {{.TotalBackups}} backups</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      {{range .Storages}}
+      <div class="col-md-6 col-lg-4">
+        <div class="card h-100" style="border-color:{{if eq .Storage.Status "available"}}var(--clr-ok){{else}}var(--clr-bad){{end}}">
+          <div class="card-header" style="background:{{if eq .Storage.Status "available"}}var(--clr-ok){{else}}var(--clr-bad){{end}};color:#fff;font-size:.85rem">
+            <i class="bi bi-hdd me-1"></i><strong>{{.Storage.Storage}}</strong>
+            <span class="float-end" style="font-size:.72rem;opacity:.85">{{.Storage.Type}}</span>
+          </div>
+          <div class="card-body" style="font-size:.82rem">
+            <div class="mb-2">
+              {{if eq .Storage.Status "available"}}<span class="status-pill ok">Disponible</span>
+              {{else}}<span class="status-pill bad">{{.Storage.Status}}</span>{{end}}
+            </div>
+            {{if .Info}}{{if gt .Info.Total 0}}
+            <div class="mb-1" style="color:var(--txt-muted)">Capacidad</div>
+            <div class="progress mb-1" style="height:14px">
+              {{$pct := pct .Info.Used .Info.Total}}
+              <div class="progress-bar {{if gt $pct 90}}bg-danger{{else if gt $pct 75}}bg-warning{{else}}bg-success{{end}}"
+                   style="width:{{$pct}}%">{{$pct}}%</div>
+            </div>
+            <div style="color:var(--txt-muted);font-size:.76rem">{{formatBytes .Info.Used}} / {{formatBytes .Info.Total}} · libre: {{formatBytes .Info.Avail}}</div>
+            {{end}}{{end}}
+            <div class="mt-2">Backups: <strong>{{.BackupCount}}</strong></div>
+          </div>
+        </div>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- Backups por storage -->
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Backups disponibles</div>
+  <div class="card-body">
+    {{range $i, $s := .Storages}}
+    {{if $s.Content}}
+    <div class="border rounded mb-2" style="overflow:hidden">
+      <button class="btn btn-secondary w-100 text-start d-flex justify-content-between align-items-center px-3 py-2"
+        type="button" data-bs-toggle="collapse" data-bs-target="#storage-{{$i}}-content">
+        <span><i class="bi bi-hdd me-2"></i><strong>{{$s.Storage.Storage}}</strong>
+          <span class="badge bg-secondary ms-2">{{len $s.Content}} items</span></span>
+        <i class="bi bi-chevron-down"></i>
+      </button>
+      <div id="storage-{{$i}}-content" class="collapse">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead><tr>
+              <th>VMID</th><th>Formato</th><th>Tamaño</th><th>Volume ID</th><th>Creación</th><th>Notas</th>
+            </tr></thead>
+            <tbody>
+            {{range $s.Content}}
+            <tr>
+              <td>{{if .VMID}}<strong>{{.VMID}}</strong>{{if .Subtype}} <small style="color:var(--txt-muted)">({{.Subtype}})</small>{{end}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+              <td><code>{{if .Format}}{{.Format}}{{else}}–{{end}}</code></td>
+              <td style="font-size:.78rem">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+              <td><small><code>{{.VolID}}</code></small></td>
+              <td style="font-size:.78rem">{{if .CTime}}{{formatUnixTime .CTime}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+              <td style="font-size:.78rem">{{if .Notes}}{{.Notes}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {{end}}
+    {{end}}
+    {{if eq .TotalBackups 0}}
+    <div class="text-center py-4" style="color:var(--txt-muted)"><i class="bi bi-archive" style="font-size:2rem;display:block;margin-bottom:.5rem"></i>Sin backups registrados</div>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
+<!-- Chart + history table -->
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
+    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">{{len .Reports}} reportes en los últimos {{.Days}} días</span>
+  </div>
+  <div class="card-body">
+    {{if .ChartData}}
+    <div class="mb-4">
+      <div style="font-size:.82rem;color:var(--txt-muted);margin-bottom:.5rem"><i class="bi bi-bar-chart me-1"></i>Duración de backups</div>
+      <div style="height:200px"><canvas id="durationChart"></canvas></div>
+    </div>
+    {{end}}
+
+    <div style="overflow-x:auto">
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr><th>Fecha</th><th>Estado backup</th><th>Inicio</th><th>Duración</th><th>Estado</th></tr>
+        </thead>
+        <tbody>
+        {{range .Reports}}
+        <tr>
+          <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+          <td>
+            {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
+            {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
+            {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          </td>
+          <td style="font-size:.78rem;color:var(--txt-muted)">{{if .BackupStarttime}}{{formatUnixTime .BackupStarttime}}{{else}}–{{end}}</td>
+          <td style="font-size:.82rem">{{formatDuration .BackupDuration}}</td>
+          <td>
+            {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+            {{else}}<span class="status-pill ok">Activo</span>{{end}}
+          </td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{else}}
+<div class="card">
+  <div class="card-body text-center py-5" style="color:var(--txt-muted)">
+    <i class="bi bi-bar-chart" style="font-size:2.5rem;display:block;margin-bottom:.75rem"></i>
+    <h5>Sin reportes</h5>
+    <p>No hay reportes para <strong>{{.Server.Name}}</strong> en los últimos {{.Days}} días.</p>
+    <a href="/servers/pve" class="btn btn-sm btn-secondary mt-2"><i class="bi bi-arrow-left me-1"></i>Volver a servidores PVE</a>
+  </div>
+</div>
+{{end}}
+
+{{end}}
+{{block "page_scripts" .}}
+{{if .ChartData}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  const raw = [{{range $i, $p := .ChartData}}{{if $i}},{{end}}{"label":"{{$p.Label}}","duration":{{$p.Duration}},"status":"{{$p.Status}}"}{{end}}];
+  if (!raw.length) return;
+  const labels    = raw.map(p => p.label);
+  const durations = raw.map(p => p.duration);
+  const colors    = raw.map(p => p.status === "OK" ? "#22c55e" : (p.duration === 0 ? "#94a3b8" : "#ef4444"));
+  const isDark    = document.documentElement.getAttribute("data-theme") === "dark";
+  const gridColor = isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)";
+  const textColor = isDark ? "#94a3b8" : "#64748b";
+  new Chart(document.getElementById("durationChart"), {
+    type: "bar",
+    data: { labels, datasets: [{ data: durations, backgroundColor: colors, borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+        const s = ctx.raw;
+        if (!s) return "Sin datos";
+        if (s < 60) return s + "s";
+        if (s < 3600) return Math.floor(s/60) + "m " + (s%60) + "s";
+        return Math.floor(s/3600) + "h " + Math.floor((s%3600)/60) + "m";
+      }}}},
+      scales: {
+        x: { ticks: { color: textColor, font: { size: 11 }, maxRotation: 45 }, grid: { color: gridColor } },
+        y: { ticks: { color: textColor, font: { size: 11 }, callback: v => v < 60 ? v+"s" : Math.floor(v/60)+"m" }, grid: { color: gridColor } }
+      }
+    }
+  });
+})();
+</script>
+{{end}}
+{{end}}

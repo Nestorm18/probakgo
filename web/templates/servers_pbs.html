@@ -1,0 +1,56 @@
+{{block "page_title" .}}Proxmox BS — Probaky{{end}}
+{{block "page_heading" .}}Proxmox Backup Server{{end}}
+{{block "page_content" .}}
+<div class="card">
+  <div class="card-body p-0" style="overflow:hidden;border-radius:.75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Servidor</th>
+          <th>Dirección</th>
+          <th>Cliente</th>
+          <th>Último reporte</th>
+          <th>Datastores</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Rows}}
+      <tr>
+        <td>
+          <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
+            {{.Server.Name}}
+          </a>
+          {{if .Server.MachineID}}
+          <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
+          {{end}}
+        </td>
+        <td>
+          <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
+          <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
+        </td>
+        <td><code>{{.Server.ClientVersion}}</code></td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">
+          {{if .LastReport}}{{formatTime .LastReport}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+        </td>
+        <td style="font-size:.82rem">
+          {{range .Stores}}
+          <div class="mb-1">
+            <span style="color:var(--txt-primary);font-weight:500">{{.Store}}</span>
+            <span style="color:var(--txt-muted)"> {{formatBytes .Used}} / {{formatBytes .Total}}</span>
+          </div>
+          {{end}}
+        </td>
+        <td>
+          {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+          {{else}}<span class="status-pill ok">Activo</span>{{end}}
+        </td>
+      </tr>
+      {{else}}
+      <tr><td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">Sin servidores registrados</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

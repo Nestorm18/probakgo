@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Probaky - {{.ReportDate}}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f5f5;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; background-color: #f5f5f5;">
+        <tr>
+            <td style="padding: 20px;">
+                <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: {{.HeaderColor}}; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600;">Reporte Diario Probaky</h1>
+                            <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px;">{{.ReportDate}} · {{.SendTime}}</p>
+                        </td>
+                    </tr>
+
+                    <!-- Contenido -->
+                    <tr>
+                        <td style="padding: 30px;">
+                            <!-- Resumen -->
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #f8f9fa; border-left: 4px solid {{.HeaderColor}}; border-radius: 4px; margin-bottom: 30px;">
+                                <tr>
+                                    <td>
+                                        <h2 style="margin: 0 0 15px 0; font-size: 20px; color: #333;">Resumen General</h2>
+                                        <p style="margin: 0 0 15px 0; font-size: 16px; color: #333;"><strong>{{.StatusText}}</strong></p>
+                                        <table role="presentation" width="100%" cellpadding="10" cellspacing="0">
+                                            <tr>
+                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPVE}}</p>
+                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PVE</p>
+                                                </td>
+                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPBS}}</p>
+                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PBS</p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: #dc3545;">{{.TotalIssues}}</p>
+                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Con Problemas</p>
+                                                </td>
+                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: #28a745;">{{.TotalOK}}</p>
+                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Operativos</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            {{if .PVEIssues}}
+                            <h2 style="font-size: 22px; color: #333; margin: 0 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PVE con Problemas</h2>
+                            {{range .PVEIssues}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #007bff; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PVE</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #f8d7da; border: 1px solid #f5c2c7; border-radius: 4px; margin-top: 15px;">
+                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #842029;">{{.StaleReason}}</h4></td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+
+                            {{if .PBSIssues}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PBS con Problemas</h2>
+                            {{range .PBSIssues}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #6c757d; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PBS</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #f8d7da; border: 1px solid #f5c2c7; border-radius: 4px; margin-top: 15px;">
+                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #842029;">{{.StaleReason}}</h4></td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+
+                            {{if .PVEOk}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PVE Operativos</h2>
+                            {{range .PVEOk}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #007bff; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PVE</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #d1e7dd; border: 1px solid #badbcc; border-radius: 4px; margin-top: 15px;">
+                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #0f5132;">Todas las VMs programadas tienen backup</h4></td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+
+                            {{if .PBSOk}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PBS Operativos</h2>
+                            {{range .PBSOk}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #6c757d; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PBS</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #d1e7dd; border: 1px solid #badbcc; border-radius: 4px; margin-top: 15px;">
+                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #0f5132;">Reporte recibido correctamente</h4></td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 5px 0; color: #6c757d; font-size: 14px;"><strong>Probaky Monitor</strong> · Sistema de Monitoreo de Backups</p>
+                            <p style="margin: 5px 0; color: #6c757d; font-size: 14px;">Reporte generado automáticamente el {{.ReportDate}}</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

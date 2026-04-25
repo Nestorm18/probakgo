@@ -1,0 +1,30 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+.venv/
+.env
+.encryption_key
+accesos.txt
+web_accesos.txt
+htmlcov/
+/logs/
+.pytest_cache/
+*.pyc
+.idea/
+coverage.xml
+.coverage
+*.db
+/download/client*.py
+/debug/*/*.json
+/debug/email*
+golang
+client.exe
+probaky-client

@@ -1,0 +1,195 @@
+package store
+
+import (
+	"database/sql"
+	"fmt"
+	"time"
+
+	"probaky/internal/domain"
+)
+
+func (s *Store) UpsertPBSServer(name, ip, publicIP, clientVersion, machineID string) (int64, error) {
+	row := s.db.QueryRow(`SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
+	var id int64
+	if err := row.Scan(&id); err == sql.ErrNoRows {
+		res, err := s.db.Exec(
+			`INSERT INTO pbs_servers (name, ip, public_ip, client_version, machine_id) VALUES (?, ?, ?, ?, ?)`,
+			name, ip, publicIP, clientVersion, machineID,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("insert pbs_server: %w", err)
+		}
+		return res.LastInsertId()
+	} else if err != nil {
+		return 0, err
+	}
+	_, err := s.db.Exec(
+		`UPDATE pbs_servers SET ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+		ip, publicIP, clientVersion, machineID, id,
+	)
+	return id, err
+}
+
+func (s *Store) InsertPBSReport(serverID int64) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO pbs_reports (server_id) VALUES (?)`, serverID)
+	if err != nil {
+		return 0, fmt.Errorf("insert pbs_report: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+func (s *Store) InsertPBSStore(reportID int64, ds domain.PBSDatastorePayload) (int64, error) {
+	res, err := s.db.Exec(
+		`INSERT INTO pbs_stores (report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		reportID, ds.Store, ds.Total, ds.Used, ds.Avail,
+		ds.EstimatedFullDate, ds.MountStatus, ds.HistoryStart, ds.HistoryDelta,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert pbs_store: %w", err)
+	}
+	return res.LastInsertId()
+}
+
+func (s *Store) InsertPBSStoreHistory(storeID int64, history []*float64) error {
+	for i, v := range history {
+		_, err := s.db.Exec(`INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`, storeID, i, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Store) InsertPBSGCStatus(storeID int64, gc *domain.GCStatusPayload) error {
+	if gc == nil {
+		return nil
+	}
+	_, err := s.db.Exec(
+		`INSERT INTO pbs_gc_status (store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
+		 pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		storeID, gc.DiskBytes, gc.DiskChunks, gc.IndexDataBytes, gc.IndexFileCount,
+		gc.PendingBytes, gc.PendingChunks, gc.RemovedBad, gc.RemovedBytes,
+		gc.RemovedChunks, gc.StillBad, gc.UPID,
+	)
+	return err
+}
+
+func (s *Store) ListPBSServers() ([]domain.PBSServer, error) {
+	rows, err := s.db.Query(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+		FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var servers []domain.PBSServer
+	for rows.Next() {
+		var sv domain.PBSServer
+		if err := rows.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
+			&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+			return nil, err
+		}
+		servers = append(servers, sv)
+	}
+	return servers, rows.Err()
+}
+
+func (s *Store) GetPBSServer(id int64) (*domain.PBSServer, error) {
+	row := s.db.QueryRow(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+		FROM pbs_servers WHERE id = ? AND is_deleted = 0`, id)
+	var sv domain.PBSServer
+	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
+		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &sv, nil
+}
+
+func (s *Store) GetLatestPBSReport(serverID int64) (*domain.PBSReport, error) {
+	row := s.db.QueryRow(`SELECT id, server_id, reported_at, is_stale, stale_reason
+		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
+	var r domain.PBSReport
+	var isStale int
+	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason); err != nil {
+		return nil, err
+	}
+	r.IsStale = isStale != 0
+	return &r, nil
+}
+
+func (s *Store) ListPBSReports(serverID int64, limit int) ([]domain.PBSReport, error) {
+	rows, err := s.db.Query(`SELECT id, server_id, reported_at, is_stale, stale_reason
+		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`, serverID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.PBSReport
+	for rows.Next() {
+		var r domain.PBSReport
+		var isStale int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
+func (s *Store) GetPBSStoresForReport(reportID int64) ([]domain.PBSStore, error) {
+	rows, err := s.db.Query(`SELECT id, report_id, store, total, used, avail,
+		estimated_full_date, mount_status, history_start, history_delta
+		FROM pbs_stores WHERE report_id = ?`, reportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var stores []domain.PBSStore
+	for rows.Next() {
+		var st domain.PBSStore
+		if err := rows.Scan(&st.ID, &st.ReportID, &st.Store, &st.Total, &st.Used, &st.Avail,
+			&st.EstimatedFullDate, &st.MountStatus, &st.HistoryStart, &st.HistoryDelta); err != nil {
+			return nil, err
+		}
+		stores = append(stores, st)
+	}
+	return stores, rows.Err()
+}
+
+func (s *Store) GetPBSGCStatus(storeID int64) (*domain.PBSGCStatus, error) {
+	row := s.db.QueryRow(`SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
+		pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid
+		FROM pbs_gc_status WHERE store_id = ?`, storeID)
+	var gc domain.PBSGCStatus
+	err := row.Scan(&gc.ID, &gc.StoreID, &gc.DiskBytes, &gc.DiskChunks, &gc.IndexDataBytes,
+		&gc.IndexFileCount, &gc.PendingBytes, &gc.PendingChunks, &gc.RemovedBad,
+		&gc.RemovedBytes, &gc.RemovedChunks, &gc.StillBad, &gc.UPID)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return &gc, err
+}
+
+func (s *Store) GetPBSHistory(storeID int64) ([]*float64, error) {
+	rows, err := s.db.Query(`SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var history []*float64
+	for rows.Next() {
+		var v *float64
+		if err := rows.Scan(&v); err != nil {
+			return nil, err
+		}
+		history = append(history, v)
+	}
+	return history, rows.Err()
+}
+
+func (s *Store) DeletePBSServer(id int64) error {
+	_, err := s.db.Exec(`UPDATE pbs_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
+	return err
+}

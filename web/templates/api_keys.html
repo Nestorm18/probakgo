@@ -1,0 +1,229 @@
+{{block "page_title" .}}API Keys — Probaky{{end}}
+{{block "page_heading" .}}API Keys{{end}}
+{{block "page_actions" .}}
+{{if isAdmin .Role}}
+<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+  <i class="bi bi-plus-lg me-1"></i>Nueva key
+</button>
+{{end}}
+{{end}}
+{{block "page_content" .}}
+
+{{if .Flash}}
+<div class="alert alert-info alert-dismissible mb-4">
+  {{.Flash}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+<div class="card">
+  <div class="card-body p-0" style="overflow:hidden;border-radius:.75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Key</th>
+          <th>Tipo</th>
+          <th>Machine ID</th>
+          <th>Último uso</th>
+          <th>Estado</th>
+          {{if isAdmin .Role}}<th></th>{{end}}
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Keys}}
+      <tr {{if not .IsActive}}style="opacity:.5"{{end}}>
+        <td>
+          <div class="fw-semibold" style="color:var(--txt-primary)">{{.Name}}</div>
+          {{if .ServerName}}<div style="font-size:.73rem;color:var(--txt-muted)">{{.ServerName}}</div>{{end}}
+        </td>
+        <td><code>{{.KeyPreview}}</code></td>
+        <td>
+          {{if eq .KeyType "server"}}<span class="key-type-badge server">server</span>
+          {{else if eq .KeyType "mobile"}}<span class="key-type-badge mobile">mobile</span>
+          {{else}}<span class="key-type-badge admin">admin</span>{{end}}
+        </td>
+        <td style="font-size:.82rem">
+          {{if .MachineID}}
+            <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i>
+            <code title="{{.MachineID}}">{{slice .MachineID 0 8}}…</code>
+          {{else}}
+            <span style="color:var(--txt-muted)">—</span>
+          {{end}}
+        </td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">
+          {{if .LastUsed}}{{formatTime .LastUsed}}{{else}}<span style="color:var(--txt-muted)">nunca</span>{{end}}
+        </td>
+        <td>
+          {{if .IsActive}}<span class="status-pill ok">Activa</span>
+          {{else}}<span class="status-pill muted">Inactiva</span>{{end}}
+        </td>
+        {{if isAdmin $.Role}}
+        <td class="text-end">
+          <div class="d-flex gap-1 justify-content-end">
+            <button class="btn btn-sm btn-outline-secondary" title="Ver clave completa"
+                    data-bs-toggle="modal" data-bs-target="#revealModal" data-kid="{{.ID}}">
+              <i class="bi bi-eye"></i>
+            </button>
+            <a href="/api-keys/{{.ID}}/edit" class="btn btn-sm btn-outline-secondary" title="Editar">
+              <i class="bi bi-pencil"></i>
+            </a>
+            {{if eq .KeyType "mobile"}}
+            <a href="/api-keys/{{.ID}}/qr" class="btn btn-sm btn-outline-secondary" title="Ver QR">
+              <i class="bi bi-qr-code"></i>
+            </a>
+            {{end}}
+            {{if .MachineID}}
+            <form method="POST" action="/api-keys/{{.ID}}/unbind" class="d-inline">
+              <button class="btn btn-sm btn-outline-warning" title="Desvincular máquina">
+                <i class="bi bi-shield-x"></i>
+              </button>
+            </form>
+            {{end}}
+            <form method="POST" action="/api-keys/{{.ID}}/toggle" class="d-inline">
+              <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
+                <i class="bi bi-{{if .IsActive}}pause{{else}}play{{end}}-fill"></i>
+              </button>
+            </form>
+            <form method="POST" action="/api-keys/{{.ID}}/delete" class="d-inline"
+                  onsubmit="return confirm('¿Eliminar esta key?')">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+        {{end}}
+      </tr>
+      {{else}}
+      <tr><td colspan="{{if isAdmin $.Role}}7{{else}}6{{end}}" class="text-center py-5" style="color:var(--txt-muted)">Sin API keys registradas</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{if isAdmin .Role}}
+<!-- Create modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="/api-keys">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2" style="color:var(--clr-accent)"></i>Nueva API Key</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Nombre</label>
+            <input type="text" name="name" class="form-control" required placeholder="Cliente soporte1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tipo</label>
+            <select name="key_type" class="form-select" required>
+              <option value="server">server (pbk-) — cliente Proxmox</option>
+              <option value="mobile">mobile (app-) — app móvil</option>
+              <option value="admin">admin (adm-) — acceso completo</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nombre de servidor <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="text" name="server_name" class="form-control" placeholder="soporte1">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-key me-1"></i>Crear key</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Reveal modal -->
+<div class="modal fade" id="revealModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-eye me-2" style="color:var(--clr-accent)"></i>Ver clave completa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="revealKeyDisplay" class="d-none mb-3">
+          <label class="form-label">Clave API</label>
+          <div class="d-flex gap-2 align-items-center">
+            <code id="revealKeyValue" class="flex-grow-1 p-2 rounded" style="word-break:break-all;font-size:.82rem;display:block"></code>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="revealCopyBtn" title="Copiar">
+              <i class="bi bi-clipboard"></i>
+            </button>
+          </div>
+        </div>
+        <div id="revealForm">
+          <label class="form-label">Tu contraseña para confirmar</label>
+          <input type="password" id="revealPassword" class="form-control" placeholder="Contraseña actual" autocomplete="current-password">
+          <div id="revealError" class="text-danger mt-2 d-none" style="font-size:.82rem"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <button type="button" class="btn btn-primary" id="revealSubmit"><i class="bi bi-eye me-1"></i>Mostrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{end}}
+{{block "page_scripts" .}}
+{{if isAdmin .Role}}
+<script>
+(function(){
+  let currentKeyId = null;
+  const modal = document.getElementById('revealModal');
+  modal.addEventListener('show.bs.modal', e => {
+    currentKeyId = e.relatedTarget.dataset.kid;
+    document.getElementById('revealPassword').value = '';
+    document.getElementById('revealError').classList.add('d-none');
+    document.getElementById('revealKeyDisplay').classList.add('d-none');
+    document.getElementById('revealForm').classList.remove('d-none');
+    document.getElementById('revealSubmit').classList.remove('d-none');
+    document.getElementById('revealKeyValue').textContent = '';
+  });
+  document.getElementById('revealSubmit').addEventListener('click', async () => {
+    const pass = document.getElementById('revealPassword').value;
+    if (!pass) return;
+    const btn = document.getElementById('revealSubmit');
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('password', pass);
+      const res = await fetch(`/api-keys/${currentKeyId}/reveal`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.error) {
+        document.getElementById('revealError').textContent = data.error;
+        document.getElementById('revealError').classList.remove('d-none');
+      } else {
+        document.getElementById('revealKeyValue').textContent = data.key;
+        document.getElementById('revealKeyDisplay').classList.remove('d-none');
+        document.getElementById('revealForm').classList.add('d-none');
+        document.getElementById('revealSubmit').classList.add('d-none');
+      }
+    } catch {
+      document.getElementById('revealError').textContent = 'Error de conexión';
+      document.getElementById('revealError').classList.remove('d-none');
+    } finally { btn.disabled = false; }
+  });
+  document.getElementById('revealPassword')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('revealSubmit').click();
+  });
+  document.getElementById('revealCopyBtn')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('revealKeyValue').textContent).then(() => {
+      const btn = document.getElementById('revealCopyBtn');
+      btn.innerHTML = '<i class="bi bi-check"></i>';
+      setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1500);
+    });
+  });
+})();
+</script>
+{{end}}
+{{end}}

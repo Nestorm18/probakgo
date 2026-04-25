@@ -1,0 +1,82 @@
+package web
+
+import (
+	"embed"
+	"io/fs"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"probaky/internal/service"
+	"probaky/internal/store"
+	webhandlers "probaky/internal/web/handlers"
+)
+
+// NewRouter builds the web UI router.
+// templateFS is the full embedded FS (paths like web/templates/base.html).
+// staticFS is a sub-FS rooted at web/static (served under /static/).
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS) (http.Handler, error) {
+	tmpl := webhandlers.NewTemplates(templateFS)
+	h := webhandlers.New(st, tmpl, rep)
+
+	r := chi.NewRouter()
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
+
+	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	r.Get("/login", h.LoginPage)
+	r.Post("/login", h.LoginPost)
+	r.Get("/logout", h.Logout)
+
+	r.Group(func(r chi.Router) {
+		r.Use(RequireLogin)
+
+		r.Get("/", h.Dashboard)
+		r.Get("/servers/pve", h.PVEServers)
+		r.Get("/servers/pve/{id}", h.PVEServerDetail)
+		r.Get("/servers/pve/{id}/reports", h.PVEServerReports)
+		r.Get("/servers/pbs", h.PBSServers)
+		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
+
+		// API keys — list visible to all, writes admin-only, reveal admin-only
+		r.Get("/api-keys", h.APIKeys)
+		r.With(RequireAdmin).Post("/api-keys", h.CreateAPIKeyPost)
+		r.With(RequireAdmin).Get("/api-keys/{id}/edit", h.EditAPIKeyPage)
+		r.With(RequireAdmin).Post("/api-keys/{id}/edit", h.EditAPIKeyPost)
+		r.With(RequireAdmin).Post("/api-keys/{id}/toggle", h.ToggleAPIKeyPost)
+		r.With(RequireAdmin).Post("/api-keys/{id}/delete", h.DeleteAPIKeyPost)
+		r.With(RequireAdmin).Post("/api-keys/{id}/unbind", h.UnbindAPIKeyPost)
+		r.With(RequireAdmin).Post("/api-keys/{id}/reveal", h.RevealAPIKeyPost)
+		r.Get("/api-keys/{id}/qr", h.QRPage)
+		r.Get("/api-keys/{id}/qr-image", h.QRImageServe)
+
+		// Users — admin only
+		r.With(RequireAdmin).Get("/users", h.Users)
+		r.With(RequireAdmin).Post("/users", h.CreateUserPost)
+		r.With(RequireAdmin).Post("/users/{id}/password", h.ChangePasswordPost)
+		r.With(RequireAdmin).Post("/users/{id}/role", h.ChangeRolePost)
+		r.With(RequireAdmin).Post("/users/{id}/toggle", h.ToggleUserPost)
+		r.With(RequireAdmin).Post("/users/{id}/delete", h.DeleteUserPost)
+
+		r.Get("/profile", h.Profile)
+		r.Post("/profile", h.ProfilePost)
+
+		// Backup config — editor + admin
+		r.With(RequireEditor).Get("/backup-config/{server}", h.BackupConfig)
+		r.With(RequireEditor).Get("/backup-config/{server}/vm/new", h.BackupConfigVMNewPage)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/new", h.BackupConfigVMNewPost)
+		r.With(RequireEditor).Get("/backup-config/{server}/vm/{vmid}/edit", h.BackupConfigVMEditPage)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/edit", h.BackupConfigVMEditPost)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/delete", h.BackupConfigVMDelete)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/toggle", h.BackupConfigVMToggle)
+
+		// Email settings — admin only
+		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
+		r.With(RequireAdmin).Post("/settings/email", h.EmailSettingsPost)
+		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)
+	})
+
+	return r, nil
+}

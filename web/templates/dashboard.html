@@ -1,0 +1,96 @@
+{{block "page_title" .}}Dashboard — Probaky{{end}}
+{{block "page_heading" .}}Dashboard{{end}}
+{{block "page_content" .}}
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon ok"><i class="bi bi-check-circle-fill"></i></div>
+      <div>
+        <div class="stat-value">{{.PVEOk}}</div>
+        <div class="stat-label">PVE Operativos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon bad"><i class="bi bi-exclamation-circle-fill"></i></div>
+      <div>
+        <div class="stat-value">{{.PVEStale}}</div>
+        <div class="stat-label">PVE Sin reporte</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon ok"><i class="bi bi-archive-fill"></i></div>
+      <div>
+        <div class="stat-value">{{.PBSOk}}</div>
+        <div class="stat-label">PBS Operativos</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="stat-card">
+      <div class="stat-icon bad"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div>
+        <div class="stat-value">{{.PBSStale}}</div>
+        <div class="stat-label">PBS Sin reporte</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Server lists -->
+<div class="row g-4">
+  <div class="col-12 col-xl-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-server me-2" style="color:var(--clr-accent)"></i>Proxmox VE</span>
+        <a href="/servers/pve" class="btn btn-sm btn-secondary">Ver todos</a>
+      </div>
+      <div style="border-radius:0 0 .75rem .75rem;overflow:hidden">
+        {{range .PVEServers}}
+        <a href="/servers/pve/{{.ID}}" class="server-row text-decoration-none">
+          <div class="server-row-icon">
+            <i class="bi bi-server"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Name}}</div>
+            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.IP}}</div>
+          </div>
+          <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.75rem"></i>
+        </a>
+        {{else}}
+        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Proxmox BS</span>
+        <a href="/servers/pbs" class="btn btn-sm btn-secondary">Ver todos</a>
+      </div>
+      <div style="border-radius:0 0 .75rem .75rem;overflow:hidden">
+        {{range .PBSServers}}
+        <a href="/servers/pbs/{{.ID}}" class="server-row text-decoration-none">
+          <div class="server-row-icon">
+            <i class="bi bi-archive"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Name}}</div>
+            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.IP}}</div>
+          </div>
+          <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.75rem"></i>
+        </a>
+        {{else}}
+        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

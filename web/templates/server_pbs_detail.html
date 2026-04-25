@@ -1,0 +1,135 @@
+{{block "page_title" .}}{{.Server.Name}} — Probaky{{end}}
+{{block "page_heading" .}}{{.Server.Name}}{{end}}
+{{block "page_actions" .}}
+<a href="/servers/pbs" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+{{end}}
+{{block "page_content" .}}
+
+<!-- Info tiles -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">IP Local</div>
+      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">{{.Server.IP}}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">IP Pública</div>
+      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">
+        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">Versión cliente</div>
+      <div class="info-tile-value"><code>{{if .Server.ClientVersion}}{{.Server.ClientVersion}}{{else}}–{{end}}</code></div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">Machine ID</div>
+      <div class="info-tile-value" style="font-size:.82rem">
+        {{if .Server.MachineID}}
+          <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i><code>{{.Server.MachineID}}</code>
+        {{else}}<span style="color:var(--txt-muted)">Sin vincular</span>{{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{if .Stores}}
+<div class="mb-4">
+  <div style="font-size:.72rem;font-weight:600;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">
+    <i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Datastores (último reporte)
+  </div>
+  {{range .Stores}}
+  <div class="card mb-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <span><i class="bi bi-hdd me-2" style="color:var(--txt-secondary)"></i>{{.Store.Store}}</span>
+      <span style="font-size:.78rem;color:var(--txt-muted)">{{formatBytes .Store.Used}} / {{formatBytes .Store.Total}}</span>
+    </div>
+    <div class="card-body">
+      <!-- Barra de uso -->
+      <div style="margin-bottom:1rem">
+        <div style="height:5px;background:var(--card-border);border-radius:3px;overflow:hidden;margin-bottom:.4rem">
+          <div style="height:100%;width:{{pct .Store.Used .Store.Total}}%;background:{{if gt (pct .Store.Used .Store.Total) 85}}var(--clr-danger){{else if gt (pct .Store.Used .Store.Total) 70}}var(--clr-warn){{else}}var(--clr-ok){{end}};border-radius:3px;transition:width .3s"></div>
+        </div>
+        <div style="font-size:.72rem;color:var(--txt-muted)">{{pct .Store.Used .Store.Total}}% utilizado</div>
+      </div>
+      <div class="row g-3">
+        <div class="col-4">
+          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Usado</div>
+          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Used}}</div>
+        </div>
+        <div class="col-4">
+          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Disponible</div>
+          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Avail}}</div>
+        </div>
+        <div class="col-4">
+          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Total</div>
+          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Total}}</div>
+        </div>
+      </div>
+      {{if .GC}}
+      <details class="mt-3">
+        <summary style="font-size:.78rem;color:var(--txt-muted);cursor:pointer;user-select:none">
+          <i class="bi bi-recycle me-1"></i>Estado Garbage Collector
+        </summary>
+        <div class="row g-2 mt-2">
+          <div class="col-6 col-md-3" style="font-size:.78rem">
+            <span style="color:var(--txt-muted)">Disk bytes:</span>
+            <div style="color:var(--txt-secondary)">{{formatBytes .GC.DiskBytes}}</div>
+          </div>
+          <div class="col-6 col-md-3" style="font-size:.78rem">
+            <span style="color:var(--txt-muted)">Index data:</span>
+            <div style="color:var(--txt-secondary)">{{formatBytes .GC.IndexDataBytes}}</div>
+          </div>
+          <div class="col-6 col-md-3" style="font-size:.78rem">
+            <span style="color:var(--txt-muted)">Pendiente:</span>
+            <div style="color:var(--txt-secondary)">{{formatBytes .GC.PendingBytes}}</div>
+          </div>
+          <div class="col-6 col-md-3" style="font-size:.78rem">
+            <span style="color:var(--txt-muted)">Eliminado:</span>
+            <div style="color:var(--txt-secondary)">{{formatBytes .GC.RemovedBytes}}</div>
+          </div>
+        </div>
+      </details>
+      {{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Reports}}
+      <tr>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+        <td>
+          {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+          {{else}}<span class="status-pill ok">Activo</span>{{end}}
+        </td>
+      </tr>
+      {{else}}
+      <tr><td colspan="2" class="text-center py-4" style="color:var(--txt-muted)">Sin reportes</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{end}}
