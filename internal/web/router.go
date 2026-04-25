@@ -8,9 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"probaky/internal/service"
-	"probaky/internal/store"
-	webhandlers "probaky/internal/web/handlers"
+	"probakgo/internal/service"
+	"probakgo/internal/store"
+	webhandlers "probakgo/internal/web/handlers"
 )
 
 // NewRouter builds the web UI router.
@@ -40,7 +40,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/servers/pbs", h.PBSServers)
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
 
-		// API keys — list visible to all, writes admin-only, reveal admin-only
+		// API keys - list visible to all, writes admin-only, reveal admin-only
 		r.Get("/api-keys", h.APIKeys)
 		r.With(RequireAdmin).Post("/api-keys", h.CreateAPIKeyPost)
 		r.With(RequireAdmin).Get("/api-keys/{id}/edit", h.EditAPIKeyPage)
@@ -52,7 +52,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/api-keys/{id}/qr", h.QRPage)
 		r.Get("/api-keys/{id}/qr-image", h.QRImageServe)
 
-		// Users — admin only
+		// Users - admin only
 		r.With(RequireAdmin).Get("/users", h.Users)
 		r.With(RequireAdmin).Post("/users", h.CreateUserPost)
 		r.With(RequireAdmin).Post("/users/{id}/password", h.ChangePasswordPost)
@@ -63,7 +63,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/profile", h.Profile)
 		r.Post("/profile", h.ProfilePost)
 
-		// Backup config — editor + admin
+		// Backup config - editor + admin
 		r.With(RequireEditor).Get("/backup-config/{server}", h.BackupConfig)
 		r.With(RequireEditor).Get("/backup-config/{server}/vm/new", h.BackupConfigVMNewPage)
 		r.With(RequireEditor).Post("/backup-config/{server}/vm/new", h.BackupConfigVMNewPost)
@@ -72,10 +72,14 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/delete", h.BackupConfigVMDelete)
 		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/toggle", h.BackupConfigVMToggle)
 
-		// Email settings — admin only
+		// Settings - admin only
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin).Post("/settings/email", h.EmailSettingsPost)
 		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)
+		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
+		r.With(RequireAdmin).Post("/settings/maintenance", h.MaintenanceSettingsPost)
+		r.With(RequireAdmin).Get("/settings/alerts", h.AlertsSettings)
+		r.With(RequireAdmin).Post("/settings/alerts", h.AlertsSettingsPost)
 	})
 
 	return r, nil

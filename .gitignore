@@ -1,30 +1,28 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-
-.venv/
+# Environment
 .env
-.encryption_key
-accesos.txt
-web_accesos.txt
-htmlcov/
-/logs/
-.pytest_cache/
-*.pyc
-.idea/
-coverage.xml
-.coverage
+.env.local
+
+# Compiled binaries
+probakgo
+probakgo_linux_amd64
+probakgo_linux_arm64
+probakgo-client
+probakgo-client_linux_amd64
+probakgo-client_linux_arm64
+*.exe
+
+# Database
 *.db
-/download/client*.py
+*.db-shm
+*.db-wal
+
+# Debug output (JSON responses and HTML previews)
 /debug/*/*.json
 /debug/email*
-golang
-client.exe
-probaky-client
+
+# IDE
+.idea/
+*.iml
+
+# Logs
+/logs/

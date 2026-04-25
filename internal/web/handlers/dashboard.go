@@ -3,7 +3,8 @@ package webhandlers
 import (
 	"net/http"
 
-	"probaky/internal/session"
+	"probakgo/internal/domain"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +40,11 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var alerts []domain.Alert
+	if cfg, err := h.store.GetEmailConfig(); err == nil {
+		alerts, _ = h.store.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr)
+	}
+
 	h.tmpl.Render(w, "dashboard.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
@@ -48,5 +54,6 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"PVEStale":   pveStale,
 		"PBSOk":      pbsOK,
 		"PBSStale":   pbsStale,
+		"Alerts":     alerts,
 	})
 }

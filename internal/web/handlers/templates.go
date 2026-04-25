@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -25,7 +26,9 @@ var templateActive = map[string]string{
 	"api_keys.html":           "keys",
 	"api_key_created.html":    "keys",
 	"users.html":              "users",
-	"email_settings.html":     "email",
+	"email_settings.html":        "email",
+	"maintenance_settings.html": "maintenance",
+	"alerts_settings.html":      "alerts",
 	"profile.html":            "",
 	"qr_code.html":            "keys",
 	"api_key_edit.html":       "keys",
@@ -97,6 +100,17 @@ func makeFuncMap() template.FuncMap {
 		},
 		"isAdmin": func(role string) bool { return role == "admin" },
 		"canEdit": func(role string) bool { return role == "admin" || role == "editor" },
+		"keyPreview": func(key string) string {
+			if len(key) <= 12 {
+				return key
+			}
+			parts := strings.SplitN(key, "-", 2)
+			if len(parts) != 2 || len(parts[1]) <= 8 {
+				return key[:4] + "..." + key[len(key)-4:]
+			}
+			tok := parts[1]
+			return parts[0] + "-" + tok[:8] + "..." + tok[len(tok)-4:]
+		},
 	}
 }
 

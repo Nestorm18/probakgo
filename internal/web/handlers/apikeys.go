@@ -9,8 +9,8 @@ import (
 	qrcode "github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
-	"probaky/internal/service"
-	"probaky/internal/session"
+	"probakgo/internal/service"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {

@@ -15,12 +15,12 @@ import (
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 
-	"probaky/internal/api"
-	"probaky/internal/config"
-	dbpkg "probaky/internal/db"
-	"probaky/internal/service"
-	"probaky/internal/store"
-	"probaky/internal/web"
+	"probakgo/internal/api"
+	"probakgo/internal/config"
+	dbpkg "probakgo/internal/db"
+	"probakgo/internal/service"
+	"probakgo/internal/store"
+	"probakgo/internal/web"
 )
 
 var version = "dev"
@@ -81,6 +81,7 @@ func main() {
 	appCtx, appCancel := context.WithCancel(context.Background())
 	defer appCancel()
 	service.StartEmailScheduler(appCtx, st, reportSvc)
+	service.StartCleanupScheduler(appCtx, st)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiSrv.Router()))
@@ -95,7 +96,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	slog.Info("probaky started", "addr", "http://"+addr)
+	slog.Info("probakgo started", "addr", "http://"+addr)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -121,11 +122,11 @@ func ensureDefaults(st *store.Store) error {
 	}
 	if !hasUsers {
 		hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
-		if _, err := st.CreateUser("probaky", string(hash), "admin"); err != nil {
+		if _, err := st.CreateUser("probakgo", string(hash), "admin"); err != nil {
 			return err
 		}
-		slog.Warn("⚠  default user created — CHANGE PASSWORD IMMEDIATELY",
-			"username", "probaky", "password", "admin123")
+		slog.Warn("⚠  default user created - CHANGE PASSWORD IMMEDIATELY",
+			"username", "probakgo", "password", "admin123")
 	}
 	hasKey, err := st.HasAdminKey()
 	if err != nil {
@@ -136,7 +137,7 @@ func ensureDefaults(st *store.Store) error {
 		if err != nil {
 			return err
 		}
-		slog.Warn("⚠  admin API key created — store it securely", "key", k.Key)
+		slog.Warn("⚠  admin API key created - store it securely", "key", k.Key)
 	}
 	return nil
 }

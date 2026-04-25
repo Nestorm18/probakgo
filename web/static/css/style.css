@@ -5,15 +5,23 @@
 :root {
   --sidebar-w: 240px;
 
-  /* Sidebar — siempre oscuro */
-  --sb-bg:         #0f172a;
-  --sb-border:     rgba(255,255,255,.06);
-  --sb-text:       #94a3b8;
-  --sb-hover-bg:   rgba(255,255,255,.06);
-  --sb-active-bg:  rgba(59,130,246,.18);
-  --sb-active-txt: #93c5fd;
-  --sb-active-bar: #3b82f6;
-  --sb-label:      #334155;
+  /* Sidebar - tema claro */
+  --sb-bg:         #ffffff;
+  --sb-border:     rgba(0,0,0,.08);
+  --sb-text:       #475569;
+  --sb-hover-bg:   rgba(0,0,0,.04);
+  --sb-active-bg:  rgba(37,99,235,.1);
+  --sb-active-txt: #2563eb;
+  --sb-active-bar: #2563eb;
+  --sb-label:      #94a3b8;
+  --sb-brand-txt:  #0f172a;
+  --sb-hover-txt:  #0f172a;
+  --sb-user-area-bg:        rgba(0,0,0,.04);
+  --sb-footer-btn-bg:       rgba(0,0,0,.04);
+  --sb-footer-btn-hover-bg: rgba(0,0,0,.08);
+  --sb-footer-btn-bd:       rgba(0,0,0,.08);
+  --sb-footer-btn-color:    #475569;
+  --sb-footer-btn-hv-color: #0f172a;
 
   /* Body */
   --body-bg:       #f1f5f9;
@@ -76,7 +84,16 @@
 [data-theme="dark"] {
   --sb-bg:         #060b14;
   --sb-border:     rgba(255,255,255,.06);
-  --sb-label:      #1e293b;
+  --sb-text:       #94a3b8;
+  --sb-label:      #475569;
+  --sb-brand-txt:  #f1f5f9;
+  --sb-hover-txt:  #e2e8f0;
+  --sb-user-area-bg:        rgba(255,255,255,.04);
+  --sb-footer-btn-bg:       rgba(255,255,255,.06);
+  --sb-footer-btn-hover-bg: rgba(255,255,255,.12);
+  --sb-footer-btn-bd:       rgba(255,255,255,.08);
+  --sb-footer-btn-color:    #94a3b8;
+  --sb-footer-btn-hv-color: #e2e8f0;
 
   --body-bg:       #0a0e1a;
   --card-bg:       #111827;
@@ -125,6 +142,15 @@
   --toggle-shadow: rgba(0,0,0,.4);
   --check-toggle-bg: #1e293b;
   --btn-close-filter: invert(1) grayscale(1);
+
+  /* Override Bootstrap 5.3 dark-theme table vars */
+  --bs-body-bg:            #0a0e1a;
+  --bs-body-color:         #f1f5f9;
+  --bs-table-bg:           transparent;
+  --bs-table-striped-bg:   rgba(255,255,255,.025);
+  --bs-table-hover-bg:     #1e293b;
+  --bs-table-border-color: rgba(255,255,255,.07);
+  --bs-border-color:       rgba(255,255,255,.07);
 }
 
 /* ─── Reset / Base ──────────────────────────────────────────── */
@@ -179,9 +205,9 @@ code {
   gap: .75rem;
   padding: 1.25rem 1rem 1.1rem;
   border-bottom: 1px solid var(--sb-border);
-  color: #f1f5f9;
+  color: var(--sb-brand-txt);
 }
-.sidebar-brand:hover { color: #fff; }
+.sidebar-brand:hover { color: var(--sb-brand-txt); }
 
 .sidebar-logo {
   width: 32px; height: 32px;
@@ -194,7 +220,7 @@ code {
 
 .sidebar-brand-text .brand-name {
   font-weight: 700; font-size: .9rem; letter-spacing: -.02em;
-  line-height: 1.2; color: #f1f5f9;
+  line-height: 1.2; color: var(--sb-brand-txt);
 }
 .sidebar-brand-text .brand-sub {
   font-size: .68rem; color: var(--sb-label);
@@ -217,7 +243,7 @@ code {
   position: relative;
 }
 .sidebar .nav-link i { font-size: .95rem; flex-shrink: 0; opacity: .85; }
-.sidebar .nav-link:hover { background: var(--sb-hover-bg); color: #e2e8f0; }
+.sidebar .nav-link:hover { background: var(--sb-hover-bg); color: var(--sb-hover-txt); }
 .sidebar .nav-link.active { background: var(--sb-active-bg); color: var(--sb-active-txt); }
 .sidebar .nav-link.active i { opacity: 1; }
 .sidebar .nav-link.active::before {
@@ -232,7 +258,7 @@ code {
 .sidebar-user {
   display: flex; align-items: center; gap: .6rem;
   padding: .5rem .75rem; border-radius: .4rem;
-  background: rgba(255,255,255,.04); margin-bottom: .5rem;
+  background: var(--sb-user-area-bg); margin-bottom: .5rem;
 }
 .sidebar-user-avatar {
   width: 28px; height: 28px; border-radius: 50%;
@@ -242,19 +268,19 @@ code {
 }
 .sidebar-user-info { min-width: 0; }
 .sidebar-user-name {
-  font-size: .78rem; font-weight: 600; color: #e2e8f0;
+  font-size: .78rem; font-weight: 600; color: var(--sb-brand-txt);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .sidebar-user-role { font-size: .65rem; color: var(--sb-label); }
 
 .sidebar-footer .d-flex .btn {
-  background: rgba(255,255,255,.06) !important;
-  border-color: rgba(255,255,255,.08) !important;
-  color: var(--sb-text) !important;
+  background: var(--sb-footer-btn-bg) !important;
+  border-color: var(--sb-footer-btn-bd) !important;
+  color: var(--sb-footer-btn-color) !important;
 }
 .sidebar-footer .d-flex .btn:hover {
-  background: rgba(255,255,255,.12) !important;
-  color: #e2e8f0 !important;
+  background: var(--sb-footer-btn-hover-bg) !important;
+  color: var(--sb-footer-btn-hv-color) !important;
 }
 
 /* ─── Main content ───────────────────────────────────────────── */
@@ -345,10 +371,12 @@ code {
 
 /* ─── Tables ─────────────────────────────────────────────────── */
 .table { color: var(--txt-primary); margin: 0; }
+/* Anula el color de fondo que Bootstrap inyecta vía --bs-table-bg en cada celda */
+.table > :not(caption) > * > * { background-color: transparent !important; }
 .table th {
   font-size: .68rem; font-weight: 600; letter-spacing: .06em;
   text-transform: uppercase; color: var(--txt-muted);
-  background: var(--table-head-bg);
+  background: var(--table-head-bg) !important;
   padding: .65rem 1.1rem; border-color: var(--card-border) !important;
   white-space: nowrap;
 }
@@ -544,7 +572,7 @@ code {
   box-shadow: 0 4px 16px rgba(0,0,0,.07);
 }
 
-/* Fallback — mantener compatibilidad si se usa .login-box */
+/* Fallback - mantener compatibilidad si se usa .login-box */
 .login-box { width: 100%; max-width: 380px; }
 .login-logo {
   width: 52px; height: 52px;

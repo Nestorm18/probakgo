@@ -8,9 +8,26 @@ import (
 	"strings"
 )
 
-const version = "1.0.0"
+const version = "dev"
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime)
+
+	// Subcommands handled before flag.Parse so they get their own flag sets.
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "install":
+			runInstall(os.Args[2:])
+			return
+		case "update":
+			fmt.Println("Self-update not yet implemented.")
+			os.Exit(1)
+		case "version":
+			fmt.Printf("probakgo-client v%s\n", version)
+			return
+		}
+	}
+
 	var (
 		debug      bool
 		debugAPI   bool
@@ -24,10 +41,18 @@ func main() {
 	flag.StringVar(&serverType, "server-type", "", "Force server type: pve or pbs")
 	flag.BoolVar(&vzdumpHook, "vzdump-hook", false, "Send report immediately (called by vzdump hook)")
 	flag.StringVar(&fromFile, "file", "", "Send report from a JSON file (for testing)")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: probakgo-client [subcommand] [flags]\n\n")
+		fmt.Fprintf(os.Stderr, "Subcommands:\n")
+		fmt.Fprintf(os.Stderr, "  install   Install on this Proxmox node and configure the vzdump hook\n")
+		fmt.Fprintf(os.Stderr, "  update    Self-update to the latest GitHub release\n")
+		fmt.Fprintf(os.Stderr, "  version   Print version\n\n")
+		fmt.Fprintf(os.Stderr, "Flags (report mode):\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
-	log.SetFlags(log.Ldate | log.Ltime)
-	log.Printf("probaky-client v%s", version)
+	log.Printf("probakgo-client v%s", version)
 
 	cfg := loadConfig()
 	if debug {

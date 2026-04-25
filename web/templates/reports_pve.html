@@ -1,4 +1,4 @@
-{{block "page_title" .}}Reportes {{.Server.Name}} — Probaky{{end}}
+{{block "page_title" .}}Reportes {{.Server.Name}} - Probaky{{end}}
 {{block "page_heading" .}}Reportes: {{.Server.Name}}{{end}}
 {{block "page_actions" .}}
 <a href="/servers/pve/{{.Server.ID}}" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver al servidor</a>
@@ -122,7 +122,7 @@
         <div class="table-responsive">
           <table class="table table-sm mb-0">
             <thead><tr>
-              <th>VMID</th><th>Formato</th><th>Tamaño</th><th>Volume ID</th><th>Creación</th><th>Notas</th>
+              <th>VMID</th><th>Formato</th><th>Tamaño</th><th>Volume ID</th><th>Creación</th><th>Notas</th><th>Verificación</th>
             </tr></thead>
             <tbody>
             {{range $s.Content}}
@@ -133,6 +133,12 @@
               <td><small><code>{{.VolID}}</code></small></td>
               <td style="font-size:.78rem">{{if .CTime}}{{formatUnixTime .CTime}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
               <td style="font-size:.78rem">{{if .Notes}}{{.Notes}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+              <td>
+                {{if eq .Verification "ok"}}<span class="status-pill ok"><i class="bi bi-shield-check me-1"></i>ok</span>
+                {{else if eq .Verification "failed"}}<span class="status-pill bad"><i class="bi bi-shield-x me-1"></i>fallido</span>
+                {{else if .Verification}}<span class="status-pill warn">{{.Verification}}</span>
+                {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+              </td>
             </tr>
             {{end}}
             </tbody>

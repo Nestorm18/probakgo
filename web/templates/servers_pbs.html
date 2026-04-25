@@ -1,4 +1,4 @@
-{{block "page_title" .}}Proxmox BS — Probaky{{end}}
+{{block "page_title" .}}Proxmox BS - Probaky{{end}}
 {{block "page_heading" .}}Proxmox Backup Server{{end}}
 {{block "page_content" .}}
 <div class="card">
@@ -12,6 +12,7 @@
           <th>Último reporte</th>
           <th>Datastores</th>
           <th>Estado</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -45,9 +46,12 @@
           {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
+        <td class="text-end" style="white-space:nowrap">
+          <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-secondary" title="Ver detalle"><i class="bi bi-eye"></i></a>
+        </td>
       </tr>
       {{else}}
-      <tr><td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">Sin servidores registrados</td></tr>
+      <tr><td colspan="7" class="text-center py-5" style="color:var(--txt-muted)">Sin servidores registrados</td></tr>
       {{end}}
       </tbody>
     </table>

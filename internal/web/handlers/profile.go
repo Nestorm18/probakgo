@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"probaky/internal/session"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) Profile(w http.ResponseWriter, r *http.Request) {

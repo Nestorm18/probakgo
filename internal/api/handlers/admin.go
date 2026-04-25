@@ -8,8 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	qrcode "github.com/skip2/go-qrcode"
 
-	"probaky/internal/domain"
-	"probaky/internal/service"
+	"probakgo/internal/domain"
+	"probakgo/internal/service"
 )
 
 func (h *H) ListAPIKeys(w http.ResponseWriter, r *http.Request) {

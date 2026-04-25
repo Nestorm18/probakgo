@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"probaky/internal/domain"
-	"probaky/internal/session"
+	"probakgo/internal/domain"
+	"probakgo/internal/session"
 )
 
 func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {

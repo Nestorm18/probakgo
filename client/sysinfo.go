@@ -63,18 +63,22 @@ func (si *SysInfo) machineID() string {
 	return ""
 }
 
+func serverTypeFromContent(content string) string {
+	c := strings.ToLower(content)
+	switch {
+	case strings.Contains(c, "proxmox backup server"):
+		return "pbs"
+	case strings.Contains(c, "proxmox virtual environment"):
+		return "pve"
+	default:
+		return "unknown"
+	}
+}
+
 func (si *SysInfo) detectServerType() string {
 	data, err := os.ReadFile("/etc/issue")
 	if err != nil {
 		return "unknown"
 	}
-	content := strings.ToLower(string(data))
-	switch {
-	case strings.Contains(content, "proxmox backup server"):
-		return "pbs"
-	case strings.Contains(content, "proxmox virtual environment"):
-		return "pve"
-	default:
-		return "unknown"
-	}
+	return serverTypeFromContent(string(data))
 }

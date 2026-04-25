@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {

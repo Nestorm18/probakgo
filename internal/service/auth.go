@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"probaky/internal/domain"
-	"probaky/internal/store"
+	"probakgo/internal/domain"
+	"probakgo/internal/store"
 )
 
 var (

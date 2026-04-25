@@ -2,6 +2,8 @@ name: Release
 
 on:
   workflow_dispatch:
+  push:
+    tags: ['v*']
 
 jobs:
   release:
@@ -17,29 +19,46 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build Linux amd64
+      - name: Build server Linux amd64
         run: |
           GOOS=linux GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
-            -o probaky-linux-amd64 .
+            -o probaky_linux_amd64 .
 
-      - name: Build Linux arm64
+      - name: Build server Linux arm64
         run: |
           GOOS=linux GOARCH=arm64 go build \
             -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
-            -o probaky-linux-arm64 .
+            -o probaky_linux_arm64 .
+
+      - name: Build client Linux amd64
+        run: |
+          GOOS=linux GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o probaky-client_linux_amd64 ./client/
+
+      - name: Build client Linux arm64
+        run: |
+          GOOS=linux GOARCH=arm64 go build \
+            -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
+            -o probaky-client_linux_arm64 ./client/
 
       - name: Create checksums
         run: |
-          sha256sum probaky-linux-amd64 probaky-linux-arm64 client.py > SHA256SUMS
+          sha256sum \
+            probaky_linux_amd64 \
+            probaky_linux_arm64 \
+            probaky-client_linux_amd64 \
+            probaky-client_linux_arm64 \
+            > SHA256SUMS
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            probaky-linux-amd64
-            probaky-linux-arm64
-            client.py
-            client_updater.py
+            probaky_linux_amd64
+            probaky_linux_arm64
+            probaky-client_linux_amd64
+            probaky-client_linux_arm64
             SHA256SUMS

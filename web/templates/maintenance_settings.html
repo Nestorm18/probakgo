@@ -1,0 +1,54 @@
+{{block "page_title" .}}Mantenimiento - Probaky{{end}}
+{{block "page_heading" .}}Mantenimiento de Datos{{end}}
+{{block "page_content" .}}
+
+<div class="row">
+  <div class="col-lg-7">
+
+    {{if .Flash}}
+    <div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
+      {{.Flash}}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {{end}}
+
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-trash3 me-2" style="color:var(--clr-accent)"></i>Retención de reportes
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/settings/maintenance">
+          <div class="row g-3 align-items-center">
+            <div class="col-md-4">
+              <label class="form-label">Retención</label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="retention_months"
+                       value="{{.Config.RetentionMonths}}" min="1" max="60" style="max-width:100px">
+                <span class="input-group-text">meses</span>
+              </div>
+              <div class="form-text">Reportes más antiguos se eliminan automáticamente.</div>
+            </div>
+            <div class="col-md-8 pt-md-3">
+              <div class="check-toggle-wrap">
+                <input class="form-check-input m-0" type="checkbox" name="retention_enabled"
+                       id="retEnabled" {{if .Config.RetentionEnabled}}checked{{end}}>
+                <label class="form-check-label m-0" for="retEnabled"
+                       style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                  Limpieza automática activada
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-floppy me-1"></i>Guardar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{{end}}

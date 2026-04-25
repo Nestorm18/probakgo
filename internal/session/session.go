@@ -6,7 +6,7 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-const sessionName = "probaky"
+const sessionName = "probakgo"
 
 var store *sessions.CookieStore
 

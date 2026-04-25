@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"probaky/internal/service"
+	"probakgo/internal/service"
 )
 
 type contextKey string

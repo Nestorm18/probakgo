@@ -6,26 +6,20 @@ import (
 )
 
 type Config struct {
-	DBPath      string
-	APIHost     string
-	APIPort     string
-	WebHost     string
-	WebPort     string
-	SessionKey  string
-	Timezone    string
-	AdminAPIKey string // printed on first run only
+	DBPath     string
+	APIHost    string
+	APIPort    string
+	SessionKey string
+	Timezone   string
 }
 
 func Load() *Config {
 	return &Config{
-		DBPath:      getEnv("DATABASE_PATH", "probaky_data.db"),
-		APIHost:     getEnv("API_HOST", "0.0.0.0"),
-		APIPort:     getEnv("API_PORT", "36748"),
-		WebHost:     getEnv("WEB_HOST", "0.0.0.0"),
-		WebPort:     getEnv("WEB_PORT", "36749"),
-		SessionKey:  getEnv("SESSION_KEY", "change-me-in-production-32bytes!"),
-		Timezone:    getEnv("TIMEZONE", "Europe/Madrid"),
-		AdminAPIKey: getEnv("ADMIN_API_KEY", ""),
+		DBPath:     getEnv("DATABASE_PATH", "probakgo_data.db"),
+		APIHost:    getEnv("API_HOST", "0.0.0.0"),
+		APIPort:    getEnv("API_PORT", "36748"),
+		SessionKey: getEnv("SESSION_KEY", "change-me-in-production-32bytes!"),
+		Timezone:   getEnv("TIMEZONE", "Europe/Madrid"),
 	}
 }
 

@@ -2,7 +2,7 @@ package store
 
 import (
 	"database/sql"
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (s *Store) GetUserByUsername(username string) (*domain.User, error) {

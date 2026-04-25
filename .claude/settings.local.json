@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build *)",
+      "Bash(xargs sed *)",
+      "Bash(go vet *)",
+      "Bash(./probakgo.exe)",
+      "Bash(echo \"PID: $!\")",
+      "Read(//tmp/**)",
+      "Bash(curl *)",
+      "Bash(bash *)",
+      "Bash(kill 1941)",
+      "Bash(go run *)",
+      "Bash(pkill -f probakgo.exe)",
+      "PowerShell(Stop-Process *)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; r=json.load\\(sys.stdin\\); print\\(f'{len\\(r[\\\\\"reports\\\\\"]\\)} reportes, primero: {r[\\\\\"reports\\\\\"][0][\\\\\"BackupStatus\\\\\"]} / IsStale={r[\\\\\"reports\\\\\"][0][\\\\\"IsStale\\\\\"]}'\\)\")",
+      "Bash(go test *)"
+    ]
+  }
+}

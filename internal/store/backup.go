@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"time"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (s *Store) ListVMBackupConfigs(serverName string) ([]domain.VMBackupConfig, error) {

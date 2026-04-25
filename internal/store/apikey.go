@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (s *Store) GetAPIKeyByValue(key string) (*domain.APIKey, error) {

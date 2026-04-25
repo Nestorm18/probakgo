@@ -3,7 +3,7 @@ package web
 import (
 	"net/http"
 
-	"probaky/internal/session"
+	"probakgo/internal/session"
 )
 
 func RequireLogin(next http.Handler) http.Handler {

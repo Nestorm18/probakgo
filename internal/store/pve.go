@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"probaky/internal/domain"
+	"probakgo/internal/domain"
 )
 
 func (s *Store) UpsertPVEServer(name, ip, publicIP, clientVersion, machineID string) (int64, error) {
@@ -87,9 +87,9 @@ func (s *Store) InsertPVEStorageInfo(storageID int64, info domain.StorageInfoPay
 
 func (s *Store) InsertPVEStorageContent(storageID int64, c domain.ContentDataPayload) error {
 	_, err := s.db.Exec(
-		`INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		storageID, c.VMID, c.Format, c.Size, c.Content, c.VolID, c.CTime, c.Subtype, c.Notes,
+		`INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		storageID, c.VMID, c.Format, c.Size, c.Content, c.VolID, c.CTime, c.Subtype, c.Notes, c.Verification,
 	)
 	return err
 }
@@ -135,11 +135,13 @@ func (s *Store) GetLatestPVEReport(serverID int64) (*domain.PVEReport, error) {
 		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PVEReport
 	var isStale int
-	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason,
+	var staleReason sql.NullString
+	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
 		&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
 		return nil, err
 	}
 	r.IsStale = isStale != 0
+	r.StaleReason = staleReason.String
 	return &r, nil
 }
 
@@ -155,11 +157,13 @@ func (s *Store) ListPVEReports(serverID int64, limit int) ([]domain.PVEReport, e
 	for rows.Next() {
 		var r domain.PVEReport
 		var isStale int
-		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason,
+		var staleReason sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
 			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
@@ -187,7 +191,7 @@ func (s *Store) GetPVEStoragesForReport(reportID int64) ([]domain.PVEStorage, er
 }
 
 func (s *Store) GetPVEStorageContent(storageID int64) ([]domain.PVEStorageContent, error) {
-	rows, err := s.db.Query(`SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes
+	rows, err := s.db.Query(`SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
 		FROM pve_storage_content WHERE storage_id = ? ORDER BY ctime DESC`, storageID)
 	if err != nil {
 		return nil, err
@@ -197,7 +201,7 @@ func (s *Store) GetPVEStorageContent(storageID int64) ([]domain.PVEStorageConten
 	for rows.Next() {
 		var c domain.PVEStorageContent
 		if err := rows.Scan(&c.ID, &c.StorageID, &c.VMID, &c.Format, &c.Size,
-			&c.Content, &c.VolID, &c.CTime, &c.Subtype, &c.Notes); err != nil {
+			&c.Content, &c.VolID, &c.CTime, &c.Subtype, &c.Notes, &c.Verification); err != nil {
 			return nil, err
 		}
 		items = append(items, c)
@@ -219,11 +223,13 @@ func (s *Store) ListPVEReportsByDays(serverID int64, days int) ([]domain.PVERepo
 	for rows.Next() {
 		var r domain.PVEReport
 		var isStale int
-		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &r.StaleReason,
+		var staleReason sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
 			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
@@ -251,4 +257,39 @@ func (s *Store) MarkPVEReportStale(reportID int64, reason string) error {
 func (s *Store) DeletePVEServer(id int64) error {
 	_, err := s.db.Exec(`UPDATE pve_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
 	return err
+}
+
+// DeleteOldPVEReports removes PVE reports (and their child rows) older than cutoff.
+// Returns the number of reports deleted.
+func (s *Store) DeleteOldPVEReports(cutoff time.Time) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	steps := []string{
+		`DELETE FROM pve_storage_content WHERE storage_id IN (
+			SELECT s.id FROM pve_storages s
+			JOIN pve_reports r ON r.id = s.report_id
+			WHERE r.reported_at < ?)`,
+		`DELETE FROM pve_storage_info WHERE storage_id IN (
+			SELECT s.id FROM pve_storages s
+			JOIN pve_reports r ON r.id = s.report_id
+			WHERE r.reported_at < ?)`,
+		`DELETE FROM pve_storages WHERE report_id IN (
+			SELECT id FROM pve_reports WHERE reported_at < ?)`,
+	}
+	for _, q := range steps {
+		if _, err := tx.Exec(q, cutoff); err != nil {
+			return 0, err
+		}
+	}
+
+	res, err := tx.Exec(`DELETE FROM pve_reports WHERE reported_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
 }
