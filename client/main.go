@@ -10,7 +10,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "dev"
+var version = "0.0.1"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
