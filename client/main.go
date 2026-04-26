@@ -6,9 +6,11 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"probakgo/internal/selfupdate"
 )
 
-const version = "dev"
+var version = "dev"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -20,8 +22,11 @@ func main() {
 			runInstall(os.Args[2:])
 			return
 		case "update":
-			fmt.Println("Self-update not yet implemented.")
-			os.Exit(1)
+			if err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version); err != nil {
+				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		case "version":
 			fmt.Printf("probakgo-client v%s\n", version)
 			return

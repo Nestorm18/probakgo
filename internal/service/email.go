@@ -77,9 +77,9 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 		return fmt.Errorf("render template: %w", err)
 	}
 
-	subject := fmt.Sprintf("Probaky Report: Todos los sistemas operativos - %s", data.ReportDate)
+	subject := fmt.Sprintf("Probakgo Report: Todos los sistemas operativos - %s", data.ReportDate)
 	if data.TotalIssues > 0 {
-		subject = fmt.Sprintf("Probaky Alert: %d servidor(es) con problemas - %s", data.TotalIssues, data.ReportDate)
+		subject = fmt.Sprintf("Probakgo Alert: %d servidor(es) con problemas - %s", data.TotalIssues, data.ReportDate)
 	}
 
 	return sendSMTP(cfg, recipients, subject, html)
