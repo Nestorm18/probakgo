@@ -12,13 +12,14 @@ import (
 )
 
 const (
-	installDir      = "/opt/probakgo"
-	logDir          = "/var/log/probakgo"
+	installDir        = "/opt/probakgo"
+	logDir            = "/var/log/probakgo"
 	logrotateConfPath = "/etc/logrotate.d/probakgo"
-	vzdumpConfPath  = "/etc/vzdump.conf"
-	hookPath        = installDir + "/vzdump_client.sh"
-	envPath         = installDir + "/.env"
-	binaryPath      = installDir + "/probakgo-client"
+	clientCronPath    = "/etc/cron.d/probakgo-client"
+	vzdumpConfPath    = "/etc/vzdump.conf"
+	hookPath          = installDir + "/vzdump_client.sh"
+	envPath           = installDir + "/.env"
+	binaryPath        = installDir + "/probakgo-client"
 )
 
 // Generated and written to hookPath during install - no separate shell script needed.
@@ -146,6 +147,14 @@ func runInstall(args []string) {
 	// 6. Configure logrotate
 	must(os.WriteFile(logrotateConfPath, []byte(logrotateConf), 0644), "write logrotate config")
 	fmt.Println("logrotate: " + logrotateConfPath)
+
+	// 7. Install auto-update cron (01:00 daily)
+	cronContent := fmt.Sprintf("0 1 * * * root %s update >> %s/update.log 2>&1\n", binaryPath, logDir)
+	if err := os.WriteFile(clientCronPath, []byte(cronContent), 0644); err != nil {
+		fmt.Printf("WARN: could not install update cron: %v\n", err)
+	} else {
+		fmt.Printf("Auto-update cron installed: %s\n", clientCronPath)
+	}
 
 	fmt.Println("\nInstallation complete!")
 	if *apiKey == "" {

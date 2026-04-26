@@ -8,7 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"probakgo/internal/api"
 	"probakgo/internal/config"
 	dbpkg "probakgo/internal/db"
+	"probakgo/internal/selfupdate"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
 	"probakgo/internal/web"
@@ -30,7 +33,18 @@ var version = "0.0.1"
 //go:embed web
 var webFS embed.FS
 
+const serverCronPath = "/etc/cron.d/probakgo"
+
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "update" {
+		if err := selfupdate.Run("Nestorm18/probakgo", "probakgo", version); err != nil {
+			slog.Error("update failed", "err", err)
+			os.Exit(1)
+		}
+		restartService()
+		return
+	}
+
 	_ = godotenv.Load()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -96,7 +110,8 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	slog.Info("probakgo started", "addr", "http://"+addr)
+	ensureUpdateCron()
+	slog.Info("probakgo started", "addr", "http://"+addr, "version", version)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -113,6 +128,39 @@ func main() {
 	shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer shutCancel()
 	_ = srv.Shutdown(shutCtx)
+}
+
+// ensureUpdateCron writes /etc/cron.d/probakgo on first startup when running as root.
+func ensureUpdateCron() {
+	if os.Getuid() != 0 {
+		return
+	}
+	if _, err := os.Stat(serverCronPath); err == nil {
+		return
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
+	content := fmt.Sprintf("0 1 * * * root %s update >> /var/log/probakgo-update.log 2>&1\n", exe)
+	if err := os.WriteFile(serverCronPath, []byte(content), 0644); err != nil {
+		slog.Warn("could not install update cron", "err", err)
+	} else {
+		slog.Info("auto-update cron installed", "path", serverCronPath, "schedule", "01:00 daily")
+	}
+}
+
+// restartService attempts to restart the probakgo systemd service after an update.
+func restartService() {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		slog.Info("update applied — restart the service manually to use the new version")
+		return
+	}
+	slog.Info("update applied — restarting service...")
+	if err := exec.Command("systemctl", "restart", "probakgo").Run(); err != nil {
+		slog.Warn("systemctl restart failed — restart manually", "err", err)
+	}
 }
 
 func ensureDefaults(st *store.Store) error {

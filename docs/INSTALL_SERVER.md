@@ -98,6 +98,18 @@ El binario crea el usuario y una API key de administración en el primer arranqu
 
 ## Actualización
 
+El servidor se auto-actualiza diariamente a las 01:00 via cron (instalado en el primer arranque como root).
+
+Actualización manual:
+
+```bash
+/opt/probakgo/probakgo update
+```
+
+El comando descarga el binario más reciente de GitHub y reinicia el servicio via `systemctl restart probakgo`.
+
+Para actualizar manualmente sin auto-update:
+
 ```bash
 systemctl stop probakgo
 cp nuevo-probakgo /opt/probakgo/probakgo
