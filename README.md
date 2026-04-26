@@ -48,6 +48,7 @@ El subcomando `install` (ejecutado como root):
 - Escribe `/opt/probakgo/.env`
 - Registra el hook vzdump en `/etc/vzdump.conf`
 - Configura logrotate
+- Instala cron de auto-actualización a las 01:00 (`/etc/cron.d/probakgo-client`)
 
 ## Compilar desde código fuente
 
@@ -125,6 +126,13 @@ web/
 - [Instalación del servidor](docs/INSTALL_SERVER.md)
 - [Notificaciones por email](docs/EMAIL_NOTIFICATIONS.md)
 - [Migraciones de base de datos](docs/MIGRATIONS.md)
+
+## Auto-actualización
+
+Tanto el servidor como el cliente se actualizan solos:
+
+- **Servidor:** al arrancar como root instala `/etc/cron.d/probakgo` (01:00 diario). Manual: `./probakgo update`
+- **Cliente:** `probakgo-client install` instala `/etc/cron.d/probakgo-client` (01:00 diario). Manual: `probakgo-client update`
 
 ## Requisitos
 

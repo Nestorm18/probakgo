@@ -53,8 +53,14 @@ go build -o probakgo-client ./client/
 - PBS: queries datastore usage; sends to `POST /report/pbs`
 - Machine ID binding via `/etc/machine-id`
 - TLS: configurable verify/skip/CA bundle via env vars
-- Subcommands: `install`, `version` (report mode is default, `--vzdump-hook` flag)
+- Subcommands: `install`, `update`, `version` (report mode is default, `--vzdump-hook` flag)
 - File mode: `--file path.json` for testing without a live Proxmox node
+
+**Self-update (2026-04):**
+- Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
+- Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00).
+- `var version` (not `const`) required for `-ldflags "-X main.version=..."` injection at release build time.
+- Note: GitHub API returns 404 for unauthenticated requests on private repos — selfupdate requires the repo to be public.
 
 ### SQLite nullable columns (2026-04)
 All nullable TEXT columns in the DB (`stale_reason`, etc.) must be scanned into `sql.NullString`, not `string`. Scanning NULL into `string` silently returns an error in modernc/sqlite, which causes the query to return `nil` - breaking any downstream logic that expects a result. Pattern:
@@ -122,8 +128,9 @@ The `install` subcommand:
 - Writes `/opt/probakgo/.env`
 - Generates and installs vzdump hook script in `/etc/vzdump.conf`
 - Configures logrotate
+- Installs `/etc/cron.d/probakgo-client` for daily self-update at 01:00
 
-**Updates**: just copy the new binary to `/opt/probakgo/probakgo-client`. No service restart needed - the client is invoked per backup, not as a daemon.
+**Updates**: `probakgo-client update` or automatic via cron. No service restart needed — the client runs per-backup, not as a daemon.
 
 ### Client configuration (`/opt/probakgo/.env`)
 

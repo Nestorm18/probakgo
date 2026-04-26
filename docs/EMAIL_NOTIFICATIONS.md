@@ -53,8 +53,8 @@ El scheduler se ejecuta a la hora configurada y evalúa:
 ## Asuntos de ejemplo
 
 ```
-✅ Probago Report: Todos los sistemas operativos - 2025-04-25
-⚠️ Probago Alert: 2 servidor(es) con problemas - 2025-04-25
+✅ Probakgo Report: Todos los sistemas operativos - 2025-04-25
+⚠️ Probakgo Alert: 2 servidor(es) con problemas - 2025-04-25
 ```
 
 ## Prueba manual
