@@ -21,7 +21,7 @@ type githubRelease struct {
 }
 
 // Run checks GitHub for a newer release of binaryName and self-updates if one exists.
-// repo is "owner/repo", e.g. "Nestorm18/probaky".
+// repo is "owner/repo", e.g. "Nestorm18/probakgo".
 // currentVersion is the running binary's version (e.g. "dev" or "v1.2.0").
 func Run(repo, binaryName, currentVersion string) error {
 	if currentVersion == "dev" {
