@@ -15,7 +15,12 @@
       "PowerShell(Stop-Process *)",
       "Bash(python3 -m json.tool)",
       "Bash(python3 -c \"import sys,json; r=json.load\\(sys.stdin\\); print\\(f'{len\\(r[\\\\\"reports\\\\\"]\\)} reportes, primero: {r[\\\\\"reports\\\\\"][0][\\\\\"BackupStatus\\\\\"]} / IsStale={r[\\\\\"reports\\\\\"][0][\\\\\"IsStale\\\\\"]}'\\)\")",
-      "Bash(go test *)"
+      "Bash(go test *)",
+      "Bash(sed 's/.*h\\\\.//')",
+      "Bash(sed 's/.*\\) //')",
+      "Bash(xargs -I {} basename {})",
+      "Bash(xargs grep *)",
+      "Bash(xargs wc *)"
     ]
   }
 }
