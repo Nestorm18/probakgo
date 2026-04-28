@@ -46,7 +46,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	next := r.URL.Query().Get("next")
-	if next == "" || next == "/login" {
+	if len(next) == 0 || next[0] != '/' || (len(next) > 1 && next[1] == '/') || next == "/login" {
 		next = "/"
 	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
