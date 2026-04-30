@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,7 +21,7 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Check version bump
+      - name: Check version sync
         run: |
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
@@ -27,12 +29,7 @@ jobs:
             echo "ERROR: server version ($SERVER_VER) != client version ($CLIENT_VER) — keep them in sync"
             exit 1
           fi
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
-          if [ -n "$LATEST_TAG" ] && [ "$SERVER_VER" = "$LATEST_TAG" ]; then
-            echo "ERROR: version $SERVER_VER matches latest tag v$LATEST_TAG — bump var version in main.go and client/main.go before pushing"
-            exit 1
-          fi
-          echo "Version check OK: $SERVER_VER (latest tag: ${LATEST_TAG:-none})"
+          echo "Version sync OK: $SERVER_VER"
 
       - name: Build
         run: go build ./...
@@ -42,3 +39,16 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+      - name: Tag and release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
+          if [ -n "$LATEST_TAG" ] && [ "$SERVER_VER" = "$LATEST_TAG" ]; then
+            echo "ERROR: version $SERVER_VER already released as v$LATEST_TAG — bump var version in main.go and client/main.go before pushing to master"
+            exit 1
+          fi
+          git tag "v$SERVER_VER"
+          git push origin "v$SERVER_VER"
+          echo "Tagged and pushed v$SERVER_VER → release workflow triggered"
