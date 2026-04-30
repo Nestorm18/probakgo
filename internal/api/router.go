@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"probakgo/internal/api/handlers"
+	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
 )
@@ -28,6 +29,7 @@ func NewServer(st *store.Store, auth *service.AuthService, rep *service.ReportSe
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
+	r.Use(ratelimit.New(120, time.Minute).JSONMiddleware)
 	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
 

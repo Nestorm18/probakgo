@@ -29,6 +29,7 @@ var templateActive = map[string]string{
 	"email_settings.html":        "email",
 	"maintenance_settings.html": "maintenance",
 	"alerts_settings.html":      "alerts",
+	"ip_bans.html":             "ip-bans",
 	"profile.html":            "",
 	"qr_code.html":            "keys",
 	"api_key_edit.html":       "keys",

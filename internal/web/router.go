@@ -3,11 +3,14 @@ package web
 import (
 	"embed"
 	"io/fs"
+	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
 	webhandlers "probakgo/internal/web/handlers"
@@ -20,14 +23,27 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	tmpl := webhandlers.NewTemplates(templateFS)
 	h := webhandlers.New(st, tmpl, rep)
 
+	// Progressive ban: 3 failures within 30 min → 24h → 7 days → permanent.
+	ban := ratelimit.NewBanhammer(3, 30*time.Minute, st,
+		24*time.Hour,
+		7*24*time.Hour,
+		0, // permanent
+	)
+	if err := ban.Load(); err != nil {
+		slog.Warn("failed to load ip bans from db", "err", err)
+	}
+	h.SetBanhammer(ban)
+
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
+	loginLimiter := ratelimit.New(10, time.Minute)
+
 	r.Get("/login", h.LoginPage)
-	r.Post("/login", h.LoginPost)
+	r.With(loginLimiter.Middleware).Post("/login", h.LoginPost)
 	r.Get("/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
@@ -80,6 +96,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/maintenance", h.MaintenanceSettingsPost)
 		r.With(RequireAdmin).Get("/settings/alerts", h.AlertsSettings)
 		r.With(RequireAdmin).Post("/settings/alerts", h.AlertsSettingsPost)
+		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)
+		r.With(RequireAdmin).Post("/settings/ip-bans/unban", h.UnbanIPPost)
 	})
 
 	return r, nil
