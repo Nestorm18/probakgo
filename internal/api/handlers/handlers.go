@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"probakgo/internal/service"
@@ -28,6 +29,11 @@ func errJSON(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, map[string]string{"error": msg})
 }
 
+func internalErr(w http.ResponseWriter, op string, err error) {
+	slog.Error(op, "err", err)
+	errJSON(w, http.StatusInternalServerError, "internal server error")
+}
+
 func (h *H) Health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -39,7 +45,7 @@ func (h *H) VerifyKey(w http.ResponseWriter, r *http.Request) {
 func (h *H) ConfigInfo(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.store.ListAPIKeys()
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "list api keys", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"total_keys": len(keys)})

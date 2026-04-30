@@ -1,6 +1,8 @@
 package selfupdate
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,7 +33,7 @@ func Run(repo, binaryName, currentVersion string) error {
 
 	fmt.Printf("Checking for updates (%s %s)...\n", binaryName, currentVersion)
 
-	tag, downloadURL, err := latestRelease(repo, binaryName)
+	tag, downloadURL, sha256URL, err := latestRelease(repo, binaryName)
 	if err != nil {
 		return fmt.Errorf("check release: %w", err)
 	}
@@ -44,7 +46,7 @@ func Run(repo, binaryName, currentVersion string) error {
 	fmt.Printf("New version: %s → %s\n", currentVersion, tag)
 	fmt.Println("Downloading...")
 
-	if err := replace(downloadURL); err != nil {
+	if err := replace(downloadURL, sha256URL, binaryName); err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
 
@@ -61,18 +63,24 @@ func LatestTag(repo string) (string, error) {
 	return rel.TagName, nil
 }
 
-func latestRelease(repo, binaryName string) (tag, url string, err error) {
+func latestRelease(repo, binaryName string) (tag, binaryURL, sha256URL string, err error) {
 	rel, err := fetchLatestRelease(repo)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
 	for _, a := range rel.Assets {
-		if a.Name == assetName {
-			return rel.TagName, a.BrowserDownloadURL, nil
+		switch a.Name {
+		case assetName:
+			binaryURL = a.BrowserDownloadURL
+		case "SHA256SUMS":
+			sha256URL = a.BrowserDownloadURL
 		}
 	}
-	return rel.TagName, "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
+	if binaryURL == "" {
+		return rel.TagName, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
+	}
+	return rel.TagName, binaryURL, sha256URL, nil
 }
 
 func fetchLatestRelease(repo string) (*githubRelease, error) {
@@ -92,12 +100,11 @@ func fetchLatestRelease(repo string) (*githubRelease, error) {
 	return &rel, nil
 }
 
-func replace(downloadURL string) error {
+func replace(downloadURL, sha256URL, binaryName string) error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate executable: %w", err)
 	}
-	// Resolve symlinks so we replace the real file
 	executable, err = filepath.EvalSymlinks(executable)
 	if err != nil {
 		return fmt.Errorf("resolve symlinks: %w", err)
@@ -110,18 +117,27 @@ func replace(downloadURL string) error {
 	}
 	defer resp.Body.Close()
 
-	// Write to a temp file in the same directory for atomic rename
 	tmpPath := executable + ".new"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
-	if _, err := io.Copy(f, resp.Body); err != nil {
+
+	h := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(f, h), resp.Body); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
 		return fmt.Errorf("write: %w", err)
 	}
 	f.Close()
+	actualHash := hex.EncodeToString(h.Sum(nil))
+
+	if sha256URL != "" {
+		if err := verifyChecksum(client, sha256URL, binaryName, actualHash); err != nil {
+			os.Remove(tmpPath)
+			return err
+		}
+	}
 
 	// Atomic replace - on Linux the kernel keeps the old inode open, so this is safe
 	if err := os.Rename(tmpPath, executable); err != nil {
@@ -129,4 +145,27 @@ func replace(downloadURL string) error {
 		return fmt.Errorf("replace binary: %w", err)
 	}
 	return nil
+}
+
+func verifyChecksum(client *http.Client, sha256URL, binaryName, actualHash string) error {
+	resp, err := client.Get(sha256URL)
+	if err != nil {
+		return fmt.Errorf("fetch checksums: %w", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read checksums: %w", err)
+	}
+	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
+	for _, line := range strings.Split(string(body), "\n") {
+		parts := strings.Fields(line)
+		if len(parts) == 2 && parts[1] == assetName {
+			if parts[0] != actualHash {
+				return fmt.Errorf("checksum mismatch for %s", assetName)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("checksum not found in SHA256SUMS for %s", assetName)
 }

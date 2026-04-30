@@ -15,7 +15,7 @@ import (
 func (h *H) ListAPIKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := h.store.ListAPIKeys()
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "list api keys", err)
 		return
 	}
 	resp := make([]domain.APIKeyResponse, 0, len(keys))
@@ -47,7 +47,7 @@ func (h *H) CreateAPIKey(w http.ResponseWriter, r *http.Request) {
 	}
 	k, err := h.store.CreateAPIKey(req.Name, req.KeyType, req.ServerName)
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "create api key", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, domain.CreateAPIKeyResponse{
@@ -69,7 +69,7 @@ func (h *H) UpdateAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.UpdateAPIKey(id, req.Name, req.ServerName); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "update api key", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
@@ -82,7 +82,7 @@ func (h *H) DeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.DeleteAPIKey(id); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "delete api key", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -95,7 +95,7 @@ func (h *H) ToggleAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.ToggleAPIKey(id); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "toggle api key", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})
@@ -108,7 +108,7 @@ func (h *H) UnbindAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.UnbindAPIKeyMachineID(id); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "unbind api key", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unbound"})
@@ -127,7 +127,7 @@ func (h *H) QRImage(w http.ResponseWriter, r *http.Request) {
 	}
 	png, err := qrcode.Encode(k.Key, qrcode.Medium, 256)
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, "qr generation failed")
+		internalErr(w, "qr encode", err)
 		return
 	}
 	w.Header().Set("Content-Type", "image/png")

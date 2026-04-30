@@ -10,13 +10,14 @@ const sessionName = "probakgo"
 
 var store *sessions.CookieStore
 
-func Init(key string) {
+func Init(key string, secure bool) {
 	store = sessions.NewCookieStore([]byte(key))
 	store.Options = &sessions.Options{
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   secure,
 	}
 }
 

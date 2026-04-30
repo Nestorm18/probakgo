@@ -17,7 +17,7 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "backup_config.html", map[string]any{
+	h.tmpl.Render(w, r, "backup_config.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
 		"ServerName": server,
@@ -30,7 +30,7 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) BackupConfigVMNewPage(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
-	h.tmpl.Render(w, "vm_backup_config_form.html", map[string]any{
+	h.tmpl.Render(w, r, "vm_backup_config_form.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
 		"ServerName": server,
@@ -66,7 +66,7 @@ func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	h.tmpl.Render(w, "vm_backup_config_form.html", map[string]any{
+	h.tmpl.Render(w, r, "vm_backup_config_form.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
 		"ServerName": server,

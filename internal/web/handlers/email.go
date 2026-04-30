@@ -16,7 +16,7 @@ func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "email_settings.html", map[string]any{
+	h.tmpl.Render(w, r, "email_settings.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Config":   cfg,
@@ -70,7 +70,7 @@ func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "maintenance_settings.html", map[string]any{
+	h.tmpl.Render(w, r, "maintenance_settings.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Config":   cfg,
@@ -119,7 +119,7 @@ func (h *WebH) AlertsSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "alerts_settings.html", map[string]any{
+	h.tmpl.Render(w, r, "alerts_settings.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Config":   cfg,

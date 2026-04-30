@@ -45,7 +45,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		alerts, _ = h.store.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr)
 	}
 
-	h.tmpl.Render(w, "dashboard.html", map[string]any{
+	h.tmpl.Render(w, r, "dashboard.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
 		"PVEServers": pveServers,

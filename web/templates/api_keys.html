@@ -1,4 +1,4 @@
-{{block "page_title" .}}API Keys - Probakgo{{end}}
+﻿{{block "page_title" .}}API Keys - Probakgo{{end}}
 {{block "page_heading" .}}API Keys{{end}}
 {{block "page_actions" .}}
 {{if isAdmin .Role}}
@@ -75,12 +75,14 @@
             {{end}}
             {{if .MachineID}}
             <form method="POST" action="/api-keys/{{.ID}}/unbind" class="d-inline">
+          {{ .CSRFField }}
               <button class="btn btn-sm btn-outline-warning" title="Desvincular máquina">
                 <i class="bi bi-shield-x"></i>
               </button>
             </form>
             {{end}}
             <form method="POST" action="/api-keys/{{.ID}}/toggle" class="d-inline">
+          {{ .CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
                 <i class="bi bi-{{if .IsActive}}pause{{else}}play{{end}}-fill"></i>
               </button>
@@ -109,6 +111,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="POST" action="/api-keys">
+          {{ .CSRFField }}
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-plus-circle me-2" style="color:var(--clr-accent)"></i>Nueva API Key</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

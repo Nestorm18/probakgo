@@ -12,7 +12,7 @@ func (h *WebH) IPBansPage(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		bans = h.ban.ListBanned()
 	}
-	h.tmpl.Render(w, "ip_bans.html", map[string]any{
+	h.tmpl.Render(w, r, "ip_bans.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Bans":     bans,

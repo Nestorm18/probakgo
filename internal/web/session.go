@@ -5,6 +5,6 @@ package web
 
 import "probakgo/internal/session"
 
-func InitSessions(key string) {
-	session.Init(key)
+func InitSessions(key string, secure bool) {
+	session.Init(key, secure)
 }

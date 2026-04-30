@@ -32,6 +32,7 @@ func (s *Server) Router() http.Handler {
 	r.Use(ratelimit.New(120, time.Minute).JSONMiddleware)
 	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
+	r.Use(apiSecurityHeaders)
 
 	h := handlers.New(s.store, s.auth, s.report)
 
@@ -85,6 +86,14 @@ func jsonError(w http.ResponseWriter, code int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}
+
+func apiSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func withValue(ctx context.Context, key, val any) context.Context {
