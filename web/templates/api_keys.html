@@ -200,7 +200,12 @@
     try {
       const fd = new FormData();
       fd.append('password', pass);
-      const res = await fetch(`/api-keys/${currentKeyId}/reveal`, { method: 'POST', body: fd });
+      const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+      const res = await fetch(`/api-keys/${currentKeyId}/reveal`, {
+        method: 'POST',
+        headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+        body: fd
+      });
       const data = await res.json();
       if (data.error) {
         document.getElementById('revealError').textContent = data.error;
