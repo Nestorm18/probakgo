@@ -33,7 +33,7 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	h.tmpl.Render(w, "login.html", map[string]any{"Error": ""})
+	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": ""})
 }
 
 func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
@@ -42,7 +42,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		if banned, remaining := h.ban.IsBanned(ip); banned {
 			w.WriteHeader(http.StatusTooManyRequests)
-			h.tmpl.Render(w, "login.html", map[string]any{
+			h.tmpl.Render(w, r, "login.html", map[string]any{
 				"Error": fmt.Sprintf("Too many failed attempts. Try again in %s.", formatRemaining(remaining)),
 			})
 			return
@@ -57,14 +57,14 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
-		h.tmpl.Render(w, "login.html", map[string]any{"Error": "Invalid credentials"})
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Invalid credentials"})
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
-		h.tmpl.Render(w, "login.html", map[string]any{"Error": "Invalid credentials"})
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Invalid credentials"})
 		return
 	}
 

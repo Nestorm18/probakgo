@@ -29,7 +29,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, r2)
 	}
-	h.tmpl.Render(w, "servers_pve.html", map[string]any{
+	h.tmpl.Render(w, r, "servers_pve.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Rows":     rows,
@@ -62,7 +62,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.tmpl.Render(w, "server_pve_detail.html", map[string]any{
+	h.tmpl.Render(w, r, "server_pve_detail.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Server":   sv,
@@ -132,7 +132,7 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	h.tmpl.Render(w, "reports_pve.html", map[string]any{
+	h.tmpl.Render(w, r, "reports_pve.html", map[string]any{
 		"Username":     username,
 		"Role":         role,
 		"Server":       sv,
@@ -165,7 +165,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		}
 		rows = append(rows, r2)
 	}
-	h.tmpl.Render(w, "servers_pbs.html", map[string]any{
+	h.tmpl.Render(w, r, "servers_pbs.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Rows":     rows,
@@ -200,7 +200,7 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.tmpl.Render(w, "server_pbs_detail.html", map[string]any{
+	h.tmpl.Render(w, r, "server_pbs_detail.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Server":   sv,

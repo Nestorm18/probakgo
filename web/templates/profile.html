@@ -1,4 +1,4 @@
-{{block "page_title" .}}Mi Perfil - Probakgo{{end}}
+﻿{{block "page_title" .}}Mi Perfil - Probakgo{{end}}
 {{block "page_heading" .}}Mi Perfil{{end}}
 {{block "page_content" .}}
 
@@ -37,6 +37,7 @@
       </div>
       <div class="card-body">
         <form method="POST" action="/profile">
+          {{ .CSRFField }}
           <div class="mb-3">
             <label class="form-label">Contraseña actual</label>
             <input type="password" class="form-control" name="current_password" required autocomplete="current-password">

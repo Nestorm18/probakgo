@@ -15,7 +15,7 @@ func (h *WebH) Profile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "profile.html", map[string]any{
+	h.tmpl.Render(w, r, "profile.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"User":     user,

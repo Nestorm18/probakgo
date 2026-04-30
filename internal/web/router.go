@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/sha256"
 	"embed"
 	"io/fs"
 	"log/slog"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gorilla/csrf"
 
 	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
@@ -19,7 +21,7 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS) (http.Handler, error) {
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS)
 	h := webhandlers.New(st, tmpl, rep)
 
@@ -37,6 +39,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r := chi.NewRouter()
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	r.Use(securityHeaders)
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
@@ -100,5 +103,15 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/ip-bans/unban", h.UnbanIPPost)
 	})
 
-	return r, nil
+	csrfKey := sha256.Sum256([]byte(sessionKey))
+	return csrf.Protect(csrfKey[:], csrf.Secure(secure))(r), nil
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		next.ServeHTTP(w, r)
+	})
 }

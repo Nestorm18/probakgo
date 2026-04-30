@@ -17,7 +17,7 @@ func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	h.tmpl.Render(w, "users.html", map[string]any{
+	h.tmpl.Render(w, r, "users.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Users":    users,

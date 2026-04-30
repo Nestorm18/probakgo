@@ -26,7 +26,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.2"
+var version = "0.0.3"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -73,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	web.InitSessions(cfg.SessionKey)
+	web.InitSessions(cfg.SessionKey, cfg.SecureSession)
 
 	authSvc := service.NewAuth(st)
 	reportSvc := service.NewReport(st, loc)
@@ -86,7 +86,7 @@ func main() {
 	}
 
 	apiSrv := api.NewServer(st, authSvc, reportSvc)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)

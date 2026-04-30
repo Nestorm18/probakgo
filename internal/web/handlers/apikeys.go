@@ -43,7 +43,7 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 			LastUsed:   k.LastUsed,
 		})
 	}
-	h.tmpl.Render(w, "api_keys.html", map[string]any{
+	h.tmpl.Render(w, r, "api_keys.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Keys":     rows,
@@ -65,7 +65,7 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	username, _, _ := session.GetUser(r)
-	h.tmpl.Render(w, "api_key_created.html", map[string]any{
+	h.tmpl.Render(w, r, "api_key_created.html", map[string]any{
 		"Username": username,
 		"Key":      k.Key,
 		"Name":     k.Name,
@@ -134,7 +134,7 @@ func (h *WebH) EditAPIKeyPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	h.tmpl.Render(w, "api_key_edit.html", map[string]any{
+	h.tmpl.Render(w, r, "api_key_edit.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Key":      k,
@@ -186,7 +186,7 @@ func (h *WebH) QRPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	h.tmpl.Render(w, "qr_code.html", map[string]any{
+	h.tmpl.Render(w, r, "qr_code.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Key":      k,

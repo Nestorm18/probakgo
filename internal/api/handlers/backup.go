@@ -13,7 +13,7 @@ func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	configs, err := h.store.ListVMBackupConfigs(server)
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "list vm backup configs", err)
 		return
 	}
 	resp := make([]domain.VMBackupConfigResponse, 0, len(configs))
@@ -36,7 +36,7 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	id, err := h.store.CreateVMBackupConfig(server, req)
 	if err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "create vm backup config", err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
@@ -51,7 +51,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.UpdateVMBackupConfig(server, vmid, req); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "update vm backup config", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
@@ -61,7 +61,7 @@ func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
 	if err := h.store.DeleteVMBackupConfig(server, vmid); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "delete vm backup config", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
@@ -71,7 +71,7 @@ func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
 	if err := h.store.ToggleVMExclude(server, vmid); err != nil {
-		errJSON(w, http.StatusInternalServerError, err.Error())
+		internalErr(w, "toggle vm exclude", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "toggled"})

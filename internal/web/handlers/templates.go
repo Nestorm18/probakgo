@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/gorilla/csrf"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -116,9 +118,9 @@ func makeFuncMap() template.FuncMap {
 }
 
 // Render renders a layout template (base.html + page).
-func (t *Templates) Render(w http.ResponseWriter, name string, data any) {
-	// Inject Active sidebar key if data is a map and Active not already set
+func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, data any) {
 	if m, ok := data.(map[string]any); ok {
+		m["CSRFField"] = csrf.TemplateField(r)
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
 		}
