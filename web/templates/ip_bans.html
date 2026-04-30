@@ -1,0 +1,75 @@
+{{block "page_title" .}}IPs Baneadas - Probakgo{{end}}
+{{block "page_heading" .}}IPs Baneadas{{end}}
+{{block "page_content" .}}
+
+{{if .Flash}}
+<div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
+  {{.Flash}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-shield-x" style="color:var(--clr-danger)"></i>
+    IPs bloqueadas actualmente
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>IP</th>
+          <th>Ofensas</th>
+          <th>Expira</th>
+          <th>Baneada el</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Bans}}
+      <tr>
+        <td><code style="font-size:.9rem">{{.IP}}</code></td>
+        <td>
+          {{if ge .BanCount 3}}
+            <span class="status-pill bad">{{.BanCount}}ª</span>
+          {{else if ge .BanCount 2}}
+            <span class="status-pill warn">{{.BanCount}}ª</span>
+          {{else}}
+            <span class="status-pill muted">{{.BanCount}}ª</span>
+          {{end}}
+        </td>
+        <td>
+          {{if .BanExpiry}}
+            <span style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .BanExpiry}}</span>
+          {{else}}
+            <span class="status-pill bad">Permanente</span>
+          {{end}}
+        </td>
+        <td style="font-size:.82rem;color:var(--txt-muted)">{{formatTime .BannedAt}}</td>
+        <td class="text-end">
+          <form method="POST" action="/settings/ip-bans/unban" class="d-inline">
+            <input type="hidden" name="ip" value="{{.IP}}">
+            <button type="submit" class="btn btn-sm btn-outline-success" title="Desbanear">
+              <i class="bi bi-shield-check me-1"></i>Desbanear
+            </button>
+          </form>
+        </td>
+      </tr>
+      {{else}}
+      <tr>
+        <td colspan="5" class="text-center py-5" style="color:var(--txt-muted)">
+          <i class="bi bi-shield-check me-2" style="color:var(--clr-ok)"></i>No hay IPs baneadas
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-3" style="font-size:.78rem;color:var(--txt-muted)">
+  <i class="bi bi-info-circle me-1"></i>
+  3 intentos fallidos en 30 min → ban 24h · siguiente ofensa → 7 días · 3ª en adelante → permanente
+</div>
+
+{{end}}
