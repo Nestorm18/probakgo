@@ -540,7 +540,7 @@ code {
   box-shadow: 0 8px 24px rgba(59,130,246,.3);
 }
 .login-headline {
-  font-size: 1.6rem; font-weight: 700; color: #f1f5f9;
+  font-size: 1.6rem; font-weight: 700; color: var(--sb-brand-txt);
   line-height: 1.25; letter-spacing: -.03em; margin-bottom: .75rem;
 }
 .login-subhead { font-size: .85rem; color: #475569; line-height: 1.65; }
