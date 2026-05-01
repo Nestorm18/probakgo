@@ -31,6 +31,9 @@ func Load() *Config {
 	}
 }
 
+// parseTrustedOrigins parses CSRF_TRUSTED_ORIGINS (comma-separated host:port values).
+// gorilla/csrf compares against the Host portion of the Origin header, so the
+// format must be "host:port" (e.g. "probakgo.local:36748"), not a full URL.
 func parseTrustedOrigins(raw string) []string {
 	if raw == "" {
 		return nil

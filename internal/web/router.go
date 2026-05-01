@@ -72,6 +72,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		// Users - admin only
 		r.With(RequireAdmin).Get("/users", h.Users)
 		r.With(RequireAdmin).Post("/users", h.CreateUserPost)
+		r.With(RequireAdmin).Post("/users/{id}/username", h.ChangeUsernamePost)
 		r.With(RequireAdmin).Post("/users/{id}/password", h.ChangePasswordPost)
 		r.With(RequireAdmin).Post("/users/{id}/role", h.ChangeRolePost)
 		r.With(RequireAdmin).Post("/users/{id}/toggle", h.ToggleUserPost)
@@ -106,7 +107,15 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	if len(trustedOrigins) > 0 {
 		csrfOpts = append(csrfOpts, csrf.TrustedOrigins(trustedOrigins))
 	}
-	return csrf.Protect(csrfKey[:], csrfOpts...)(r), nil
+	protected := csrf.Protect(csrfKey[:], csrfOpts...)(r)
+	if !secure {
+		// gorilla/csrf v1.7.3 defaults to HTTPS scheme for origin comparison.
+		// PlaintextHTTPRequest marks the request as HTTP so sameOrigin works correctly.
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			protected.ServeHTTP(w, csrf.PlaintextHTTPRequest(req))
+		}), nil
+	}
+	return protected, nil
 }
 
 func securityHeaders(next http.Handler) http.Handler {

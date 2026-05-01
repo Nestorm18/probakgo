@@ -25,7 +25,7 @@ func writeFixture(t *testing.T, payload any) string {
 func TestSendReportFromFilePVE(t *testing.T) {
 	var received map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/report/pve" {
+		if r.URL.Path != "/api/report/pve" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		if r.Method != http.MethodPost {
@@ -54,8 +54,8 @@ func TestSendReportFromFilePVE(t *testing.T) {
 
 func TestSendReportFromFilePBS(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/report/pbs" {
-			t.Errorf("unexpected path: %s (want /report/pbs)", r.URL.Path)
+		if r.URL.Path != "/api/report/pbs" {
+			t.Errorf("unexpected path: %s (want /api/report/pbs)", r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
 	}))

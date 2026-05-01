@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -136,9 +137,9 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 		storageName := str(sm["storage"])
 
 		sr := map[string]any{
-			"digest":        sm["digest"],
+			"digest":        str(sm["digest"]),
 			"prune_backups": sm["prune-backups"],
-			"shared":        sm["shared"],
+			"shared":        boolVal(sm["shared"]),
 			"server":        str(sm["server"]),
 			"storage":       storageName,
 			"export":        str(sm["export"]),
@@ -157,20 +158,11 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 				continue
 			}
 			sr["storage_info"] = []any{map[string]any{
-				"total":         nsm["total"],
-				"used":          nsm["used"],
-				"avail":         nsm["avail"],
-				"free":          nsm["free"],
-				"used_percent":  nsm["used-percent"],
-				"type":          nsm["type"],
-				"content":       nsm["content"],
-				"shared":        nsm["shared"],
-				"enabled":       nsm["enabled"],
-				"path":          nsm["path"],
-				"export":        nsm["export"],
-				"digest":        nsm["digest"],
-				"prune_backups": nsm["prune-backups"],
-				"created_at":    now,
+				"total":        nsm["total"],
+				"used":         nsm["used"],
+				"avail":        nsm["avail"],
+				"used_percent": nsm["used-percent"],
+				"enabled":      boolVal(nsm["enabled"]),
 			}}
 			break
 		}
@@ -188,6 +180,13 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 				if v, ok := im["verification"].(map[string]any); ok {
 					verif, _ = v["state"].(string)
 				}
+				var ctime int64
+				switch v := im["ctime"].(type) {
+				case float64:
+					ctime = int64(v)
+				case string:
+					ctime, _ = strconv.ParseInt(v, 10, 64)
+				}
 				contents = append(contents, map[string]any{
 					"vmid":         im["vmid"],
 					"format":       im["format"],
@@ -195,7 +194,7 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 					"content":      im["content"],
 					"volid":        im["volid"],
 					"verification": verif,
-					"ctime":        im["ctime"],
+					"ctime":        ctime,
 					"notes":        im["notes"],
 					"subtype":      im["subtype"],
 					"parent":       im["parent"],
@@ -229,4 +228,15 @@ func str(v any) string {
 	}
 	s, _ := v.(string)
 	return s
+}
+
+// boolVal converts Proxmox API values (true/false or 0/1) to bool.
+func boolVal(v any) bool {
+	switch x := v.(type) {
+	case bool:
+		return x
+	case float64:
+		return x != 0
+	}
+	return false
 }
