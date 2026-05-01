@@ -20,7 +20,7 @@
 
 ## Operacional
 
-- [ ] **Backup de la BD** — SQLite es un único fichero, no hay ningún cron que lo respalde. Añadir copia diaria antes del auto-update o documentar cómo hacerlo.
+- [x] **Backup de la BD** — no necesario, el servidor corre virtualizado y el backup lo gestiona el hipervisor.
 
 ---
 
