@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -50,8 +51,11 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 		return fmt.Errorf("marshal report: %w", err)
 	}
 
-	url := cfg.APIURL + "/" + urlPath
-	log.Printf("Sending report to %s ...", url)
+	url := cfg.APIURL + "/api/" + urlPath
+	log.Printf("Sending report to %s ... (%d bytes)", url, len(body))
+	if cfg.Debug {
+		log.Printf("DEBUG payload: %s", string(body))
+	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -67,6 +71,7 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 	}
 	defer resp.Body.Close()
 
+	respBody, _ := io.ReadAll(resp.Body)
 	switch resp.StatusCode {
 	case 200:
 		log.Printf("Report sent successfully (%s)", time.Now().Format(time.RFC3339))
@@ -74,6 +79,6 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 	case 401:
 		return fmt.Errorf("authentication error: API key invalid or inactive")
 	default:
-		return fmt.Errorf("server returned %d", resp.StatusCode)
+		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
 	}
 }

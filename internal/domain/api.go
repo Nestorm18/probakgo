@@ -46,7 +46,7 @@ func (b *BackupStatus) StatusString() string {
 
 type StoragePayload struct {
 	Digest       string            `json:"digest"`
-	PruneBackups map[string]any    `json:"prune_backups"`
+	PruneBackups json.RawMessage   `json:"prune_backups"`
 	Shared       bool              `json:"shared"`
 	Server       string            `json:"server"`
 	Storage      string            `json:"storage"`
