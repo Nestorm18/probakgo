@@ -26,5 +26,5 @@
 
 ## Limpieza
 
-- [ ] **`docs/INSTALL_SERVER.md` obsoleto** — supersedido por `INSTALLATION.md`. Borrar o redirigir para evitar confusión.
-- [ ] **Eliminar QR code** — las páginas `/api-keys/{id}/qr` y `/api-keys/{id}/qr-image` no se usan en el flujo normal. Eliminar rutas, handlers (`QRPage`, `QRImageServe`), template `qr_code.html`, dependencia `github.com/skip2/go-qrcode`, y cualquier enlace en templates. Resuelve también el IDOR de seguridad anterior.
+- [x] **`docs/INSTALL_SERVER.md` obsoleto** — supersedido por `INSTALLATION.md`. Borrar o redirigir para evitar confusión.
+- [x] **Eliminar QR code** — las páginas `/api-keys/{id}/qr` y `/api-keys/{id}/qr-image` no se usan en el flujo normal. Eliminar rutas, handlers (`QRPage`, `QRImageServe`), template `qr_code.html`, dependencia `github.com/skip2/go-qrcode`, y cualquier enlace en templates. Resuelve también el IDOR de seguridad anterior.

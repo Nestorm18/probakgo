@@ -20,7 +20,10 @@
       "Bash(sed 's/.*\\) //')",
       "Bash(xargs -I {} basename {})",
       "Bash(xargs grep *)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(go mod *)"
     ]
   }
 }

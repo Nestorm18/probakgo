@@ -63,7 +63,6 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireAdminKey).Delete("/admin/api-keys/{id}", h.DeleteAPIKey)
 	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/toggle", h.ToggleAPIKey)
 	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/unbind", h.UnbindAPIKey)
-	r.With(s.requireAdminKey).Get("/admin/api-keys/{id}/qr-image", h.QRImage)
 
 	// Client download
 	r.Get("/download/latest-metadata", h.DownloadMetadata)
