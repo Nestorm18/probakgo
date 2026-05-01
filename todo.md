@@ -10,11 +10,11 @@
 
 ## Seguridad
 
-- [ ] **Content-Security-Policy** — faltan las cabeceras CSP. `X-Frame-Options` y `X-Content-Type-Options` ya están, pero CSP es la más efectiva. Bootstrap e Icons se sirven desde jsdelivr, hay que incluirlos en la política.
-- [ ] **CSRF con proxy inverso** — gorilla/csrf valida la cabecera `Referer` en HTTPS. Si se accede por IP y por dominio a la vez puede rechazar formularios. Configurar `csrf.TrustedOrigins` si se usa nginx.
-- [ ] **[HIGH] IDOR endpoints QR** — `/api-keys/{id}/qr` y `/api-keys/{id}/qr-image` solo requieren `RequireLogin`, no `RequireAdmin`. Un usuario `reader` puede obtener la clave completa de cualquier API key cambiando el `{id}`. Mover a `RequireAdmin` o eliminar (ver tarea de limpieza abajo).
-- [ ] **[MEDIUM] Path sin comillas en cron/systemd** — `main.go:ensureUpdateCron` y `ensureSystemdService` interpolan `os.Executable()` directamente en el fichero cron y en `ExecStart=` sin comillas. Si el path contiene espacios, el servicio/cron se rompe. Envolver el path entre comillas.
-- [ ] **[LOW] API key completa en logs** — en el primer arranque, `main.go:ensureDefaults` loguea la clave `adm-...` completa con `slog.Warn`. Queda en `journalctl` accesible a otros usuarios del servidor. Mostrar solo el prefijo o indicar dónde consultarla en la UI.
+- [x] **Content-Security-Policy** — añadida CSP en `securityHeaders`: permite scripts/estilos de jsdelivr y self, bloquea todo lo demás.
+- [x] **CSRF con proxy inverso** — `CSRF_TRUSTED_ORIGINS` propagado desde config a `csrf.Protect`; documentado en `.env.example`.
+- [x] **[HIGH] IDOR endpoints QR** — resuelto eliminando el feature QR completo.
+- [x] **[MEDIUM] Path sin comillas en cron/systemd** — path del ejecutable entrecomillado en `ensureUpdateCron` y `ensureSystemdService`.
+- [x] **[LOW] API key completa en logs** — sustituido por preview (`service.KeyPreview`) con instrucción de ir a la UI.
 
 ---
 

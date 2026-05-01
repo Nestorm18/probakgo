@@ -184,7 +184,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=%s
-ExecStart=%s
+ExecStart="%s"
 Restart=on-failure
 RestartSec=5
 
@@ -214,7 +214,7 @@ func ensureUpdateCron() {
 		return
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
-	content := fmt.Sprintf("0 1 * * * root %s update >> /var/log/probakgo-update.log 2>&1\n", exe)
+	content := fmt.Sprintf("0 1 * * * root \"%s\" update >> /var/log/probakgo-update.log 2>&1\n", exe)
 	if err := os.WriteFile(serverCronPath, []byte(content), 0644); err != nil {
 		slog.Warn("could not install update cron", "err", err)
 	} else {
@@ -256,7 +256,7 @@ func ensureDefaults(st *store.Store) error {
 		if err != nil {
 			return err
 		}
-		slog.Warn("⚠  admin API key created - store it securely", "key", k.Key)
+		slog.Warn("⚠  admin API key created - retrieve the full key from the web UI (/api-keys)", "key_preview", service.KeyPreview(k.Key))
 	}
 	return nil
 }
