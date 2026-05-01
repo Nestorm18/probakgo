@@ -48,7 +48,7 @@
         <td style="font-size:.82rem;color:var(--txt-muted)">{{formatTime .BannedAt}}</td>
         <td class="text-end">
           <form method="POST" action="/settings/ip-bans/unban" class="d-inline">
-          {{ .CSRFField }}
+            {{ $.CSRFField }}
             <input type="hidden" name="ip" value="{{.IP}}">
             <button type="submit" class="btn btn-sm btn-outline-success" title="Desbanear">
               <i class="bi bi-shield-check me-1"></i>Desbanear

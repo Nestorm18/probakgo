@@ -75,19 +75,20 @@
             {{end}}
             {{if .MachineID}}
             <form method="POST" action="/api-keys/{{.ID}}/unbind" class="d-inline">
-          {{ .CSRFField }}
+              {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-warning" title="Desvincular máquina">
                 <i class="bi bi-shield-x"></i>
               </button>
             </form>
             {{end}}
             <form method="POST" action="/api-keys/{{.ID}}/toggle" class="d-inline">
-          {{ .CSRFField }}
+              {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
                 <i class="bi bi-{{if .IsActive}}pause{{else}}play{{end}}-fill"></i>
               </button>
             </form>
             <form id="del-key-{{.ID}}" method="POST" action="/api-keys/{{.ID}}/delete" class="d-inline">
+              {{ $.CSRFField }}
               <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
                       data-confirm="¿Eliminar esta key?" data-form="del-key-{{.ID}}">
                 <i class="bi bi-trash"></i>

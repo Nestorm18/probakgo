@@ -51,12 +51,13 @@
               <i class="bi bi-pencil"></i>
             </a>
             <form method="POST" action="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/toggle" class="d-inline">
-          {{ .CSRFField }}
+              {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsExcluded}}Incluir{{else}}Excluir{{end}}">
                 <i class="bi bi-{{if .IsExcluded}}eye{{else}}eye-slash{{end}}"></i>
               </button>
             </form>
             <form id="del-vm-{{.VMID}}" method="POST" action="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/delete" class="d-inline">
+              {{ $.CSRFField }}
               <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
                       data-confirm="¿Eliminar configuración de VM {{.VMID}}?" data-form="del-vm-{{.VMID}}">
                 <i class="bi bi-trash"></i>
