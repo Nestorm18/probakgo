@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	qrcode "github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
 	"probakgo/internal/service"
@@ -161,35 +160,3 @@ func (h *WebH) EditAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
-func (h *WebH) QRImageServe(w http.ResponseWriter, r *http.Request) {
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	k, err := h.store.GetAPIKey(id)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	png, err := qrcode.Encode(k.Key, qrcode.Medium, 256)
-	if err != nil {
-		http.Error(w, "qr error", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	w.Header().Set("Cache-Control", "private, max-age=3600")
-	_, _ = w.Write(png)
-}
-
-func (h *WebH) QRPage(w http.ResponseWriter, r *http.Request) {
-	username, role, _ := session.GetUser(r)
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	k, err := h.store.GetAPIKey(id)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	h.tmpl.Render(w, r, "qr_code.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Key":      k,
-		"APIID":    id,
-	})
-}

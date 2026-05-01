@@ -6,7 +6,6 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	qrcode "github.com/skip2/go-qrcode"
 
 	"probakgo/internal/domain"
 	"probakgo/internal/service"
@@ -112,24 +111,4 @@ func (h *H) UnbindAPIKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "unbound"})
-}
-
-func (h *H) QRImage(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		errJSON(w, http.StatusBadRequest, "invalid id")
-		return
-	}
-	k, err := h.store.GetAPIKey(id)
-	if err != nil {
-		errJSON(w, http.StatusNotFound, "key not found")
-		return
-	}
-	png, err := qrcode.Encode(k.Key, qrcode.Medium, 256)
-	if err != nil {
-		internalErr(w, "qr encode", err)
-		return
-	}
-	w.Header().Set("Content-Type", "image/png")
-	_, _ = w.Write(png)
 }

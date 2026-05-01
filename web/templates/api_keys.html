@@ -68,11 +68,6 @@
             <a href="/api-keys/{{.ID}}/edit" class="btn btn-sm btn-outline-secondary" title="Editar">
               <i class="bi bi-pencil"></i>
             </a>
-            {{if eq .KeyType "mobile"}}
-            <a href="/api-keys/{{.ID}}/qr" class="btn btn-sm btn-outline-secondary" title="Ver QR">
-              <i class="bi bi-qr-code"></i>
-            </a>
-            {{end}}
             {{if .MachineID}}
             <form method="POST" action="/api-keys/{{.ID}}/unbind" class="d-inline">
               {{ $.CSRFField }}

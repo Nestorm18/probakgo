@@ -68,8 +68,6 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/api-keys/{id}/delete", h.DeleteAPIKeyPost)
 		r.With(RequireAdmin).Post("/api-keys/{id}/unbind", h.UnbindAPIKeyPost)
 		r.With(RequireAdmin).Post("/api-keys/{id}/reveal", h.RevealAPIKeyPost)
-		r.Get("/api-keys/{id}/qr", h.QRPage)
-		r.Get("/api-keys/{id}/qr-image", h.QRImageServe)
 
 		// Users - admin only
 		r.With(RequireAdmin).Get("/users", h.Users)
