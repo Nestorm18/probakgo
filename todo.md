@@ -4,7 +4,7 @@
 
 ## Bugs
 
-- [ ] **`download.go` referencia `client.py`** — resto del predecessor Python. El endpoint `/download/latest` devuelve 404 siempre. Actualizar para servir el binario del cliente o eliminar el endpoint si ya no se usa.
+- [x] **`download.go` referencia `client.py`** — resto del predecessor Python. El endpoint `/download/latest` devuelve 404 siempre. Eliminados `/download/latest` y `/download/latest-metadata`; el cliente usa self-update vía GitHub releases.
 
 ---
 
