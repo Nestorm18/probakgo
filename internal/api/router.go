@@ -64,10 +64,6 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/toggle", h.ToggleAPIKey)
 	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/unbind", h.UnbindAPIKey)
 
-	// Client download
-	r.Get("/download/latest-metadata", h.DownloadMetadata)
-	r.With(s.requireAnyKey).Get("/download/latest", h.DownloadLatest)
-
 	return r
 }
 
