@@ -45,20 +45,29 @@
         <td class="text-end">
           <div class="d-flex gap-1 justify-content-end">
             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
+                    data-bs-target="#usernameModal" data-uid="{{.ID}}" data-username="{{.Username}}"
+                    title="Cambiar nombre">
+              <i class="bi bi-pencil"></i>
+            </button>
+            {{if not (and (eq .Username $.CurrentUsername) (eq .Role "admin"))}}
+            <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
                     data-bs-target="#roleModal" data-uid="{{.ID}}" data-role="{{.Role}}"
                     title="Cambiar rol">
               <i class="bi bi-person-gear"></i>
             </button>
+            {{end}}
             <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal"
                     data-bs-target="#pwdModal" data-uid="{{.ID}}" title="Cambiar contraseña">
               <i class="bi bi-key"></i>
             </button>
+            {{if not (and (eq .Username $.CurrentUsername) (eq .Role "admin"))}}
             <form method="POST" action="/users/{{.ID}}/toggle" class="d-inline">
               {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
                 <i class="bi bi-{{if .IsActive}}pause{{else}}play{{end}}-fill"></i>
               </button>
             </form>
+            {{end}}
             <form id="del-user-{{.ID}}" method="POST" action="/users/{{.ID}}/delete" class="d-inline">
               {{ $.CSRFField }}
               <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
@@ -121,6 +130,29 @@
   </div>
 </div>
 
+<!-- Change username modal -->
+<div class="modal fade" id="usernameModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" id="usernameForm" action="">
+          {{ .CSRFField }}
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil me-2" style="color:var(--clr-accent)"></i>Cambiar nombre de usuario</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Nuevo nombre</label>
+          <input type="text" name="username" id="usernameInput" class="form-control" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- Change role modal -->
 <div class="modal fade" id="roleModal" tabindex="-1">
   <div class="modal-dialog">
@@ -159,8 +191,24 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <label class="form-label">Nueva contraseña</label>
-          <input type="password" name="password" class="form-control" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password">
+          <div class="mb-3">
+            <label class="form-label">Nueva contraseña</label>
+            <div class="input-group">
+              <input type="password" name="password" class="form-control pwd-input" placeholder="Mínimo 6 caracteres" required minlength="6" autocomplete="new-password">
+              <button type="button" class="btn btn-outline-secondary pwd-toggle" title="Mostrar/ocultar">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label">Confirmar contraseña</label>
+            <div class="input-group">
+              <input type="password" name="password_confirm" class="form-control pwd-input-confirm" placeholder="Repite la contraseña" required minlength="6" autocomplete="new-password">
+              <button type="button" class="btn btn-outline-secondary pwd-toggle-confirm" title="Mostrar/ocultar">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -174,8 +222,42 @@
 {{end}}
 {{block "page_scripts" .}}
 <script>
+  // Password visibility toggles
+  document.querySelectorAll('.pwd-toggle').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const input = btn.previousElementSibling;
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = `<i class="bi bi-eye${isPassword ? '-slash' : ''}"></i>`;
+    });
+  });
+  document.querySelectorAll('.pwd-toggle-confirm').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      const input = btn.previousElementSibling;
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.innerHTML = `<i class="bi bi-eye${isPassword ? '-slash' : ''}"></i>`;
+    });
+  });
+
+  document.getElementById('usernameModal').addEventListener('show.bs.modal', e => {
+    const uid = e.relatedTarget.dataset.uid;
+    const username = e.relatedTarget.dataset.username;
+    document.getElementById('usernameForm').action = `/users/${uid}/username`;
+    document.getElementById('usernameInput').value = username;
+  });
   document.getElementById('pwdModal').addEventListener('show.bs.modal', e => {
     document.getElementById('pwdForm').action = `/users/${e.relatedTarget.dataset.uid}/password`;
+    // Clear password fields on modal open
+    document.querySelector('[name="password"]').value = '';
+    document.querySelector('[name="password_confirm"]').value = '';
+    document.querySelector('[name="password"]').type = 'password';
+    document.querySelector('[name="password_confirm"]').type = 'password';
+    document.querySelectorAll('.pwd-toggle, .pwd-toggle-confirm').forEach(btn => {
+      btn.innerHTML = '<i class="bi bi-eye"></i>';
+    });
   });
   document.getElementById('roleModal').addEventListener('show.bs.modal', e => {
     const uid = e.relatedTarget.dataset.uid;

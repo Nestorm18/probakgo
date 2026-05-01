@@ -45,6 +45,11 @@ func (s *Store) CreateUser(username, hash, role string) (int64, error) {
 	return res.LastInsertId()
 }
 
+func (s *Store) UpdateUserUsername(id int64, username string) error {
+	_, err := s.db.Exec(`UPDATE users SET username=? WHERE id=?`, username, id)
+	return err
+}
+
 func (s *Store) UpdateUserPassword(id int64, hash string) error {
 	_, err := s.db.Exec(`UPDATE users SET password_hash=? WHERE id=?`, hash, id)
 	return err

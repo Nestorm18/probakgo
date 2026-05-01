@@ -18,11 +18,12 @@ func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.tmpl.Render(w, r, "users.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Users":    users,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"Username":       username,
+		"Role":           role,
+		"CurrentUsername": username,
+		"Users":          users,
+		"Flash":          r.URL.Query().Get("flash"),
+		"FlashOK":        r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -49,11 +50,48 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users?flash=Usuario+creado&ok=1", http.StatusSeeOther)
 }
 
+func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	newUsername := r.FormValue("username")
+	if newUsername == "" {
+		http.Redirect(w, r, "/users?flash=Nombre+de+usuario+requerido", http.StatusSeeOther)
+		return
+	}
+	curUsername, _, _ := session.GetUser(r)
+	u, err := h.store.GetUser(id)
+	if err != nil {
+		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
+		return
+	}
+	if err := h.store.UpdateUserUsername(id, newUsername); err != nil {
+		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
+		return
+	}
+	// If changing own username, logout
+	if u.Username == curUsername {
+		session.Clear(w, r)
+		http.Redirect(w, r, "/login?flash=Nombre+de+usuario+cambió+a+"+newUsername+"+—+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/users?flash=Nombre+de+usuario+cambió+a+"+newUsername+"&ok=1", http.StatusSeeOther)
+}
+
 func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	pass := r.FormValue("password")
-	if pass == "" {
-		http.Redirect(w, r, "/users?flash=Contraseña+requerida", http.StatusSeeOther)
+	confirm := r.FormValue("password_confirm")
+	if pass == "" || confirm == "" {
+		http.Redirect(w, r, "/users?flash=Contraseña+y+confirmación+requeridas", http.StatusSeeOther)
+		return
+	}
+	if pass != confirm {
+		http.Redirect(w, r, "/users?flash=Las+contraseñas+no+coinciden", http.StatusSeeOther)
+		return
+	}
+	curUsername, _, _ := session.GetUser(r)
+	u, err := h.store.GetUser(id)
+	if err != nil {
+		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
@@ -62,6 +100,12 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.UpdateUserPassword(id, string(hash))
+	// If changing own password, logout
+	if u.Username == curUsername {
+		session.Clear(w, r)
+		http.Redirect(w, r, "/login?flash=Contraseña+actualizada+—+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		return
+	}
 	http.Redirect(w, r, "/users?flash=Contraseña+actualizada&ok=1", http.StatusSeeOther)
 }
 
@@ -72,16 +116,15 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash=Rol+no+válido", http.StatusSeeOther)
 		return
 	}
-	// Prevent self-demotion
-	_, sessionRole, _ := session.GetUser(r)
+	curUsername, sessionRole, _ := session.GetUser(r)
 	u, err := h.store.GetUser(id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
 	}
-	curUsername, _, _ := session.GetUser(r)
-	if u.Username == curUsername && sessionRole == "admin" && role != "admin" {
-		http.Redirect(w, r, "/users?flash=No+puedes+cambiar+tu+propio+rol+de+admin", http.StatusSeeOther)
+	// Prevent admin from changing their own role
+	if u.Username == curUsername && sessionRole == "admin" {
+		http.Redirect(w, r, "/users?flash=No+puedes+cambiar+tu+propio+rol", http.StatusSeeOther)
 		return
 	}
 	_ = h.store.UpdateUserRole(id, role)
@@ -90,6 +133,17 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	curUsername, sessionRole, _ := session.GetUser(r)
+	u, err := h.store.GetUser(id)
+	if err != nil {
+		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
+		return
+	}
+	// Prevent admin from toggling their own status
+	if u.Username == curUsername && sessionRole == "admin" {
+		http.Redirect(w, r, "/users?flash=No+puedes+desactivarte+a+ti+mismo", http.StatusSeeOther)
+		return
+	}
 	_ = h.store.ToggleUser(id)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }

@@ -33,7 +33,8 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": ""})
+	flash := r.URL.Query().Get("flash")
+	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": flash})
 }
 
 func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
