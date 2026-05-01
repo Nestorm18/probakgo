@@ -2,20 +2,29 @@
 
 ---
 
-## Seguridad (pendiente)
+## Bugs
 
-- [x] **Open redirect en login** — `?next=` no valida que sea una ruta relativa interna; un atacante puede redirigir a `?next=https://evil.com`. Validar que empiece por `/` y no por `//`.
-- [x] **Cookie `Secure` flag** — las sesiones no tienen `Secure: true`; si el servidor se expone con HTTPS las cookies viajan sin protección. Activar con `SESSION_SECURE=true` en `.env`.
-- [x] **SESSION_KEY inseguro por defecto** — si `.env` no define `SESSION_KEY` se usa un valor fijo del código. Generar uno aleatorio al arrancar si no está configurado, o fallar con error claro.
-- [x] **Sin CSRF en formularios web** — todos los POST de la UI (cambio de contraseña, usuarios, API keys, etc.) carecen de token CSRF. Añadir middleware CSRF (p.ej. `gorilla/csrf`).
-- [x] **Detalles de error expuestos en API** — algunos handlers devuelven `err.Error()` directamente al cliente. Sustituir por mensajes genéricos y loguear el detalle en servidor.
-- [x] **Sin cabeceras de seguridad HTTP** — no se emiten `X-Frame-Options`, `X-Content-Type-Options`, `Content-Security-Policy`, etc. Añadir middleware de cabeceras seguras.
-- [x] **Sin rate limiting** — el endpoint `/login` y todos los endpoints de API no tienen límite de peticiones. Riesgo de fuerza bruta y abuso.
-- [x] **Verificación SHA256 en selfupdate** — el proceso de auto-actualización descarga el binario sin verificar el hash contra `SHA256SUMS`. Si el repositorio es público, añadir verificación de firma/hash.
+- [ ] **`download.go` referencia `client.py`** — resto del predecessor Python. El endpoint `/download/latest` devuelve 404 siempre. Actualizar para servir el binario del cliente o eliminar el endpoint si ya no se usa.
 
 ---
 
-## CI — version enforcement
+## Seguridad
 
-- [x] Añadir step en `ci.yml` que falle si `var version` en `main.go` y `client/main.go` coincide con el último git tag (recordatorio de bumpar versión antes de cada release).
-- [x] Verificar también que `var version` es idéntica en servidor y cliente. No tiene sentido, puede ser diferente
+- [ ] **Content-Security-Policy** — faltan las cabeceras CSP. `X-Frame-Options` y `X-Content-Type-Options` ya están, pero CSP es la más efectiva. Bootstrap e Icons se sirven desde jsdelivr, hay que incluirlos en la política.
+- [ ] **CSRF con proxy inverso** — gorilla/csrf valida la cabecera `Referer` en HTTPS. Si se accede por IP y por dominio a la vez puede rechazar formularios. Configurar `csrf.TrustedOrigins` si se usa nginx.
+- [ ] **[HIGH] IDOR endpoints QR** — `/api-keys/{id}/qr` y `/api-keys/{id}/qr-image` solo requieren `RequireLogin`, no `RequireAdmin`. Un usuario `reader` puede obtener la clave completa de cualquier API key cambiando el `{id}`. Mover a `RequireAdmin` o eliminar (ver tarea de limpieza abajo).
+- [ ] **[MEDIUM] Path sin comillas en cron/systemd** — `main.go:ensureUpdateCron` y `ensureSystemdService` interpolan `os.Executable()` directamente en el fichero cron y en `ExecStart=` sin comillas. Si el path contiene espacios, el servicio/cron se rompe. Envolver el path entre comillas.
+- [ ] **[LOW] API key completa en logs** — en el primer arranque, `main.go:ensureDefaults` loguea la clave `adm-...` completa con `slog.Warn`. Queda en `journalctl` accesible a otros usuarios del servidor. Mostrar solo el prefijo o indicar dónde consultarla en la UI.
+
+---
+
+## Operacional
+
+- [ ] **Backup de la BD** — SQLite es un único fichero, no hay ningún cron que lo respalde. Añadir copia diaria antes del auto-update o documentar cómo hacerlo.
+
+---
+
+## Limpieza
+
+- [ ] **`docs/INSTALL_SERVER.md` obsoleto** — supersedido por `INSTALLATION.md`. Borrar o redirigir para evitar confusión.
+- [ ] **Eliminar QR code** — las páginas `/api-keys/{id}/qr` y `/api-keys/{id}/qr-image` no se usan en el flujo normal. Eliminar rutas, handlers (`QRPage`, `QRImageServe`), template `qr_code.html`, dependencia `github.com/skip2/go-qrcode`, y cualquier enlace en templates. Resuelve también el IDOR de seguridad anterior.

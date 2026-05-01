@@ -6,26 +6,42 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
-	DBPath        string
-	APIHost       string
-	APIPort       string
-	SessionKey    string
-	Timezone      string
-	SecureSession bool
+	DBPath         string
+	APIHost        string
+	APIPort        string
+	SessionKey     string
+	Timezone       string
+	SecureSession  bool
+	TrustedOrigins []string
 }
 
 func Load() *Config {
 	return &Config{
-		DBPath:        getEnv("DATABASE_PATH", "probakgo_data.db"),
-		APIHost:       getEnv("API_HOST", "0.0.0.0"),
-		APIPort:       getEnv("API_PORT", "36748"),
-		SessionKey:    loadSessionKey(),
-		Timezone:      getEnv("TIMEZONE", "Europe/Madrid"),
-		SecureSession: getEnv("SESSION_SECURE", "false") == "true",
+		DBPath:         getEnv("DATABASE_PATH", "probakgo_data.db"),
+		APIHost:        getEnv("API_HOST", "0.0.0.0"),
+		APIPort:        getEnv("API_PORT", "36748"),
+		SessionKey:     loadSessionKey(),
+		Timezone:       getEnv("TIMEZONE", "Europe/Madrid"),
+		SecureSession:  getEnv("SESSION_SECURE", "false") == "true",
+		TrustedOrigins: parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
 	}
+}
+
+func parseTrustedOrigins(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var out []string
+	for _, s := range strings.Split(raw, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func loadSessionKey() string {

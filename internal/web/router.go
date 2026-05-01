@@ -21,7 +21,7 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool) (http.Handler, error) {
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS)
 	h := webhandlers.New(st, tmpl, rep)
 
@@ -104,7 +104,11 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	})
 
 	csrfKey := sha256.Sum256([]byte(sessionKey))
-	return csrf.Protect(csrfKey[:], csrf.Secure(secure))(r), nil
+	csrfOpts := []csrf.Option{csrf.Secure(secure)}
+	if len(trustedOrigins) > 0 {
+		csrfOpts = append(csrfOpts, csrf.TrustedOrigins(trustedOrigins))
+	}
+	return csrf.Protect(csrfKey[:], csrfOpts...)(r), nil
 }
 
 func securityHeaders(next http.Handler) http.Handler {
