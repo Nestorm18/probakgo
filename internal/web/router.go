@@ -21,8 +21,8 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string) (http.Handler, error) {
-	tmpl := webhandlers.NewTemplates(templateFS)
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string) (http.Handler, error) {
+	tmpl := webhandlers.NewTemplates(templateFS, version)
 	h := webhandlers.New(st, tmpl, rep)
 
 	// Progressive ban: 3 failures within 30 min → 24h → 7 days → permanent.

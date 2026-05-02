@@ -40,12 +40,14 @@ var templateActive = map[string]string{
 type Templates struct {
 	fs      embed.FS
 	funcMap template.FuncMap
+	version string
 }
 
-func NewTemplates(fs embed.FS) *Templates {
+func NewTemplates(fs embed.FS, version string) *Templates {
 	return &Templates{
 		fs:      fs,
 		funcMap: makeFuncMap(),
+		version: version,
 	}
 }
 
@@ -121,6 +123,7 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 	if m, ok := data.(map[string]any); ok {
 		m["CSRFField"] = csrf.TemplateField(r)
 		m["CSRFToken"] = csrf.Token(r)
+		m["Version"] = t.version
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
 		}

@@ -28,7 +28,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.10"
+var version = "0.0.11"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -41,13 +41,19 @@ const (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "update" {
-		if err := selfupdate.Run("Nestorm18/probakgo", "probakgo", version); err != nil {
-			slog.Error("update failed", "err", err)
-			os.Exit(1)
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "version":
+			fmt.Printf("probakgo v%s\n", version)
+			return
+		case "update":
+			if err := selfupdate.Run("Nestorm18/probakgo", "probakgo", version); err != nil {
+				slog.Error("update failed", "err", err)
+				os.Exit(1)
+			}
+			restartService()
+			return
 		}
-		restartService()
-		return
 	}
 
 	_ = godotenv.Load()
@@ -92,7 +98,7 @@ func main() {
 	}
 
 	apiSrv := api.NewServer(st, authSvc, reportSvc)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)
