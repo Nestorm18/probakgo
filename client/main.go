@@ -7,13 +7,22 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
+
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.12"
+var version = "0.0.13"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
+
+	for _, p := range []string{"/opt/probakgo/.env", ".env"} {
+		if _, err := os.Stat(p); err == nil {
+			_ = godotenv.Load(p)
+			break
+		}
+	}
 
 	// Subcommands handled before flag.Parse so they get their own flag sets.
 	if len(os.Args) > 1 {
