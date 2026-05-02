@@ -131,3 +131,84 @@ func TestDeleteOldPVEReports(t *testing.T) {
 		t.Fatalf("current report should remain: %v", err)
 	}
 }
+
+func TestInsertPVEBackupTask_RoundTrip(t *testing.T) {
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(serverID, nil)
+
+	task := domain.BackupTaskPayload{
+		VMID:      100,
+		VMName:    "debian-vm",
+		Status:    "OK",
+		StartTime: 1000,
+		EndTime:   2000,
+		Duration:  1000,
+		Size:      512 * 1024 * 1024,
+		Filename:  "vzdump-qemu-100.vma.zst",
+	}
+	if err := st.InsertPVEBackupTask(reportID, task); err != nil {
+		t.Fatalf("insert task: %v", err)
+	}
+
+	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	if err != nil {
+		t.Fatalf("get tasks: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("want 1 task, got %d", len(tasks))
+	}
+	got := tasks[0]
+	if got.ReportID != reportID {
+		t.Errorf("ReportID: want %d, got %d", reportID, got.ReportID)
+	}
+	if got.VMID != 100 {
+		t.Errorf("VMID: want 100, got %d", got.VMID)
+	}
+	if got.VMName != "debian-vm" {
+		t.Errorf("VMName: want debian-vm, got %q", got.VMName)
+	}
+	if got.Status != "OK" {
+		t.Errorf("Status: want OK, got %q", got.Status)
+	}
+	if got.Size != 512*1024*1024 {
+		t.Errorf("Size: want %d, got %d", 512*1024*1024, got.Size)
+	}
+	if got.Filename != "vzdump-qemu-100.vma.zst" {
+		t.Errorf("Filename: want vzdump-qemu-100.vma.zst, got %q", got.Filename)
+	}
+}
+
+func TestGetPVEBackupTasksForReport_Empty(t *testing.T) {
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(serverID, nil)
+
+	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	if err != nil {
+		t.Fatalf("get tasks: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Errorf("want 0 tasks for report with no tasks, got %d", len(tasks))
+	}
+}
+
+func TestGetPVEBackupTasksForReport_OrderedByStarttime(t *testing.T) {
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(serverID, nil)
+
+	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 200, StartTime: 2000})
+	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 100, StartTime: 1000})
+
+	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	if err != nil {
+		t.Fatalf("get tasks: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("want 2 tasks, got %d", len(tasks))
+	}
+	if tasks[0].VMID != 100 || tasks[1].VMID != 200 {
+		t.Errorf("want tasks ordered by starttime ASC, got VMIDs %d, %d", tasks[0].VMID, tasks[1].VMID)
+	}
+}
