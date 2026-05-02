@@ -48,19 +48,6 @@ func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKe
 	return k, nil
 }
 
-// ValidateMobileKey validates an app- key.
-func (a *AuthService) ValidateMobileKey(rawKey string) (*domain.APIKey, error) {
-	k, err := a.store.GetAPIKeyByValue(rawKey)
-	if err != nil || !k.IsActive {
-		return nil, ErrInvalidKey
-	}
-	if k.KeyType != "mobile" {
-		return nil, ErrKeyType
-	}
-	_ = a.store.UpdateAPIKeyLastUsed(k.ID)
-	return k, nil
-}
-
 // ValidateAdminKey validates an adm- key.
 func (a *AuthService) ValidateAdminKey(rawKey string) (*domain.APIKey, error) {
 	k, err := a.store.GetAPIKeyByValue(rawKey)
@@ -74,7 +61,7 @@ func (a *AuthService) ValidateAdminKey(rawKey string) (*domain.APIKey, error) {
 	return k, nil
 }
 
-// ValidateAnyKey accepts server, mobile, or admin keys.
+// ValidateAnyKey accepts server or admin keys.
 func (a *AuthService) ValidateAnyKey(rawKey string) (*domain.APIKey, error) {
 	k, err := a.store.GetAPIKeyByValue(rawKey)
 	if err != nil || !k.IsActive {

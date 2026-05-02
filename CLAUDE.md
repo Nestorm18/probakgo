@@ -111,7 +111,7 @@ go build -o probakgo-client ./client/
 - DB: SQLite with embedded migrations
 - Auth: bcrypt passwords, session cookies (gorilla/sessions)
 - Roles: 3-tier RBAC - `reader` (read-only), `editor` (backup config), `admin` (full access)
-- API key types: `pbk-` (client), `app-` (mobile), `adm-` (admin)
+- API key types: `pbk-` (client), `adm-` (admin)
 
 **Client:**
 - Detects server type (PVE/PBS) from `/etc/issue`
@@ -240,3 +240,35 @@ Embedded in `internal/db/migrations/`. Applied automatically on server startup v
 - `seed.sh` - envía un reporte PVE y uno PBS al servidor vía API (requiere clave `pbk-` activa)
 - `seed_history.go` - inserta 6 días de reportes históricos directamente en la BD SQLite (`go run testdata/seed_history.go`); útil para probar el gráfico de duración y la vista de historial
 - Ejecutar siempre `seed.sh` primero (crea los servidores), luego `seed_history.go`
+
+### Backup tasks por VM (2026-05)
+
+Contexto de uso: el usuario revisa las copias cada día a las 9h. Los backups corren de noche (ej. lunes 21h, acaban martes 02h). Algunos PVE con PBS hacen 2 jobs/día (mediodía + medianoche). Solo importa el **último job** — si el de medianoche falla, el backup está incompleto aunque el de mediodía funcionara.
+
+**Tabla `pve_backup_tasks` (migration 004):**
+Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `report_id`, `vmid`, `vm_name`, `status` (texto completo de Proxmox, "OK" o mensaje de error), `starttime`, `endtime`, `duration`, `size` (bytes del fichero en storage), `filename` (volid).
+
+**Cómo el cliente detecta el "último job" (`client/pve.go → backupJobTasks`):**
+1. Consulta `nodes/{node}/tasks?typefilter=vzdump&limit=100`, ordena por `endtime DESC`.
+2. Toma la tarea más reciente como ancla. Añade tareas consecutivas mientras el gap entre `prevTask.start` y `currentTask.end` sea < 2h. Al superar 2h de hueco, para — es un job distinto.
+3. Deduplica por VMID (se queda con la más reciente dentro del job).
+4. Enriquece cada tarea con nombre de VM (de `nodes/{node}/qemu` y `lxc`) y fichero+tamaño (cruzando con storage content por VMID y |ctime - starttime| < 300s).
+
+**Por qué 2h de gap:** backups consecutivos dentro de un job son secuenciales (VM A acaba → VM B empieza, gap de segundos/minutos). Entre jobs distintos (mediodía vs medianoche) el gap es de horas. 2h es suficientemente grande para no partir un job largo y suficientemente pequeño para separar dos jobs del mismo día.
+
+**Staleness con schedule (`service/report.go → IsStaleForServer`):**
+- Lee `VMBackupConfig` del servidor para saber qué días de la semana tiene backups.
+- Busca hacia atrás el último día programado que ya "completó": `dayStart + 28h < now` (28h de gracia para backups de madrugada que pertenecen al día anterior).
+- Stale si no se recibió ningún reporte desde el inicio de ese día.
+- Sin config → fallback a `IsStale` (reporte recibido hoy).
+- Retorna `(bool, string)` — el string es la razón ("no report received today" o "no report received on last backup day").
+
+**Ejemplo (backup solo Lun-Vie, corre a las 21h, acaba ~02h):**
+- Sábado 10h: último día programado = Viernes. `Vie 00h + 28h = Sab 04h < Sab 10h` → completado. Reporte del Sáb 02h ≥ Vie 00h → **no stale** ✓
+- Domingo: mismo razonamiento → **no stale** ✓
+- Martes 05h (si lunes falló): `Lun 00h + 28h = Mar 04h < Mar 05h` → completado. Sin reporte desde Lun 00h → **stale** ✓
+
+**UI en `web/templates/server_pve_detail.html`:**
+- Card "Último job de backup": tabla VMID/Nombre/Estado/Duración/Tamaño/Fichero del job más reciente. El tooltip del badge ERROR muestra el mensaje completo de Proxmox.
+- Accordion "Historial de jobs (últimos 5 días)": hasta 4 jobs anteriores, colapsables, con badge OK/ERROR en la cabecera. Solo muestra entradas que tengan tasks en DB (los reportes anteriores al despliegue de esta feature no tienen tasks).
+- Ambas secciones usan datos de `pve_backup_tasks` ligados al `report_id` del reporte correspondiente.

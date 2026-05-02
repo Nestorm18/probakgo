@@ -98,14 +98,15 @@
                                     <td>
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td><h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
                                                 <td style="text-align: right;"><span style="background-color: #007bff; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PVE</span></td>
                                             </tr>
                                         </table>
-                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
-                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #f8d7da; border: 1px solid #f5c2c7; border-radius: 4px; margin-top: 15px;">
-                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #842029;">{{.StaleReason}}</h4></td></tr>
+                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="10" cellspacing="0" style="background-color: #f8d7da; border: 1px solid #f5c2c7; border-radius: 4px; margin-bottom: 12px;">
+                                            <tr><td><p style="margin: 0; font-size: 14px; color: #842029;">{{.StaleReason}}</p></td></tr>
                                         </table>
+                                        {{template "vmtable" .}}
                                     </td>
                                 </tr>
                             </table>
@@ -142,14 +143,12 @@
                                     <td>
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td><h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
                                                 <td style="text-align: right;"><span style="background-color: #007bff; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PVE</span></td>
                                             </tr>
                                         </table>
-                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
-                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #d1e7dd; border: 1px solid #badbcc; border-radius: 4px; margin-top: 15px;">
-                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #0f5132;">Todas las VMs programadas tienen backup</h4></td></tr>
-                                        </table>
+                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        {{template "vmtable" .}}
                                     </td>
                                 </tr>
                             </table>
@@ -191,5 +190,35 @@
             </td>
         </tr>
     </table>
+{{define "vmtable"}}
+{{if .VMTasks}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #dee2e6; border-radius: 4px; overflow: hidden; font-size: 13px;">
+    <tr style="background-color: #f8f9fa;">
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">VMID</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Nombre</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Estado</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Duración</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Tamaño</td>
+    </tr>
+    {{range .VMTasks}}
+    <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 8px 12px; font-family: monospace; color: #6c757d;">{{.VMID}}</td>
+        <td style="padding: 8px 12px; font-weight: 500; color: #333;">{{.VMName}}</td>
+        <td style="padding: 8px 12px;">
+            {{if .IsMissing}}
+            <span style="background-color: #fd7e14; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;">SIN BACKUP</span>
+            {{else if eq .Status "OK"}}
+            <span style="background-color: #28a745; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;">OK</span>
+            {{else}}
+            <span style="background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;" title="{{.Status}}">ERROR</span>
+            {{end}}
+        </td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{if .IsMissing}}–{{else}}{{.Duration}}{{end}}</td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{if .IsMissing}}–{{else}}{{.Size}}{{end}}</td>
+    </tr>
+    {{end}}
+</table>
+{{end}}
+{{end}}
 </body>
 </html>

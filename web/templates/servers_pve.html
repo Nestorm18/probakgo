@@ -38,6 +38,7 @@
           {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
           {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          {{if gt .TaskMissing 0}}<span class="status-pill warn ms-1">{{.TaskMissing}} sin backup</span>{{end}}
         </td>
         <td>
           {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>

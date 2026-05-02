@@ -42,7 +42,6 @@ func (s *Store) ListAPIKeys() ([]domain.APIKey, error) {
 func (s *Store) CreateAPIKey(name, keyType, serverName string) (*domain.APIKey, error) {
 	prefix := map[string]string{
 		"server": "pbk",
-		"mobile": "app",
 		"admin":  "adm",
 	}[keyType]
 	if prefix == "" {

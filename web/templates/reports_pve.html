@@ -77,14 +77,14 @@
     <div class="row g-3">
       {{range .Storages}}
       <div class="col-md-6 col-lg-4">
-        <div class="card h-100" style="border-color:{{if eq .Storage.Status "available"}}var(--clr-ok){{else}}var(--clr-bad){{end}}">
-          <div class="card-header" style="background:{{if eq .Storage.Status "available"}}var(--clr-ok){{else}}var(--clr-bad){{end}};color:#fff;font-size:.85rem">
+        <div class="card h-100" style="border-color:{{if or (eq .Storage.Status "available") (eq .Storage.Status "online")}}var(--clr-ok){{else}}var(--clr-danger){{end}}">
+          <div class="card-header" style="background:{{if or (eq .Storage.Status "available") (eq .Storage.Status "online")}}var(--clr-ok){{else}}var(--clr-danger){{end}};color:#fff;font-size:.85rem">
             <i class="bi bi-hdd me-1"></i><strong>{{.Storage.Storage}}</strong>
             <span class="float-end" style="font-size:.72rem;opacity:.85">{{.Storage.Type}}</span>
           </div>
           <div class="card-body" style="font-size:.82rem">
             <div class="mb-2">
-              {{if eq .Storage.Status "available"}}<span class="status-pill ok">Disponible</span>
+              {{if or (eq .Storage.Status "available") (eq .Storage.Status "online")}}<span class="status-pill ok">{{.Storage.Status}}</span>
               {{else}}<span class="status-pill bad">{{.Storage.Status}}</span>{{end}}
             </div>
             {{if .Info}}{{if gt .Info.Total 0}}

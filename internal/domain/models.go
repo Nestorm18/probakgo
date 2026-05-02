@@ -122,6 +122,19 @@ type PBSGCStatus struct {
 	UPID            string `db:"upid"`
 }
 
+type PVEBackupTask struct {
+	ID        int64  `db:"id"`
+	ReportID  int64  `db:"report_id"`
+	VMID      int64  `db:"vmid"`
+	VMName    string `db:"vm_name"`
+	Status    string `db:"status"`
+	StartTime int64  `db:"starttime"`
+	EndTime   int64  `db:"endtime"`
+	Duration  int64  `db:"duration"`
+	Size      int64  `db:"size"`
+	Filename  string `db:"filename"`
+}
+
 type APIKey struct {
 	ID         int64      `db:"id"`
 	Key        string     `db:"key"`

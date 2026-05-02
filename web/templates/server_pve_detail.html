@@ -41,6 +41,53 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Último job de backup</span>
+    {{if .BackupTasks}}<span style="font-size:.75rem;color:var(--txt-muted);font-weight:400">{{formatUnixTime (index .BackupTasks 0).StartTime}}</span>{{end}}
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>VMID</th>
+          <th>Nombre</th>
+          <th>Estado</th>
+          <th>Duración</th>
+          <th>Tamaño</th>
+          <th>Fichero</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .BackupTasks}}
+      <tr>
+        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
+        <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td>
+          {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
+          {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
+        </td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace;word-break:break-all;max-width:260px">{{.Filename}}</td>
+      </tr>
+      {{end}}
+      {{range .MissingVMs}}
+      <tr>
+        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
+        <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td><span class="status-pill warn">MISSING</span></td>
+        <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup</td>
+      </tr>
+      {{end}}
+      {{if and (eq (len .BackupTasks) 0) (eq (len .MissingVMs) 0)}}
+      <tr><td colspan="6" class="text-center py-4" style="color:var(--txt-muted)">Sin datos de tareas</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {{if .Storages}}
 <div class="card mb-4">
   <div class="card-header">
@@ -65,7 +112,7 @@
         </td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Storage.Type}}</td>
         <td>
-          {{if eq .Storage.Status "available"}}<span class="status-pill ok">Disponible</span>
+          {{if or (eq .Storage.Status "available") (eq .Storage.Status "online")}}<span class="status-pill ok">{{.Storage.Status}}</span>
           {{else}}<span class="status-pill warn">{{.Storage.Status}}</span>{{end}}
         </td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">{{len .Content}}</td>
@@ -73,6 +120,48 @@
       {{end}}
       </tbody>
     </table>
+  </div>
+</div>
+{{end}}
+
+{{if .JobHistory}}
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-calendar3 me-2" style="color:var(--clr-accent)"></i>Historial de jobs (últimos 5 días)
+  </div>
+  <div class="list-group list-group-flush" style="border-radius:0 0 .75rem .75rem;overflow:hidden">
+    {{range $i, $job := .JobHistory}}
+    <div class="list-group-item p-0" style="border-color:var(--bdr)">
+      <button class="btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+              style="background:none;border:none;border-radius:0;color:var(--txt-primary)"
+              data-bs-toggle="collapse" data-bs-target="#job-hist-{{$i}}">
+        <span style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime $job.Report.ReportedAt}}</span>
+        {{if $job.AllOK}}<span class="status-pill ok">OK</span>
+        {{else}}<span class="status-pill bad">ERROR</span>{{end}}
+      </button>
+      <div id="job-hist-{{$i}}" class="collapse">
+        <table class="table table-sm mb-0" style="font-size:.82rem;border-top:1px solid var(--bdr)">
+          <thead>
+            <tr><th>VMID</th><th>Nombre</th><th>Estado</th><th>Duración</th><th>Tamaño</th></tr>
+          </thead>
+          <tbody>
+          {{range $job.Tasks}}
+          <tr>
+            <td style="font-family:'DM Mono',monospace;color:var(--txt-muted)">{{.VMID}}</td>
+            <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+            <td>
+              {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
+              {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
+            </td>
+            <td style="color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
+            <td style="color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+          </tr>
+          {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {{end}}
   </div>
 </div>
 {{end}}
