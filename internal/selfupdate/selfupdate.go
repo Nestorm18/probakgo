@@ -17,6 +17,7 @@ import (
 type githubRelease struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
+		ID                 int64  `json:"id"`
 		Name               string `json:"name"`
 		BrowserDownloadURL string `json:"browser_download_url"`
 	} `json:"assets"`
@@ -33,7 +34,7 @@ func Run(repo, binaryName, currentVersion string) error {
 
 	fmt.Printf("Checking for updates (%s %s)...\n", binaryName, currentVersion)
 
-	tag, downloadURL, sha256URL, err := latestRelease(repo, binaryName)
+	tag, assetID, binaryURL, sha256URL, err := latestRelease(repo, binaryName)
 	if err != nil {
 		return fmt.Errorf("check release: %w", err)
 	}
@@ -46,7 +47,7 @@ func Run(repo, binaryName, currentVersion string) error {
 	fmt.Printf("New version: %s → %s\n", currentVersion, tag)
 	fmt.Println("Downloading...")
 
-	if err := replace(downloadURL, sha256URL, binaryName); err != nil {
+	if err := replace(repo, assetID, binaryURL, sha256URL, binaryName); err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
 
@@ -63,29 +64,50 @@ func LatestTag(repo string) (string, error) {
 	return rel.TagName, nil
 }
 
-func latestRelease(repo, binaryName string) (tag, binaryURL, sha256URL string, err error) {
+func latestRelease(repo, binaryName string) (tag string, assetID int64, binaryURL, sha256URL string, err error) {
 	rel, err := fetchLatestRelease(repo)
 	if err != nil {
-		return "", "", "", err
+		return "", 0, "", "", err
 	}
 	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
+	var binAssetID int64
 	for _, a := range rel.Assets {
 		switch a.Name {
 		case assetName:
 			binaryURL = a.BrowserDownloadURL
+			binAssetID = a.ID
 		case "SHA256SUMS":
 			sha256URL = a.BrowserDownloadURL
 		}
 	}
 	if binaryURL == "" {
-		return rel.TagName, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
+		return rel.TagName, 0, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
 	}
-	return rel.TagName, binaryURL, sha256URL, nil
+	return rel.TagName, binAssetID, binaryURL, sha256URL, nil
+}
+
+func githubToken() string {
+	return os.Getenv("GITHUB_TOKEN")
+}
+
+func newAPIRequest(method, url string) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	if tok := githubToken(); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+	return req, nil
 }
 
 func fetchLatestRelease(repo string) (*githubRelease, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Get("https://api.github.com/repos/" + repo + "/releases/latest")
+	req, err := newAPIRequest("GET", "https://api.github.com/repos/"+repo+"/releases/latest")
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch: %w", err)
 	}
@@ -100,7 +122,7 @@ func fetchLatestRelease(repo string) (*githubRelease, error) {
 	return &rel, nil
 }
 
-func replace(downloadURL, sha256URL, binaryName string) error {
+func replace(repo string, assetID int64, downloadURL, sha256URL, binaryName string) error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate executable: %w", err)
@@ -111,7 +133,25 @@ func replace(downloadURL, sha256URL, binaryName string) error {
 	}
 
 	client := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := client.Get(downloadURL)
+
+	// For private repos (token present), download via API assets endpoint.
+	// For public repos, use the browser download URL directly.
+	var binReq *http.Request
+	if tok := githubToken(); tok != "" && assetID != 0 {
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, assetID)
+		binReq, err = newAPIRequest("GET", apiURL)
+		if err != nil {
+			return fmt.Errorf("build asset request: %w", err)
+		}
+		binReq.Header.Set("Accept", "application/octet-stream")
+	} else {
+		binReq, err = http.NewRequest("GET", downloadURL, nil)
+		if err != nil {
+			return fmt.Errorf("build download request: %w", err)
+		}
+	}
+
+	resp, err := client.Do(binReq)
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
@@ -148,7 +188,11 @@ func replace(downloadURL, sha256URL, binaryName string) error {
 }
 
 func verifyChecksum(client *http.Client, sha256URL, binaryName, actualHash string) error {
-	resp, err := client.Get(sha256URL)
+	req, err := newAPIRequest("GET", sha256URL)
+	if err != nil {
+		return fmt.Errorf("build checksum request: %w", err)
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("fetch checksums: %w", err)
 	}
