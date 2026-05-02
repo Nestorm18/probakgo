@@ -10,7 +10,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.8"
+var version = "0.0.9"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -108,7 +108,7 @@ func main() {
 	}
 	log.Println("Proxmox connection OK")
 
-	if vzdumpHook || fromFile != "" {
+	if vzdumpHook || fromFile != "" || cfg.ServerType == "pbs" {
 		if err := sendReport(cfg, si, fromFile); err != nil {
 			log.Printf("ERROR: %v", err)
 			os.Exit(1)
