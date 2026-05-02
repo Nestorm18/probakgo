@@ -12,10 +12,11 @@ import (
 type ReportService struct {
 	store *store.Store
 	tz    *time.Location
+	now   func() time.Time
 }
 
 func NewReport(st *store.Store, tz *time.Location) *ReportService {
-	return &ReportService{store: st, tz: tz}
+	return &ReportService{store: st, tz: tz, now: time.Now}
 }
 
 func (r *ReportService) SavePVEReport(req *domain.PVEReportRequest) error {
@@ -85,7 +86,7 @@ func (r *ReportService) SavePBSReport(req *domain.PBSReportRequest) error {
 
 // IsStale returns true when the report was not received today (in the configured timezone).
 func (r *ReportService) IsStale(reportedAt time.Time) bool {
-	now := time.Now().In(r.tz)
+	now := r.now().In(r.tz)
 	rep := reportedAt.In(r.tz)
 	return now.Year() != rep.Year() || now.YearDay() != rep.YearDay()
 }
@@ -117,7 +118,7 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 		return r.IsStale(reportedAt), "no report received today"
 	}
 
-	now := time.Now().In(r.tz)
+	now := r.now().In(r.tz)
 	// Look back up to 14 days for the most recent completed expected backup day.
 	for i := 1; i <= 14; i++ {
 		candidate := now.AddDate(0, 0, -i)

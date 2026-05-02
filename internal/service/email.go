@@ -23,6 +23,15 @@ type serverRow struct {
 	IP          string
 	StaleReason string
 	VMTasks     []vmTaskRow
+	Datastores  []datastoreRow
+}
+
+type datastoreRow struct {
+	Name        string
+	Used        string
+	Total       string
+	UsedPct     int
+	MountStatus string
 }
 
 type vmTaskRow struct {
@@ -155,8 +164,8 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 			}
 		}
 
-		if rep.IsStale(r.ReportedAt) {
-			row.StaleReason = "no report received today"
+		if stale, reason := rep.IsStaleForServer(r.ReportedAt, sv.Name); stale {
+			row.StaleReason = reason
 			pveIssues = append(pveIssues, row)
 		} else if r.IsStale {
 			row.StaleReason = r.StaleReason
@@ -174,6 +183,21 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 			row.StaleReason = "no reports received"
 			pbsIssues = append(pbsIssues, row)
 			continue
+		}
+		if stores, err := st.GetPBSStoresForReport(r.ID); err == nil {
+			for _, ds := range stores {
+				usedPct := 0
+				if ds.Total > 0 {
+					usedPct = int(ds.Used * 100 / ds.Total)
+				}
+				row.Datastores = append(row.Datastores, datastoreRow{
+					Name:        ds.Store,
+					Used:        emailFmtBytes(ds.Used),
+					Total:       emailFmtBytes(ds.Total),
+					UsedPct:     usedPct,
+					MountStatus: ds.MountStatus,
+				})
+			}
 		}
 		if rep.IsStale(r.ReportedAt) {
 			row.StaleReason = "no report received today"
