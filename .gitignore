@@ -19,6 +19,7 @@ probakgo-client_linux_arm64
 # Debug output (JSON responses and HTML previews)
 /debug/*/*.json
 /debug/email*
+/debug/vzdum*
 
 # IDE
 .idea/
