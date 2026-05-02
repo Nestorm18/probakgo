@@ -34,7 +34,7 @@ func Run(repo, binaryName, currentVersion string) error {
 
 	fmt.Printf("Checking for updates (%s %s)...\n", binaryName, currentVersion)
 
-	tag, assetID, binaryURL, sha256URL, err := latestRelease(repo, binaryName)
+	tag, binID, sha256ID, binaryURL, sha256URL, err := latestRelease(repo, binaryName)
 	if err != nil {
 		return fmt.Errorf("check release: %w", err)
 	}
@@ -47,7 +47,7 @@ func Run(repo, binaryName, currentVersion string) error {
 	fmt.Printf("New version: %s → %s\n", currentVersion, tag)
 	fmt.Println("Downloading...")
 
-	if err := replace(repo, assetID, binaryURL, sha256URL, binaryName); err != nil {
+	if err := replace(repo, binID, sha256ID, binaryURL, sha256URL, binaryName); err != nil {
 		return fmt.Errorf("update: %w", err)
 	}
 
@@ -64,26 +64,26 @@ func LatestTag(repo string) (string, error) {
 	return rel.TagName, nil
 }
 
-func latestRelease(repo, binaryName string) (tag string, assetID int64, binaryURL, sha256URL string, err error) {
+func latestRelease(repo, binaryName string) (tag string, binID, sha256ID int64, binaryURL, sha256URL string, err error) {
 	rel, err := fetchLatestRelease(repo)
 	if err != nil {
-		return "", 0, "", "", err
+		return "", 0, 0, "", "", err
 	}
 	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
-	var binAssetID int64
 	for _, a := range rel.Assets {
 		switch a.Name {
 		case assetName:
 			binaryURL = a.BrowserDownloadURL
-			binAssetID = a.ID
+			binID = a.ID
 		case "SHA256SUMS":
 			sha256URL = a.BrowserDownloadURL
+			sha256ID = a.ID
 		}
 	}
 	if binaryURL == "" {
-		return rel.TagName, 0, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
+		return rel.TagName, 0, 0, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
 	}
-	return rel.TagName, binAssetID, binaryURL, sha256URL, nil
+	return rel.TagName, binID, sha256ID, binaryURL, sha256URL, nil
 }
 
 func githubToken() string {
@@ -122,7 +122,7 @@ func fetchLatestRelease(repo string) (*githubRelease, error) {
 	return &rel, nil
 }
 
-func replace(repo string, assetID int64, downloadURL, sha256URL, binaryName string) error {
+func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryName string) error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate executable: %w", err)
@@ -137,8 +137,8 @@ func replace(repo string, assetID int64, downloadURL, sha256URL, binaryName stri
 	// For private repos (token present), download via API assets endpoint.
 	// For public repos, use the browser download URL directly.
 	var binReq *http.Request
-	if tok := githubToken(); tok != "" && assetID != 0 {
-		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, assetID)
+	if tok := githubToken(); tok != "" && binID != 0 {
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, binID)
 		binReq, err = newAPIRequest("GET", apiURL)
 		if err != nil {
 			return fmt.Errorf("build asset request: %w", err)
@@ -173,7 +173,7 @@ func replace(repo string, assetID int64, downloadURL, sha256URL, binaryName stri
 	actualHash := hex.EncodeToString(h.Sum(nil))
 
 	if sha256URL != "" {
-		if err := verifyChecksum(client, sha256URL, binaryName, actualHash); err != nil {
+		if err := verifyChecksum(client, repo, sha256ID, sha256URL, binaryName, actualHash); err != nil {
 			os.Remove(tmpPath)
 			return err
 		}
@@ -187,10 +187,21 @@ func replace(repo string, assetID int64, downloadURL, sha256URL, binaryName stri
 	return nil
 }
 
-func verifyChecksum(client *http.Client, sha256URL, binaryName, actualHash string) error {
-	req, err := newAPIRequest("GET", sha256URL)
-	if err != nil {
-		return fmt.Errorf("build checksum request: %w", err)
+func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL, binaryName, actualHash string) error {
+	var req *http.Request
+	var err error
+	if tok := githubToken(); tok != "" && sha256ID != 0 {
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, sha256ID)
+		req, err = newAPIRequest("GET", apiURL)
+		if err != nil {
+			return fmt.Errorf("build checksum request: %w", err)
+		}
+		req.Header.Set("Accept", "application/octet-stream")
+	} else {
+		req, err = http.NewRequest("GET", sha256URL, nil)
+		if err != nil {
+			return fmt.Errorf("build checksum request: %w", err)
+		}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
