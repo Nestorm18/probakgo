@@ -249,6 +249,34 @@ func (s *Store) GetPVEStorageInfo(storageID int64) (*domain.PVEStorageInfo, erro
 	return &info, nil
 }
 
+func (s *Store) InsertPVEBackupTask(reportID int64, t domain.BackupTaskPayload) error {
+	_, err := s.db.Exec(
+		`INSERT INTO pve_backup_tasks (report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		reportID, t.VMID, t.VMName, t.Status, t.StartTime, t.EndTime, t.Duration, t.Size, t.Filename,
+	)
+	return err
+}
+
+func (s *Store) GetPVEBackupTasksForReport(reportID int64) ([]domain.PVEBackupTask, error) {
+	rows, err := s.db.Query(`SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
+		FROM pve_backup_tasks WHERE report_id = ? ORDER BY starttime ASC`, reportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tasks []domain.PVEBackupTask
+	for rows.Next() {
+		var t domain.PVEBackupTask
+		if err := rows.Scan(&t.ID, &t.ReportID, &t.VMID, &t.VMName, &t.Status,
+			&t.StartTime, &t.EndTime, &t.Duration, &t.Size, &t.Filename); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, rows.Err()
+}
+
 func (s *Store) MarkPVEReportStale(reportID int64, reason string) error {
 	_, err := s.db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason=? WHERE id=?`, reason, reportID)
 	return err
@@ -278,6 +306,8 @@ func (s *Store) DeleteOldPVEReports(cutoff time.Time) (int64, error) {
 			JOIN pve_reports r ON r.id = s.report_id
 			WHERE r.reported_at < ?)`,
 		`DELETE FROM pve_storages WHERE report_id IN (
+			SELECT id FROM pve_reports WHERE reported_at < ?)`,
+		`DELETE FROM pve_backup_tasks WHERE report_id IN (
 			SELECT id FROM pve_reports WHERE reported_at < ?)`,
 	}
 	for _, q := range steps {

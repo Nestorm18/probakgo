@@ -40,7 +40,6 @@
         <td><code>{{.KeyPreview}}</code></td>
         <td>
           {{if eq .KeyType "server"}}<span class="key-type-badge server">server</span>
-          {{else if eq .KeyType "mobile"}}<span class="key-type-badge mobile">mobile</span>
           {{else}}<span class="key-type-badge admin">admin</span>{{end}}
         </td>
         <td style="font-size:.82rem">
@@ -121,7 +120,6 @@
             <label class="form-label">Tipo</label>
             <select name="key_type" class="form-select" required>
               <option value="server">server (pbk-) - cliente Proxmox</option>
-              <option value="mobile">mobile (app-) - app móvil</option>
               <option value="admin">admin (adm-) - acceso completo</option>
             </select>
           </div>

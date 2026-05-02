@@ -8,13 +8,25 @@ import (
 // --- PVE report payload (sent by client) ---
 
 type PVEReportRequest struct {
-	Hostname         string            `json:"hostname"`
-	IPAddress        string            `json:"ip_address"`
-	PublicIP         string            `json:"public_ip"`
-	ClientVersion    string            `json:"client_version"`
-	MachineID        string            `json:"machine_id"`
-	LastBackupStatus *BackupStatus     `json:"last_backup_status"`
-	Storages         []StoragePayload  `json:"storages"`
+	Hostname         string               `json:"hostname"`
+	IPAddress        string               `json:"ip_address"`
+	PublicIP         string               `json:"public_ip"`
+	ClientVersion    string               `json:"client_version"`
+	MachineID        string               `json:"machine_id"`
+	LastBackupStatus *BackupStatus        `json:"last_backup_status"`
+	Storages         []StoragePayload     `json:"storages"`
+	BackupTasks      []BackupTaskPayload  `json:"backup_tasks"`
+}
+
+type BackupTaskPayload struct {
+	VMID      int64  `json:"vmid"`
+	VMName    string `json:"vm_name"`
+	Status    string `json:"status"`
+	StartTime int64  `json:"starttime"`
+	EndTime   int64  `json:"endtime"`
+	Duration  int64  `json:"duration"`
+	Size      int64  `json:"size"`
+	Filename  string `json:"filename"`
 }
 
 // BackupStatus.Status can arrive as bool or string from the client.

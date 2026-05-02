@@ -77,6 +77,118 @@ type backupStatus struct {
 	Duration  int64 `json:"duration"`
 }
 
+type backupFile struct {
+	ctime int64
+	size  int64
+	volid string
+}
+
+func (c *pveClient) vmNames() map[int64]string {
+	names := make(map[int64]string)
+	for _, ep := range []string{
+		fmt.Sprintf("nodes/%s/qemu", c.si.Hostname),
+		fmt.Sprintf("nodes/%s/lxc", c.si.Hostname),
+	} {
+		data, err := c.get(ep)
+		if err != nil {
+			continue
+		}
+		vms, _ := data["data"].([]any)
+		for _, v := range vms {
+			vm, ok := v.(map[string]any)
+			if !ok {
+				continue
+			}
+			vmidF, _ := vm["vmid"].(float64)
+			name, _ := vm["name"].(string)
+			names[int64(vmidF)] = name
+		}
+	}
+	return names
+}
+
+func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64][]backupFile) []map[string]any {
+	data, err := c.get(fmt.Sprintf("nodes/%s/tasks?typefilter=vzdump&limit=100", c.si.Hostname))
+	if err != nil {
+		return nil
+	}
+	raw, _ := data["data"].([]any)
+
+	type rawTask struct{ start, end float64; status, id string }
+	var finished []rawTask
+	for _, t := range raw {
+		m, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		end, hasEnd := m["endtime"].(float64)
+		start, hasStart := m["starttime"].(float64)
+		status, hasStatus := m["status"].(string)
+		id, _ := m["id"].(string)
+		if !hasEnd || !hasStart || !hasStatus {
+			continue
+		}
+		finished = append(finished, rawTask{start, end, status, id})
+	}
+	if len(finished) == 0 {
+		return nil
+	}
+
+	// Sort by endtime DESC so we process most-recent first.
+	sort.Slice(finished, func(i, j int) bool { return finished[i].end > finished[j].end })
+
+	// Group tasks into the last job: two consecutive tasks belong to the same job if
+	// the gap between one task ending and the next one starting is < 2 hours.
+	// The gap is: prevTask.start - currentTask.end (going backwards in time).
+	const maxGap = 2 * 3600.0
+	var jobTasks []rawTask
+	prevStart := finished[0].start
+	for _, t := range finished {
+		if len(jobTasks) > 0 && prevStart-t.end > maxGap {
+			break
+		}
+		jobTasks = append(jobTasks, t)
+		if t.start < prevStart {
+			prevStart = t.start
+		}
+	}
+
+	// Build results; deduplicate by VMID (first = most recent within the job).
+	seen := make(map[int64]bool)
+	var result []map[string]any
+	for _, t := range jobTasks {
+		vmid, _ := strconv.ParseInt(t.id, 10, 64)
+		if seen[vmid] {
+			continue
+		}
+		seen[vmid] = true
+
+		task := map[string]any{
+			"vmid":      vmid,
+			"vm_name":   names[vmid],
+			"status":    t.status,
+			"starttime": int64(t.start),
+			"endtime":   int64(t.end),
+			"duration":  int64(t.end - t.start),
+			"size":      int64(0),
+			"filename":  "",
+		}
+		for _, f := range filesByVMID[vmid] {
+			diff := f.ctime - int64(t.start)
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff < 300 {
+				task["size"] = f.size
+				task["filename"] = f.volid
+				break
+			}
+		}
+		result = append(result, task)
+	}
+	return result
+}
+
 func (c *pveClient) lastBackupStatus() backupStatus {
 	empty := backupStatus{OK: false, StartTime: -1, EndTime: -1, Duration: -1}
 	data, err := c.get(fmt.Sprintf("nodes/%s/tasks?typefilter=vzdump&limit=50", c.si.Hostname))
@@ -128,6 +240,7 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 
 	now := time.Now().Format(time.RFC3339)
 	var result []map[string]any
+	filesByVMID := make(map[int64][]backupFile)
 
 	for _, s := range storageList {
 		sm, ok := s.(map[string]any)
@@ -200,6 +313,15 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 					"parent":       im["parent"],
 					"created_at":   now,
 				})
+				if str(im["content"]) == "backup" {
+					vmidF, _ := im["vmid"].(float64)
+					sizeF, _ := im["size"].(float64)
+					filesByVMID[int64(vmidF)] = append(filesByVMID[int64(vmidF)], backupFile{
+						ctime: ctime,
+						size:  int64(sizeF),
+						volid: str(im["volid"]),
+					})
+				}
 			}
 			if contents != nil {
 				sr["content_data"] = contents
@@ -211,15 +333,47 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 		result = append(result, sr)
 	}
 
+	names := c.vmNames()
+	tasks := c.backupJobTasks(names, filesByVMID)
+
 	return map[string]any{
 		"hostname":           c.si.Hostname,
 		"ip_address":         c.si.localIP(),
 		"public_ip":          c.si.publicIP(),
 		"client_version":     version,
 		"machine_id":         c.si.machineID(),
-		"last_backup_status": c.lastBackupStatus(),
+		"last_backup_status": jobBackupStatus(tasks),
 		"storages":           result,
+		"backup_tasks":       tasks,
 	}, nil
+}
+
+// jobBackupStatus derives the overall backup status from all tasks in the job.
+// If any VM failed, the job is considered failed — even if later VMs succeeded.
+func jobBackupStatus(tasks []map[string]any) backupStatus {
+	if len(tasks) == 0 {
+		return backupStatus{OK: false, StartTime: -1, EndTime: -1, Duration: -1}
+	}
+	allOK := true
+	var minStart int64 = 1<<62
+	var maxEnd int64
+	for _, t := range tasks {
+		if str(t["status"]) != "OK" {
+			allOK = false
+		}
+		if s, _ := t["starttime"].(int64); s < minStart {
+			minStart = s
+		}
+		if e, _ := t["endtime"].(int64); e > maxEnd {
+			maxEnd = e
+		}
+	}
+	return backupStatus{
+		OK:        allOK,
+		StartTime: minStart,
+		EndTime:   maxEnd,
+		Duration:  maxEnd - minStart,
+	}
 }
 
 func str(v any) string {

@@ -22,6 +22,16 @@ type serverRow struct {
 	Name        string
 	IP          string
 	StaleReason string
+	VMTasks     []vmTaskRow
+}
+
+type vmTaskRow struct {
+	VMID      string
+	VMName    string
+	Status    string
+	Duration  string
+	Size      string
+	IsMissing bool
 }
 
 type diskAlertRow struct {
@@ -105,6 +115,46 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 			pveIssues = append(pveIssues, row)
 			continue
 		}
+
+		tasks, _ := st.GetPVEBackupTasksForReport(r.ID)
+		for _, t := range tasks {
+			name := t.VMName
+			if name == "" {
+				name = fmt.Sprintf("%d", t.VMID)
+			}
+			row.VMTasks = append(row.VMTasks, vmTaskRow{
+				VMID:     fmt.Sprintf("%d", t.VMID),
+				VMName:   name,
+				Status:   t.Status,
+				Duration: emailFmtDuration(t.Duration),
+				Size:     emailFmtBytes(t.Size),
+			})
+		}
+		if len(tasks) > 0 {
+			configs, _ := st.ListVMBackupConfigs(sv.Name)
+			if len(configs) > 0 {
+				jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
+				seenVMIDs := make(map[string]bool)
+				for _, t := range tasks {
+					seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
+				}
+				for _, c := range configs {
+					if c.IsExcluded || !emailVMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+						continue
+					}
+					name := c.VMName
+					if name == "" {
+						name = c.VMID
+					}
+					row.VMTasks = append(row.VMTasks, vmTaskRow{
+						VMID:      c.VMID,
+						VMName:    name,
+						IsMissing: true,
+					})
+				}
+			}
+		}
+
 		if rep.IsStale(r.ReportedAt) {
 			row.StaleReason = "no report received today"
 			pveIssues = append(pveIssues, row)
@@ -268,6 +318,58 @@ func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportServic
 			}
 		}
 	}()
+}
+
+func emailFmtBytes(b int64) string {
+	if b <= 0 {
+		return "–"
+	}
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+}
+
+func emailFmtDuration(secs int64) string {
+	if secs <= 0 {
+		return "–"
+	}
+	h := secs / 3600
+	m := (secs % 3600) / 60
+	s := secs % 60
+	if h > 0 {
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	if m > 0 {
+		return fmt.Sprintf("%dm %ds", m, s)
+	}
+	return fmt.Sprintf("%ds", s)
+}
+
+func emailVMScheduledForDay(c domain.VMBackupConfig, day time.Weekday) bool {
+	switch day {
+	case time.Monday:
+		return c.Monday
+	case time.Tuesday:
+		return c.Tuesday
+	case time.Wednesday:
+		return c.Wednesday
+	case time.Thursday:
+		return c.Thursday
+	case time.Friday:
+		return c.Friday
+	case time.Saturday:
+		return c.Saturday
+	case time.Sunday:
+		return c.Sunday
+	}
+	return false
 }
 
 // nextRunTime returns the next wall-clock moment matching HH:MM in the given timezone.

@@ -34,7 +34,6 @@
             <div class="d-flex flex-column gap-2" style="font-size:.82rem">
               <div><span style="color:var(--txt-muted)">Tipo:</span>
                 {{if eq .Key.KeyType "server"}}<span class="key-type-badge server ms-1">server</span>
-                {{else if eq .Key.KeyType "mobile"}}<span class="key-type-badge mobile ms-1">mobile</span>
                 {{else}}<span class="key-type-badge admin ms-1">admin</span>{{end}}
               </div>
               <div><span style="color:var(--txt-muted)">Key:</span> <code>{{keyPreview .Key.Key}}</code></div>
