@@ -28,7 +28,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.12"
+var version = "0.0.13"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -41,6 +41,8 @@ const (
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version":
