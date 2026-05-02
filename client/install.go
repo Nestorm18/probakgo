@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -127,7 +129,8 @@ func runInstall(args []string) {
 	must(os.WriteFile(hookPath, []byte(hookScript), 0755), "write hook script")
 	fmt.Printf("Hook script: %s\n", hookPath)
 
-	// 5. Register hook in /etc/vzdump.conf (PVE nodes only)
+	// 5. Register hook in /etc/vzdump.conf (PVE) or cron report (PBS)
+	isPBS := false
 	if _, err := os.Stat(vzdumpConfPath); err == nil {
 		hookLine := "script: " + hookPath
 		if !fileContains(vzdumpConfPath, hookLine) {
@@ -141,19 +144,27 @@ func runInstall(args []string) {
 			fmt.Println("Hook already in /etc/vzdump.conf")
 		}
 	} else {
-		fmt.Println("NOTE: /etc/vzdump.conf not found (PBS node - no hook needed)")
+		isPBS = true
+		fmt.Println("PBS node: report cron will be installed (no vzdump hook needed)")
 	}
 
 	// 6. Configure logrotate
 	must(os.WriteFile(logrotateConfPath, []byte(logrotateConf), 0644), "write logrotate config")
 	fmt.Println("logrotate: " + logrotateConfPath)
 
-	// 7. Install auto-update cron (01:00 daily)
+	// 7. Install cron: auto-update at 01:00 + PBS daily report at 06:00
 	cronContent := fmt.Sprintf("0 1 * * * root %s update >> %s/update.log 2>&1\n", binaryPath, logDir)
+	if isPBS {
+		cronContent += fmt.Sprintf("0 6 * * * root %s >> %s/report.log 2>&1\n", binaryPath, logDir)
+	}
 	if err := os.WriteFile(clientCronPath, []byte(cronContent), 0644); err != nil {
-		fmt.Printf("WARN: could not install update cron: %v\n", err)
+		fmt.Printf("WARN: could not install cron: %v\n", err)
 	} else {
-		fmt.Printf("Auto-update cron installed: %s\n", clientCronPath)
+		if isPBS {
+			fmt.Printf("Cron installed: %s (update 01:00, report 06:00)\n", clientCronPath)
+		} else {
+			fmt.Printf("Auto-update cron installed: %s\n", clientCronPath)
+		}
 	}
 
 	fmt.Println("\nInstallation complete!")
@@ -176,28 +187,69 @@ func generateProxmoxToken(tokenID string) (token, secret string, err error) {
 				return "root@pam!" + tokenID, val, nil
 			}
 		}
-		fmt.Printf("WARN: pveum token creation: %v\n", e)
+		fmt.Printf("WARN: pveum token creation failed: %v\n", e)
 	}
 
 	if _, e := exec.LookPath("proxmox-backup-manager"); e == nil {
 		fmt.Println("Generating Proxmox Backup Server API token...")
 		_ = exec.Command("proxmox-backup-manager", "user", "delete-token", "root@pam", tokenID).Run()
-		for _, subcmd := range [][]string{
-			{"user", "generate-token", "root@pam", tokenID, "--output-format", "json"},
-			{"user", "token", "add", "root@pam", tokenID, "--output-format", "json"},
-		} {
-			out, e := exec.Command("proxmox-backup-manager", subcmd...).Output()
-			if e == nil {
-				if val := jsonField(out, "value"); val != "" {
-					fmt.Println("PBS API token generated")
-					return "root@pam!" + tokenID, val, nil
-				}
-			}
+		if val := runPBSGenerateToken(tokenID); val != "" {
+			fmt.Println("PBS API token generated")
+			grantPBSTokenACL(tokenID)
+			return "root@pam!" + tokenID, val, nil
 		}
-		fmt.Println("WARN: proxmox-backup-manager token creation failed")
+		return "", "", fmt.Errorf("proxmox-backup-manager token creation failed; set PROXMOX_TOKEN and PROXMOX_SECRET manually in %s", envPath)
 	}
 
 	return "", "", fmt.Errorf("pveum and proxmox-backup-manager not found; configure credentials manually")
+}
+
+// grantPBSTokenACL grants the Audit role on / so the token can read datastore-usage.
+func grantPBSTokenACL(tokenID string) {
+	authID := "root@pam!" + tokenID
+	err := exec.Command("proxmox-backup-manager", "acl", "update", "/", "Audit",
+		"--auth-id", authID).Run()
+	if err != nil {
+		fmt.Printf("WARN: could not set ACL for %s: %v\n", authID, err)
+		fmt.Printf("      Run manually: proxmox-backup-manager acl update / Audit --auth-id '%s'\n", authID)
+	} else {
+		fmt.Printf("ACL granted: %s → Audit on /\n", authID)
+	}
+}
+
+// runPBSGenerateToken tries several invocation styles for proxmox-backup-manager
+// and returns the token secret on success, or "" on failure.
+func runPBSGenerateToken(tokenID string) string {
+	// Try: flag after subcommand args, then flag before subcommand (some PBS versions differ)
+	attempts := [][]string{
+		{"user", "generate-token", "root@pam", tokenID, "--output-format", "json"},
+		{"--output-format", "json", "user", "generate-token", "root@pam", tokenID},
+		{"user", "generate-token", "root@pam", tokenID},
+	}
+	for _, args := range attempts {
+		cmd := exec.Command("proxmox-backup-manager", args...)
+		out, e := cmd.Output()
+		if e != nil {
+			var exitErr *exec.ExitError
+			if errors.As(e, &exitErr) && len(exitErr.Stderr) > 0 {
+				fmt.Printf("WARN: generate-token: %s\n", strings.TrimSpace(string(exitErr.Stderr)))
+			}
+			continue
+		}
+		if val := jsonField(out, "value"); val != "" {
+			return val
+		}
+		if val := extractUUID(string(out)); val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
+var uuidRe = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+
+func extractUUID(s string) string {
+	return uuidRe.FindString(s)
 }
 
 func jsonField(data []byte, key string) string {
