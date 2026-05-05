@@ -73,12 +73,22 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) ToggleAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	k, err := h.store.GetAPIKey(id)
+	if err == nil && k.KeyType == "admin" {
+		http.Redirect(w, r, "/api-keys?flash=Las+claves+admin+no+se+pueden+pausar", http.StatusSeeOther)
+		return
+	}
 	_ = h.store.ToggleAPIKey(id)
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
 func (h *WebH) DeleteAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	k, err := h.store.GetAPIKey(id)
+	if err == nil && k.KeyType == "admin" {
+		http.Redirect(w, r, "/api-keys?flash=Las+claves+admin+no+se+pueden+eliminar", http.StatusSeeOther)
+		return
+	}
 	_ = h.store.DeleteAPIKey(id)
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }

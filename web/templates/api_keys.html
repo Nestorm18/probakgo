@@ -75,6 +75,7 @@
               </button>
             </form>
             {{end}}
+            {{if eq .KeyType "server"}}
             <form method="POST" action="/api-keys/{{.ID}}/toggle" class="d-inline">
               {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
@@ -88,6 +89,7 @@
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            {{end}}
           </div>
         </td>
         {{end}}
@@ -148,9 +150,10 @@
       <div class="modal-body">
         <div id="revealKeyDisplay" class="d-none mb-3">
           <label class="form-label">Clave API</label>
-          <div class="d-flex gap-2 align-items-center">
-            <code id="revealKeyValue" class="flex-grow-1 p-2 rounded" style="word-break:break-all;font-size:.82rem;display:block"></code>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="revealCopyBtn" title="Copiar">
+          <div class="input-group">
+            <input type="text" id="revealKeyValue" class="form-control" readonly
+                   style="font-family:'DM Mono',monospace;font-size:.8rem">
+            <button type="button" class="btn btn-outline-secondary" id="revealCopyBtn" title="Copiar">
               <i class="bi bi-clipboard"></i>
             </button>
           </div>
@@ -184,7 +187,7 @@
     document.getElementById('revealKeyDisplay').classList.add('d-none');
     document.getElementById('revealForm').classList.remove('d-none');
     document.getElementById('revealSubmit').classList.remove('d-none');
-    document.getElementById('revealKeyValue').textContent = '';
+    document.getElementById('revealKeyValue').value = '';
   });
   document.getElementById('revealSubmit').addEventListener('click', async () => {
     const pass = document.getElementById('revealPassword').value;
@@ -205,7 +208,7 @@
         document.getElementById('revealError').textContent = data.error;
         document.getElementById('revealError').classList.remove('d-none');
       } else {
-        document.getElementById('revealKeyValue').textContent = data.key;
+        document.getElementById('revealKeyValue').value = data.key;
         document.getElementById('revealKeyDisplay').classList.remove('d-none');
         document.getElementById('revealForm').classList.add('d-none');
         document.getElementById('revealSubmit').classList.add('d-none');
@@ -219,11 +222,19 @@
     if (e.key === 'Enter') document.getElementById('revealSubmit').click();
   });
   document.getElementById('revealCopyBtn')?.addEventListener('click', () => {
-    navigator.clipboard.writeText(document.getElementById('revealKeyValue').textContent).then(() => {
-      const btn = document.getElementById('revealCopyBtn');
+    const input = document.getElementById('revealKeyValue');
+    const btn = document.getElementById('revealCopyBtn');
+    const confirm = () => {
       btn.innerHTML = '<i class="bi bi-check"></i>';
       setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1500);
-    });
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(confirm).catch(() => {
+        input.select(); document.execCommand('copy'); confirm();
+      });
+    } else {
+      input.select(); document.execCommand('copy'); confirm();
+    }
   });
 })();
 </script>

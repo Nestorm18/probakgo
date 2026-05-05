@@ -68,6 +68,7 @@
               </button>
             </form>
             {{end}}
+            {{if ne .Role "admin"}}
             <form id="del-user-{{.ID}}" method="POST" action="/users/{{.ID}}/delete" class="d-inline">
               {{ $.CSRFField }}
               <button type="button" class="btn btn-sm btn-outline-danger" title="Eliminar"
@@ -75,6 +76,7 @@
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            {{end}}
           </div>
         </td>
       </tr>
