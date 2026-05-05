@@ -33,6 +33,14 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
+	if h.ban != nil {
+		if banned, remaining := h.ban.IsBanned(ratelimit.ExtractIP(r)); banned {
+			h.tmpl.Render(w, r, "login.html", map[string]any{
+				"Error": fmt.Sprintf("Too many failed attempts. Try again in %s.", formatRemaining(remaining)),
+			})
+			return
+		}
+	}
 	flash := r.URL.Query().Get("flash")
 	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": flash})
 }
@@ -41,11 +49,8 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 	ip := ratelimit.ExtractIP(r)
 
 	if h.ban != nil {
-		if banned, remaining := h.ban.IsBanned(ip); banned {
-			w.WriteHeader(http.StatusTooManyRequests)
-			h.tmpl.Render(w, r, "login.html", map[string]any{
-				"Error": fmt.Sprintf("Too many failed attempts. Try again in %s.", formatRemaining(remaining)),
-			})
+		if banned, _ := h.ban.IsBanned(ip); banned {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 	}

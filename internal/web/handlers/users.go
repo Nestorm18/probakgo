@@ -150,6 +150,15 @@ func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) DeleteUserPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	u, err := h.store.GetUser(id)
+	if err != nil {
+		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
+		return
+	}
+	if u.Role == "admin" {
+		http.Redirect(w, r, "/users?flash=No+se+puede+eliminar+un+usuario+admin", http.StatusSeeOther)
+		return
+	}
 	_ = h.store.DeleteUser(id)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
