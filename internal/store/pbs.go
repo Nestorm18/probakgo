@@ -61,6 +61,40 @@ func (s *Store) InsertPBSStoreHistory(storeID int64, history []*float64) error {
 	return nil
 }
 
+func (s *Store) InsertPBSSnapshot(storeID int64, g domain.PBSGroupPayload) error {
+	_, err := s.db.Exec(
+		`INSERT INTO pbs_snapshots (store_id, backup_type, backup_id, last_backup, backup_count,
+		 owner, comment, verification_state, size)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		storeID, g.BackupType, g.BackupID, g.LastBackup, g.BackupCount,
+		g.Owner, g.Comment, g.VerificationState, g.Size,
+	)
+	if err != nil {
+		return fmt.Errorf("insert pbs_snapshot: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) GetPBSSnapshotsForStore(storeID int64) ([]domain.PBSSnapshot, error) {
+	rows, err := s.db.Query(`SELECT id, store_id, backup_type, backup_id, last_backup, backup_count,
+		owner, comment, verification_state, size
+		FROM pbs_snapshots WHERE store_id = ? ORDER BY backup_type, backup_id`, storeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var snapshots []domain.PBSSnapshot
+	for rows.Next() {
+		var sn domain.PBSSnapshot
+		if err := rows.Scan(&sn.ID, &sn.StoreID, &sn.BackupType, &sn.BackupID, &sn.LastBackup,
+			&sn.BackupCount, &sn.Owner, &sn.Comment, &sn.VerificationState, &sn.Size); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, sn)
+	}
+	return snapshots, rows.Err()
+}
+
 func (s *Store) InsertPBSGCStatus(storeID int64, gc *domain.GCStatusPayload) error {
 	if gc == nil {
 		return nil
@@ -213,6 +247,10 @@ func (s *Store) DeleteOldPBSReports(cutoff time.Time) (int64, error) {
 			JOIN pbs_reports r ON r.id = st.report_id
 			WHERE r.reported_at < ?)`,
 		`DELETE FROM pbs_gc_status WHERE store_id IN (
+			SELECT st.id FROM pbs_stores st
+			JOIN pbs_reports r ON r.id = st.report_id
+			WHERE r.reported_at < ?)`,
+		`DELETE FROM pbs_snapshots WHERE store_id IN (
 			SELECT st.id FROM pbs_stores st
 			JOIN pbs_reports r ON r.id = st.report_id
 			WHERE r.reported_at < ?)`,

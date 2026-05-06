@@ -118,6 +118,18 @@ type PBSDatastorePayload struct {
 	HistoryDelta      int64      `json:"history-delta"`
 	History           []*float64 `json:"history"`
 	GCStatus          *GCStatusPayload `json:"gc-status"`
+	Groups            []PBSGroupPayload `json:"groups,omitempty"`
+}
+
+type PBSGroupPayload struct {
+	BackupType        string `json:"backup-type"`
+	BackupID          string `json:"backup-id"`
+	LastBackup        int64  `json:"last-backup"`
+	BackupCount       int64  `json:"backup-count"`
+	Owner             string `json:"owner"`
+	Comment           string `json:"comment"`
+	VerificationState string `json:"verification-state"`
+	Size              int64  `json:"size"`
 }
 
 type GCStatusPayload struct {

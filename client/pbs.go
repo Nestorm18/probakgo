@@ -70,6 +70,26 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("datastore-usage: %w", err)
 	}
+	if list, ok := data["data"].([]any); ok {
+		for _, item := range list {
+			ds, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			storeName, _ := ds["store"].(string)
+			if storeName == "" {
+				continue
+			}
+			groups, err := c.get(fmt.Sprintf("admin/datastore/%s/groups", storeName))
+			if err != nil {
+				log.Printf("WARN: PBS groups for %q: %v", storeName, err)
+				continue
+			}
+			if g, ok := groups["data"]; ok {
+				ds["groups"] = g
+			}
+		}
+	}
 	return map[string]any{
 		"hostname":        c.si.Hostname,
 		"ip_address":      c.si.localIP(),

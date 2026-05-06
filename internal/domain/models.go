@@ -106,6 +106,19 @@ type PBSStoreHistory struct {
 	Value    *float64 `db:"value"`
 }
 
+type PBSSnapshot struct {
+	ID                int64  `db:"id"`
+	StoreID           int64  `db:"store_id"`
+	BackupType        string `db:"backup_type"`
+	BackupID          string `db:"backup_id"`
+	LastBackup        int64  `db:"last_backup"`
+	BackupCount       int64  `db:"backup_count"`
+	Owner             string `db:"owner"`
+	Comment           string `db:"comment"`
+	VerificationState string `db:"verification_state"`
+	Size              int64  `db:"size"`
+}
+
 type PBSGCStatus struct {
 	ID              int64  `db:"id"`
 	StoreID         int64  `db:"store_id"`
@@ -185,8 +198,9 @@ type EmailConfig struct {
 	SendTime         string `db:"send_time"`
 	RetentionMonths  int    `db:"retention_months"`
 	RetentionEnabled bool   `db:"retention_enabled"`
-	AlertDiskPct     int    `db:"alert_disk_pct"`   // 0 = disabled
-	AlertBackupErr   bool   `db:"alert_backup_err"`
+	AlertDiskPct        int  `db:"alert_disk_pct"`   // 0 = disabled
+	AlertBackupErr      bool `db:"alert_backup_err"`
+	AlertPBSStaleHours  int  `db:"alert_pbs_stale_hours"` // 0 = disabled
 }
 
 // Alert represents a detected condition requiring attention.

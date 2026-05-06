@@ -154,10 +154,14 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 
 	// Build results; deduplicate by VMID (first = most recent within the job).
+	// Skip tasks with non-numeric id (job orchestration tasks, not per-VM tasks).
 	seen := make(map[int64]bool)
 	var result []map[string]any
 	for _, t := range jobTasks {
-		vmid, _ := strconv.ParseInt(t.id, 10, 64)
+		vmid, err := strconv.ParseInt(t.id, 10, 64)
+		if err != nil || vmid == 0 {
+			continue
+		}
 		if seen[vmid] {
 			continue
 		}
