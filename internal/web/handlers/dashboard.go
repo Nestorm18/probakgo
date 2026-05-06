@@ -47,6 +47,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	var alerts []domain.Alert
 	if cfg, err := h.store.GetEmailConfig(); err == nil {
 		alerts, _ = h.store.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr)
+		if cfg.AlertPBSStaleHours > 0 {
+			pbsStale, _ := h.store.GetPBSStaleAlerts(cfg.AlertPBSStaleHours)
+			alerts = append(alerts, pbsStale...)
+		}
 	}
 
 	// Task-level alerts: ERROR and MISSING VMs from latest PVE backup job

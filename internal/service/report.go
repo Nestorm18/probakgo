@@ -80,6 +80,11 @@ func (r *ReportService) SavePBSReport(req *domain.PBSReportRequest) error {
 		if err := r.store.InsertPBSGCStatus(storeID, ds.GCStatus); err != nil {
 			return fmt.Errorf("insert gc status: %w", err)
 		}
+		for _, g := range ds.Groups {
+			if err := r.store.InsertPBSSnapshot(storeID, g); err != nil {
+				return fmt.Errorf("insert pbs snapshot %s/%s: %w", g.BackupType, g.BackupID, err)
+			}
+		}
 	}
 	return nil
 }

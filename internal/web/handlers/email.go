@@ -55,6 +55,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
+		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 	}
 	if err := h.store.UpsertEmailConfig(cfg); err != nil {
 		http.Redirect(w, r, "/settings/email?flash="+err.Error(), http.StatusSeeOther)
@@ -104,6 +105,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.SendTime = existing.SendTime
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
+		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 	}
 	if err := h.store.UpsertEmailConfig(cfg); err != nil {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
@@ -135,10 +137,15 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	if alertDisk < 0 || alertDisk > 99 {
 		alertDisk = 0
 	}
+	pbsStaleHours, _ := strconv.Atoi(r.FormValue("alert_pbs_stale_hours"))
+	if pbsStaleHours < 0 {
+		pbsStaleHours = 0
+	}
 
 	cfg := domain.EmailConfig{
-		AlertDiskPct:   alertDisk,
-		AlertBackupErr: r.FormValue("alert_backup_err") == "on",
+		AlertDiskPct:       alertDisk,
+		AlertBackupErr:     r.FormValue("alert_backup_err") == "on",
+		AlertPBSStaleHours: pbsStaleHours,
 	}
 	if existing != nil {
 		cfg.SMTPHost = existing.SMTPHost

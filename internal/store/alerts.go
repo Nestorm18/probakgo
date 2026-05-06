@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"time"
 
 	"probakgo/internal/domain"
 )
@@ -114,6 +115,52 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 	}
 
 	return alerts, nil
+}
+
+// GetPBSStaleAlerts returns alerts for PBS snapshots whose last_backup is older than staleHours.
+// staleHours=0 disables the check.
+func (s *Store) GetPBSStaleAlerts(staleHours int) ([]domain.Alert, error) {
+	if staleHours <= 0 {
+		return nil, nil
+	}
+	cutoff := time.Now().Unix() - int64(staleHours)*3600
+	rows, err := s.db.Query(`
+		SELECT sv.name, st.store, sn.backup_type, sn.backup_id, sn.last_backup
+		FROM pbs_snapshots sn
+		JOIN pbs_stores st ON st.id = sn.store_id
+		JOIN pbs_reports r  ON r.id  = st.report_id
+		JOIN pbs_servers sv ON sv.id = r.server_id
+		WHERE sv.is_deleted = 0
+		  AND r.id IN (SELECT MAX(id) FROM pbs_reports GROUP BY server_id)
+		  AND sn.last_backup > 0
+		  AND sn.last_backup < ?
+		ORDER BY sv.name, st.store, sn.backup_type, sn.backup_id`, cutoff)
+	if err != nil {
+		return nil, fmt.Errorf("pbs stale alerts: %w", err)
+	}
+	defer rows.Close()
+	var alerts []domain.Alert
+	for rows.Next() {
+		var serverName, storeName, btype, bid string
+		var lastBackup int64
+		if err := rows.Scan(&serverName, &storeName, &btype, &bid, &lastBackup); err != nil {
+			return nil, err
+		}
+		h := int(time.Since(time.Unix(lastBackup, 0)).Hours())
+		var since string
+		if h >= 48 {
+			since = fmt.Sprintf("%dd", h/24)
+		} else {
+			since = fmt.Sprintf("%dh", h)
+		}
+		alerts = append(alerts, domain.Alert{
+			ServerName: serverName,
+			StoreName:  storeName,
+			Type:       "pbs_stale",
+			Message:    fmt.Sprintf("%s/%s sin backup desde hace %s", btype, bid, since),
+		})
+	}
+	return alerts, rows.Err()
 }
 
 func fmtBytes(b int64) string {
