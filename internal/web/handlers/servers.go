@@ -25,10 +25,12 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			stale, _ = h.report.IsStaleForServer(rep.ReportedAt, sv.Name)
 		}
+		alertCfg, _ := h.store.GetPVEAlertConfig(sv.ID)
 		r2 := map[string]any{
-			"Server":       sv,
-			"IsStale":      stale,
-			"TaskMissing":  0,
+			"Server":      sv,
+			"IsStale":     stale,
+			"TaskMissing": 0,
+			"AlertConfig": alertCfg,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -59,6 +61,8 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		"Username": username,
 		"Role":     role,
 		"Rows":     rows,
+		"Flash":    r.URL.Query().Get("flash"),
+		"FlashOK":  r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -133,6 +137,8 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	alertCfg, _ := h.store.GetPVEAlertConfig(id)
+
 	h.tmpl.Render(w, r, "server_pve_detail.html", map[string]any{
 		"Username":    username,
 		"Role":        role,
@@ -142,6 +148,9 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"BackupTasks": backupTasks,
 		"MissingVMs":  missingVMs,
 		"JobHistory":  jobHistory,
+		"AlertConfig": alertCfg,
+		"Flash":       r.URL.Query().Get("flash"),
+		"FlashOK":     r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -228,9 +237,11 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 	var rows []map[string]any
 	for _, sv := range servers {
 		rep, _ := h.store.GetLatestPBSReport(sv.ID)
+		alertCfg, _ := h.store.GetPBSAlertConfig(sv.ID)
 		r2 := map[string]any{
-			"Server":  sv,
-			"IsStale": rep == nil || rep.IsStale,
+			"Server":      sv,
+			"IsStale":     rep == nil || rep.IsStale,
+			"AlertConfig": alertCfg,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -243,6 +254,8 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		"Username": username,
 		"Role":     role,
 		"Rows":     rows,
+		"Flash":    r.URL.Query().Get("flash"),
+		"FlashOK":  r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -276,12 +289,17 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	alertCfg, _ := h.store.GetPBSAlertConfig(id)
+
 	h.tmpl.Render(w, r, "server_pbs_detail.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Server":   sv,
-		"Reports":  reports,
-		"Stores":   storeDetails,
+		"Username":    username,
+		"Role":        role,
+		"Server":      sv,
+		"Reports":     reports,
+		"Stores":      storeDetails,
+		"AlertConfig": alertCfg,
+		"Flash":       r.URL.Query().Get("flash"),
+		"FlashOK":     r.URL.Query().Get("ok") == "1",
 	})
 }
 

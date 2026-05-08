@@ -1,0 +1,156 @@
+package store
+
+import (
+	"database/sql"
+
+	"probakgo/internal/domain"
+)
+
+func (s *Store) GetPVEAlertConfig(serverID int64) (domain.PVEAlertConfig, error) {
+	row := s.db.QueryRow(
+		`SELECT disk_pct, stale_hours, backup_err FROM pve_alert_config WHERE server_id = ?`,
+		serverID,
+	)
+	var cfg domain.PVEAlertConfig
+	cfg.ServerID = serverID
+	var diskPct, staleHours, backupErr sql.NullInt64
+	if err := row.Scan(&diskPct, &staleHours, &backupErr); err == sql.ErrNoRows {
+		return cfg, nil
+	} else if err != nil {
+		return cfg, err
+	}
+	if diskPct.Valid {
+		v := int(diskPct.Int64)
+		cfg.DiskPct = &v
+	}
+	if staleHours.Valid {
+		v := int(staleHours.Int64)
+		cfg.StaleHours = &v
+	}
+	if backupErr.Valid {
+		v := int(backupErr.Int64)
+		cfg.BackupErr = &v
+	}
+	return cfg, nil
+}
+
+func (s *Store) UpsertPVEAlertConfig(cfg domain.PVEAlertConfig) error {
+	_, err := s.db.Exec(`
+		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, updated_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(server_id) DO UPDATE SET
+			disk_pct=excluded.disk_pct,
+			stale_hours=excluded.stale_hours,
+			backup_err=excluded.backup_err,
+			updated_at=excluded.updated_at`,
+		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.StaleHours), nullInt(cfg.BackupErr),
+	)
+	return err
+}
+
+func (s *Store) GetPVEVMAlertConfigs(serverID int64) ([]domain.PVEVMAlertConfig, error) {
+	rows, err := s.db.Query(
+		`SELECT id, server_id, vmid, backup_err, min_size_mb FROM pve_vm_alert_config WHERE server_id = ?`,
+		serverID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var configs []domain.PVEVMAlertConfig
+	for rows.Next() {
+		var c domain.PVEVMAlertConfig
+		var backupErr, minSizeMB sql.NullInt64
+		if err := rows.Scan(&c.ID, &c.ServerID, &c.VMID, &backupErr, &minSizeMB); err != nil {
+			return nil, err
+		}
+		if backupErr.Valid {
+			v := int(backupErr.Int64)
+			c.BackupErr = &v
+		}
+		if minSizeMB.Valid {
+			v := int(minSizeMB.Int64)
+			c.MinSizeMB = &v
+		}
+		configs = append(configs, c)
+	}
+	return configs, rows.Err()
+}
+
+func (s *Store) UpsertPVEVMAlertConfig(cfg domain.PVEVMAlertConfig) error {
+	_, err := s.db.Exec(`
+		INSERT INTO pve_vm_alert_config (server_id, vmid, backup_err, min_size_mb)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(server_id, vmid) DO UPDATE SET
+			backup_err=excluded.backup_err,
+			min_size_mb=excluded.min_size_mb`,
+		cfg.ServerID, cfg.VMID, nullInt(cfg.BackupErr), nullInt(cfg.MinSizeMB),
+	)
+	return err
+}
+
+func (s *Store) DeletePVEVMAlertConfig(serverID, vmid int64) error {
+	_, err := s.db.Exec(
+		`DELETE FROM pve_vm_alert_config WHERE server_id = ? AND vmid = ?`,
+		serverID, vmid,
+	)
+	return err
+}
+
+func (s *Store) GetPBSAlertConfig(serverID int64) (domain.PBSAlertConfig, error) {
+	row := s.db.QueryRow(
+		`SELECT disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config WHERE server_id = ?`,
+		serverID,
+	)
+	var cfg domain.PBSAlertConfig
+	cfg.ServerID = serverID
+	cfg.VerifyAlert = true // default on
+	var diskPct, daysUntilFull, staleHours sql.NullInt64
+	var verifyAlert int
+	if err := row.Scan(&diskPct, &daysUntilFull, &staleHours, &verifyAlert); err == sql.ErrNoRows {
+		return cfg, nil
+	} else if err != nil {
+		return cfg, err
+	}
+	if diskPct.Valid {
+		v := int(diskPct.Int64)
+		cfg.DiskPct = &v
+	}
+	if daysUntilFull.Valid {
+		v := int(daysUntilFull.Int64)
+		cfg.DaysUntilFull = &v
+	}
+	if staleHours.Valid {
+		v := int(staleHours.Int64)
+		cfg.StaleHours = &v
+	}
+	cfg.VerifyAlert = verifyAlert != 0
+	return cfg, nil
+}
+
+func (s *Store) UpsertPBSAlertConfig(cfg domain.PBSAlertConfig) error {
+	verifyInt := 0
+	if cfg.VerifyAlert {
+		verifyInt = 1
+	}
+	_, err := s.db.Exec(`
+		INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(server_id) DO UPDATE SET
+			disk_pct=excluded.disk_pct,
+			days_until_full=excluded.days_until_full,
+			stale_hours=excluded.stale_hours,
+			verify_alert=excluded.verify_alert,
+			updated_at=excluded.updated_at`,
+		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.DaysUntilFull), nullInt(cfg.StaleHours), verifyInt,
+	)
+	return err
+}
+
+// nullInt converts *int to a SQL-compatible value (nil → NULL, &v → v).
+func nullInt(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}

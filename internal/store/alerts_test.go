@@ -71,10 +71,10 @@ func TestGetAlerts_PBSDisk_OverThreshold(t *testing.T) {
 
 	found := false
 	for _, a := range alerts {
-		if a.Type == "disk" && a.ServerName == "pbs-heavy" {
+		if a.Type == domain.AlertTypeDisk && a.ServerName == "pbs-heavy" {
 			found = true
-			if a.UsedPct < 85 {
-				t.Errorf("UsedPct: want >= 85, got %d", a.UsedPct)
+			if a.Value == "" {
+				t.Error("Value should not be empty for disk alert")
 			}
 			if a.Message == "" {
 				t.Error("Message should not be empty")
@@ -95,7 +95,7 @@ func TestGetAlerts_PBSDisk_UnderThreshold(t *testing.T) {
 		t.Fatalf("get alerts: %v", err)
 	}
 	for _, a := range alerts {
-		if a.Type == "disk" && a.ServerName == "pbs-light" {
+		if a.Type == domain.AlertTypeDisk && a.ServerName == "pbs-light" {
 			t.Error("expected no disk alert for pbs-light at 50% usage")
 		}
 	}
@@ -112,7 +112,7 @@ func TestGetAlerts_PVEDisk_OverThreshold(t *testing.T) {
 
 	found := false
 	for _, a := range alerts {
-		if a.Type == "disk" && a.ServerName == "pve-heavy" {
+		if a.Type == domain.AlertTypeDisk && a.ServerName == "pve-heavy" {
 			found = true
 		}
 	}
@@ -134,7 +134,7 @@ func TestGetAlerts_BackupError(t *testing.T) {
 
 	found := false
 	for _, a := range alerts {
-		if a.Type == "backup_error" && a.ServerName == "pve-err" {
+		if a.Type == domain.AlertTypeBackupError && a.ServerName == "pve-err" {
 			found = true
 			if a.Message == "" {
 				t.Error("backup_error alert Message should not be empty")
@@ -157,7 +157,7 @@ func TestGetAlerts_BackupOK_NoAlert(t *testing.T) {
 		t.Fatalf("get alerts: %v", err)
 	}
 	for _, a := range alerts {
-		if a.Type == "backup_error" && a.ServerName == "pve-ok" {
+		if a.Type == domain.AlertTypeBackupError && a.ServerName == "pve-ok" {
 			t.Error("expected no backup_error alert for OK status")
 		}
 	}

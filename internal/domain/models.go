@@ -205,9 +205,62 @@ type EmailConfig struct {
 
 // Alert represents a detected condition requiring attention.
 type Alert struct {
+	ID         string    // dedup key: "type:serverType:serverID:store:vmid"
 	ServerName string
-	StoreName  string // empty for server-level alerts
-	Type       string // "disk" | "backup_error"
-	UsedPct    int    // filled for disk alerts
-	Message    string // human-readable description
+	ServerID   int64
+	ServerType string // "pve" | "pbs"
+	StoreName  string // empty if server-level
+	VMID       int64  // 0 if not applicable
+	VMName     string
+	Type       string // AlertType* constant
+	Severity   string // AlertSeverity* constant
+	Title      string
+	Message    string
+	Value      string // measured value, e.g. "87%"
+	Threshold  string // configured threshold, e.g. "85%"
+	DetectedAt time.Time
+}
+
+const (
+	AlertTypeDisk        = "disk"
+	AlertTypeBackupError = "backup_error"
+	AlertTypeBackupSize  = "backup_size"
+	AlertTypePBSFill     = "pbs_fill"
+	AlertTypePBSStale    = "pbs_stale"
+	AlertTypePBSVerify   = "pbs_verify"
+	AlertTypePVEStale    = "pve_stale"
+)
+
+const (
+	AlertSeverityCritical = "critical"
+	AlertSeverityWarning  = "warning"
+)
+
+// PVEAlertConfig holds per-server alert thresholds for a PVE server.
+// nil fields inherit from the global email_config values.
+type PVEAlertConfig struct {
+	ServerID   int64
+	DiskPct    *int // nil = use global; storage usage threshold %
+	StaleHours *int // nil = use global; 0 = disabled
+	BackupErr  *int // nil = use global; 0 = ignore; 1 = alert
+}
+
+// PVEVMAlertConfig holds per-VM overrides within a PVE server.
+// nil fields inherit from the server-level PVEAlertConfig.
+type PVEVMAlertConfig struct {
+	ID        int64
+	ServerID  int64
+	VMID      int64
+	BackupErr *int // nil = inherit; 0 = ignore; 1 = alert
+	MinSizeMB *int // nil = no size check; alert if backup < N MB
+}
+
+// PBSAlertConfig holds per-server alert thresholds for a PBS server.
+// nil fields inherit from the global email_config values.
+type PBSAlertConfig struct {
+	ServerID      int64
+	DiskPct       *int // nil = use global
+	DaysUntilFull *int // nil = disabled; alert if disk fills in < N days
+	StaleHours    *int // nil = use global; 0 = disabled
+	VerifyAlert   bool
 }

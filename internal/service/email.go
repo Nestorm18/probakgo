@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"log/slog"
 	"net/smtp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -216,14 +217,15 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 	if alerts, err := st.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr); err == nil {
 		for _, a := range alerts {
 			switch a.Type {
-			case "disk":
+			case domain.AlertTypeDisk:
+				pct, _ := strconv.Atoi(a.Value)
 				diskAlerts = append(diskAlerts, diskAlertRow{
 					ServerName: a.ServerName,
 					StoreName:  a.StoreName,
-					UsedPct:    a.UsedPct,
+					UsedPct:    pct,
 					Detail:     a.Message,
 				})
-			case "backup_error":
+			case domain.AlertTypeBackupError:
 				backupErrors = append(backupErrors, serverRow{
 					Name:        a.ServerName,
 					StaleReason: a.Message,

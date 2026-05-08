@@ -2,33 +2,20 @@
 {{block "page_heading" .}}Dashboard{{end}}
 {{block "page_content" .}}
 
-{{if .Alerts}}
-<div class="card mb-4" style="border-left:3px solid var(--clr-warn)">
-  <div class="card-header d-flex align-items-center gap-2">
-    <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
-    <span>Alertas</span>
-    <span class="badge ms-1" style="background:var(--clr-warn);color:#fff;font-size:.73rem">{{len .Alerts}}</span>
-  </div>
-  <div class="card-body p-0" style="border-radius:0 0 .75rem .75rem;overflow:hidden">
-    {{range .Alerts}}
-    <div class="d-flex align-items-start gap-3 px-3 py-2" style="border-bottom:1px solid var(--border-color)">
-      {{if eq .Type "disk"}}
-        <i class="bi bi-hdd-fill mt-1" style="color:{{if ge .UsedPct 95}}var(--clr-danger){{else}}var(--clr-warn){{end}};flex-shrink:0"></i>
-      {{else if eq .Type "task_missing"}}
-        <i class="bi bi-exclamation-circle-fill mt-1" style="color:var(--clr-warn);flex-shrink:0"></i>
-      {{else}}
-        <i class="bi bi-x-circle-fill mt-1" style="color:var(--clr-danger);flex-shrink:0"></i>
-      {{end}}
-      <div>
-        <div style="font-size:.85rem;font-weight:600;color:var(--txt-primary)">
-          {{.ServerName}}{{if .StoreName}} · <span style="font-weight:400">{{.StoreName}}</span>{{end}}
-        </div>
-        <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Message}}</div>
-      </div>
+{{if or (gt .AlertCritical 0) (gt .AlertWarning 0)}}
+<a href="/alerts" class="text-decoration-none">
+  <div class="card mb-4 d-flex flex-row align-items-center gap-3 px-4 py-3" style="border-left:3px solid {{if gt .AlertCritical 0}}var(--clr-danger){{else}}var(--clr-warn){{end}}">
+    <i class="bi bi-bell-fill fs-5" style="color:{{if gt .AlertCritical 0}}var(--clr-danger){{else}}var(--clr-warn){{end}}"></i>
+    <div class="flex-grow-1">
+      <span style="font-weight:600;color:var(--txt-primary)">Alertas activas</span>
+      <span class="ms-3" style="font-size:.82rem;color:var(--txt-secondary)">
+        {{if gt .AlertCritical 0}}<span class="badge" style="background:var(--clr-danger)">{{.AlertCritical}} crítica{{if gt .AlertCritical 1}}s{{end}}</span>{{end}}
+        {{if gt .AlertWarning 0}}<span class="badge ms-1" style="background:var(--clr-warn)">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>{{end}}
+      </span>
     </div>
-    {{end}}
+    <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.8rem"></i>
   </div>
-</div>
+</a>
 {{end}}
 
 <!-- Stat cards -->
