@@ -85,9 +85,52 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 				log.Printf("WARN: PBS groups for %q: %v", storeName, err)
 				continue
 			}
-			if g, ok := groups["data"]; ok {
-				ds["groups"] = g
+			groupList, _ := groups["data"].([]any)
+
+			// Fetch snapshot sizes and verification states (groups endpoint omits both).
+			// Build map (backup-type/backup-id/backup-time) → {size, verification-state}.
+			type snapInfo struct {
+				size         int64
+				verifState   string
 			}
+			snapData := map[string]snapInfo{}
+			if snaps, err := c.get(fmt.Sprintf("admin/datastore/%s/snapshots", storeName)); err == nil {
+				for _, s := range snaps["data"].([]any) {
+					snap, ok := s.(map[string]any)
+					if !ok {
+						continue
+					}
+					bt, _ := snap["backup-type"].(string)
+					bi, _ := snap["backup-id"].(string)
+					ts, _ := snap["backup-time"].(float64)
+					sz, _ := snap["size"].(float64)
+					var verifState string
+					if v, ok := snap["verification"].(map[string]any); ok {
+						verifState, _ = v["state"].(string)
+					}
+					key := fmt.Sprintf("%s/%s/%d", bt, bi, int64(ts))
+					snapData[key] = snapInfo{size: int64(sz), verifState: verifState}
+				}
+			} else {
+				log.Printf("WARN: PBS snapshots for %q: %v", storeName, err)
+			}
+
+			// Inject size and verification-state of the latest snapshot into each group.
+			for _, g := range groupList {
+				grp, ok := g.(map[string]any)
+				if !ok {
+					continue
+				}
+				bt, _ := grp["backup-type"].(string)
+				bi, _ := grp["backup-id"].(string)
+				lastBackup, _ := grp["last-backup"].(float64)
+				key := fmt.Sprintf("%s/%s/%d", bt, bi, int64(lastBackup))
+				if info, found := snapData[key]; found {
+					grp["size"] = info.size
+					grp["verification-state"] = info.verifState
+				}
+			}
+			ds["groups"] = groupList
 		}
 	}
 	return map[string]any{

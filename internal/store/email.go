@@ -47,7 +47,7 @@ func (s *Store) UpsertEmailConfig(c domain.EmailConfig) error {
 			is_enabled, send_time,
 			retention_months, retention_enabled, alert_disk_pct, alert_backup_err,
 			alert_pbs_stale_hours
-		) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			smtp_host=excluded.smtp_host,
 			smtp_port=excluded.smtp_port,
