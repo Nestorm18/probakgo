@@ -266,10 +266,12 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		for _, st := range stores {
 			gc, _ := h.store.GetPBSGCStatus(st.ID)
 			history, _ := h.store.GetPBSHistory(st.ID)
+			snapshots, _ := h.store.GetPBSSnapshotsForStore(st.ID)
 			storeDetails = append(storeDetails, map[string]any{
-				"Store":   st,
-				"GC":      gc,
-				"History": history,
+				"Store":     st,
+				"GC":        gc,
+				"History":   history,
+				"Snapshots": snapshots,
 			})
 		}
 	}

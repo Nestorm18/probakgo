@@ -67,7 +67,7 @@ func makeFuncMap() template.FuncMap {
 			}
 		},
 		"formatBytes": func(b int64) string {
-			const unit = 1024
+			const unit = 1000
 			if b < unit {
 				return fmt.Sprintf("%d B", b)
 			}
@@ -76,7 +76,7 @@ func makeFuncMap() template.FuncMap {
 				div *= unit
 				exp++
 			}
-			return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
+			return fmt.Sprintf("%.2f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 		},
 		"pct": func(used, total int64) int {
 			if total == 0 {
@@ -101,6 +101,9 @@ func makeFuncMap() template.FuncMap {
 				return "–"
 			}
 			return time.Unix(ts, 0).Format("02 Jan 2006 15:04")
+		},
+		"isPast": func(ts int64) bool {
+			return ts > 0 && time.Unix(ts, 0).Before(time.Now())
 		},
 		"isAdmin": func(role string) bool { return role == "admin" },
 		"canEdit": func(role string) bool { return role == "admin" || role == "editor" },

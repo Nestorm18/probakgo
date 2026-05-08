@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -155,11 +156,12 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 
 	// Build results; deduplicate by VMID (first = most recent within the job).
 	// Skip tasks with non-numeric id (job orchestration tasks, not per-VM tasks).
+	// PBS pull-mode tasks use id format "vm/101" or "ct/101" instead of just "101".
 	seen := make(map[int64]bool)
 	var result []map[string]any
 	for _, t := range jobTasks {
-		vmid, err := strconv.ParseInt(t.id, 10, 64)
-		if err != nil || vmid == 0 {
+		vmid := parseVMID(t.id)
+		if vmid == 0 {
 			continue
 		}
 		if seen[vmid] {
@@ -178,11 +180,9 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 			"filename":  "",
 		}
 		for _, f := range filesByVMID[vmid] {
-			diff := f.ctime - int64(t.start)
-			if diff < 0 {
-				diff = -diff
-			}
-			if diff < 300 {
+			// File must have been created during this task's execution window.
+			// ±300s of starttime caused cross-matching between consecutive jobs.
+			if f.ctime >= int64(t.start)-60 && f.ctime <= int64(t.end)+60 {
 				task["size"] = f.size
 				task["filename"] = f.volid
 				break
@@ -378,6 +378,22 @@ func jobBackupStatus(tasks []map[string]any) backupStatus {
 		EndTime:   maxEnd,
 		Duration:  maxEnd - minStart,
 	}
+}
+
+// parseVMID extracts a numeric VMID from a task id field.
+// Handles both plain "101" and PBS pull-mode format "vm/101" / "ct/101".
+func parseVMID(id string) int64 {
+	// Try plain numeric first.
+	if v, err := strconv.ParseInt(id, 10, 64); err == nil {
+		return v
+	}
+	// Try "type/vmid" format (vm/101, ct/101, etc.).
+	if i := strings.LastIndex(id, "/"); i >= 0 {
+		if v, err := strconv.ParseInt(id[i+1:], 10, 64); err == nil {
+			return v
+		}
+	}
+	return 0
 }
 
 func str(v any) string {
