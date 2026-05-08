@@ -7,6 +7,13 @@
 {{end}}
 {{block "page_content" .}}
 
+{{if .Flash}}
+<div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible fade show mb-4" role="alert">
+  {{.Flash}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{{end}}
+
 <!-- Info tiles -->
 <div class="row g-3 mb-4">
   <div class="col-6 col-lg-3">

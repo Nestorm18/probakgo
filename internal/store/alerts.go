@@ -7,6 +7,13 @@ import (
 	"probakgo/internal/domain"
 )
 
+func diskSeverity(pct int) string {
+	if pct >= 95 {
+		return domain.AlertSeverityCritical
+	}
+	return domain.AlertSeverityWarning
+}
+
 // GetAlerts returns active disk and backup-error alerts based on current thresholds.
 // diskPct=0 disables disk checks. checkBackupErr=false disables backup error checks.
 func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, error) {
@@ -36,11 +43,17 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 			}
 			pct := int(float64(used) / float64(total) * 100)
 			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("disk:pbs:%s:%s", serverName, storeName),
 				ServerName: serverName,
+				ServerType: "pbs",
 				StoreName:  storeName,
-				Type:       "disk",
-				UsedPct:    pct,
+				Type:       domain.AlertTypeDisk,
+				Severity:   diskSeverity(pct),
+				Title:      "Disco casi lleno",
 				Message:    fmt.Sprintf("%d%% usado (%s / %s)", pct, fmtBytes(used), fmtBytes(total)),
+				Value:      fmt.Sprintf("%d", pct),
+				Threshold:  fmt.Sprintf("%d%%", diskPct),
+				DetectedAt: time.Now(),
 			})
 		}
 		if err := rows.Err(); err != nil {
@@ -72,11 +85,17 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 			}
 			pct := int(float64(used) / float64(total) * 100)
 			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("disk:pve:%s:%s", serverName, storageName),
 				ServerName: serverName,
+				ServerType: "pve",
 				StoreName:  storageName,
-				Type:       "disk",
-				UsedPct:    pct,
+				Type:       domain.AlertTypeDisk,
+				Severity:   diskSeverity(pct),
+				Title:      "Disco casi lleno",
 				Message:    fmt.Sprintf("%d%% usado (%s / %s)", pct, fmtBytes(used), fmtBytes(total)),
+				Value:      fmt.Sprintf("%d", pct),
+				Threshold:  fmt.Sprintf("%d%%", diskPct),
+				DetectedAt: time.Now(),
 			})
 		}
 		if err := rows2.Err(); err != nil {
@@ -104,9 +123,14 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 				return nil, err
 			}
 			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("backup_error:pve:%s", serverName),
 				ServerName: serverName,
-				Type:       "backup_error",
+				ServerType: "pve",
+				Type:       domain.AlertTypeBackupError,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Backup fallido",
 				Message:    fmt.Sprintf("último backup fallido: %s", status),
+				DetectedAt: time.Now(),
 			})
 		}
 		if err := rows.Err(); err != nil {
@@ -154,10 +178,16 @@ func (s *Store) GetPBSStaleAlerts(staleHours int) ([]domain.Alert, error) {
 			since = fmt.Sprintf("%dh", h)
 		}
 		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("pbs_stale:pbs:%s:%s:%s/%s", serverName, storeName, btype, bid),
 			ServerName: serverName,
+			ServerType: "pbs",
 			StoreName:  storeName,
-			Type:       "pbs_stale",
+			Type:       domain.AlertTypePBSStale,
+			Severity:   domain.AlertSeverityWarning,
+			Title:      "Snapshot sin actualizar",
 			Message:    fmt.Sprintf("%s/%s sin backup desde hace %s", btype, bid, since),
+			Value:      since,
+			DetectedAt: time.Now(),
 		})
 	}
 	return alerts, rows.Err()

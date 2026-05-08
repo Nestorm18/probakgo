@@ -53,11 +53,16 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Use(RequireLogin)
 
 		r.Get("/", h.Dashboard)
+		r.Get("/alerts", h.Alerts)
+		r.Post("/alerts/suppress", h.AlertSuppressPost)
+		r.Post("/alerts/unsuppress", h.AlertUnsuppressPost)
 		r.Get("/servers/pve", h.PVEServers)
 		r.Get("/servers/pve/{id}", h.PVEServerDetail)
 		r.Get("/servers/pve/{id}/reports", h.PVEServerReports)
 		r.Get("/servers/pbs", h.PBSServers)
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
+		r.With(RequireEditor).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
+		r.With(RequireEditor).Post("/servers/pbs/{id}/alerts", h.PBSAlertConfigPost)
 
 		// API keys - list visible to all, writes admin-only, reveal admin-only
 		r.Get("/api-keys", h.APIKeys)

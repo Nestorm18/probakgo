@@ -28,6 +28,7 @@
       <div class="sidebar-label">Monitor</div>
       <ul class="nav flex-column gap-1 mb-3">
         <li><a class="nav-link {{if eq .Active "dashboard"}}active{{end}}" href="/"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
+        <li><a class="nav-link {{if eq .Active "alerts-view"}}active{{end}}" href="/alerts"><i class="bi bi-bell"></i>Alertas{{if .AlertCritical}}<span class="badge ms-auto" style="background:var(--clr-danger);font-size:.65rem">{{.AlertCritical}}</span>{{else if .AlertWarning}}<span class="badge ms-auto" style="background:var(--clr-warn);font-size:.65rem">{{.AlertWarning}}</span>{{end}}</a></li>
         <li><a class="nav-link {{if eq .Active "pve"}}active{{end}}" href="/servers/pve"><i class="bi bi-server"></i>Proxmox VE</a></li>
         <li><a class="nav-link {{if eq .Active "pbs"}}active{{end}}" href="/servers/pbs"><i class="bi bi-archive"></i>Proxmox BS</a></li>
       </ul>

@@ -21,6 +21,10 @@ $SERVER_PASS  = $SSH_PASS
 $CLIENT1_PASS = $SSH_PASS
 $CLIENT2_PASS = $SSH_PASS
 
+# Write password to a temp file with UTF-8 encoding so sshpass handles non-ASCII (e.g. ñ)
+$tmpPassFile = [System.IO.Path]::GetTempFileName()
+[System.IO.File]::WriteAllText($tmpPassFile, $SSH_PASS, [System.Text.Encoding]::UTF8)
+
 if (-not ($Server -or $Clients -or $All -or $Update)) { $All = $true }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,9 +43,7 @@ $hasSshpass = $null -ne (Get-Command sshpass -ErrorAction SilentlyContinue)
 function Invoke-SSH {
     param([string]$target, [string]$password, [string]$cmd)
     if ($password -and $hasSshpass) {
-        $env:SSHPASS = $password
-        sshpass -e ssh -o StrictHostKeyChecking=no $target $cmd
-        Remove-Item Env:SSHPASS -ErrorAction SilentlyContinue
+        sshpass -f $tmpPassFile ssh -o StrictHostKeyChecking=no $target $cmd
     } else {
         ssh $target $cmd
     }
@@ -50,9 +52,7 @@ function Invoke-SSH {
 function Invoke-SCP {
     param([string]$target, [string]$password, [string]$src, [string]$dst)
     if ($password -and $hasSshpass) {
-        $env:SSHPASS = $password
-        sshpass -e scp -o StrictHostKeyChecking=no $src "${target}:${dst}"
-        Remove-Item Env:SSHPASS -ErrorAction SilentlyContinue
+        sshpass -f $tmpPassFile scp -o StrictHostKeyChecking=no $src "${target}:${dst}"
     } else {
         scp $src "${target}:${dst}"
     }
@@ -102,12 +102,12 @@ echo "Client updated OK"
     Write-Host "=== Running vzdump on $CLIENT1_HOST ===" -ForegroundColor Cyan
     # Invoke-SSH $CLIENT1_HOST $CLIENT1_PASS "vzdump 101 --storage NAS --mode snapshot"
 
-    Invoke-SSH $CLIENT1_HOST $CLIENT1_PASS "vzdump 101 --notification-mode auto --node soporte1 --remove 0 --mode snapshot --storage PBS"
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "vzdump PBS OK" -ForegroundColor Green
-    } else {
-        Write-Warning "vzdump PBS returned exit code $LASTEXITCODE"
-    }
+    # Invoke-SSH $CLIENT1_HOST $CLIENT1_PASS "vzdump 101 --notification-mode auto --node soporte1 --remove 0 --mode snapshot --storage PBS"
+    # if ($LASTEXITCODE -eq 0) {
+    #     Write-Host "vzdump PBS OK" -ForegroundColor Green
+    # } else {
+    #     Write-Warning "vzdump PBS returned exit code $LASTEXITCODE"
+    # }
 
     # Write-Host "=== Running PVE report on $CLIENT1_HOST ===" -ForegroundColor Cyan
     # Invoke-SSH $CLIENT1_HOST $CLIENT1_PASS "/opt/probakgo/probakgo-client"
@@ -179,4 +179,5 @@ if ($All -or $Server)  { Deploy-Server }
 if ($All -or $Clients) { Deploy-Clients }
 if ($Update)           { Update-All }
 
+Remove-Item $tmpPassFile -ErrorAction SilentlyContinue
 Write-Host "`nDone." -ForegroundColor Green

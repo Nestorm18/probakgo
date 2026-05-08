@@ -18,6 +18,7 @@ var standaloneTemplates = map[string]bool{
 
 // templateActive maps template name → sidebar active key
 var templateActive = map[string]string{
+	"alerts.html":             "alerts-view",
 	"dashboard.html":          "dashboard",
 	"servers_pve.html":        "pve",
 	"server_pve_detail.html":  "pve",
@@ -104,6 +105,19 @@ func makeFuncMap() template.FuncMap {
 		},
 		"isPast": func(ts int64) bool {
 			return ts > 0 && time.Unix(ts, 0).Before(time.Now())
+		},
+		"daysUntil": func(ts int64) int {
+			d := int(time.Until(time.Unix(ts, 0)).Hours() / 24)
+			if d < 0 {
+				return 0
+			}
+			return d
+		},
+		"deref": func(p *int) int {
+			if p == nil {
+				return 0
+			}
+			return *p
 		},
 		"isAdmin": func(role string) bool { return role == "admin" },
 		"canEdit": func(role string) bool { return role == "admin" || role == "editor" },

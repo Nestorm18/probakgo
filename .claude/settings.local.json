@@ -19,7 +19,9 @@
       "Bash(sed 's/.*\\) //')",
       "Bash(xargs -I {} basename {})",
       "Bash(xargs grep *)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "Bash(Test-Path *)",
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\Traballo\\\\GolandProjects\\\\probakgo\\\\web\\\\templates\\\\server_pbs_detail.html'\\).Count\")"
     ]
   }
 }

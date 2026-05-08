@@ -1,0 +1,190 @@
+{{block "page_title" .}}Alertas - Probakgo{{end}}
+{{block "page_heading" .}}Alertas{{end}}
+{{block "page_content" .}}
+
+<!-- Summary bar -->
+<div class="d-flex gap-3 mb-4 flex-wrap">
+  {{if .AlertCritical}}
+  <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-danger) 30%,transparent)">
+    <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
+    <span style="font-weight:600;color:var(--clr-danger)">{{.AlertCritical}} crítica{{if gt .AlertCritical 1}}s{{end}}</span>
+  </div>
+  {{end}}
+  {{if .AlertWarning}}
+  <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-warn) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-warn) 30%,transparent)">
+    <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
+    <span style="font-weight:600;color:var(--clr-warn)">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>
+  </div>
+  {{end}}
+  {{if and (not .AlertCritical) (not .AlertWarning)}}
+  <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-ok) 30%,transparent)">
+    <i class="bi bi-check-circle-fill" style="color:var(--clr-ok)"></i>
+    <span style="font-weight:600;color:var(--clr-ok)">Sin alertas activas</span>
+  </div>
+  {{end}}
+
+  <!-- Filters -->
+  <div class="ms-auto d-flex gap-2 flex-wrap">
+    <form method="get" action="/alerts" class="d-flex gap-2 flex-wrap">
+      <select name="severity" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="" {{if eq .FilterSeverity ""}}selected{{end}}>Todas las severidades</option>
+        <option value="critical" {{if eq .FilterSeverity "critical"}}selected{{end}}>Crítica</option>
+        <option value="warning" {{if eq .FilterSeverity "warning"}}selected{{end}}>Advertencia</option>
+      </select>
+      <select name="server" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <option value="" {{if eq .FilterServer ""}}selected{{end}}>Todos los servidores</option>
+        {{range .ServerNames}}
+        <option value="{{.}}" {{if eq . $.FilterServer}}selected{{end}}>{{.}}</option>
+        {{end}}
+      </select>
+      {{if or .FilterSeverity .FilterServer}}
+      <a href="/alerts" class="btn btn-sm btn-secondary">Limpiar</a>
+      {{end}}
+    </form>
+  </div>
+</div>
+
+<!-- Active alert list -->
+{{if .Alerts}}
+<div class="card mb-4">
+  <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
+    {{range .Alerts}}
+    <div class="d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
+      <div class="mt-1" style="flex-shrink:0;width:1.1rem;text-align:center">
+        {{if eq .Severity "critical"}}
+          <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
+        {{else}}
+          <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
+        {{end}}
+      </div>
+      <div class="flex-grow-1 min-w-0">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <span style="font-weight:600;font-size:.88rem;color:var(--txt-primary)">{{.Title}}</span>
+          {{if eq .Severity "critical"}}
+            <span class="badge" style="background:var(--clr-danger);font-size:.68rem">crítica</span>
+          {{else}}
+            <span class="badge" style="background:var(--clr-warn);font-size:.68rem">advertencia</span>
+          {{end}}
+        </div>
+        <div style="font-size:.8rem;color:var(--txt-secondary)">{{.Message}}</div>
+        <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size:.75rem;color:var(--txt-muted)">
+          <span><i class="bi bi-server me-1"></i>{{.ServerName}}</span>
+          {{if .StoreName}}<span><i class="bi bi-hdd me-1"></i>{{.StoreName}}</span>{{end}}
+          {{if .VMName}}<span><i class="bi bi-pc me-1"></i>{{.VMName}}</span>{{end}}
+          {{if .Value}}<span>Valor: <strong style="color:var(--txt-primary)">{{.Value}}</strong></span>{{end}}
+          {{if .Threshold}}<span>Umbral: {{.Threshold}}</span>{{end}}
+        </div>
+      </div>
+      <div class="d-flex gap-1 align-items-start mt-1" style="flex-shrink:0">
+        {{if eq .ServerType "pve"}}
+          <span class="badge" style="background:var(--clr-accent);font-size:.68rem">PVE</span>
+        {{else}}
+          <span class="badge" style="background:#6c757d;font-size:.68rem">PBS</span>
+        {{end}}
+        {{if $.Role}}{{if canEdit $.Role}}
+        <button class="btn btn-sm suppress-open-btn ms-1"
+                style="padding:.15rem .4rem;font-size:.75rem;color:var(--txt-muted);background:none;border:1px solid var(--border-color)"
+                title="Suprimir temporalmente"
+                data-alert-id="{{.ID}}"
+                data-alert-title="{{.Title}}"
+                data-server-name="{{.ServerName}}">
+          <i class="bi bi-bell-slash"></i>
+        </button>
+        {{end}}{{end}}
+      </div>
+    </div>
+    {{end}}
+  </div>
+</div>
+{{else}}
+<div class="card mb-4">
+  <div class="card-body text-center py-5" style="color:var(--txt-muted)">
+    <i class="bi bi-check-circle fs-2 mb-2 d-block" style="color:var(--clr-ok)"></i>
+    <div style="font-size:.9rem">No hay alertas{{if or .FilterSeverity .FilterServer}} con los filtros actuales{{end}}</div>
+  </div>
+</div>
+{{end}}
+
+<!-- Suppressed alerts -->
+{{if .Suppressed}}
+<details class="mb-3">
+  <summary style="cursor:pointer;font-size:.82rem;color:var(--txt-muted);list-style:none;display:flex;align-items:center;gap:.5rem">
+    <i class="bi bi-bell-slash"></i>
+    <span>Suprimidas ({{len .Suppressed}})</span>
+  </summary>
+  <div class="card mt-2">
+    <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
+      {{range .Suppressed}}
+      <div class="d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
+        <div class="flex-grow-1 min-w-0">
+          <div style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</div>
+          <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>
+          <div style="font-size:.73rem;color:var(--txt-muted);margin-top:.25rem">
+            <i class="bi bi-server me-1"></i>{{.Alert.ServerName}}
+            · Suprimida hasta {{formatTime .Until}}
+          </div>
+        </div>
+        <form method="post" action="/alerts/unsuppress" class="mt-1">
+          {{$.CSRFField}}
+          <input type="hidden" name="alert_id" value="{{.Alert.ID}}">
+          <button type="submit" class="btn btn-sm btn-secondary" style="font-size:.75rem;padding:.2rem .5rem">
+            <i class="bi bi-bell me-1"></i>Reactivar
+          </button>
+        </form>
+      </div>
+      {{end}}
+    </div>
+  </div>
+</details>
+{{end}}
+
+<!-- Suppress modal -->
+<div class="modal fade" id="suppressModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold"><i class="bi bi-bell-slash me-2"></i>Suprimir alerta</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/alerts/suppress">
+        {{.CSRFField}}
+        <input type="hidden" id="suppressAlertId" name="alert_id">
+        <div class="modal-body pt-1">
+          <p id="suppressAlertDesc" class="mb-3" style="font-size:.85rem;color:var(--txt-secondary)"></p>
+          <div class="mb-3">
+            <label class="form-label" style="font-size:.82rem">Suprimir durante</label>
+            <select name="days" class="form-select form-select-sm">
+              <option value="1">1 día</option>
+              <option value="3" selected>3 días</option>
+              <option value="7">7 días</option>
+              <option value="14">14 días</option>
+              <option value="30">30 días</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:.82rem">Motivo <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Mantenimiento programado...">
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-warning">Suprimir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{{end}}
+{{block "page_scripts" .}}
+<script>
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.suppress-open-btn');
+  if (!btn) return;
+  const d = btn.dataset;
+  document.getElementById('suppressAlertId').value = d.alertId;
+  document.getElementById('suppressAlertDesc').textContent = d.alertTitle + ' — ' + d.serverName;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('suppressModal')).show();
+});
+</script>
+{{end}}

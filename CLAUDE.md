@@ -106,12 +106,13 @@ go build -o probakgo-client ./client/
 
 **Server:**
 - API: all endpoints (health, auth, PVE/PBS reports, backup config, admin API keys, download)
-- Web UI: dashboard, PVE servers + detail + historical reports, PBS servers, API keys, users, email settings, profile
+- Web UI: dashboard, PVE servers + detail + historical reports, PBS servers + detail (snapshots, estimated fill, mount status), API keys, users, email settings, profile
 - Email: daily report scheduler (configurable time via DB, SMTP with STARTTLS)
-- DB: SQLite with embedded migrations
+- DB: SQLite with embedded migrations (001–006; 007 planned for alert config)
 - Auth: bcrypt passwords, session cookies (gorilla/sessions)
 - Roles: 3-tier RBAC - `reader` (read-only), `editor` (backup config), `admin` (full access)
 - API key types: `pbk-` (client), `adm-` (admin)
+- Alerts: global thresholds in `email_config` evaluated by `internal/store/alerts.go`; per-server/VM alert config planned (see TODO.md)
 
 **Client:**
 - Detects server type (PVE/PBS) from `/etc/issue`
@@ -137,7 +138,11 @@ r.StaleReason = staleReason.String
 ```
 
 ### Template functions (web/handlers/templates.go)
-Registered in `makeFuncMap()`: `formatTime`, `formatBytes`, `pct`, `formatDuration`, `formatUnixTime`, `isAdmin`, `canEdit`, `keyPreview`. Add new helpers there, not inline in templates.
+Registered in `makeFuncMap()`: `formatTime`, `formatBytes`, `pct`, `formatDuration`, `formatUnixTime`, `isPast`, `isAdmin`, `canEdit`, `keyPreview`. Add new helpers there, not inline in templates.
+
+- `formatBytes`: uses SI base 1000 (not 1024), 2 decimal places. e.g. "1.05 GB".
+- `isPast(ts int64) bool`: returns true if Unix timestamp is in the past (used for estimated full date).
+- Template-to-Active-key mapping lives in `templateActive` map in the same file. Add new templates there.
 
 ### Import cycle note (2026-04)
 Session code lives in `internal/session` (not `internal/web`) to avoid:
@@ -147,8 +152,12 @@ Session code lives in `internal/session` (not `internal/web`) to avoid:
 Email, Mantenimiento y Alertas son páginas separadas bajo `/settings/`:
 - `/settings/email` — SMTP, destinatarios, hora de envío
 - `/settings/maintenance` — retención de reportes (meses + toggle)
-- `/settings/alerts` — umbral de disco (%) + alerta de backup fallido
+- `/settings/alerts` — umbrales globales: disco (%), backup fallido, PBS stale (h)
+- `/settings/ip-bans` — gestión de IPs baneadas
 Cada POST carga el config existente y sobreescribe solo sus campos.
+
+`/settings/alerts` son los umbrales **globales** (fallback). La config per-servidor/VM
+está planificada en TODO.md y vivirá en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`.
 
 ### Testing strategy (2026-04)
 Tests de store usan `internal/store/testhelpers_test.go` → `openTestDB(t)`:
@@ -233,7 +242,17 @@ Default login: `probakgo` / `admin123` - change immediately.
 
 ### DB migrations
 
-Embedded in `internal/db/migrations/`. Applied automatically on server startup via `schema_migrations` table. Currently: `001_initial.up.sql` (all schema including roles).
+Embedded in `internal/db/migrations/`. Applied automatically on server startup via `schema_migrations` table.
+
+| File | Contents |
+|------|----------|
+| `001_initial.up.sql` | All base schema: servers, reports, storages, email_config, users, API keys, roles |
+| `002_settings.up.sql` | Settings columns in email_config (retention, alerts) |
+| `003_ip_bans.up.sql` | `ip_bans` table |
+| `004_backup_tasks.up.sql` | `pve_backup_tasks` table |
+| `005_remove_mobile_key_type.up.sql` | Remove deprecated key type |
+| `006_pbs_snapshots.up.sql` | `pbs_snapshots` table + `alert_pbs_stale_hours` column in email_config |
+| `007_alert_config.up.sql` | (planned) `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config` |
 
 ### Test fixtures (`testdata/`)
 
@@ -252,7 +271,11 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 1. Consulta `nodes/{node}/tasks?typefilter=vzdump&limit=100`, ordena por `endtime DESC`.
 2. Toma la tarea más reciente como ancla. Añade tareas consecutivas mientras el gap entre `prevTask.start` y `currentTask.end` sea < 2h. Al superar 2h de hueco, para — es un job distinto.
 3. Deduplica por VMID (se queda con la más reciente dentro del job).
-4. Enriquece cada tarea con nombre de VM (de `nodes/{node}/qemu` y `lxc`) y fichero+tamaño (cruzando con storage content por VMID y |ctime - starttime| < 300s).
+4. Enriquece cada tarea con nombre de VM (de `nodes/{node}/qemu` y `lxc`) y fichero+tamaño (cruzando con storage content por VMID y ventana `[task.start-60, task.end+60]`).
+
+**PBS pull-mode task IDs:** en PVE configurado con PBS como destino, las tareas vzdump pueden tener IDs en formato `"vm/101"` o `"ct/101"` en lugar del numérico `"101"`. `parseVMID()` en `client/pve.go` maneja ambos formatos.
+
+**Ventana de matching de ficheros:** se usa `f.ctime >= task.start-60 && f.ctime <= task.end+60` (no `±300s desde starttime`). El motivo: `±300s` causaba cross-matching entre tareas consecutivas de jobs distintos.
 
 **Por qué 2h de gap:** backups consecutivos dentro de un job son secuenciales (VM A acaba → VM B empieza, gap de segundos/minutos). Entre jobs distintos (mediodía vs medianoche) el gap es de horas. 2h es suficientemente grande para no partir un job largo y suficientemente pequeño para separar dos jobs del mismo día.
 
@@ -268,7 +291,38 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 - Domingo: mismo razonamiento → **no stale** ✓
 - Martes 05h (si lunes falló): `Lun 00h + 28h = Mar 04h < Mar 05h` → completado. Sin reporte desde Lun 00h → **stale** ✓
 
-**UI en `web/templates/server_pve_detail.html`:**
+**UI en `web/templates/server_pve_detail.html` (PVE):**
 - Card "Último job de backup": tabla VMID/Nombre/Estado/Duración/Tamaño/Fichero del job más reciente. El tooltip del badge ERROR muestra el mensaje completo de Proxmox.
 - Accordion "Historial de jobs (últimos 5 días)": hasta 4 jobs anteriores, colapsables, con badge OK/ERROR en la cabecera. Solo muestra entradas que tengan tasks en DB (los reportes anteriores al despliegue de esta feature no tienen tasks).
 - Ambas secciones usan datos de `pve_backup_tasks` ligados al `report_id` del reporte correspondiente.
+
+### PBS snapshots (2026-05)
+
+**Migration 006** añade tabla `pbs_snapshots` y columna `alert_pbs_stale_hours` en `email_config`.
+
+**Cliente (`client/pbs.go`):**
+1. Para cada datastore, consulta `admin/datastore/{store}/groups` (lista de grupos de backup).
+2. Consulta `admin/datastore/{store}/snapshots` para obtener `size` y `verification.state` del snapshot más reciente de cada grupo (el endpoint de groups omite ambos campos).
+3. Inyecta `size` y `verification-state` en cada grupo antes de enviar el payload.
+
+**Campos en `pbs_stores`:** `estimated_full_date` (Unix timestamp, 0 si no disponible), `mount_status` (texto, "available" o error).
+
+**Campos en `pbs_snapshots`:** `backup_type`, `backup_id`, `last_backup`, `backup_count`, `owner`, `comment`, `verification_state`, `size`.
+
+**Relación:** `pbs_snapshots.store_id` → `pbs_stores.id` → `pbs_reports.id`. Los snapshots se muestran del último reporte: `GetPBSStoresForReport(latestReport.ID)` → por cada store, `GetPBSSnapshotsForStore(store.ID)`.
+
+**UI en `web/templates/server_pbs_detail.html`:**
+- Tarjeta de datastore: muestra `EstimatedFullDate` (con `isPast` para detectar si ya pasó sin riesgo real), `MountStatus`.
+- `<details>` colapsable "Grupos de backup": tabla con tipo/ID/último backup/copias/tamaño/verificación/propietario.
+
+### Alert system — estado actual y roadmap (2026-05)
+
+**Estado actual:** umbrales globales en `email_config`. `internal/store/alerts.go` contiene `GetAlerts(diskPct, backupErr)` (PVE disk + PBS disk + PVE backup errors) y `GetPBSStaleAlerts(hours)`. El dashboard llama ambos y añade task-level alerts manualmente.
+
+**Roadmap completo:** ver `TODO.md → PLAN: Sistema de Alertas por Servidor/VM`.
+
+Resumen de la arquitectura planificada:
+- Migration 007: `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config`
+- `internal/service/alertengine.go`: slice de `AlertEvaluator` functions — añadir tipo = añadir función
+- Página `/alerts` (entre Dashboard y Proxmox VE en el nav): vista tipo Grafana/Zabbix
+- Config por servidor en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`
