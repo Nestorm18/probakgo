@@ -97,9 +97,9 @@ journalctl -u probakgo -f         # tail de logs en vivo
 En la web UI:
 
 1. Ir a **API Keys → Nueva API Key**
-2. **Tipo:** `server (pbk-)` — cliente Proxmox
+2. **Tipo:** `server (pbk-)` - cliente Proxmox
 3. **Nombre:** identifica el nodo, ej. `pve-lab`
-4. Copiar la clave generada — **sólo se muestra una vez**
+4. Copiar la clave generada - **sólo se muestra una vez**
 
 ---
 
@@ -167,8 +167,8 @@ Cuando termine, el hook vzdump invoca automáticamente al cliente y envía el re
 /opt/probakgo/probakgo-client --debug --debug-api-calls --vzdump-hook
 ```
 
-- `--debug` — log verbose en stdout
-- `--debug-api-calls` — guarda respuestas crudas de la API de Proxmox en `debug/`
+- `--debug` - log verbose en stdout
+- `--debug-api-calls` - guarda respuestas crudas de la API de Proxmox en `debug/`
 
 ### Logs persistentes del cliente
 
@@ -259,6 +259,6 @@ rm probakgo_data.db .env
 ## Notas de seguridad
 
 - No uses credenciales de producción en estas VMs de prueba
-- La API key `adm-...` del primer arranque permite acceso completo vía API — trátala como secreto
+- La API key `adm-...` del primer arranque permite acceso completo vía API - trátala como secreto
 - Cambia `admin123` antes de cualquier prueba realista
 - Si la VM servidor está expuesta fuera del lab, configura `SESSION_SECURE=true` y un proxy HTTPS delante (ver `INSTALLATION.md`)

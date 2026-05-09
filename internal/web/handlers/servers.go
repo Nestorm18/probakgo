@@ -139,18 +139,25 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 
 	alertCfg, _ := h.store.GetPVEAlertConfig(id)
 
+	vmAlertCfgs, _ := h.store.GetPVEVMAlertConfigs(id)
+	vmAlertMap := make(map[int64]domain.PVEVMAlertConfig, len(vmAlertCfgs))
+	for _, c := range vmAlertCfgs {
+		vmAlertMap[c.VMID] = c
+	}
+
 	h.tmpl.Render(w, r, "server_pve_detail.html", map[string]any{
-		"Username":    username,
-		"Role":        role,
-		"Server":      sv,
-		"Reports":     reports,
-		"Storages":    storages,
-		"BackupTasks": backupTasks,
-		"MissingVMs":  missingVMs,
-		"JobHistory":  jobHistory,
-		"AlertConfig": alertCfg,
-		"Flash":       r.URL.Query().Get("flash"),
-		"FlashOK":     r.URL.Query().Get("ok") == "1",
+		"Username":       username,
+		"Role":           role,
+		"Server":         sv,
+		"Reports":        reports,
+		"Storages":       storages,
+		"BackupTasks":    backupTasks,
+		"MissingVMs":     missingVMs,
+		"JobHistory":     jobHistory,
+		"AlertConfig":    alertCfg,
+		"VMAlertConfigs": vmAlertMap,
+		"Flash":          r.URL.Query().Get("flash"),
+		"FlashOK":        r.URL.Query().Get("ok") == "1",
 	})
 }
 

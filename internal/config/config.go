@@ -17,6 +17,7 @@ type Config struct {
 	Timezone       string
 	SecureSession  bool
 	TrustedOrigins []string
+	Dev            bool
 }
 
 func Load() *Config {
@@ -28,6 +29,7 @@ func Load() *Config {
 		Timezone:       getEnv("TIMEZONE", "Europe/Madrid"),
 		SecureSession:  getEnv("SESSION_SECURE", "false") == "true",
 		TrustedOrigins: parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
+		Dev:            os.Getenv("DEV") == "true",
 	}
 }
 
@@ -55,7 +57,7 @@ func loadSessionKey() string {
 	if _, err := rand.Read(b); err != nil {
 		panic("config: cannot generate random SESSION_KEY: " + err.Error())
 	}
-	slog.Warn("SESSION_KEY not set — using random key, all sessions will be lost on restart. Set SESSION_KEY in .env for persistent sessions.")
+	slog.Warn("SESSION_KEY not set - using random key, all sessions will be lost on restart. Set SESSION_KEY in .env for persistent sessions.")
 	return hex.EncodeToString(b)
 }
 

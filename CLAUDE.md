@@ -127,7 +127,7 @@ go build -o probakgo-client ./client/
 - Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
 - Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00).
 - `var version` (not `const`) required for `-ldflags "-X main.version=..."` injection at release build time.
-- Note: GitHub API returns 404 for unauthenticated requests on private repos — selfupdate requires the repo to be public.
+- Note: GitHub API returns 404 for unauthenticated requests on private repos - selfupdate requires the repo to be public.
 
 ### SQLite nullable columns (2026-04)
 All nullable TEXT columns in the DB (`stale_reason`, etc.) must be scanned into `sql.NullString`, not `string`. Scanning NULL into `string` silently returns an error in modernc/sqlite, which causes the query to return `nil` - breaking any downstream logic that expects a result. Pattern:
@@ -150,10 +150,10 @@ Session code lives in `internal/session` (not `internal/web`) to avoid:
 
 ### Settings pages (2026-04)
 Email, Mantenimiento y Alertas son páginas separadas bajo `/settings/`:
-- `/settings/email` — SMTP, destinatarios, hora de envío
-- `/settings/maintenance` — retención de reportes (meses + toggle)
-- `/settings/alerts` — umbrales globales: disco (%), backup fallido, PBS stale (h)
-- `/settings/ip-bans` — gestión de IPs baneadas
+- `/settings/email` - SMTP, destinatarios, hora de envío
+- `/settings/maintenance` - retención de reportes (meses + toggle)
+- `/settings/alerts` - umbrales globales: disco (%), backup fallido, PBS stale (h)
+- `/settings/ip-bans` - gestión de IPs baneadas
 Cada POST carga el config existente y sobreescribe solo sus campos.
 
 `/settings/alerts` son los umbrales **globales** (fallback). La config per-servidor/VM
@@ -205,7 +205,7 @@ The `install` subcommand:
 - Configures logrotate
 - Installs `/etc/cron.d/probakgo-client` for daily self-update at 01:00
 
-**Updates**: `probakgo-client update` or automatic via cron. No service restart needed — the client runs per-backup, not as a daemon.
+**Updates**: `probakgo-client update` or automatic via cron. No service restart needed - the client runs per-backup, not as a daemon.
 
 ### Client configuration (`/opt/probakgo/.env`)
 
@@ -262,14 +262,14 @@ Embedded in `internal/db/migrations/`. Applied automatically on server startup v
 
 ### Backup tasks por VM (2026-05)
 
-Contexto de uso: el usuario revisa las copias cada día a las 9h. Los backups corren de noche (ej. lunes 21h, acaban martes 02h). Algunos PVE con PBS hacen 2 jobs/día (mediodía + medianoche). Solo importa el **último job** — si el de medianoche falla, el backup está incompleto aunque el de mediodía funcionara.
+Contexto de uso: el usuario revisa las copias cada día a las 9h. Los backups corren de noche (ej. lunes 21h, acaban martes 02h). Algunos PVE con PBS hacen 2 jobs/día (mediodía + medianoche). Solo importa el **último job** - si el de medianoche falla, el backup está incompleto aunque el de mediodía funcionara.
 
 **Tabla `pve_backup_tasks` (migration 004):**
 Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `report_id`, `vmid`, `vm_name`, `status` (texto completo de Proxmox, "OK" o mensaje de error), `starttime`, `endtime`, `duration`, `size` (bytes del fichero en storage), `filename` (volid).
 
 **Cómo el cliente detecta el "último job" (`client/pve.go → backupJobTasks`):**
 1. Consulta `nodes/{node}/tasks?typefilter=vzdump&limit=100`, ordena por `endtime DESC`.
-2. Toma la tarea más reciente como ancla. Añade tareas consecutivas mientras el gap entre `prevTask.start` y `currentTask.end` sea < 2h. Al superar 2h de hueco, para — es un job distinto.
+2. Toma la tarea más reciente como ancla. Añade tareas consecutivas mientras el gap entre `prevTask.start` y `currentTask.end` sea < 2h. Al superar 2h de hueco, para - es un job distinto.
 3. Deduplica por VMID (se queda con la más reciente dentro del job).
 4. Enriquece cada tarea con nombre de VM (de `nodes/{node}/qemu` y `lxc`) y fichero+tamaño (cruzando con storage content por VMID y ventana `[task.start-60, task.end+60]`).
 
@@ -284,7 +284,7 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 - Busca hacia atrás el último día programado que ya "completó": `dayStart + 28h < now` (28h de gracia para backups de madrugada que pertenecen al día anterior).
 - Stale si no se recibió ningún reporte desde el inicio de ese día.
 - Sin config → fallback a `IsStale` (reporte recibido hoy).
-- Retorna `(bool, string)` — el string es la razón ("no report received today" o "no report received on last backup day").
+- Retorna `(bool, string)` - el string es la razón ("no report received today" o "no report received on last backup day").
 
 **Ejemplo (backup solo Lun-Vie, corre a las 21h, acaba ~02h):**
 - Sábado 10h: último día programado = Viernes. `Vie 00h + 28h = Sab 04h < Sab 10h` → completado. Reporte del Sáb 02h ≥ Vie 00h → **no stale** ✓
@@ -315,7 +315,7 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 - Tarjeta de datastore: muestra `EstimatedFullDate` (con `isPast` para detectar si ya pasó sin riesgo real), `MountStatus`.
 - `<details>` colapsable "Grupos de backup": tabla con tipo/ID/último backup/copias/tamaño/verificación/propietario.
 
-### Alert system — estado actual y roadmap (2026-05)
+### Alert system - estado actual y roadmap (2026-05)
 
 **Estado actual:** umbrales globales en `email_config`. `internal/store/alerts.go` contiene `GetAlerts(diskPct, backupErr)` (PVE disk + PBS disk + PVE backup errors) y `GetPBSStaleAlerts(hours)`. El dashboard llama ambos y añade task-level alerts manualmente.
 
@@ -323,6 +323,6 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 
 Resumen de la arquitectura planificada:
 - Migration 007: `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config`
-- `internal/service/alertengine.go`: slice de `AlertEvaluator` functions — añadir tipo = añadir función
+- `internal/service/alertengine.go`: slice de `AlertEvaluator` functions - añadir tipo = añadir función
 - Página `/alerts` (entre Dashboard y Proxmox VE en el nav): vista tipo Grafana/Zabbix
 - Config por servidor en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`

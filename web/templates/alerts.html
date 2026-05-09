@@ -183,7 +183,7 @@ document.addEventListener('click', e => {
   if (!btn) return;
   const d = btn.dataset;
   document.getElementById('suppressAlertId').value = d.alertId;
-  document.getElementById('suppressAlertDesc').textContent = d.alertTitle + ' — ' + d.serverName;
+  document.getElementById('suppressAlertDesc').textContent = d.alertTitle + ' - ' + d.serverName;
   bootstrap.Modal.getOrCreateInstance(document.getElementById('suppressModal')).show();
 });
 </script>

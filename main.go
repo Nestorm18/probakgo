@@ -28,7 +28,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.20"
+var version = "0.0.21"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -100,7 +100,7 @@ func main() {
 	}
 
 	apiSrv := api.NewServer(st, authSvc, reportSvc)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version, cfg.Dev)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)
@@ -233,12 +233,12 @@ func ensureUpdateCron() {
 // restartService attempts to restart the probakgo systemd service after an update.
 func restartService() {
 	if _, err := exec.LookPath("systemctl"); err != nil {
-		slog.Info("update applied — restart the service manually to use the new version")
+		slog.Info("update applied - restart the service manually to use the new version")
 		return
 	}
-	slog.Info("update applied — restarting service...")
+	slog.Info("update applied - restarting service...")
 	if err := exec.Command("systemctl", "restart", "probakgo").Run(); err != nil {
-		slog.Warn("systemctl restart failed — restart manually", "err", err)
+		slog.Warn("systemctl restart failed - restart manually", "err", err)
 	}
 }
 

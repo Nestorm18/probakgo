@@ -19,18 +19,18 @@ cd /opt/probakgo
 
 En el **primer arranque como root**, el binario configura automáticamente:
 
-- **SESSION_KEY** — genera una clave aleatoria y la persiste en `.env`
-- **Servicio systemd** — instala y habilita `probakgo.service`
-- **Cron de auto-actualización** — instala `/etc/cron.d/probakgo` (01:00 diario)
+- **SESSION_KEY** - genera una clave aleatoria y la persiste en `.env`
+- **Servicio systemd** - instala y habilita `probakgo.service`
+- **Cron de auto-actualización** - instala `/etc/cron.d/probakgo` (01:00 diario)
 
 ### 2. Acceso inicial
 
 Abre `http://<ip-servidor>:36748` en el navegador.
 
 - **Usuario:** `probakgo`
-- **Contraseña:** `admin123` — **cambiar inmediatamente**
+- **Contraseña:** `admin123` - **cambiar inmediatamente**
 
-En el log también verás una API key `adm-` generada en el primer arranque — guárdala si la necesitas para acceso API.
+En el log también verás una API key `adm-` generada en el primer arranque - guárdala si la necesitas para acceso API.
 
 ### 3. Arrancar como servicio
 
@@ -107,7 +107,7 @@ En la interfaz web: **API Keys → Nueva API Key**
 - **Tipo:** `pbk-` (cliente Proxmox)
 - **Nombre:** identifica el nodo (ej. `pve-01`)
 
-Copia la clave generada — solo se muestra una vez.
+Copia la clave generada - solo se muestra una vez.
 
 ### 2. Instalar en el nodo
 

@@ -115,7 +115,10 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 	raw, _ := data["data"].([]any)
 
-	type rawTask struct{ start, end float64; status, id string }
+	type rawTask struct {
+		start, end float64
+		status, id string
+	}
 	var finished []rawTask
 	for _, t := range raw {
 		m, ok := t.(map[string]any)
@@ -202,7 +205,10 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 	}
 	tasks, _ := data["data"].([]any)
 
-	type task struct{ end, start float64; status string }
+	type task struct {
+		end, start float64
+		status     string
+	}
 	var finished []task
 	for _, t := range tasks {
 		m, ok := t.(map[string]any)
@@ -353,13 +359,13 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 }
 
 // jobBackupStatus derives the overall backup status from all tasks in the job.
-// If any VM failed, the job is considered failed — even if later VMs succeeded.
+// If any VM failed, the job is considered failed - even if later VMs succeeded.
 func jobBackupStatus(tasks []map[string]any) backupStatus {
 	if len(tasks) == 0 {
 		return backupStatus{OK: false, StartTime: -1, EndTime: -1, Duration: -1}
 	}
 	allOK := true
-	var minStart int64 = 1<<62
+	var minStart int64 = 1 << 62
 	var maxEnd int64
 	for _, t := range tasks {
 		if str(t["status"]) != "OK" {
