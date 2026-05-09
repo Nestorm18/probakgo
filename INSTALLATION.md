@@ -30,8 +30,6 @@ Abre `http://<ip-servidor>:36748` en el navegador.
 - **Usuario:** `probakgo`
 - **Contraseña:** `admin123` - **cambiar inmediatamente**
 
-En el log también verás una API key `adm-` generada en el primer arranque - guárdala si la necesitas para acceso API.
-
 ### 3. Arrancar como servicio
 
 Tras el primer arranque el servicio ya está instalado y habilitado. Para gestionarlo:
@@ -104,10 +102,11 @@ El cliente se instala en cada nodo PVE o PBS que quieras monitorizar. Se ejecuta
 
 En la interfaz web: **API Keys → Nueva API Key**
 
-- **Tipo:** `pbk-` (cliente Proxmox)
 - **Nombre:** identifica el nodo (ej. `pve-01`)
+- **Nombre de servidor** *(opcional)*: alias corto que aparece en el dashboard (ej. `pve-01`)
+- **URL Proxmox** *(opcional)*: URL completa de la interfaz Proxmox (ej. `https://192.168.1.10:8006`). Permite abrir el panel Proxmox directamente desde el dashboard.
 
-Copia la clave generada - solo se muestra una vez.
+Tras crear la key, la interfaz muestra los **3 pasos de instalación con los datos precargados** — puedes copiarlos directamente. La key solo se muestra una vez.
 
 ### 2. Instalar en el nodo
 
@@ -164,6 +163,10 @@ Si la detección automática falla:
 /opt/probakgo/probakgo-client --server-type pve --vzdump-hook
 # o --server-type pbs
 ```
+
+### Reiniciar la base de datos
+
+En **Configuración → Reiniciar BD** puedes borrar todos los datos monitorizados (reportes, servidores, alertas, API keys) manteniendo los usuarios. Requiere confirmación con contraseña dos veces. Útil para empezar desde cero sin reinstalar.
 
 ---
 
