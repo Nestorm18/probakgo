@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,8 +9,9 @@ import (
 )
 
 func TestReportPVE_HappyPath(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, err := ts.store.CreateAPIKey("client", "server", "")
+	k, err := ts.store.CreateAPIKey(ctx, "client", "", "")
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
 	}
@@ -28,8 +30,9 @@ func TestReportPVE_HappyPath(t *testing.T) {
 }
 
 func TestReportPVE_MissingHostname(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	body := `{"hostname":"","ip_address":"10.0.0.1"}`
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
@@ -45,8 +48,9 @@ func TestReportPVE_MissingHostname(t *testing.T) {
 }
 
 func TestReportPVE_InvalidJSON(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader("{bad json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -76,8 +80,9 @@ func TestReportPVE_NoAuth(t *testing.T) {
 }
 
 func TestReportPBS_HappyPath(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, err := ts.store.CreateAPIKey("client", "server", "")
+	k, err := ts.store.CreateAPIKey(ctx, "client", "", "")
 	if err != nil {
 		t.Fatalf("create api key: %v", err)
 	}

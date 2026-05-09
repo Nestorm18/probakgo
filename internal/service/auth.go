@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,9 +12,9 @@ import (
 )
 
 var (
-	ErrInvalidKey    = errors.New("invalid or inactive API key")
-	ErrMachineID     = errors.New("machine ID mismatch")
-	ErrKeyType       = errors.New("key type not allowed for this endpoint")
+	ErrInvalidKey = errors.New("invalid or inactive API key")
+	ErrMachineID  = errors.New("machine ID mismatch")
+	ErrKeyType    = errors.New("key type not allowed for this endpoint")
 )
 
 type AuthService struct {
@@ -27,7 +28,8 @@ func NewAuth(st *store.Store) *AuthService {
 // ValidateServerKey validates a pbk- key and handles machine ID binding.
 // Returns the API key record if valid.
 func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKey, error) {
-	k, err := a.store.GetAPIKeyByValue(rawKey)
+	ctx := context.Background()
+	k, err := a.store.GetAPIKeyByValue(ctx, rawKey)
 	if err != nil || !k.IsActive {
 		return nil, ErrInvalidKey
 	}
@@ -36,7 +38,7 @@ func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKe
 	}
 	if machineID != "" {
 		if k.MachineID == "" {
-			if err := a.store.BindAPIKeyMachineID(k.ID, machineID); err != nil {
+			if err := a.store.BindAPIKeyMachineID(ctx, k.ID, machineID); err != nil {
 				slog.Error("bind machine id", "err", err)
 			}
 			k.MachineID = machineID
@@ -44,30 +46,7 @@ func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKe
 			return nil, fmt.Errorf("%w: key bound to different machine", ErrMachineID)
 		}
 	}
-	_ = a.store.UpdateAPIKeyLastUsed(k.ID)
-	return k, nil
-}
-
-// ValidateAdminKey validates an adm- key.
-func (a *AuthService) ValidateAdminKey(rawKey string) (*domain.APIKey, error) {
-	k, err := a.store.GetAPIKeyByValue(rawKey)
-	if err != nil || !k.IsActive {
-		return nil, ErrInvalidKey
-	}
-	if k.KeyType != "admin" {
-		return nil, ErrKeyType
-	}
-	_ = a.store.UpdateAPIKeyLastUsed(k.ID)
-	return k, nil
-}
-
-// ValidateAnyKey accepts server or admin keys.
-func (a *AuthService) ValidateAnyKey(rawKey string) (*domain.APIKey, error) {
-	k, err := a.store.GetAPIKeyByValue(rawKey)
-	if err != nil || !k.IsActive {
-		return nil, ErrInvalidKey
-	}
-	_ = a.store.UpdateAPIKeyLastUsed(k.ID)
+	_ = a.store.UpdateAPIKeyLastUsed(ctx, k.ID)
 	return k, nil
 }
 

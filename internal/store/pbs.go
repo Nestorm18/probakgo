@@ -1,18 +1,22 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
-func (s *Store) UpsertPBSServer(name, ip, publicIP, clientVersion, machineID string) (int64, error) {
-	row := s.db.QueryRow(`SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
+func (s *Store) UpsertPBSServer(ctx context.Context, name, ip, publicIP, clientVersion, machineID string) (int64, error) {
+	debug.RecordQuery(ctx, `SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
 	var id int64
 	if err := row.Scan(&id); err == sql.ErrNoRows {
-		res, err := s.db.Exec(
+		debug.RecordQuery(ctx, `INSERT INTO pbs_servers (name, ip, public_ip, client_version, machine_id) VALUES (?, ?, ?, ?, ?)`)
+		res, err := s.db.ExecContext(ctx,
 			`INSERT INTO pbs_servers (name, ip, public_ip, client_version, machine_id) VALUES (?, ?, ?, ?, ?)`,
 			name, ip, publicIP, clientVersion, machineID,
 		)
@@ -23,23 +27,26 @@ func (s *Store) UpsertPBSServer(name, ip, publicIP, clientVersion, machineID str
 	} else if err != nil {
 		return 0, err
 	}
-	_, err := s.db.Exec(
+	debug.RecordQuery(ctx, `UPDATE pbs_servers SET ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+	_, err := s.db.ExecContext(ctx,
 		`UPDATE pbs_servers SET ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
 		ip, publicIP, clientVersion, machineID, id,
 	)
 	return id, err
 }
 
-func (s *Store) InsertPBSReport(serverID int64) (int64, error) {
-	res, err := s.db.Exec(`INSERT INTO pbs_reports (server_id) VALUES (?)`, serverID)
+func (s *Store) InsertPBSReport(ctx context.Context, serverID int64) (int64, error) {
+	debug.RecordQuery(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`, serverID)
 	if err != nil {
 		return 0, fmt.Errorf("insert pbs_report: %w", err)
 	}
 	return res.LastInsertId()
 }
 
-func (s *Store) InsertPBSStore(reportID int64, ds domain.PBSDatastorePayload) (int64, error) {
-	res, err := s.db.Exec(
+func (s *Store) InsertPBSStore(ctx context.Context, reportID int64, ds domain.PBSDatastorePayload) (int64, error) {
+	debug.RecordQuery(ctx, `INSERT INTO pbs_stores (report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO pbs_stores (report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, ds.Store, ds.Total, ds.Used, ds.Avail,
@@ -51,9 +58,10 @@ func (s *Store) InsertPBSStore(reportID int64, ds domain.PBSDatastorePayload) (i
 	return res.LastInsertId()
 }
 
-func (s *Store) InsertPBSStoreHistory(storeID int64, history []*float64) error {
+func (s *Store) InsertPBSStoreHistory(ctx context.Context, storeID int64, history []*float64) error {
 	for i, v := range history {
-		_, err := s.db.Exec(`INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`, storeID, i, v)
+		debug.RecordQuery(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`)
+		_, err := s.db.ExecContext(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`, storeID, i, v)
 		if err != nil {
 			return err
 		}
@@ -61,8 +69,9 @@ func (s *Store) InsertPBSStoreHistory(storeID int64, history []*float64) error {
 	return nil
 }
 
-func (s *Store) InsertPBSSnapshot(storeID int64, g domain.PBSGroupPayload) error {
-	_, err := s.db.Exec(
+func (s *Store) InsertPBSSnapshot(ctx context.Context, storeID int64, g domain.PBSGroupPayload) error {
+	debug.RecordQuery(ctx, `INSERT INTO pbs_snapshots (store_id, backup_type, backup_id, last_backup, backup_count, owner, comment, verification_state, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pbs_snapshots (store_id, backup_type, backup_id, last_backup, backup_count,
 		 owner, comment, verification_state, size)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -75,8 +84,9 @@ func (s *Store) InsertPBSSnapshot(storeID int64, g domain.PBSGroupPayload) error
 	return nil
 }
 
-func (s *Store) GetPBSSnapshotsForStore(storeID int64) ([]domain.PBSSnapshot, error) {
-	rows, err := s.db.Query(`SELECT id, store_id, backup_type, backup_id, last_backup, backup_count,
+func (s *Store) GetPBSSnapshotsForStore(ctx context.Context, storeID int64) ([]domain.PBSSnapshot, error) {
+	debug.RecordQuery(ctx, `SELECT id, store_id, backup_type, backup_id, last_backup, backup_count, owner, comment, verification_state, size FROM pbs_snapshots WHERE store_id = ? ORDER BY backup_type, backup_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, store_id, backup_type, backup_id, last_backup, backup_count,
 		owner, comment, verification_state, size
 		FROM pbs_snapshots WHERE store_id = ? ORDER BY backup_type, backup_id`, storeID)
 	if err != nil {
@@ -95,11 +105,12 @@ func (s *Store) GetPBSSnapshotsForStore(storeID int64) ([]domain.PBSSnapshot, er
 	return snapshots, rows.Err()
 }
 
-func (s *Store) InsertPBSGCStatus(storeID int64, gc *domain.GCStatusPayload) error {
+func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain.GCStatusPayload) error {
 	if gc == nil {
 		return nil
 	}
-	_, err := s.db.Exec(
+	debug.RecordQuery(ctx, `INSERT INTO pbs_gc_status (store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count, pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pbs_gc_status (store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
 		 pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -110,8 +121,9 @@ func (s *Store) InsertPBSGCStatus(storeID int64, gc *domain.GCStatusPayload) err
 	return err
 }
 
-func (s *Store) ListPBSServers() ([]domain.PBSServer, error) {
-	rows, err := s.db.Query(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+func (s *Store) ListPBSServers(ctx context.Context) ([]domain.PBSServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
 		FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -129,8 +141,9 @@ func (s *Store) ListPBSServers() ([]domain.PBSServer, error) {
 	return servers, rows.Err()
 }
 
-func (s *Store) GetPBSServer(id int64) (*domain.PBSServer, error) {
-	row := s.db.QueryRow(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+func (s *Store) GetPBSServer(ctx context.Context, id int64) (*domain.PBSServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
 		FROM pbs_servers WHERE id = ? AND is_deleted = 0`, id)
 	var sv domain.PBSServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
@@ -140,8 +153,9 @@ func (s *Store) GetPBSServer(id int64) (*domain.PBSServer, error) {
 	return &sv, nil
 }
 
-func (s *Store) GetLatestPBSReport(serverID int64) (*domain.PBSReport, error) {
-	row := s.db.QueryRow(`SELECT id, server_id, reported_at, is_stale, stale_reason
+func (s *Store) GetLatestPBSReport(ctx context.Context, serverID int64) (*domain.PBSReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
 		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PBSReport
 	var isStale int
@@ -154,8 +168,9 @@ func (s *Store) GetLatestPBSReport(serverID int64) (*domain.PBSReport, error) {
 	return &r, nil
 }
 
-func (s *Store) ListPBSReports(serverID int64, limit int) ([]domain.PBSReport, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, reported_at, is_stale, stale_reason
+func (s *Store) ListPBSReports(ctx context.Context, serverID int64, limit int) ([]domain.PBSReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
 		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`, serverID, limit)
 	if err != nil {
 		return nil, err
@@ -176,8 +191,9 @@ func (s *Store) ListPBSReports(serverID int64, limit int) ([]domain.PBSReport, e
 	return reports, rows.Err()
 }
 
-func (s *Store) GetPBSStoresForReport(reportID int64) ([]domain.PBSStore, error) {
-	rows, err := s.db.Query(`SELECT id, report_id, store, total, used, avail,
+func (s *Store) GetPBSStoresForReport(ctx context.Context, reportID int64) ([]domain.PBSStore, error) {
+	debug.RecordQuery(ctx, `SELECT id, report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta FROM pbs_stores WHERE report_id = ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, store, total, used, avail,
 		estimated_full_date, mount_status, history_start, history_delta
 		FROM pbs_stores WHERE report_id = ?`, reportID)
 	if err != nil {
@@ -196,8 +212,9 @@ func (s *Store) GetPBSStoresForReport(reportID int64) ([]domain.PBSStore, error)
 	return stores, rows.Err()
 }
 
-func (s *Store) GetPBSGCStatus(storeID int64) (*domain.PBSGCStatus, error) {
-	row := s.db.QueryRow(`SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
+func (s *Store) GetPBSGCStatus(ctx context.Context, storeID int64) (*domain.PBSGCStatus, error) {
+	debug.RecordQuery(ctx, `SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count, pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid FROM pbs_gc_status WHERE store_id = ?`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
 		pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid
 		FROM pbs_gc_status WHERE store_id = ?`, storeID)
 	var gc domain.PBSGCStatus
@@ -210,8 +227,9 @@ func (s *Store) GetPBSGCStatus(storeID int64) (*domain.PBSGCStatus, error) {
 	return &gc, err
 }
 
-func (s *Store) GetPBSHistory(storeID int64) ([]*float64, error) {
-	rows, err := s.db.Query(`SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`, storeID)
+func (s *Store) GetPBSHistory(ctx context.Context, storeID int64) ([]*float64, error) {
+	debug.RecordQuery(ctx, `SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`)
+	rows, err := s.db.QueryContext(ctx, `SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`, storeID)
 	if err != nil {
 		return nil, err
 	}
@@ -227,8 +245,9 @@ func (s *Store) GetPBSHistory(storeID int64) ([]*float64, error) {
 	return history, rows.Err()
 }
 
-func (s *Store) DeletePBSServer(id int64) error {
-	_, err := s.db.Exec(`UPDATE pbs_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
+func (s *Store) DeletePBSServer(ctx context.Context, id int64) error {
+	debug.RecordQuery(ctx, `UPDATE pbs_servers SET is_deleted=1, updated_at=? WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE pbs_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
 	return err
 }
 

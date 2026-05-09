@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,14 +9,15 @@ import (
 )
 
 func TestUpsertPVEServer_CreateAndUpdate(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
-	id1, err := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "mid-aaa")
+	id1, err := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "mid-aaa")
 	if err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
 
-	id2, err := st.UpsertPVEServer("pve-node", "10.0.0.2", "", "1.1", "mid-aaa")
+	id2, err := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.2", "", "1.1", "mid-aaa")
 	if err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
@@ -24,7 +26,7 @@ func TestUpsertPVEServer_CreateAndUpdate(t *testing.T) {
 		t.Errorf("want same ID on upsert, got %d and %d", id1, id2)
 	}
 
-	sv, err := st.GetPVEServer(id1)
+	sv, err := st.GetPVEServer(ctx, id1)
 	if err != nil {
 		t.Fatalf("get server: %v", err)
 	}
@@ -37,15 +39,16 @@ func TestUpsertPVEServer_CreateAndUpdate(t *testing.T) {
 }
 
 func TestInsertPVEReport_NilBackupStatus(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 
-	reportID, err := st.InsertPVEReport(serverID, nil)
+	reportID, err := st.InsertPVEReport(ctx, serverID, nil)
 	if err != nil {
 		t.Fatalf("insert report: %v", err)
 	}
 
-	rep, err := st.GetLatestPVEReport(serverID)
+	rep, err := st.GetLatestPVEReport(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get latest: %v", err)
 	}
@@ -58,19 +61,20 @@ func TestInsertPVEReport_NilBackupStatus(t *testing.T) {
 }
 
 func TestGetLatestPVEReport_ReturnsNewest(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 
-	id1, _ := st.InsertPVEReport(serverID, nil)
+	id1, _ := st.InsertPVEReport(ctx, serverID, nil)
 	// backdate id1 so id2 is definitely the newest by timestamp
 	yesterday := time.Now().Add(-24 * time.Hour)
 	if _, err := st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, id1); err != nil {
 		t.Fatalf("backdate report: %v", err)
 	}
 
-	id2, _ := st.InsertPVEReport(serverID, nil)
+	id2, _ := st.InsertPVEReport(ctx, serverID, nil)
 
-	rep, err := st.GetLatestPVEReport(serverID)
+	rep, err := st.GetLatestPVEReport(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get latest: %v", err)
 	}
@@ -80,32 +84,34 @@ func TestGetLatestPVEReport_ReturnsNewest(t *testing.T) {
 }
 
 func TestGetLatestPVEReport_NoReports(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 
-	_, err := st.GetLatestPVEReport(serverID)
+	_, err := st.GetLatestPVEReport(ctx, serverID)
 	if err == nil {
 		t.Error("want error for server with no reports, got nil")
 	}
 }
 
 func TestDeleteOldPVEReports(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 
 	// Insert old report and backdate it to 6 months ago
-	oldID, _ := st.InsertPVEReport(serverID, nil)
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	sixMonthsAgo := time.Now().AddDate(0, -6, 0)
 	if _, err := st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", sixMonthsAgo, oldID); err != nil {
 		t.Fatalf("backdate old report: %v", err)
 	}
 
 	// Add storage + content children to verify cascade delete
-	stID, _ := st.InsertPVEStorage(oldID, domain.StoragePayload{Storage: "local", Content: "backup", Type: "dir"})
-	_ = st.InsertPVEStorageContent(stID, domain.ContentDataPayload{VMID: 100, Format: "tar"})
+	stID, _ := st.InsertPVEStorage(ctx, oldID, domain.StoragePayload{Storage: "local", Content: "backup", Type: "dir"})
+	_ = st.InsertPVEStorageContent(ctx, stID, domain.ContentDataPayload{VMID: 100, Format: "tar"})
 
 	// Insert a current report
-	_, _ = st.InsertPVEReport(serverID, nil)
+	_, _ = st.InsertPVEReport(ctx, serverID, nil)
 
 	cutoff := time.Now().AddDate(0, -1, 0)
 	n, err := st.DeleteOldPVEReports(cutoff)
@@ -127,15 +133,16 @@ func TestDeleteOldPVEReports(t *testing.T) {
 	}
 
 	// Current report must survive
-	if _, err := st.GetLatestPVEReport(serverID); err != nil {
+	if _, err := st.GetLatestPVEReport(ctx, serverID); err != nil {
 		t.Fatalf("current report should remain: %v", err)
 	}
 }
 
 func TestInsertPVEBackupTask_RoundTrip(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
 	task := domain.BackupTaskPayload{
 		VMID:      100,
@@ -147,11 +154,11 @@ func TestInsertPVEBackupTask_RoundTrip(t *testing.T) {
 		Size:      512 * 1024 * 1024,
 		Filename:  "vzdump-qemu-100.vma.zst",
 	}
-	if err := st.InsertPVEBackupTask(reportID, task); err != nil {
+	if err := st.InsertPVEBackupTask(ctx, reportID, task); err != nil {
 		t.Fatalf("insert task: %v", err)
 	}
 
-	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	tasks, err := st.GetPVEBackupTasksForReport(ctx, reportID)
 	if err != nil {
 		t.Fatalf("get tasks: %v", err)
 	}
@@ -180,11 +187,12 @@ func TestInsertPVEBackupTask_RoundTrip(t *testing.T) {
 }
 
 func TestGetPVEBackupTasksForReport_Empty(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
-	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	tasks, err := st.GetPVEBackupTasksForReport(ctx, reportID)
 	if err != nil {
 		t.Fatalf("get tasks: %v", err)
 	}
@@ -194,14 +202,15 @@ func TestGetPVEBackupTasksForReport_Empty(t *testing.T) {
 }
 
 func TestGetPVEBackupTasksForReport_OrderedByStarttime(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 200, StartTime: 2000})
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 100, StartTime: 1000})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 200, StartTime: 2000})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 100, StartTime: 1000})
 
-	tasks, err := st.GetPVEBackupTasksForReport(reportID)
+	tasks, err := st.GetPVEBackupTasksForReport(ctx, reportID)
 	if err != nil {
 		t.Fatalf("get tasks: %v", err)
 	}

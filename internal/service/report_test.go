@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ func TestIsStale_YesterdayStale(t *testing.T) {
 }
 
 func TestSavePVEReport_FullRoundTrip(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
@@ -61,7 +63,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 		t.Fatalf("SavePVEReport: %v", err)
 	}
 
-	servers, err := st.ListPVEServers()
+	servers, err := st.ListPVEServers(ctx)
 	if err != nil {
 		t.Fatalf("ListPVEServers: %v", err)
 	}
@@ -69,7 +71,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
 
-	rep, err := st.GetLatestPVEReport(servers[0].ID)
+	rep, err := st.GetLatestPVEReport(ctx, servers[0].ID)
 	if err != nil {
 		t.Fatalf("GetLatestPVEReport: %v", err)
 	}
@@ -80,7 +82,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 		t.Errorf("BackupDuration: want 1000, got %d", rep.BackupDuration)
 	}
 
-	storages, err := st.GetPVEStoragesForReport(rep.ID)
+	storages, err := st.GetPVEStoragesForReport(ctx, rep.ID)
 	if err != nil {
 		t.Fatalf("GetPVEStoragesForReport: %v", err)
 	}
@@ -88,7 +90,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 		t.Fatalf("want 1 storage, got %d", len(storages))
 	}
 
-	content, err := st.GetPVEStorageContent(storages[0].ID)
+	content, err := st.GetPVEStorageContent(ctx, storages[0].ID)
 	if err != nil {
 		t.Fatalf("GetPVEStorageContent: %v", err)
 	}
@@ -101,6 +103,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 }
 
 func TestSavePBSReport_FullRoundTrip(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
@@ -128,7 +131,7 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 		t.Fatalf("SavePBSReport: %v", err)
 	}
 
-	servers, err := st.ListPBSServers()
+	servers, err := st.ListPBSServers(ctx)
 	if err != nil {
 		t.Fatalf("ListPBSServers: %v", err)
 	}
@@ -136,12 +139,12 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 		t.Fatalf("want 1 server, got %d", len(servers))
 	}
 
-	rep, err := st.GetLatestPBSReport(servers[0].ID)
+	rep, err := st.GetLatestPBSReport(ctx, servers[0].ID)
 	if err != nil {
 		t.Fatalf("GetLatestPBSReport: %v", err)
 	}
 
-	stores, err := st.GetPBSStoresForReport(rep.ID)
+	stores, err := st.GetPBSStoresForReport(ctx, rep.ID)
 	if err != nil {
 		t.Fatalf("GetPBSStoresForReport: %v", err)
 	}
@@ -155,7 +158,7 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 		t.Errorf("Total: want 500, got %d", stores[0].Total)
 	}
 
-	gc, err := st.GetPBSGCStatus(stores[0].ID)
+	gc, err := st.GetPBSGCStatus(ctx, stores[0].ID)
 	if err != nil {
 		t.Fatalf("GetPBSGCStatus: %v", err)
 	}
@@ -168,10 +171,11 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 }
 
 func TestBuildPVEServerResponse_NoReport(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	serverID, err := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
+	serverID, err := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 	if err != nil {
 		t.Fatalf("upsert server: %v", err)
 	}
@@ -190,11 +194,12 @@ func TestBuildPVEServerResponse_NoReport(t *testing.T) {
 }
 
 func TestBuildPVEServerResponse_StaleReport(t *testing.T) {
+	ctx := context.Background()
 	db, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
 	yesterday := time.Now().Add(-25 * time.Hour)
 	if _, err := db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, reportID); err != nil {

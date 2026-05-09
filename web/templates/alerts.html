@@ -49,7 +49,7 @@
 <div class="card mb-4">
   <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
     {{range .Alerts}}
-    <div class="d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
+    <div class="alert-row d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
       <div class="mt-1" style="flex-shrink:0;width:1.1rem;text-align:center">
         {{if eq .Severity "critical"}}
           <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
@@ -57,7 +57,7 @@
           <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
         {{end}}
       </div>
-      <div class="flex-grow-1 min-w-0">
+      <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="flex-grow-1 min-w-0 text-decoration-none" style="cursor:pointer" title="Ver servidor">
         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
           <span style="font-weight:600;font-size:.88rem;color:var(--txt-primary)">{{.Title}}</span>
           {{if eq .Severity "critical"}}
@@ -74,7 +74,7 @@
           {{if .Value}}<span>Valor: <strong style="color:var(--txt-primary)">{{.Value}}</strong></span>{{end}}
           {{if .Threshold}}<span>Umbral: {{.Threshold}}</span>{{end}}
         </div>
-      </div>
+      </a>
       <div class="d-flex gap-1 align-items-start mt-1" style="flex-shrink:0">
         {{if eq .ServerType "pve"}}
           <span class="badge" style="background:var(--clr-accent);font-size:.68rem">PVE</span>
@@ -115,7 +115,7 @@
   <div class="card mt-2">
     <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
       {{range .Suppressed}}
-      <div class="d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
+      <div class="alert-row d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
         <div class="flex-grow-1 min-w-0">
           <div style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</div>
           <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>

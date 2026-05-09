@@ -4,7 +4,8 @@ param(
     [switch]$Server,
     [switch]$Clients,
     [switch]$All,
-    [switch]$Update   # Run 'update' subcommand on all machines (pulls from GitHub)
+    [switch]$Update,  # Run 'update' subcommand on all machines (pulls from GitHub)
+    [switch]$Db       # Copy the SQLite database from the server to the local directory
 )
 
 # ── Hosts ─────────────────────────────────────────────────────────────────────
@@ -25,7 +26,7 @@ $CLIENT2_PASS = $SSH_PASS
 $tmpPassFile = [System.IO.Path]::GetTempFileName()
 [System.IO.File]::WriteAllText($tmpPassFile, $SSH_PASS, [System.Text.Encoding]::UTF8)
 
-if (-not ($Server -or $Clients -or $All -or $Update)) { $All = $true }
+if (-not ($Server -or $Clients -or $All -or $Update -or $Db)) { $All = $true }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 function Set-BuildEnv {
@@ -55,6 +56,15 @@ function Invoke-SCP {
         sshpass -f $tmpPassFile scp -o StrictHostKeyChecking=no $src "${target}:${dst}"
     } else {
         scp $src "${target}:${dst}"
+    }
+}
+
+function Invoke-SCPFrom {
+    param([string]$target, [string]$password, [string]$src, [string]$dst)
+    if ($password -and $hasSshpass) {
+        sshpass -f $tmpPassFile scp -o StrictHostKeyChecking=no "${target}:${src}" $dst
+    } else {
+        scp "${target}:${src}" $dst
     }
 }
 
@@ -175,9 +185,20 @@ function Update-All {
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+function Fetch-DB {
+    Write-Host "`n=== Fetching database from $SERVER_HOST ===" -ForegroundColor Cyan
+    Invoke-SCPFrom $SERVER_HOST $SERVER_PASS "/opt/probakgo/probakgo_data.db" ".\probakgo_data.db"
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Database saved to .\probakgo_data.db" -ForegroundColor Green
+    } else {
+        Write-Warning "SCP from $SERVER_HOST failed"
+    }
+}
+
 if ($All -or $Server)  { Deploy-Server }
 if ($All -or $Clients) { Deploy-Clients }
 if ($Update)           { Update-All }
+if ($Db)               { Fetch-DB }
 
 Remove-Item $tmpPassFile -ErrorAction SilentlyContinue
 Write-Host "`nDone." -ForegroundColor Green

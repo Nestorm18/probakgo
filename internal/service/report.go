@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -20,36 +21,37 @@ func NewReport(st *store.Store, tz *time.Location) *ReportService {
 }
 
 func (r *ReportService) SavePVEReport(req *domain.PVEReportRequest) error {
-	serverID, err := r.store.UpsertPVEServer(
+	ctx := context.Background()
+	serverID, err := r.store.UpsertPVEServer(ctx,
 		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPVEReport(serverID, req.LastBackupStatus)
+	reportID, err := r.store.InsertPVEReport(ctx, serverID, req.LastBackupStatus)
 	if err != nil {
 		return fmt.Errorf("insert report: %w", err)
 	}
 
 	for _, st := range req.Storages {
-		stID, err := r.store.InsertPVEStorage(reportID, st)
+		stID, err := r.store.InsertPVEStorage(ctx, reportID, st)
 		if err != nil {
 			return fmt.Errorf("insert storage %s: %w", st.Storage, err)
 		}
 		for _, info := range st.StorageInfo {
-			if err := r.store.InsertPVEStorageInfo(stID, info); err != nil {
+			if err := r.store.InsertPVEStorageInfo(ctx, stID, info); err != nil {
 				return fmt.Errorf("insert storage info: %w", err)
 			}
 		}
 		for _, c := range st.ContentData {
-			if err := r.store.InsertPVEStorageContent(stID, c); err != nil {
+			if err := r.store.InsertPVEStorageContent(ctx, stID, c); err != nil {
 				return fmt.Errorf("insert content: %w", err)
 			}
 		}
 	}
 	for _, t := range req.BackupTasks {
-		if err := r.store.InsertPVEBackupTask(reportID, t); err != nil {
+		if err := r.store.InsertPVEBackupTask(ctx, reportID, t); err != nil {
 			return fmt.Errorf("insert backup task vmid %d: %w", t.VMID, err)
 		}
 	}
@@ -57,31 +59,32 @@ func (r *ReportService) SavePVEReport(req *domain.PVEReportRequest) error {
 }
 
 func (r *ReportService) SavePBSReport(req *domain.PBSReportRequest) error {
-	serverID, err := r.store.UpsertPBSServer(
+	ctx := context.Background()
+	serverID, err := r.store.UpsertPBSServer(ctx,
 		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
 	)
 	if err != nil {
 		return fmt.Errorf("upsert pbs server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPBSReport(serverID)
+	reportID, err := r.store.InsertPBSReport(ctx, serverID)
 	if err != nil {
 		return fmt.Errorf("insert pbs report: %w", err)
 	}
 
 	for _, ds := range req.PBSInformation.Data {
-		storeID, err := r.store.InsertPBSStore(reportID, ds)
+		storeID, err := r.store.InsertPBSStore(ctx, reportID, ds)
 		if err != nil {
 			return fmt.Errorf("insert pbs store %s: %w", ds.Store, err)
 		}
-		if err := r.store.InsertPBSStoreHistory(storeID, ds.History); err != nil {
+		if err := r.store.InsertPBSStoreHistory(ctx, storeID, ds.History); err != nil {
 			return fmt.Errorf("insert pbs history: %w", err)
 		}
-		if err := r.store.InsertPBSGCStatus(storeID, ds.GCStatus); err != nil {
+		if err := r.store.InsertPBSGCStatus(ctx, storeID, ds.GCStatus); err != nil {
 			return fmt.Errorf("insert gc status: %w", err)
 		}
 		for _, g := range ds.Groups {
-			if err := r.store.InsertPBSSnapshot(storeID, g); err != nil {
+			if err := r.store.InsertPBSSnapshot(ctx, storeID, g); err != nil {
 				return fmt.Errorf("insert pbs snapshot %s/%s: %w", g.BackupType, g.BackupID, err)
 			}
 		}
@@ -101,7 +104,7 @@ func (r *ReportService) IsStale(reportedAt time.Time) bool {
 // A backup day is considered "completed" when now > dayStart + 28h, giving a grace period
 // for backups that start late at night and finish after midnight.
 func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string) (bool, string) {
-	configs, err := r.store.ListVMBackupConfigs(serverName)
+	configs, err := r.store.ListVMBackupConfigs(context.Background(), serverName)
 	if err != nil || len(configs) == 0 {
 		return r.IsStale(reportedAt), "no report received today"
 	}
@@ -156,6 +159,7 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.
 func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVEServerResponse {
+	ctx := context.Background()
 	resp := domain.PVEServerResponse{
 		ID:            sv.ID,
 		Name:          sv.Name,
@@ -164,7 +168,7 @@ func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVESe
 		ClientVersion: sv.ClientVersion,
 		MachineBound:  sv.MachineID != "",
 	}
-	rep, err := r.store.GetLatestPVEReport(sv.ID)
+	rep, err := r.store.GetLatestPVEReport(ctx, sv.ID)
 	if err != nil {
 		resp.IsStale = true
 		resp.StaleReason = "no reports received"
@@ -184,6 +188,7 @@ func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVESe
 
 // BuildPBSServerResponse assembles a PBSServerResponse enriched with latest report data.
 func (r *ReportService) BuildPBSServerResponse(sv domain.PBSServer) domain.PBSServerResponse {
+	ctx := context.Background()
 	resp := domain.PBSServerResponse{
 		ID:            sv.ID,
 		Name:          sv.Name,
@@ -192,7 +197,7 @@ func (r *ReportService) BuildPBSServerResponse(sv domain.PBSServer) domain.PBSSe
 		ClientVersion: sv.ClientVersion,
 		MachineBound:  sv.MachineID != "",
 	}
-	rep, err := r.store.GetLatestPBSReport(sv.ID)
+	rep, err := r.store.GetLatestPBSReport(ctx, sv.ID)
 	if err != nil {
 		resp.IsStale = true
 		resp.StaleReason = "no reports received"

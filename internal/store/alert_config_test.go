@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"probakgo/internal/domain"
@@ -9,8 +10,9 @@ import (
 func intPtr(v int) *int { return &v }
 
 func TestPVEAlertConfig_NotFound(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	cfg, err := st.GetPVEAlertConfig(999)
+	cfg, err := st.GetPVEAlertConfig(ctx, 999)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -20,8 +22,9 @@ func TestPVEAlertConfig_NotFound(t *testing.T) {
 }
 
 func TestPVEAlertConfig_RoundTrip(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve1", "1.2.3.4", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve1", "1.2.3.4", "", "1.0", "")
 
 	want := domain.PVEAlertConfig{
 		ServerID:   serverID,
@@ -29,11 +32,11 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 		StaleHours: intPtr(0),
 		BackupErr:  intPtr(1),
 	}
-	if err := st.UpsertPVEAlertConfig(want); err != nil {
+	if err := st.UpsertPVEAlertConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	got, err := st.GetPVEAlertConfig(serverID)
+	got, err := st.GetPVEAlertConfig(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -49,15 +52,16 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 }
 
 func TestPVEAlertConfig_NullFields(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve2", "1.2.3.4", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve2", "1.2.3.4", "", "1.0", "")
 
 	cfg := domain.PVEAlertConfig{ServerID: serverID} // all nil
-	if err := st.UpsertPVEAlertConfig(cfg); err != nil {
+	if err := st.UpsertPVEAlertConfig(ctx, cfg); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	got, err := st.GetPVEAlertConfig(serverID)
+	got, err := st.GetPVEAlertConfig(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -67,8 +71,9 @@ func TestPVEAlertConfig_NullFields(t *testing.T) {
 }
 
 func TestPVEVMAlertConfig_UpsertDeleteRoundTrip(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve3", "1.2.3.4", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve3", "1.2.3.4", "", "1.0", "")
 
 	cfg := domain.PVEVMAlertConfig{
 		ServerID:  serverID,
@@ -76,11 +81,11 @@ func TestPVEVMAlertConfig_UpsertDeleteRoundTrip(t *testing.T) {
 		BackupErr: intPtr(1),
 		MinSizeMB: intPtr(500),
 	}
-	if err := st.UpsertPVEVMAlertConfig(cfg); err != nil {
+	if err := st.UpsertPVEVMAlertConfig(ctx, cfg); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	got, err := st.GetPVEVMAlertConfigs(serverID)
+	got, err := st.GetPVEVMAlertConfigs(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
@@ -91,18 +96,19 @@ func TestPVEVMAlertConfig_UpsertDeleteRoundTrip(t *testing.T) {
 		t.Errorf("unexpected values: %+v", got[0])
 	}
 
-	if err := st.DeletePVEVMAlertConfig(serverID, 101); err != nil {
+	if err := st.DeletePVEVMAlertConfig(ctx, serverID, 101); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
-	got, _ = st.GetPVEVMAlertConfigs(serverID)
+	got, _ = st.GetPVEVMAlertConfigs(ctx, serverID)
 	if len(got) != 0 {
 		t.Errorf("expected 0 configs after delete, got %d", len(got))
 	}
 }
 
 func TestPBSAlertConfig_NotFound(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	cfg, err := st.GetPBSAlertConfig(999)
+	cfg, err := st.GetPBSAlertConfig(ctx, 999)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -115,8 +121,9 @@ func TestPBSAlertConfig_NotFound(t *testing.T) {
 }
 
 func TestPBSAlertConfig_RoundTrip(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPBSServer("pbs1", "1.2.3.4", "", "1.0", "")
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs1", "1.2.3.4", "", "1.0", "")
 
 	want := domain.PBSAlertConfig{
 		ServerID:      serverID,
@@ -125,11 +132,11 @@ func TestPBSAlertConfig_RoundTrip(t *testing.T) {
 		StaleHours:    intPtr(48),
 		VerifyAlert:   false,
 	}
-	if err := st.UpsertPBSAlertConfig(want); err != nil {
+	if err := st.UpsertPBSAlertConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	got, err := st.GetPBSAlertConfig(serverID)
+	got, err := st.GetPBSAlertConfig(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}

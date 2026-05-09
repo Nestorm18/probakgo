@@ -1,19 +1,23 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
-func (s *Store) UpsertPVEServer(name, ip, publicIP, clientVersion, machineID string) (int64, error) {
-	row := s.db.QueryRow(`SELECT id FROM pve_servers WHERE name = ? AND is_deleted = 0`, name)
+func (s *Store) UpsertPVEServer(ctx context.Context, name, ip, publicIP, clientVersion, machineID string) (int64, error) {
+	debug.RecordQuery(ctx, `SELECT id FROM pve_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id FROM pve_servers WHERE name = ? AND is_deleted = 0`, name)
 	var id int64
 	if err := row.Scan(&id); err == sql.ErrNoRows {
-		res, err := s.db.Exec(
+		debug.RecordQuery(ctx, `INSERT INTO pve_servers (name, ip, public_ip, client_version, machine_id) VALUES (?, ?, ?, ?, ?)`)
+		res, err := s.db.ExecContext(ctx,
 			`INSERT INTO pve_servers (name, ip, public_ip, client_version, machine_id) VALUES (?, ?, ?, ?, ?)`,
 			name, ip, publicIP, clientVersion, machineID,
 		)
@@ -24,14 +28,15 @@ func (s *Store) UpsertPVEServer(name, ip, publicIP, clientVersion, machineID str
 	} else if err != nil {
 		return 0, err
 	}
-	_, err := s.db.Exec(
+	debug.RecordQuery(ctx, `UPDATE pve_servers SET ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+	_, err := s.db.ExecContext(ctx,
 		`UPDATE pve_servers SET ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
 		ip, publicIP, clientVersion, machineID, id,
 	)
 	return id, err
 }
 
-func (s *Store) InsertPVEReport(serverID int64, bs *domain.BackupStatus) (int64, error) {
+func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.BackupStatus) (int64, error) {
 	status := ""
 	var starttime, endtime, duration int64
 	if bs != nil {
@@ -40,7 +45,8 @@ func (s *Store) InsertPVEReport(serverID int64, bs *domain.BackupStatus) (int64,
 		endtime = bs.EndTime
 		duration = bs.Duration
 	}
-	res, err := s.db.Exec(
+	debug.RecordQuery(ctx, `INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration) VALUES (?, ?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration)
 		 VALUES (?, ?, ?, ?, ?)`,
 		serverID, status, starttime, endtime, duration,
@@ -51,13 +57,14 @@ func (s *Store) InsertPVEReport(serverID int64, bs *domain.BackupStatus) (int64,
 	return res.LastInsertId()
 }
 
-func (s *Store) InsertPVEStorage(reportID int64, st domain.StoragePayload) (int64, error) {
+func (s *Store) InsertPVEStorage(ctx context.Context, reportID int64, st domain.StoragePayload) (int64, error) {
 	pruneJSON, _ := json.Marshal(st.PruneBackups)
 	shared := 0
 	if st.Shared {
 		shared = 1
 	}
-	res, err := s.db.Exec(
+	debug.RecordQuery(ctx, `INSERT INTO pve_storages (report_id, storage, path, content, type, status, shared, server, digest, prune_backups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO pve_storages (report_id, storage, path, content, type, status, shared, server, digest, prune_backups)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, st.Storage, st.Path, st.Content, st.Type, st.Status,
@@ -69,7 +76,7 @@ func (s *Store) InsertPVEStorage(reportID int64, st domain.StoragePayload) (int6
 	return res.LastInsertId()
 }
 
-func (s *Store) InsertPVEStorageInfo(storageID int64, info domain.StorageInfoPayload) error {
+func (s *Store) InsertPVEStorageInfo(ctx context.Context, storageID int64, info domain.StorageInfoPayload) error {
 	active, enabled := 0, 0
 	if info.Active {
 		active = 1
@@ -77,7 +84,8 @@ func (s *Store) InsertPVEStorageInfo(storageID int64, info domain.StorageInfoPay
 	if info.Enabled {
 		enabled = 1
 	}
-	_, err := s.db.Exec(
+	debug.RecordQuery(ctx, `INSERT INTO pve_storage_info (storage_id, total, used, avail, used_percent, active, enabled, lvl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pve_storage_info (storage_id, total, used, avail, used_percent, active, enabled, lvl)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		storageID, info.Total, info.Used, info.Avail, info.UsedPct, active, enabled, info.Lvl,
@@ -85,8 +93,9 @@ func (s *Store) InsertPVEStorageInfo(storageID int64, info domain.StorageInfoPay
 	return err
 }
 
-func (s *Store) InsertPVEStorageContent(storageID int64, c domain.ContentDataPayload) error {
-	_, err := s.db.Exec(
+func (s *Store) InsertPVEStorageContent(ctx context.Context, storageID int64, c domain.ContentDataPayload) error {
+	debug.RecordQuery(ctx, `INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		storageID, c.VMID, c.Format, c.Size, c.Content, c.VolID, c.CTime, c.Subtype, c.Notes, c.Verification,
@@ -94,8 +103,9 @@ func (s *Store) InsertPVEStorageContent(storageID int64, c domain.ContentDataPay
 	return err
 }
 
-func (s *Store) ListPVEServers() ([]domain.PVEServer, error) {
-	rows, err := s.db.Query(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE is_deleted = 0 ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
 		FROM pve_servers WHERE is_deleted = 0 ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -113,8 +123,9 @@ func (s *Store) ListPVEServers() ([]domain.PVEServer, error) {
 	return servers, rows.Err()
 }
 
-func (s *Store) GetPVEServer(id int64) (*domain.PVEServer, error) {
-	row := s.db.QueryRow(`SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+func (s *Store) GetPVEServer(ctx context.Context, id int64) (*domain.PVEServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
 		FROM pve_servers WHERE id = ? AND is_deleted = 0`, id)
 	var sv domain.PVEServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
@@ -129,8 +140,9 @@ type PVEReportRow struct {
 	ServerName string `db:"server_name"`
 }
 
-func (s *Store) GetLatestPVEReport(serverID int64) (*domain.PVEReport, error) {
-	row := s.db.QueryRow(`SELECT id, server_id, reported_at, is_stale, stale_reason,
+func (s *Store) GetLatestPVEReport(ctx context.Context, serverID int64) (*domain.PVEReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
 		backup_status, backup_starttime, backup_endtime, backup_duration
 		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PVEReport
@@ -145,8 +157,9 @@ func (s *Store) GetLatestPVEReport(serverID int64) (*domain.PVEReport, error) {
 	return &r, nil
 }
 
-func (s *Store) ListPVEReports(serverID int64, limit int) ([]domain.PVEReport, error) {
-	rows, err := s.db.Query(`SELECT id, server_id, reported_at, is_stale, stale_reason,
+func (s *Store) ListPVEReports(ctx context.Context, serverID int64, limit int) ([]domain.PVEReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
 		backup_status, backup_starttime, backup_endtime, backup_duration
 		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`, serverID, limit)
 	if err != nil {
@@ -169,8 +182,9 @@ func (s *Store) ListPVEReports(serverID int64, limit int) ([]domain.PVEReport, e
 	return reports, rows.Err()
 }
 
-func (s *Store) GetPVEStoragesForReport(reportID int64) ([]domain.PVEStorage, error) {
-	rows, err := s.db.Query(`SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups
+func (s *Store) GetPVEStoragesForReport(ctx context.Context, reportID int64) ([]domain.PVEStorage, error) {
+	debug.RecordQuery(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups FROM pve_storages WHERE report_id = ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups
 		FROM pve_storages WHERE report_id = ?`, reportID)
 	if err != nil {
 		return nil, err
@@ -190,8 +204,9 @@ func (s *Store) GetPVEStoragesForReport(reportID int64) ([]domain.PVEStorage, er
 	return storages, rows.Err()
 }
 
-func (s *Store) GetPVEStorageContent(storageID int64) ([]domain.PVEStorageContent, error) {
-	rows, err := s.db.Query(`SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
+func (s *Store) GetPVEStorageContent(ctx context.Context, storageID int64) ([]domain.PVEStorageContent, error) {
+	debug.RecordQuery(ctx, `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification FROM pve_storage_content WHERE storage_id = ? ORDER BY ctime DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
 		FROM pve_storage_content WHERE storage_id = ? ORDER BY ctime DESC`, storageID)
 	if err != nil {
 		return nil, err
@@ -209,9 +224,10 @@ func (s *Store) GetPVEStorageContent(storageID int64) ([]domain.PVEStorageConten
 	return items, rows.Err()
 }
 
-func (s *Store) ListPVEReportsByDays(serverID int64, days int) ([]domain.PVEReport, error) {
+func (s *Store) ListPVEReportsByDays(ctx context.Context, serverID int64, days int) ([]domain.PVEReport, error) {
 	threshold := time.Now().AddDate(0, 0, -days)
-	rows, err := s.db.Query(`SELECT id, server_id, reported_at, is_stale, stale_reason,
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
 		backup_status, backup_starttime, backup_endtime, backup_duration
 		FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`,
 		serverID, threshold)
@@ -235,8 +251,9 @@ func (s *Store) ListPVEReportsByDays(serverID int64, days int) ([]domain.PVERepo
 	return reports, rows.Err()
 }
 
-func (s *Store) GetPVEStorageInfo(storageID int64) (*domain.PVEStorageInfo, error) {
-	row := s.db.QueryRow(`SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl
+func (s *Store) GetPVEStorageInfo(ctx context.Context, storageID int64) (*domain.PVEStorageInfo, error) {
+	debug.RecordQuery(ctx, `SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl FROM pve_storage_info WHERE storage_id = ? LIMIT 1`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl
 		FROM pve_storage_info WHERE storage_id = ? LIMIT 1`, storageID)
 	var info domain.PVEStorageInfo
 	var active, enabled int
@@ -249,8 +266,9 @@ func (s *Store) GetPVEStorageInfo(storageID int64) (*domain.PVEStorageInfo, erro
 	return &info, nil
 }
 
-func (s *Store) InsertPVEBackupTask(reportID int64, t domain.BackupTaskPayload) error {
-	_, err := s.db.Exec(
+func (s *Store) InsertPVEBackupTask(ctx context.Context, reportID int64, t domain.BackupTaskPayload) error {
+	debug.RecordQuery(ctx, `INSERT INTO pve_backup_tasks (report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO pve_backup_tasks (report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, t.VMID, t.VMName, t.Status, t.StartTime, t.EndTime, t.Duration, t.Size, t.Filename,
@@ -258,8 +276,9 @@ func (s *Store) InsertPVEBackupTask(reportID int64, t domain.BackupTaskPayload) 
 	return err
 }
 
-func (s *Store) GetPVEBackupTasksForReport(reportID int64) ([]domain.PVEBackupTask, error) {
-	rows, err := s.db.Query(`SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
+func (s *Store) GetPVEBackupTasksForReport(ctx context.Context, reportID int64) ([]domain.PVEBackupTask, error) {
+	debug.RecordQuery(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename FROM pve_backup_tasks WHERE report_id = ? ORDER BY starttime ASC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
 		FROM pve_backup_tasks WHERE report_id = ? ORDER BY starttime ASC`, reportID)
 	if err != nil {
 		return nil, err
@@ -277,13 +296,15 @@ func (s *Store) GetPVEBackupTasksForReport(reportID int64) ([]domain.PVEBackupTa
 	return tasks, rows.Err()
 }
 
-func (s *Store) MarkPVEReportStale(reportID int64, reason string) error {
-	_, err := s.db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason=? WHERE id=?`, reason, reportID)
+func (s *Store) MarkPVEReportStale(ctx context.Context, reportID int64, reason string) error {
+	debug.RecordQuery(ctx, `UPDATE pve_reports SET is_stale=1, stale_reason=? WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE pve_reports SET is_stale=1, stale_reason=? WHERE id=?`, reason, reportID)
 	return err
 }
 
-func (s *Store) DeletePVEServer(id int64) error {
-	_, err := s.db.Exec(`UPDATE pve_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
+func (s *Store) DeletePVEServer(ctx context.Context, id int64) error {
+	debug.RecordQuery(ctx, `UPDATE pve_servers SET is_deleted=1, updated_at=? WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE pve_servers SET is_deleted=1, updated_at=? WHERE id=?`, time.Now(), id)
 	return err
 }
 

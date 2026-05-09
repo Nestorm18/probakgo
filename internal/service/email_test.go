@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -45,13 +46,14 @@ func TestNextRunTime_Past(t *testing.T) {
 }
 
 func TestBuildEmailData_AllOK(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	serverID, _ := st.UpsertPVEServer("pve-ok", "10.0.0.1", "", "1.0", "")
-	_, _ = st.InsertPVEReport(serverID, nil) // reported now → not stale
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-ok", "10.0.0.1", "", "1.0", "")
+	_, _ = st.InsertPVEReport(ctx, serverID, nil) // reported now → not stale
 
-	cfg, _ := st.GetEmailConfig()
+	cfg, _ := st.GetEmailConfig(ctx)
 	// Disable disk and backup-error alerts so only staleness matters
 	cfg.AlertDiskPct = 0
 	cfg.AlertBackupErr = false
@@ -75,15 +77,16 @@ func TestBuildEmailData_AllOK(t *testing.T) {
 }
 
 func TestBuildEmailData_WithStale(t *testing.T) {
+	ctx := context.Background()
 	db, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	serverID, _ := st.UpsertPVEServer("pve-stale", "10.0.0.1", "", "1.0", "")
-	oldID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "10.0.0.1", "", "1.0", "")
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	yesterday := time.Now().Add(-25 * time.Hour)
 	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, oldID)
 
-	cfg, _ := st.GetEmailConfig()
+	cfg, _ := st.GetEmailConfig(ctx)
 	cfg.AlertDiskPct = 0
 	cfg.AlertBackupErr = false
 

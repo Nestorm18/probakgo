@@ -10,9 +10,10 @@ import (
 )
 
 func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
-	configs, err := h.store.ListVMBackupConfigs(server)
+	configs, err := h.store.ListVMBackupConfigs(ctx, server)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -28,26 +29,42 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) BackupConfigVMNewPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
+
+	var vm *domain.VMBackupConfig
+	if copyID := r.URL.Query().Get("copy"); copyID != "" {
+		configs, _ := h.store.ListVMBackupConfigs(ctx, server)
+		for i, c := range configs {
+			if c.VMID == copyID {
+				clone := configs[i]
+				clone.VMID = ""
+				vm = &clone
+				break
+			}
+		}
+	}
+
 	h.tmpl.Render(w, r, "vm_backup_config_form.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
 		"ServerName": server,
 		"Action":     "new",
-		"VM":         nil,
+		"VM":         vm,
 		"Flash":      r.URL.Query().Get("flash"),
 	})
 }
 
 func (h *WebH) BackupConfigVMNewPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	server := chi.URLParam(r, "server")
 	req := collectVMFormRequest(r)
 	if req.VMID == "" {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/new?flash=VM+ID+requerido", http.StatusSeeOther)
 		return
 	}
-	if _, err := h.store.CreateVMBackupConfig(server, req); err != nil {
+	if _, err := h.store.CreateVMBackupConfig(ctx, server, req); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/new?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -55,10 +72,11 @@ func (h *WebH) BackupConfigVMNewPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
-	configs, _ := h.store.ListVMBackupConfigs(server)
+	configs, _ := h.store.ListVMBackupConfigs(ctx, server)
 	var vm *domain.VMBackupConfig
 	for i, c := range configs {
 		if c.VMID == vmid {
@@ -77,11 +95,12 @@ func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) BackupConfigVMEditPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
 	req := collectVMFormRequest(r)
 	req.VMID = vmid
-	if err := h.store.UpdateVMBackupConfig(server, vmid, req); err != nil {
+	if err := h.store.UpdateVMBackupConfig(ctx, server, vmid, req); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/"+vmid+"/edit?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -89,9 +108,10 @@ func (h *WebH) BackupConfigVMEditPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) BackupConfigVMDelete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
-	if err := h.store.DeleteVMBackupConfig(server, vmid); err != nil {
+	if err := h.store.DeleteVMBackupConfig(ctx, server, vmid); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -99,9 +119,10 @@ func (h *WebH) BackupConfigVMDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) BackupConfigVMToggle(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
-	if err := h.store.ToggleVMExclude(server, vmid); err != nil {
+	if err := h.store.ToggleVMExclude(ctx, server, vmid); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}

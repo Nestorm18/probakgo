@@ -28,7 +28,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.21"
+var version = "0.0.23"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -243,28 +243,18 @@ func restartService() {
 }
 
 func ensureDefaults(st *store.Store) error {
-	hasUsers, err := st.HasUsers()
+	ctx := context.Background()
+	hasUsers, err := st.HasUsers(ctx)
 	if err != nil {
 		return err
 	}
 	if !hasUsers {
 		hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
-		if _, err := st.CreateUser("probakgo", string(hash), "admin"); err != nil {
+		if _, err := st.CreateUser(ctx, "probakgo", string(hash), "admin"); err != nil {
 			return err
 		}
 		slog.Warn("⚠  default user created - CHANGE PASSWORD IMMEDIATELY",
 			"username", "probakgo", "password", "admin123")
-	}
-	hasKey, err := st.HasAdminKey()
-	if err != nil {
-		return err
-	}
-	if !hasKey {
-		k, err := st.CreateAPIKey("Admin key", "admin", "")
-		if err != nil {
-			return err
-		}
-		slog.Warn("⚠  admin API key created - retrieve the full key from the web UI (/api-keys)", "key_preview", service.KeyPreview(k.Key))
 	}
 	return nil
 }

@@ -23,7 +23,6 @@
         <tr>
           <th>Nombre</th>
           <th>Key</th>
-          <th>Tipo</th>
           <th>Machine ID</th>
           <th>Último uso</th>
           <th>Estado</th>
@@ -38,10 +37,6 @@
           {{if .ServerName}}<div style="font-size:.73rem;color:var(--txt-muted)">{{.ServerName}}</div>{{end}}
         </td>
         <td><code>{{.KeyPreview}}</code></td>
-        <td>
-          {{if eq .KeyType "server"}}<span class="key-type-badge server">server</span>
-          {{else}}<span class="key-type-badge admin">admin</span>{{end}}
-        </td>
         <td style="font-size:.82rem">
           {{if .MachineID}}
             <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i>
@@ -75,7 +70,6 @@
               </button>
             </form>
             {{end}}
-            {{if eq .KeyType "server"}}
             <form method="POST" action="/api-keys/{{.ID}}/toggle" class="d-inline">
               {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsActive}}Desactivar{{else}}Activar{{end}}">
@@ -89,13 +83,12 @@
                 <i class="bi bi-trash"></i>
               </button>
             </form>
-            {{end}}
           </div>
         </td>
         {{end}}
       </tr>
       {{else}}
-      <tr><td colspan="{{if isAdmin $.Role}}7{{else}}6{{end}}" class="text-center py-5" style="color:var(--txt-muted)">Sin API keys registradas</td></tr>
+      <tr><td colspan="{{if isAdmin $.Role}}6{{else}}5{{end}}" class="text-center py-5" style="color:var(--txt-muted)">Sin API keys registradas</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -119,15 +112,12 @@
             <input type="text" name="name" class="form-control" required placeholder="Cliente soporte1">
           </div>
           <div class="mb-3">
-            <label class="form-label">Tipo</label>
-            <select name="key_type" class="form-select" required>
-              <option value="server">server (pbk-) - cliente Proxmox</option>
-              <option value="admin">admin (adm-) - acceso completo</option>
-            </select>
-          </div>
-          <div class="mb-3">
             <label class="form-label">Nombre de servidor <span style="color:var(--txt-muted)">(opcional)</span></label>
             <input type="text" name="server_name" class="form-control" placeholder="soporte1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">URL Proxmox <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="url" name="server_url" class="form-control" placeholder="https://192.168.1.10:8006">
           </div>
         </div>
         <div class="modal-footer">

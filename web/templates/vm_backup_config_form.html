@@ -23,7 +23,7 @@
             {{if eq .Action "edit"}}
             <input type="text" class="form-control" name="vm_id" value="{{if .VM}}{{.VM.VMID}}{{end}}" readonly style="opacity:.7">
             {{else}}
-            <input type="text" class="form-control" name="vm_id" value="" placeholder="100" required>
+            <input type="text" class="form-control" name="vm_id" value="{{if .VM}}{{.VM.VMID}}{{end}}" placeholder="100" required autofocus>
             {{end}}
           </div>
           <div class="mb-4">

@@ -9,8 +9,9 @@ import (
 )
 
 func (h *WebH) Profile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	user, err := h.store.GetUserByUsername(username)
+	user, err := h.store.GetUserByUsername(ctx, username)
 	if err != nil {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
@@ -25,8 +26,9 @@ func (h *WebH) Profile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, _, _ := session.GetUser(r)
-	user, err := h.store.GetUserByUsername(username)
+	user, err := h.store.GetUserByUsername(ctx, username)
 	if err != nil {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
@@ -57,7 +59,7 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
-	if err := h.store.UpdateUserPassword(user.ID, string(hash)); err != nil {
+	if err := h.store.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
 		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}

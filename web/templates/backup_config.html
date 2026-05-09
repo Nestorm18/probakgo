@@ -50,6 +50,9 @@
             <a href="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/edit" class="btn btn-sm btn-outline-secondary" title="Editar">
               <i class="bi bi-pencil"></i>
             </a>
+            <a href="/backup-config/{{$.ServerName}}/vm/new?copy={{.VMID}}" class="btn btn-sm btn-outline-secondary" title="Duplicar">
+              <i class="bi bi-copy"></i>
+            </a>
             <form method="POST" action="/backup-config/{{$.ServerName}}/vm/{{.VMID}}/toggle" class="d-inline">
               {{ $.CSRFField }}
               <button class="btn btn-sm btn-outline-secondary" title="{{if .IsExcluded}}Incluir{{else}}Excluir{{end}}">

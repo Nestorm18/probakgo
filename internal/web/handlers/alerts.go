@@ -11,6 +11,7 @@ import (
 )
 
 func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 
 	cfg, err := service.LoadAlertConfigs(h.store)
@@ -24,7 +25,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	suppressions, _ := h.store.GetActiveSuppressions()
+	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 
 	var active, suppressed []domain.Alert
 	for _, a := range allAlerts {
@@ -83,6 +84,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	alertID := r.FormValue("alert_id")
 	days, _ := strconv.Atoi(r.FormValue("days"))
 	reason := r.FormValue("reason")
@@ -91,14 +93,15 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	until := time.Now().Add(time.Duration(days) * 24 * time.Hour)
-	_ = h.store.UpsertAlertSuppression(alertID, until, reason)
+	_ = h.store.UpsertAlertSuppression(ctx, alertID, until, reason)
 	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
 }
 
 func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	alertID := r.FormValue("alert_id")
 	if alertID != "" {
-		_ = h.store.DeleteAlertSuppression(alertID)
+		_ = h.store.DeleteAlertSuppression(ctx, alertID)
 	}
 	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
 }

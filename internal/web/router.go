@@ -100,6 +100,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/toggle", h.BackupConfigVMToggle)
 
 		// Settings - admin only
+		r.With(RequireAdmin).Get("/settings", h.SettingsHub)
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin).Post("/settings/email", h.EmailSettingsPost)
 		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)
@@ -109,6 +110,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/alerts", h.AlertsSettingsPost)
 		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)
 		r.With(RequireAdmin).Post("/settings/ip-bans/unban", h.UnbanIPPost)
+		r.With(RequireAdmin).Get("/settings/reset", h.ResetSettings)
+		r.With(RequireAdmin).Post("/settings/reset", h.ResetDatabasePost)
 	})
 
 	csrfKey := sha256.Sum256([]byte(sessionKey))

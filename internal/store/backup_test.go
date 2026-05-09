@@ -1,12 +1,14 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"probakgo/internal/domain"
 )
 
 func TestCreateAndListVMBackupConfig(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
 	req := domain.CreateVMBackupConfigRequest{
@@ -16,7 +18,7 @@ func TestCreateAndListVMBackupConfig(t *testing.T) {
 		Wednesday: true,
 		Friday:    true,
 	}
-	id, err := st.CreateVMBackupConfig("pve-01", req)
+	id, err := st.CreateVMBackupConfig(ctx, "pve-01", req)
 	if err != nil {
 		t.Fatalf("CreateVMBackupConfig: %v", err)
 	}
@@ -24,7 +26,7 @@ func TestCreateAndListVMBackupConfig(t *testing.T) {
 		t.Error("want non-zero ID")
 	}
 
-	configs, err := st.ListVMBackupConfigs("pve-01")
+	configs, err := st.ListVMBackupConfigs(ctx, "pve-01")
 	if err != nil {
 		t.Fatalf("ListVMBackupConfigs: %v", err)
 	}
@@ -46,26 +48,27 @@ func TestCreateAndListVMBackupConfig(t *testing.T) {
 	}
 
 	// Different server → empty list
-	others, _ := st.ListVMBackupConfigs("pve-99")
+	others, _ := st.ListVMBackupConfigs(ctx, "pve-99")
 	if len(others) != 0 {
 		t.Errorf("want 0 configs for other server, got %d", len(others))
 	}
 }
 
 func TestUpdateVMBackupConfig(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
-	_, _ = st.CreateVMBackupConfig("pve-01", domain.CreateVMBackupConfigRequest{
+	_, _ = st.CreateVMBackupConfig(ctx, "pve-01", domain.CreateVMBackupConfigRequest{
 		VMID: "101", VMName: "old-name", Monday: true,
 	})
 
-	if err := st.UpdateVMBackupConfig("pve-01", "101", domain.CreateVMBackupConfigRequest{
+	if err := st.UpdateVMBackupConfig(ctx, "pve-01", "101", domain.CreateVMBackupConfigRequest{
 		VMID: "101", VMName: "new-name", Tuesday: true, Thursday: true,
 	}); err != nil {
 		t.Fatalf("UpdateVMBackupConfig: %v", err)
 	}
 
-	configs, _ := st.ListVMBackupConfigs("pve-01")
+	configs, _ := st.ListVMBackupConfigs(ctx, "pve-01")
 	if len(configs) != 1 {
 		t.Fatalf("want 1 config, got %d", len(configs))
 	}
@@ -82,17 +85,18 @@ func TestUpdateVMBackupConfig(t *testing.T) {
 }
 
 func TestDeleteVMBackupConfig_SoftDelete(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
-	_, _ = st.CreateVMBackupConfig("pve-01", domain.CreateVMBackupConfigRequest{
+	_, _ = st.CreateVMBackupConfig(ctx, "pve-01", domain.CreateVMBackupConfigRequest{
 		VMID: "200", VMName: "vm-to-delete",
 	})
 
-	if err := st.DeleteVMBackupConfig("pve-01", "200"); err != nil {
+	if err := st.DeleteVMBackupConfig(ctx, "pve-01", "200"); err != nil {
 		t.Fatalf("DeleteVMBackupConfig: %v", err)
 	}
 
-	configs, err := st.ListVMBackupConfigs("pve-01")
+	configs, err := st.ListVMBackupConfigs(ctx, "pve-01")
 	if err != nil {
 		t.Fatalf("ListVMBackupConfigs after delete: %v", err)
 	}
@@ -109,26 +113,27 @@ func TestDeleteVMBackupConfig_SoftDelete(t *testing.T) {
 }
 
 func TestToggleVMExclude(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	_, _ = st.CreateVMBackupConfig("pve-01", domain.CreateVMBackupConfigRequest{VMID: "300", VMName: "vm"})
+	_, _ = st.CreateVMBackupConfig(ctx, "pve-01", domain.CreateVMBackupConfigRequest{VMID: "300", VMName: "vm"})
 
-	configs, _ := st.ListVMBackupConfigs("pve-01")
+	configs, _ := st.ListVMBackupConfigs(ctx, "pve-01")
 	if configs[0].IsExcluded {
 		t.Fatal("want IsExcluded=false initially")
 	}
 
-	if err := st.ToggleVMExclude("pve-01", "300"); err != nil {
+	if err := st.ToggleVMExclude(ctx, "pve-01", "300"); err != nil {
 		t.Fatalf("first ToggleVMExclude: %v", err)
 	}
-	configs, _ = st.ListVMBackupConfigs("pve-01")
+	configs, _ = st.ListVMBackupConfigs(ctx, "pve-01")
 	if !configs[0].IsExcluded {
 		t.Error("want IsExcluded=true after first toggle")
 	}
 
-	if err := st.ToggleVMExclude("pve-01", "300"); err != nil {
+	if err := st.ToggleVMExclude(ctx, "pve-01", "300"); err != nil {
 		t.Fatalf("second ToggleVMExclude: %v", err)
 	}
-	configs, _ = st.ListVMBackupConfigs("pve-01")
+	configs, _ = st.ListVMBackupConfigs(ctx, "pve-01")
 	if configs[0].IsExcluded {
 		t.Error("want IsExcluded=false after second toggle")
 	}

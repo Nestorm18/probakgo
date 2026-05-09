@@ -1,14 +1,17 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
-func (s *Store) ListVMBackupConfigs(serverName string) ([]domain.VMBackupConfig, error) {
-	rows, err := s.db.Query(`SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday,
+func (s *Store) ListVMBackupConfigs(ctx context.Context, serverName string) ([]domain.VMBackupConfig, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday, is_excluded, is_deleted, deleted_at, created_at FROM vm_backup_configs WHERE server_name = ? AND is_deleted = 0 ORDER BY vm_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday,
 		thursday, friday, saturday, sunday, is_excluded, is_deleted, deleted_at, created_at
 		FROM vm_backup_configs WHERE server_name = ? AND is_deleted = 0 ORDER BY vm_id`, serverName)
 	if err != nil {
@@ -18,8 +21,9 @@ func (s *Store) ListVMBackupConfigs(serverName string) ([]domain.VMBackupConfig,
 	return scanVMConfigs(rows)
 }
 
-func (s *Store) CreateVMBackupConfig(serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
-	res, err := s.db.Exec(
+func (s *Store) CreateVMBackupConfig(ctx context.Context, serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
+	debug.RecordQuery(ctx, `INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday,
 		 thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		serverName, req.VMID, req.VMName,
@@ -33,8 +37,9 @@ func (s *Store) CreateVMBackupConfig(serverName string, req domain.CreateVMBacku
 	return res.LastInsertId()
 }
 
-func (s *Store) UpdateVMBackupConfig(serverName, vmID string, req domain.CreateVMBackupConfigRequest) error {
-	_, err := s.db.Exec(
+func (s *Store) UpdateVMBackupConfig(ctx context.Context, serverName, vmID string, req domain.CreateVMBackupConfigRequest) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET vm_name=?, monday=?, tuesday=?, wednesday=?, thursday=?, friday=?, saturday=?, sunday=? WHERE server_name=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
 		`UPDATE vm_backup_configs SET vm_name=?, monday=?, tuesday=?, wednesday=?,
 		 thursday=?, friday=?, saturday=?, sunday=?
 		 WHERE server_name=? AND vm_id=? AND is_deleted=0`,
@@ -46,16 +51,18 @@ func (s *Store) UpdateVMBackupConfig(serverName, vmID string, req domain.CreateV
 	return err
 }
 
-func (s *Store) ToggleVMExclude(serverName, vmID string) error {
-	_, err := s.db.Exec(
+func (s *Store) ToggleVMExclude(ctx context.Context, serverName, vmID string) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_excluded = NOT is_excluded WHERE server_name=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
 		`UPDATE vm_backup_configs SET is_excluded = NOT is_excluded WHERE server_name=? AND vm_id=? AND is_deleted=0`,
 		serverName, vmID,
 	)
 	return err
 }
 
-func (s *Store) DeleteVMBackupConfig(serverName, vmID string) error {
-	_, err := s.db.Exec(
+func (s *Store) DeleteVMBackupConfig(ctx context.Context, serverName, vmID string) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_name=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
 		`UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_name=? AND vm_id=? AND is_deleted=0`,
 		time.Now(), serverName, vmID,
 	)

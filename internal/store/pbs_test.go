@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,14 +9,15 @@ import (
 )
 
 func TestUpsertPBSServer_CreateAndUpdate(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
-	id1, err := st.UpsertPBSServer("pbs-node", "10.0.1.1", "", "1.0", "mid-bbb")
+	id1, err := st.UpsertPBSServer(ctx, "pbs-node", "10.0.1.1", "", "1.0", "mid-bbb")
 	if err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
 
-	id2, err := st.UpsertPBSServer("pbs-node", "10.0.1.2", "", "1.1", "mid-bbb")
+	id2, err := st.UpsertPBSServer(ctx, "pbs-node", "10.0.1.2", "", "1.1", "mid-bbb")
 	if err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
@@ -24,7 +26,7 @@ func TestUpsertPBSServer_CreateAndUpdate(t *testing.T) {
 		t.Errorf("want same ID on upsert, got %d and %d", id1, id2)
 	}
 
-	sv, err := st.GetPBSServer(id1)
+	sv, err := st.GetPBSServer(ctx, id1)
 	if err != nil {
 		t.Fatalf("get server: %v", err)
 	}
@@ -37,19 +39,20 @@ func TestUpsertPBSServer_CreateAndUpdate(t *testing.T) {
 }
 
 func TestInsertPBSReport_And_GetLatest(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPBSServer("pbs-node", "10.0.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-node", "10.0.1.1", "", "1.0", "")
 
-	id1, _ := st.InsertPBSReport(serverID)
+	id1, _ := st.InsertPBSReport(ctx, serverID)
 	// backdate id1 so id2 is definitely the newest by timestamp
 	yesterday := time.Now().Add(-24 * time.Hour)
 	if _, err := st.db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", yesterday, id1); err != nil {
 		t.Fatalf("backdate report: %v", err)
 	}
 
-	id2, _ := st.InsertPBSReport(serverID)
+	id2, _ := st.InsertPBSReport(ctx, serverID)
 
-	rep, err := st.GetLatestPBSReport(serverID)
+	rep, err := st.GetLatestPBSReport(ctx, serverID)
 	if err != nil {
 		t.Fatalf("get latest: %v", err)
 	}
@@ -59,22 +62,23 @@ func TestInsertPBSReport_And_GetLatest(t *testing.T) {
 }
 
 func TestDeleteOldPBSReports(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPBSServer("pbs-node", "10.0.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-node", "10.0.1.1", "", "1.0", "")
 
 	// Insert old report and backdate it
-	oldID, _ := st.InsertPBSReport(serverID)
+	oldID, _ := st.InsertPBSReport(ctx, serverID)
 	sixMonthsAgo := time.Now().AddDate(0, -6, 0)
 	if _, err := st.db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", sixMonthsAgo, oldID); err != nil {
 		t.Fatalf("backdate old report: %v", err)
 	}
 
 	// Add store + gc_status children to verify cascade delete
-	stID, _ := st.InsertPBSStore(oldID, domain.PBSDatastorePayload{Store: "backup", Total: 1000, Used: 500})
-	_ = st.InsertPBSGCStatus(stID, &domain.GCStatusPayload{DiskBytes: 100, DiskChunks: 5})
+	stID, _ := st.InsertPBSStore(ctx, oldID, domain.PBSDatastorePayload{Store: "backup", Total: 1000, Used: 500})
+	_ = st.InsertPBSGCStatus(ctx, stID, &domain.GCStatusPayload{DiskBytes: 100, DiskChunks: 5})
 
 	// Insert a current report
-	_, _ = st.InsertPBSReport(serverID)
+	_, _ = st.InsertPBSReport(ctx, serverID)
 
 	cutoff := time.Now().AddDate(0, -1, 0)
 	n, err := st.DeleteOldPBSReports(cutoff)
@@ -96,7 +100,7 @@ func TestDeleteOldPBSReports(t *testing.T) {
 	}
 
 	// Current report must survive
-	if _, err := st.GetLatestPBSReport(serverID); err != nil {
+	if _, err := st.GetLatestPBSReport(ctx, serverID); err != nil {
 		t.Fatalf("current report should remain: %v", err)
 	}
 }
