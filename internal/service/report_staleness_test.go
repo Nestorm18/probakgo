@@ -45,7 +45,7 @@ func TestIsStaleForServer_WeekendNoStale_FreshFridayReport(t *testing.T) {
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
 	})
 
-	// Report arrived Friday 22:00 — Saturday 04:00 (28h after Fri 00:00) has passed, report covers Friday
+	// Report arrived Friday 22:00 - Saturday 04:00 (28h after Fri 00:00) has passed, report covers Friday
 	fridayEvening := time.Date(2026, 5, 1, 22, 0, 0, 0, time.UTC)
 	stale, reason := svc.IsStaleForServer(fridayEvening, "pve-01")
 	if stale {
@@ -60,7 +60,7 @@ func TestIsStaleForServer_WeekendStale_NoFridayReport(t *testing.T) {
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
 	})
 
-	// No report since Thursday — Friday backup was missed
+	// No report since Thursday - Friday backup was missed
 	thursdayOld := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
 	stale, _ := svc.IsStaleForServer(thursdayOld, "pve-01")
 	if !stale {
@@ -69,7 +69,7 @@ func TestIsStaleForServer_WeekendStale_NoFridayReport(t *testing.T) {
 }
 
 func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
-	// "now" = Saturday 02:00 — within the 28h grace window of Friday's backup
+	// "now" = Saturday 02:00 - within the 28h grace window of Friday's backup
 	earlysat := time.Date(2026, 5, 2, 2, 0, 0, 0, time.UTC)
 	svc, create := newSvcAt(t, earlysat)
 	create(domain.CreateVMBackupConfigRequest{

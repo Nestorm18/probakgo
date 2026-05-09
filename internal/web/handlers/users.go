@@ -18,12 +18,12 @@ func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.tmpl.Render(w, r, "users.html", map[string]any{
-		"Username":       username,
-		"Role":           role,
+		"Username":        username,
+		"Role":            role,
 		"CurrentUsername": username,
-		"Users":          users,
-		"Flash":          r.URL.Query().Get("flash"),
-		"FlashOK":        r.URL.Query().Get("ok") == "1",
+		"Users":           users,
+		"Flash":           r.URL.Query().Get("flash"),
+		"FlashOK":         r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -70,7 +70,7 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 	// If changing own username, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
-		http.Redirect(w, r, "/login?flash=Nombre+de+usuario+cambió+a+"+newUsername+"+—+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?flash=Nombre+de+usuario+cambió+a+"+newUsername+"+-+inicia+sesión+de+nuevo", http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/users?flash=Nombre+de+usuario+cambió+a+"+newUsername+"&ok=1", http.StatusSeeOther)
@@ -103,7 +103,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	// If changing own password, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
-		http.Redirect(w, r, "/login?flash=Contraseña+actualizada+—+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?flash=Contraseña+actualizada+-+inicia+sesión+de+nuevo", http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/users?flash=Contraseña+actualizada&ok=1", http.StatusSeeOther)

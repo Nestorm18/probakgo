@@ -39,16 +39,18 @@ var templateActive = map[string]string{
 }
 
 type Templates struct {
-	fs      embed.FS
-	funcMap template.FuncMap
-	version string
+	fs          embed.FS
+	funcMap     template.FuncMap
+	version     string
+	badgeCounts func() (int, int)
 }
 
-func NewTemplates(fs embed.FS, version string) *Templates {
+func NewTemplates(fs embed.FS, version string, badgeCounts func() (int, int)) *Templates {
 	return &Templates{
-		fs:      fs,
-		funcMap: makeFuncMap(),
-		version: version,
+		fs:          fs,
+		funcMap:     makeFuncMap(),
+		version:     version,
+		badgeCounts: badgeCounts,
 	}
 }
 
@@ -143,6 +145,16 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		m["Version"] = t.version
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
+		}
+		if _, has := m["AlertCritical"]; !has && t.badgeCounts != nil {
+			c, w := t.badgeCounts()
+			m["AlertCritical"] = c
+			m["AlertWarning"] = w
+		}
+		if di := debugFromContext(r.Context()); di != nil {
+			di.mu.Lock()
+			di.Template = name
+			di.mu.Unlock()
 		}
 	}
 

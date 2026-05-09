@@ -95,6 +95,56 @@
   </div>
 </div>
 
+{{if and (canEdit .Role) .BackupTasks}}
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-bell-slash me-2" style="color:var(--clr-accent)"></i>Alertas por VM
+    <span style="font-size:.72rem;color:var(--txt-muted);font-weight:400;margin-left:.5rem">Overrides del último job - Heredar sin tamaño elimina el override</span>
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>VMID</th>
+          <th>Nombre</th>
+          <th colspan="3">Configuración de alerta</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .BackupTasks}}
+      {{$vmcfg := index $.VMAlertConfigs .VMID}}
+      <tr>
+        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary);vertical-align:middle">{{.VMID}}</td>
+        <td style="font-weight:500;vertical-align:middle">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td colspan="3">
+          <form method="POST" action="/servers/pve/{{$.Server.ID}}/alerts/vm" class="d-flex align-items-center gap-2 flex-wrap">
+            {{$.CSRFField}}
+            <input type="hidden" name="vmid" value="{{.VMID}}">
+            <div class="d-flex align-items-center gap-1">
+              <label class="form-label mb-0" style="font-size:.78rem;color:var(--txt-secondary);white-space:nowrap">Backup fallido:</label>
+              <select name="backup_err" class="form-select form-select-sm" style="width:auto">
+                <option value="">Heredar</option>
+                <option value="1" {{if $vmcfg.BackupErr}}{{if eq (deref $vmcfg.BackupErr) 1}}selected{{end}}{{end}}>Alertar</option>
+                <option value="0" {{if $vmcfg.BackupErr}}{{if eq (deref $vmcfg.BackupErr) 0}}selected{{end}}{{end}}>Ignorar</option>
+              </select>
+            </div>
+            <div class="d-flex align-items-center gap-1">
+              <label class="form-label mb-0" style="font-size:.78rem;color:var(--txt-secondary);white-space:nowrap">Tamaño mín.:</label>
+              <input type="number" name="min_size_mb" class="form-control form-control-sm" style="width:90px"
+                     placeholder="MB" min="1"
+                     {{if $vmcfg.MinSizeMB}}value="{{deref $vmcfg.MinSizeMB}}"{{end}}>
+            </div>
+            <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
 {{if .Storages}}
 <div class="card mb-4">
   <div class="card-header">

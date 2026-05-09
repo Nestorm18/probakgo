@@ -133,7 +133,7 @@ func TestLastBackupStatusPicksMostRecent(t *testing.T) {
 				map[string]any{"starttime": float64(500), "endtime": float64(900), "status": "OK"},
 				// middle, succeeded
 				map[string]any{"starttime": float64(1000), "endtime": float64(2000), "status": "OK"},
-				// most recent, failed — this one must win
+				// most recent, failed - this one must win
 				map[string]any{"starttime": float64(3000), "endtime": float64(5000), "status": "ERROR: disk full"},
 			},
 		})

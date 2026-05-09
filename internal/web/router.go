@@ -21,8 +21,10 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string) (http.Handler, error) {
-	tmpl := webhandlers.NewTemplates(templateFS, version)
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool) (http.Handler, error) {
+	tmpl := webhandlers.NewTemplates(templateFS, version, func() (int, int) {
+		return service.ActiveAlertCounts(st)
+	})
 	h := webhandlers.New(st, tmpl, rep)
 
 	// Progressive ban: 3 failures within 30 min → 24h → 7 days → permanent.
@@ -40,6 +42,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
+	r.Use(webhandlers.DebugBarMiddleware(dev))
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
@@ -62,6 +65,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/servers/pbs", h.PBSServers)
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
 		r.With(RequireEditor).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
+		r.With(RequireEditor).Post("/servers/pve/{id}/alerts/vm", h.PVEVMAlertConfigPost)
 		r.With(RequireEditor).Post("/servers/pbs/{id}/alerts", h.PBSAlertConfigPost)
 
 		// API keys - list visible to all, writes admin-only, reveal admin-only

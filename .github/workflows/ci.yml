@@ -26,7 +26,7 @@ jobs:
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
           if [ "$SERVER_VER" != "$CLIENT_VER" ]; then
-            echo "ERROR: server version ($SERVER_VER) != client version ($CLIENT_VER) — keep them in sync"
+            echo "ERROR: server version ($SERVER_VER) != client version ($CLIENT_VER) - keep them in sync"
             exit 1
           fi
           echo "Version sync OK: $SERVER_VER"
@@ -48,7 +48,7 @@ jobs:
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
           if [ -n "$LATEST_TAG" ] && [ "$SERVER_VER" = "$LATEST_TAG" ]; then
-            echo "ERROR: version $SERVER_VER already released — bump var version in main.go and client/main.go before pushing to master"
+            echo "ERROR: version $SERVER_VER already released - bump var version in main.go and client/main.go before pushing to master"
             exit 1
           fi
 

@@ -111,13 +111,27 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 		if c.IsExcluded {
 			continue
 		}
-		if c.Monday    { expected[time.Monday] = true }
-		if c.Tuesday   { expected[time.Tuesday] = true }
-		if c.Wednesday { expected[time.Wednesday] = true }
-		if c.Thursday  { expected[time.Thursday] = true }
-		if c.Friday    { expected[time.Friday] = true }
-		if c.Saturday  { expected[time.Saturday] = true }
-		if c.Sunday    { expected[time.Sunday] = true }
+		if c.Monday {
+			expected[time.Monday] = true
+		}
+		if c.Tuesday {
+			expected[time.Tuesday] = true
+		}
+		if c.Wednesday {
+			expected[time.Wednesday] = true
+		}
+		if c.Thursday {
+			expected[time.Thursday] = true
+		}
+		if c.Friday {
+			expected[time.Friday] = true
+		}
+		if c.Saturday {
+			expected[time.Saturday] = true
+		}
+		if c.Sunday {
+			expected[time.Sunday] = true
+		}
 	}
 	if len(expected) == 0 {
 		return r.IsStale(reportedAt), "no report received today"
@@ -132,7 +146,7 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 		}
 		dayStart := time.Date(candidate.Year(), candidate.Month(), candidate.Day(), 0, 0, 0, 0, r.tz)
 		if now.Before(dayStart.Add(28 * time.Hour)) {
-			// This day's backup window hasn't closed yet — keep looking back
+			// This day's backup window hasn't closed yet - keep looking back
 			continue
 		}
 		return reportedAt.Before(dayStart), "no report received on last backup day"
@@ -143,12 +157,12 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.
 func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVEServerResponse {
 	resp := domain.PVEServerResponse{
-		ID:           sv.ID,
-		Name:         sv.Name,
-		IP:           sv.IP,
-		PublicIP:     sv.PublicIP,
+		ID:            sv.ID,
+		Name:          sv.Name,
+		IP:            sv.IP,
+		PublicIP:      sv.PublicIP,
 		ClientVersion: sv.ClientVersion,
-		MachineBound: sv.MachineID != "",
+		MachineBound:  sv.MachineID != "",
 	}
 	rep, err := r.store.GetLatestPVEReport(sv.ID)
 	if err != nil {
@@ -171,12 +185,12 @@ func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVESe
 // BuildPBSServerResponse assembles a PBSServerResponse enriched with latest report data.
 func (r *ReportService) BuildPBSServerResponse(sv domain.PBSServer) domain.PBSServerResponse {
 	resp := domain.PBSServerResponse{
-		ID:           sv.ID,
-		Name:         sv.Name,
-		IP:           sv.IP,
-		PublicIP:     sv.PublicIP,
+		ID:            sv.ID,
+		Name:          sv.Name,
+		IP:            sv.IP,
+		PublicIP:      sv.PublicIP,
 		ClientVersion: sv.ClientVersion,
-		MachineBound: sv.MachineID != "",
+		MachineBound:  sv.MachineID != "",
 	}
 	rep, err := r.store.GetLatestPBSReport(sv.ID)
 	if err != nil {

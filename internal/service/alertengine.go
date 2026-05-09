@@ -39,7 +39,7 @@ var evaluators = []AlertEvaluator{
 }
 
 // RunAll executes all registered evaluators. Individual errors are logged but do not
-// stop execution — partial alerts are better than none.
+// stop execution - partial alerts are better than none.
 func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	var all []domain.Alert
 	for _, eval := range evaluators {
@@ -486,6 +486,28 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		}
 	}
 	return alerts, nil
+}
+
+// ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.
+// Used by the web UI to show the sidebar badge on every page.
+func ActiveAlertCounts(st *store.Store) (critical, warning int) {
+	cfg, err := LoadAlertConfigs(st)
+	if err != nil {
+		return
+	}
+	all, _ := RunAll(st, cfg)
+	supps, _ := st.GetActiveSuppressions()
+	for _, a := range all {
+		if _, suppressed := supps[a.ID]; suppressed {
+			continue
+		}
+		if a.Severity == domain.AlertSeverityCritical {
+			critical++
+		} else {
+			warning++
+		}
+	}
+	return
 }
 
 // ── Priority resolution helpers ───────────────────────────────────────────────

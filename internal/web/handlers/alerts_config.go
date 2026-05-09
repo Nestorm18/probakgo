@@ -44,6 +44,43 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
 }
 
+func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	vmid, err := strconv.ParseInt(r.FormValue("vmid"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid vmid", http.StatusBadRequest)
+		return
+	}
+
+	backupErrStr := r.FormValue("backup_err")
+	minSizeStr := r.FormValue("min_size_mb")
+
+	if backupErrStr == "" && minSizeStr == "" {
+		_ = h.store.DeletePVEVMAlertConfig(id, vmid)
+	} else {
+		cfg := domain.PVEVMAlertConfig{ServerID: id, VMID: vmid}
+		if backupErrStr != "" {
+			if n, err2 := strconv.Atoi(backupErrStr); err2 == nil {
+				cfg.BackupErr = &n
+			}
+		}
+		if minSizeStr != "" {
+			if n, err2 := strconv.Atoi(minSizeStr); err2 == nil {
+				cfg.MinSizeMB = &n
+			}
+		}
+		if err := h.store.UpsertPVEVMAlertConfig(cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+VM+guardada&ok=1", http.StatusSeeOther)
+}
+
 func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
