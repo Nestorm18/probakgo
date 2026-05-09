@@ -10,6 +10,7 @@ import (
 )
 
 func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
@@ -33,7 +34,7 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.store.UpsertPVEAlertConfig(cfg); err != nil {
+	if err := h.store.UpsertPVEAlertConfig(ctx, cfg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -45,6 +46,7 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
@@ -60,7 +62,7 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	minSizeStr := r.FormValue("min_size_mb")
 
 	if backupErrStr == "" && minSizeStr == "" {
-		_ = h.store.DeletePVEVMAlertConfig(id, vmid)
+		_ = h.store.DeletePVEVMAlertConfig(ctx, id, vmid)
 	} else {
 		cfg := domain.PVEVMAlertConfig{ServerID: id, VMID: vmid}
 		if backupErrStr != "" {
@@ -73,7 +75,7 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 				cfg.MinSizeMB = &n
 			}
 		}
-		if err := h.store.UpsertPVEVMAlertConfig(cfg); err != nil {
+		if err := h.store.UpsertPVEVMAlertConfig(ctx, cfg); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -82,6 +84,7 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
@@ -108,7 +111,7 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := h.store.UpsertPBSAlertConfig(cfg); err != nil {
+	if err := h.store.UpsertPBSAlertConfig(ctx, cfg); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

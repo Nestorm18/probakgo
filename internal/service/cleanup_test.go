@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,9 +9,10 @@ import (
 )
 
 func TestRunCleanup_Disabled(t *testing.T) {
+	ctx := context.Background()
 	db, st := openTestStore(t)
 
-	if err := st.UpsertEmailConfig(domain.EmailConfig{
+	if err := st.UpsertEmailConfig(ctx, domain.EmailConfig{
 		RetentionEnabled: false,
 		RetentionMonths:  3,
 		SendTime:         "08:00",
@@ -18,8 +20,8 @@ func TestRunCleanup_Disabled(t *testing.T) {
 		t.Fatalf("UpsertEmailConfig: %v", err)
 	}
 
-	serverID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	oldID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	if _, err := db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?",
 		time.Now().AddDate(0, -6, 0), oldID); err != nil {
 		t.Fatalf("backdate report: %v", err)
@@ -27,7 +29,7 @@ func TestRunCleanup_Disabled(t *testing.T) {
 
 	runCleanup(st)
 
-	rep, err := st.GetLatestPVEReport(serverID)
+	rep, err := st.GetLatestPVEReport(ctx, serverID)
 	if err != nil {
 		t.Fatalf("report should not be deleted when retention disabled: %v", err)
 	}
@@ -37,9 +39,10 @@ func TestRunCleanup_Disabled(t *testing.T) {
 }
 
 func TestRunCleanup_DeletesOld(t *testing.T) {
+	ctx := context.Background()
 	db, st := openTestStore(t)
 
-	if err := st.UpsertEmailConfig(domain.EmailConfig{
+	if err := st.UpsertEmailConfig(ctx, domain.EmailConfig{
 		RetentionEnabled: true,
 		RetentionMonths:  1,
 		SendTime:         "08:00",
@@ -50,16 +53,16 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 	twoMonthsAgo := time.Now().AddDate(0, -2, 0)
 
 	// PVE: old report (to be deleted) + current report (to survive)
-	pveID, _ := st.UpsertPVEServer("pve-node", "10.0.0.1", "", "1.0", "")
-	oldPVE, _ := st.InsertPVEReport(pveID, nil)
+	pveID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	oldPVE, _ := st.InsertPVEReport(ctx, pveID, nil)
 	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", twoMonthsAgo, oldPVE)
-	_, _ = st.InsertPVEReport(pveID, nil)
+	_, _ = st.InsertPVEReport(ctx, pveID, nil)
 
 	// PBS: old report (to be deleted) + current report (to survive)
-	pbsID, _ := st.UpsertPBSServer("pbs-node", "10.0.0.2", "", "1.0", "")
-	oldPBS, _ := st.InsertPBSReport(pbsID)
+	pbsID, _ := st.UpsertPBSServer(ctx, "pbs-node", "10.0.0.2", "", "1.0", "")
+	oldPBS, _ := st.InsertPBSReport(ctx, pbsID)
 	db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", twoMonthsAgo, oldPBS)
-	_, _ = st.InsertPBSReport(pbsID)
+	_, _ = st.InsertPBSReport(ctx, pbsID)
 
 	runCleanup(st)
 
@@ -73,10 +76,10 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 		t.Error("old PBS report should be deleted")
 	}
 
-	if _, err := st.GetLatestPVEReport(pveID); err != nil {
+	if _, err := st.GetLatestPVEReport(ctx, pveID); err != nil {
 		t.Fatalf("current PVE report should remain: %v", err)
 	}
-	if _, err := st.GetLatestPBSReport(pbsID); err != nil {
+	if _, err := st.GetLatestPBSReport(ctx, pbsID); err != nil {
 		t.Fatalf("current PBS report should remain: %v", err)
 	}
 }

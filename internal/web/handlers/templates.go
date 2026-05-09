@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/gorilla/csrf"
+
+	"probakgo/internal/debug"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -29,10 +32,12 @@ var templateActive = map[string]string{
 	"api_keys.html":           "keys",
 	"api_key_created.html":    "keys",
 	"users.html":              "users",
-	"email_settings.html":        "email",
-	"maintenance_settings.html": "maintenance",
-	"alerts_settings.html":      "alerts",
-	"ip_bans.html":             "ip-bans",
+	"settings_hub.html":          "settings",
+	"email_settings.html":        "settings",
+	"maintenance_settings.html":  "settings",
+	"alerts_settings.html":       "settings",
+	"ip_bans.html":               "settings",
+	"reset_settings.html":        "settings",
 	"profile.html":            "",
 	"api_key_edit.html":       "keys",
 	"reports_pve.html":        "pve",
@@ -151,11 +156,23 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 			m["AlertCritical"] = c
 			m["AlertWarning"] = w
 		}
-		if di := debugFromContext(r.Context()); di != nil {
-			di.mu.Lock()
+		if di := debug.FromContext(r.Context()); di != nil {
+			di.Mu.Lock()
 			di.Template = name
-			di.mu.Unlock()
+			di.Mu.Unlock()
 		}
+
+		jsonBytes, err := json.MarshalIndent(m, "", "  ")
+		var jsonStr string
+		if err != nil {
+			jsonStr = "marshal error: " + err.Error()
+		} else {
+			jsonStr = string(jsonBytes)
+			if len(jsonStr) > 8000 {
+				jsonStr = jsonStr[:8000] + "\n... (truncated)"
+			}
+		}
+		debug.RecordTemplateData(r.Context(), jsonStr)
 	}
 
 	var tmpl *template.Template

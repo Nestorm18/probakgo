@@ -28,13 +28,16 @@
             <label class="form-label">Nombre de servidor <span style="color:var(--txt-muted);font-weight:400">(opcional)</span></label>
             <input type="text" class="form-control" name="server_name" value="{{.Key.ServerName}}" placeholder="soporte1">
           </div>
+          <div class="mb-3">
+            <label class="form-label">URL Proxmox <span style="color:var(--txt-muted);font-weight:400">(opcional)</span></label>
+            <input type="url" class="form-control" name="server_url" value="{{.Key.ServerURL}}" placeholder="https://192.168.1.10:8006">
+          </div>
 
           <div class="mb-4 p-3 rounded" style="background:var(--body-bg);border:1px solid var(--card-border)">
             <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">Info de la key</div>
             <div class="d-flex flex-column gap-2" style="font-size:.82rem">
               <div><span style="color:var(--txt-muted)">Tipo:</span>
-                {{if eq .Key.KeyType "server"}}<span class="key-type-badge server ms-1">server</span>
-                {{else}}<span class="key-type-badge admin ms-1">admin</span>{{end}}
+                <span class="key-type-badge server ms-1">server</span>
               </div>
               <div><span style="color:var(--txt-muted)">Key:</span> <code>{{keyPreview .Key.Key}}</code></div>
               {{if .Key.MachineID}}<div><span style="color:var(--txt-muted)">Machine ID:</span> <code>{{.Key.MachineID}}</code></div>{{end}}

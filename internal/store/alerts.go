@@ -1,9 +1,11 @@
 package store
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
@@ -16,12 +18,13 @@ func diskSeverity(pct int) string {
 
 // GetAlerts returns active disk and backup-error alerts based on current thresholds.
 // diskPct=0 disables disk checks. checkBackupErr=false disables backup error checks.
-func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, error) {
+func (s *Store) GetAlerts(ctx context.Context, diskPct int, checkBackupErr bool) ([]domain.Alert, error) {
 	var alerts []domain.Alert
 
 	if diskPct > 0 {
 		// PBS datastore disk usage
-		rows, err := s.db.Query(`
+		debug.RecordQuery(ctx, `SELECT sv.name, st.store, st.used, st.total FROM pbs_stores st JOIN pbs_reports r ON r.id = st.report_id JOIN pbs_servers sv ON sv.id = r.server_id WHERE sv.is_deleted = 0 AND r.id IN (SELECT MAX(id) FROM pbs_reports GROUP BY server_id) AND st.total > 0 AND (CAST(st.used AS REAL) * 100 / st.total) >= ? ORDER BY sv.name, st.store`)
+		rows, err := s.db.QueryContext(ctx, `
 			SELECT sv.name, st.store, st.used, st.total
 			FROM pbs_stores st
 			JOIN pbs_reports r  ON r.id  = st.report_id
@@ -61,7 +64,8 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 		}
 
 		// PVE backup storage disk usage
-		rows2, err := s.db.Query(`
+		debug.RecordQuery(ctx, `SELECT sv.name, s.storage, si.used, si.total FROM pve_storage_info si JOIN pve_storages s ON s.id = si.storage_id JOIN pve_reports r ON r.id = s.report_id JOIN pve_servers sv ON sv.id = r.server_id WHERE sv.is_deleted = 0 AND r.id IN (SELECT MAX(id) FROM pve_reports GROUP BY server_id) AND s.content LIKE '%backup%' AND si.total > 0 AND (CAST(si.used AS REAL) * 100 / si.total) >= ? ORDER BY sv.name, s.storage`)
+		rows2, err := s.db.QueryContext(ctx, `
 			SELECT sv.name, s.storage, si.used, si.total
 			FROM pve_storage_info si
 			JOIN pve_storages s  ON s.id  = si.storage_id
@@ -104,7 +108,8 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 	}
 
 	if checkBackupErr {
-		rows, err := s.db.Query(`
+		debug.RecordQuery(ctx, `SELECT sv.name, r.backup_status FROM pve_reports r JOIN pve_servers sv ON sv.id = r.server_id WHERE sv.is_deleted = 0 AND r.id IN (SELECT MAX(id) FROM pve_reports GROUP BY server_id) AND r.backup_status != '' AND r.backup_status != 'OK' ORDER BY sv.name`)
+		rows, err := s.db.QueryContext(ctx, `
 			SELECT sv.name, r.backup_status
 			FROM pve_reports r
 			JOIN pve_servers sv ON sv.id = r.server_id
@@ -143,12 +148,13 @@ func (s *Store) GetAlerts(diskPct int, checkBackupErr bool) ([]domain.Alert, err
 
 // GetPBSStaleAlerts returns alerts for PBS snapshots whose last_backup is older than staleHours.
 // staleHours=0 disables the check.
-func (s *Store) GetPBSStaleAlerts(staleHours int) ([]domain.Alert, error) {
+func (s *Store) GetPBSStaleAlerts(ctx context.Context, staleHours int) ([]domain.Alert, error) {
 	if staleHours <= 0 {
 		return nil, nil
 	}
 	cutoff := time.Now().Unix() - int64(staleHours)*3600
-	rows, err := s.db.Query(`
+	debug.RecordQuery(ctx, `SELECT sv.name, st.store, sn.backup_type, sn.backup_id, sn.last_backup FROM pbs_snapshots sn JOIN pbs_stores st ON st.id = sn.store_id JOIN pbs_reports r ON r.id = st.report_id JOIN pbs_servers sv ON sv.id = r.server_id WHERE sv.is_deleted = 0 AND r.id IN (SELECT MAX(id) FROM pbs_reports GROUP BY server_id) AND sn.last_backup > 0 AND sn.last_backup < ? ORDER BY sv.name, st.store, sn.backup_type, sn.backup_id`)
+	rows, err := s.db.QueryContext(ctx, `
 		SELECT sv.name, st.store, sn.backup_type, sn.backup_id, sn.last_backup
 		FROM pbs_snapshots sn
 		JOIN pbs_stores st ON st.id = sn.store_id

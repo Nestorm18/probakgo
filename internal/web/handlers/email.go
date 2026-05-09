@@ -4,14 +4,33 @@ import (
 	"net/http"
 	"strconv"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"probakgo/internal/domain"
 	"probakgo/internal/service"
 	"probakgo/internal/session"
 )
 
-func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
+func (h *WebH) SettingsHub(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	cfg, err := h.store.GetEmailConfig()
+	cfg, _ := h.store.GetEmailConfig(ctx)
+	banCount := 0
+	if h.ban != nil {
+		banCount = len(h.ban.ListBanned())
+	}
+	h.tmpl.Render(w, r, "settings_hub.html", map[string]any{
+		"Username": username,
+		"Role":     role,
+		"Config":   cfg,
+		"BanCount": banCount,
+	})
+}
+
+func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, role, _ := session.GetUser(r)
+	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -26,7 +45,8 @@ func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
-	existing, _ := h.store.GetEmailConfig()
+	ctx := r.Context()
+	existing, _ := h.store.GetEmailConfig(ctx)
 
 	port, _ := strconv.Atoi(r.FormValue("smtp_port"))
 	if port == 0 {
@@ -57,7 +77,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 	}
-	if err := h.store.UpsertEmailConfig(cfg); err != nil {
+	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/email?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -65,8 +85,9 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	cfg, err := h.store.GetEmailConfig()
+	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -81,7 +102,8 @@ func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
-	existing, _ := h.store.GetEmailConfig()
+	ctx := r.Context()
+	existing, _ := h.store.GetEmailConfig(ctx)
 
 	retMonths, _ := strconv.Atoi(r.FormValue("retention_months"))
 	if retMonths < 1 {
@@ -107,7 +129,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 	}
-	if err := h.store.UpsertEmailConfig(cfg); err != nil {
+	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -115,8 +137,9 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) AlertsSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	cfg, err := h.store.GetEmailConfig()
+	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -131,7 +154,8 @@ func (h *WebH) AlertsSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
-	existing, _ := h.store.GetEmailConfig()
+	ctx := r.Context()
+	existing, _ := h.store.GetEmailConfig(ctx)
 
 	alertDisk, _ := strconv.Atoi(r.FormValue("alert_disk_pct"))
 	if alertDisk < 0 || alertDisk > 99 {
@@ -158,11 +182,55 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 	}
-	if err := h.store.UpsertEmailConfig(cfg); err != nil {
+	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/alerts?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+}
+
+func (h *WebH) ResetSettings(w http.ResponseWriter, r *http.Request) {
+	username, role, _ := session.GetUser(r)
+	h.tmpl.Render(w, r, "reset_settings.html", map[string]any{
+		"Username": username,
+		"Role":     role,
+		"Flash":    r.URL.Query().Get("flash"),
+		"FlashOK":  r.URL.Query().Get("ok") == "1",
+	})
+}
+
+func (h *WebH) ResetDatabasePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, _, _ := session.GetUser(r)
+
+	user, err := h.store.GetUserByUsername(ctx, username)
+	if err != nil {
+		http.Redirect(w, r, "/settings/reset?flash=Error+al+obtener+usuario", http.StatusSeeOther)
+		return
+	}
+
+	pass := r.FormValue("password")
+	passConfirm := r.FormValue("password_confirm")
+
+	if pass != passConfirm {
+		http.Redirect(w, r, "/settings/reset?flash=Las+contrasenas+no+coinciden", http.StatusSeeOther)
+		return
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(pass)) != nil {
+		http.Redirect(w, r, "/settings/reset?flash=Contrasena+incorrecta", http.StatusSeeOther)
+		return
+	}
+
+	if err := h.store.ResetAllData(ctx); err != nil {
+		http.Redirect(w, r, "/settings/reset?flash=Error:+"+err.Error(), http.StatusSeeOther)
+		return
+	}
+
+	if h.ban != nil {
+		_ = h.ban.Load()
+	}
+
+	http.Redirect(w, r, "/settings/reset?flash=Base+de+datos+reiniciada+correctamente&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) EmailTest(w http.ResponseWriter, r *http.Request) {

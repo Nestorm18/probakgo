@@ -41,12 +41,3 @@ func (h *H) Health(w http.ResponseWriter, r *http.Request) {
 func (h *H) VerifyKey(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "valid"})
 }
-
-func (h *H) ConfigInfo(w http.ResponseWriter, r *http.Request) {
-	keys, err := h.store.ListAPIKeys()
-	if err != nil {
-		internalErr(w, "list api keys", err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"total_keys": len(keys)})
-}

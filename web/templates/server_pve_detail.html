@@ -69,7 +69,10 @@
       {{range .BackupTasks}}
       <tr>
         <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
-        <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td style="font-weight:500">
+          {{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          {{if not (index $.ConfiguredVMIDs (printf "%d" .VMID))}}<span class="status-pill info ms-1" style="font-size:.65rem" title="Esta VM no está en el backup config">No configurada</span>{{end}}
+        </td>
         <td>
           {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
           {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
@@ -83,8 +86,8 @@
       <tr>
         <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
         <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
-        <td><span class="status-pill warn">MISSING</span></td>
-        <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup</td>
+        <td><span class="status-pill warn">No recibido</span></td>
+        <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup en el último job</td>
       </tr>
       {{end}}
       {{if and (eq (len .BackupTasks) 0) (eq (len .MissingVMs) 0)}}

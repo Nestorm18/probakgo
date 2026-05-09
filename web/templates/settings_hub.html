@@ -1,0 +1,115 @@
+{{define "page_title"}}Configuración - Probakgo{{end}}
+{{define "page_heading"}}Configuración{{end}}
+{{define "page_content"}}
+
+<div class="row g-3">
+
+  <div class="col-sm-6 col-xl-3">
+    <a href="/settings/email" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#3b82f6"><i class="bi bi-envelope-fill"></i></div>
+          <div>
+            <div class="fw-semibold">Email</div>
+            <div class="text-secondary" style="font-size:.8rem">SMTP, destinatarios y hora de envío</div>
+          </div>
+          <div class="mt-auto">
+            {{if .Config}}
+              {{if .Config.IsEnabled}}
+                <span class="badge" style="background:var(--clr-ok)">Activo</span>
+                {{if .Config.SMTPHost}}<span class="badge bg-secondary ms-1">{{.Config.SMTPHost}}</span>{{end}}
+              {{else}}
+                <span class="badge" style="background:var(--clr-secondary)">Desactivado</span>
+              {{end}}
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <a href="/settings/maintenance" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#f59e0b"><i class="bi bi-trash3-fill"></i></div>
+          <div>
+            <div class="fw-semibold">Mantenimiento</div>
+            <div class="text-secondary" style="font-size:.8rem">Retención de reportes históricos</div>
+          </div>
+          <div class="mt-auto">
+            {{if .Config}}
+              {{if .Config.RetentionEnabled}}
+                <span class="badge" style="background:var(--clr-ok)">{{.Config.RetentionMonths}} meses</span>
+              {{else}}
+                <span class="badge" style="background:var(--clr-secondary)">Sin límite</span>
+              {{end}}
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <a href="/settings/alerts" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#ef4444"><i class="bi bi-bell-fill"></i></div>
+          <div>
+            <div class="fw-semibold">Alertas</div>
+            <div class="text-secondary" style="font-size:.8rem">Umbrales globales de disco y backups</div>
+          </div>
+          <div class="mt-auto">
+            {{if .Config}}
+              {{if .Config.AlertDiskPct}}<span class="badge bg-secondary">Disco &gt;{{.Config.AlertDiskPct}}%</span>{{end}}
+              {{if .Config.AlertPBSStaleHours}}<span class="badge bg-secondary ms-1">PBS &gt;{{.Config.AlertPBSStaleHours}}h</span>{{end}}
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
+    <a href="/settings/ip-bans" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#8b5cf6"><i class="bi bi-shield-fill-x"></i></div>
+          <div>
+            <div class="fw-semibold">IPs Baneadas</div>
+            <div class="text-secondary" style="font-size:.8rem">Gestión de accesos bloqueados</div>
+          </div>
+          <div class="mt-auto">
+            {{if .BanCount}}
+              <span class="badge" style="background:var(--clr-danger)">{{.BanCount}} bloqueadas</span>
+            {{else}}
+              <span class="badge" style="background:var(--clr-secondary)">Sin bloqueos</span>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+
+  <div class="col-sm-6 col-xl-3">
+    <a href="/settings/reset" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#ef4444"><i class="bi bi-database-x"></i></div>
+          <div>
+            <div class="fw-semibold">Reiniciar BD</div>
+            <div class="text-secondary" style="font-size:.8rem">Eliminar todos los datos operativos</div>
+          </div>
+          <div class="mt-auto">
+            <span class="badge" style="background:var(--clr-danger)">Destructivo</span>
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+</div>
+
+{{end}}

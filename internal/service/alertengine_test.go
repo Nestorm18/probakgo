@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -42,12 +43,13 @@ func hasAlertForVM(alerts []domain.Alert, typ string, vmid int64) bool {
 // ── evalPVEDisk ───────────────────────────────────────────────────────────────
 
 func TestEvalPVEDisk_OverThreshold(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve1", "1.1.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve1", "1.1.1.1", "", "1.0", "")
 
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	stgID, _ := st.InsertPVEStorage(reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
-	_ = st.InsertPVEStorageInfo(stgID, domain.StorageInfoPayload{Total: 1000, Used: 900, Avail: 100, Active: true, Enabled: true})
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	stgID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, stgID, domain.StorageInfoPayload{Total: 1000, Used: 900, Avail: 100, Active: true, Enabled: true})
 
 	cfg := defaultCfg()
 	alerts, err := evalPVEDisk(st, cfg)
@@ -60,11 +62,12 @@ func TestEvalPVEDisk_OverThreshold(t *testing.T) {
 }
 
 func TestEvalPVEDisk_UnderThreshold(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve2", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	stgID, _ := st.InsertPVEStorage(reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
-	_ = st.InsertPVEStorageInfo(stgID, domain.StorageInfoPayload{Total: 1000, Used: 500, Avail: 500, Active: true, Enabled: true})
+	serverID, _ := st.UpsertPVEServer(ctx, "pve2", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	stgID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, stgID, domain.StorageInfoPayload{Total: 1000, Used: 500, Avail: 500, Active: true, Enabled: true})
 
 	cfg := defaultCfg()
 	alerts, _ := evalPVEDisk(st, cfg)
@@ -74,11 +77,12 @@ func TestEvalPVEDisk_UnderThreshold(t *testing.T) {
 }
 
 func TestEvalPVEDisk_PerServerThreshold(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve3", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	stgID, _ := st.InsertPVEStorage(reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
-	_ = st.InsertPVEStorageInfo(stgID, domain.StorageInfoPayload{Total: 1000, Used: 700, Avail: 300, Active: true, Enabled: true})
+	serverID, _ := st.UpsertPVEServer(ctx, "pve3", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	stgID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "backup-store", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, stgID, domain.StorageInfoPayload{Total: 1000, Used: 700, Avail: 300, Active: true, Enabled: true})
 
 	cfg := defaultCfg() // global=85%, usage=70% → no alert normally
 	threshold := 60
@@ -93,11 +97,12 @@ func TestEvalPVEDisk_PerServerThreshold(t *testing.T) {
 // ── evalPVEBackupErrors ───────────────────────────────────────────────────────
 
 func TestEvalPVEBackupErrors_ErrorTask(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-err", "1.1.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-err", "1.1.1.1", "", "1.0", "")
 	bs := &domain.BackupStatus{Status: json.RawMessage(`"PARTIAL"`)}
-	reportID, _ := st.InsertPVEReport(serverID, bs)
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 101, VMName: "debian", Status: "PARTIAL"})
+	reportID, _ := st.InsertPVEReport(ctx, serverID, bs)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 101, VMName: "debian", Status: "PARTIAL"})
 
 	cfg := defaultCfg()
 	alerts, _ := evalPVEBackupErrors(st, cfg)
@@ -107,11 +112,12 @@ func TestEvalPVEBackupErrors_ErrorTask(t *testing.T) {
 }
 
 func TestEvalPVEBackupErrors_OKTask_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-ok", "1.1.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-ok", "1.1.1.1", "", "1.0", "")
 	bs := &domain.BackupStatus{Status: json.RawMessage(`"OK"`)}
-	reportID, _ := st.InsertPVEReport(serverID, bs)
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 101, VMName: "debian", Status: "OK"})
+	reportID, _ := st.InsertPVEReport(ctx, serverID, bs)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 101, VMName: "debian", Status: "OK"})
 
 	cfg := defaultCfg()
 	alerts, _ := evalPVEBackupErrors(st, cfg)
@@ -121,10 +127,11 @@ func TestEvalPVEBackupErrors_OKTask_NoAlert(t *testing.T) {
 }
 
 func TestEvalPVEBackupErrors_VMOverride_Ignore(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-override", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 102, VMName: "win", Status: "ERROR"})
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-override", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 102, VMName: "win", Status: "ERROR"})
 
 	cfg := defaultCfg() // global backup_err=true
 	ignore := 0
@@ -138,10 +145,11 @@ func TestEvalPVEBackupErrors_VMOverride_Ignore(t *testing.T) {
 }
 
 func TestEvalPVEBackupErrors_ServerDisable_VMOverrideAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-mixed", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 103, VMName: "db", Status: "ERROR"})
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-mixed", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 103, VMName: "db", Status: "ERROR"})
 
 	cfg := defaultCfg()
 	serverIgnore := 0
@@ -159,11 +167,12 @@ func TestEvalPVEBackupErrors_ServerDisable_VMOverrideAlert(t *testing.T) {
 // ── evalPVEBackupSize ─────────────────────────────────────────────────────────
 
 func TestEvalPVEBackupSize_TooSmall(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-size", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-size", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	// backup size = 10 MB, min = 500 MB
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 200, VMName: "tiny", Status: "OK", Size: 10 * 1024 * 1024})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 200, VMName: "tiny", Status: "OK", Size: 10 * 1024 * 1024})
 
 	cfg := defaultCfg()
 	minMB := 500
@@ -177,10 +186,11 @@ func TestEvalPVEBackupSize_TooSmall(t *testing.T) {
 }
 
 func TestEvalPVEBackupSize_BigEnough_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-bigsize", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 201, VMName: "big", Status: "OK", Size: 600 * 1024 * 1024})
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-bigsize", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 201, VMName: "big", Status: "OK", Size: 600 * 1024 * 1024})
 
 	cfg := defaultCfg()
 	minMB := 500
@@ -196,9 +206,10 @@ func TestEvalPVEBackupSize_BigEnough_NoAlert(t *testing.T) {
 // ── evalPVEStale ──────────────────────────────────────────────────────────────
 
 func TestEvalPVEStale_StaleServer(t *testing.T) {
+	ctx := context.Background()
 	db, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-stale", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	// backdate report so is_stale=1 gets set
 	_, _ = db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason='no report received today' WHERE id=?`, reportID)
 
@@ -210,9 +221,10 @@ func TestEvalPVEStale_StaleServer(t *testing.T) {
 }
 
 func TestEvalPVEStale_NotStale_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPVEServer("pve-fresh", "1.1.1.1", "", "1.0", "")
-	_, _ = st.InsertPVEReport(serverID, nil)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-fresh", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPVEReport(ctx, serverID, nil)
 
 	cfg := defaultCfg()
 	alerts, _ := evalPVEStale(st, cfg)
@@ -224,10 +236,11 @@ func TestEvalPVEStale_NotStale_NoAlert(t *testing.T) {
 // ── evalPBSDisk ───────────────────────────────────────────────────────────────
 
 func TestEvalPBSDisk_OverThreshold(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs1", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	_, _ = st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "datastore1", Total: 1000, Used: 900})
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs1", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "datastore1", Total: 1000, Used: 900})
 
 	cfg := defaultCfg()
 	alerts, _ := evalPBSDisk(st, cfg)
@@ -239,11 +252,12 @@ func TestEvalPBSDisk_OverThreshold(t *testing.T) {
 // ── evalPBSFill ───────────────────────────────────────────────────────────────
 
 func TestEvalPBSFill_WithinThreshold(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-fill", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-fill", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
 	fillDate := time.Now().Add(10 * 24 * time.Hour).Unix() // fills in 10 days
-	_, _ = st.InsertPBSStore(reportID, domain.PBSDatastorePayload{
+	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{
 		Store: "ds1", Total: 1000, Used: 500, EstimatedFullDate: fillDate,
 	})
 
@@ -258,11 +272,12 @@ func TestEvalPBSFill_WithinThreshold(t *testing.T) {
 }
 
 func TestEvalPBSFill_BeyondThreshold_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-nofill", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-nofill", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
 	fillDate := time.Now().Add(60 * 24 * time.Hour).Unix() // fills in 60 days
-	_, _ = st.InsertPBSStore(reportID, domain.PBSDatastorePayload{
+	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{
 		Store: "ds1", Total: 1000, Used: 200, EstimatedFullDate: fillDate,
 	})
 
@@ -279,11 +294,12 @@ func TestEvalPBSFill_BeyondThreshold_NoAlert(t *testing.T) {
 // ── evalPBSStale ──────────────────────────────────────────────────────────────
 
 func TestEvalPBSStale_OldSnapshot(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-stale", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	storeID, _ := st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
-	_ = st.InsertPBSSnapshot(storeID, domain.PBSGroupPayload{
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-stale", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	storeID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
+	_ = st.InsertPBSSnapshot(ctx, storeID, domain.PBSGroupPayload{
 		BackupType: "vm", BackupID: "101",
 		LastBackup: time.Now().Add(-72 * time.Hour).Unix(), // 72h ago
 	})
@@ -296,11 +312,12 @@ func TestEvalPBSStale_OldSnapshot(t *testing.T) {
 }
 
 func TestEvalPBSStale_RecentSnapshot_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-fresh", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	storeID, _ := st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
-	_ = st.InsertPBSSnapshot(storeID, domain.PBSGroupPayload{
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-fresh", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	storeID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
+	_ = st.InsertPBSSnapshot(ctx, storeID, domain.PBSGroupPayload{
 		BackupType: "vm", BackupID: "101",
 		LastBackup: time.Now().Add(-10 * time.Hour).Unix(), // 10h ago
 	})
@@ -315,11 +332,12 @@ func TestEvalPBSStale_RecentSnapshot_NoAlert(t *testing.T) {
 // ── evalPBSVerify ─────────────────────────────────────────────────────────────
 
 func TestEvalPBSVerify_FailedVerification(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-verify", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	storeID, _ := st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
-	_ = st.InsertPBSSnapshot(storeID, domain.PBSGroupPayload{
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-verify", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	storeID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
+	_ = st.InsertPBSSnapshot(ctx, storeID, domain.PBSGroupPayload{
 		BackupType: "vm", BackupID: "101", VerificationState: "failed",
 	})
 
@@ -333,11 +351,12 @@ func TestEvalPBSVerify_FailedVerification(t *testing.T) {
 }
 
 func TestEvalPBSVerify_OKVerification_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-okverify", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	storeID, _ := st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
-	_ = st.InsertPBSSnapshot(storeID, domain.PBSGroupPayload{
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-okverify", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	storeID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
+	_ = st.InsertPBSSnapshot(ctx, storeID, domain.PBSGroupPayload{
 		BackupType: "vm", BackupID: "101", VerificationState: "ok",
 	})
 
@@ -351,11 +370,12 @@ func TestEvalPBSVerify_OKVerification_NoAlert(t *testing.T) {
 }
 
 func TestEvalPBSVerify_Disabled_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
-	serverID, _ := st.UpsertPBSServer("pbs-noverify", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
-	storeID, _ := st.InsertPBSStore(reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
-	_ = st.InsertPBSSnapshot(storeID, domain.PBSGroupPayload{
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-noverify", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	storeID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000})
+	_ = st.InsertPBSSnapshot(ctx, storeID, domain.PBSGroupPayload{
 		BackupType: "vm", BackupID: "101", VerificationState: "failed",
 	})
 
@@ -383,19 +403,20 @@ func TestRunAll_NoServers_NoAlerts(t *testing.T) {
 }
 
 func TestRunAll_ReturnsAlertsFromMultipleEvaluators(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 
 	// PVE server with disk alert + backup error
-	pveID, _ := st.UpsertPVEServer("pve-all", "1.1.1.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(pveID, nil)
-	stgID, _ := st.InsertPVEStorage(reportID, domain.StoragePayload{Storage: "bkp", Content: "backup"})
-	_ = st.InsertPVEStorageInfo(stgID, domain.StorageInfoPayload{Total: 1000, Used: 900, Avail: 100, Active: true, Enabled: true})
-	_ = st.InsertPVEBackupTask(reportID, domain.BackupTaskPayload{VMID: 101, VMName: "vm1", Status: "ERROR"})
+	pveID, _ := st.UpsertPVEServer(ctx, "pve-all", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, pveID, nil)
+	stgID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "bkp", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, stgID, domain.StorageInfoPayload{Total: 1000, Used: 900, Avail: 100, Active: true, Enabled: true})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 101, VMName: "vm1", Status: "ERROR"})
 
 	// PBS server with disk alert
-	pbsID, _ := st.UpsertPBSServer("pbs-all", "2.2.2.2", "", "1.0", "")
-	pbsReportID, _ := st.InsertPBSReport(pbsID)
-	_, _ = st.InsertPBSStore(pbsReportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000, Used: 920})
+	pbsID, _ := st.UpsertPBSServer(ctx, "pbs-all", "2.2.2.2", "", "1.0", "")
+	pbsReportID, _ := st.InsertPBSReport(ctx, pbsID)
+	_, _ = st.InsertPBSStore(ctx, pbsReportID, domain.PBSDatastorePayload{Store: "ds1", Total: 1000, Used: 920})
 
 	cfg := defaultCfg()
 	alerts, err := RunAll(st, cfg)

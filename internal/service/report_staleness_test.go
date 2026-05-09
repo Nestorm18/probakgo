@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -12,10 +13,11 @@ var saturday = time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
 
 func newSvcAt(t *testing.T, now time.Time) (*ReportService, func(domain.CreateVMBackupConfigRequest) int64) {
 	t.Helper()
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := &ReportService{store: st, tz: time.UTC, now: func() time.Time { return now }}
 	create := func(req domain.CreateVMBackupConfigRequest) int64 {
-		id, err := st.CreateVMBackupConfig("pve-01", req)
+		id, err := st.CreateVMBackupConfig(ctx, "pve-01", req)
 		if err != nil {
 			t.Fatalf("create config: %v", err)
 		}
@@ -90,15 +92,16 @@ func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
 }
 
 func TestIsStaleForServer_AllConfigsExcluded_FallsBack(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	if _, err := st.CreateVMBackupConfig("pve-ex", domain.CreateVMBackupConfigRequest{
+	if _, err := st.CreateVMBackupConfig(ctx, "pve-ex", domain.CreateVMBackupConfigRequest{
 		VMID: "100", VMName: "vm", Monday: true, Friday: true,
 	}); err != nil {
 		t.Fatalf("create config: %v", err)
 	}
-	if err := st.ToggleVMExclude("pve-ex", "100"); err != nil {
+	if err := st.ToggleVMExclude(ctx, "pve-ex", "100"); err != nil {
 		t.Fatalf("toggle exclude: %v", err)
 	}
 

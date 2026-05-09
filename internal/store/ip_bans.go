@@ -1,14 +1,15 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
 	"probakgo/internal/ratelimit"
 )
 
-func (s *Store) ListIPBans() ([]ratelimit.IPBan, error) {
-	rows, err := s.db.Query(`SELECT ip, ban_count, ban_expiry, banned_at FROM ip_bans ORDER BY banned_at DESC`)
+func (s *Store) ListIPBans(ctx context.Context) ([]ratelimit.IPBan, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT ip, ban_count, ban_expiry, banned_at FROM ip_bans ORDER BY banned_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -31,12 +32,12 @@ func (s *Store) ListIPBans() ([]ratelimit.IPBan, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) UpsertIPBan(b ratelimit.IPBan) error {
+func (s *Store) UpsertIPBan(ctx context.Context, b ratelimit.IPBan) error {
 	var expiry any
 	if b.BanExpiry != nil {
 		expiry = b.BanExpiry.UTC().Format(time.RFC3339)
 	}
-	_, err := s.db.Exec(`
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO ip_bans (ip, ban_count, ban_expiry, banned_at)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(ip) DO UPDATE SET
@@ -48,7 +49,7 @@ func (s *Store) UpsertIPBan(b ratelimit.IPBan) error {
 	return err
 }
 
-func (s *Store) DeleteIPBan(ip string) error {
-	_, err := s.db.Exec(`DELETE FROM ip_bans WHERE ip = ?`, ip)
+func (s *Store) DeleteIPBan(ctx context.Context, ip string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM ip_bans WHERE ip = ?`, ip)
 	return err
 }

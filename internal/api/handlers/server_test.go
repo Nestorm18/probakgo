@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,8 +10,9 @@ import (
 )
 
 func TestListPVEServers_Empty(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -33,9 +35,10 @@ func TestListPVEServers_Empty(t *testing.T) {
 }
 
 func TestListPVEServers_WithServer(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
-	ts.store.UpsertPVEServer("pve-01", "10.0.0.1", "", "1.0", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+	ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -59,8 +62,9 @@ func TestListPVEServers_WithServer(t *testing.T) {
 }
 
 func TestListPVEReports_NotFound(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve/9999/reports", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -74,10 +78,11 @@ func TestListPVEReports_NotFound(t *testing.T) {
 }
 
 func TestListPVEReports_HappyPath(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
-	serverID, _ := ts.store.UpsertPVEServer("pve-01", "10.0.0.1", "", "1.0", "")
-	ts.store.InsertPVEReport(serverID, nil)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+	serverID, _ := ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	ts.store.InsertPVEReport(ctx, serverID, nil)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/servers/pve/%d/reports", serverID), nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)

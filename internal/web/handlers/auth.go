@@ -58,7 +58,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
-	user, err := h.store.GetUserByUsername(username)
+	user, err := h.store.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)

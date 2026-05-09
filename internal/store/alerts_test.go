@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -10,16 +11,17 @@ import (
 // seedPVEWithBackupStorage inserts a PVE server with one backup storage at the given usage %.
 func seedPVEWithBackupStorage(t *testing.T, st *Store, serverName string, usedPct int) {
 	t.Helper()
-	serverID, _ := st.UpsertPVEServer(serverName, "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPVEReport(serverID, nil)
-	stID, _ := st.InsertPVEStorage(reportID, domain.StoragePayload{
+	ctx := context.Background()
+	serverID, _ := st.UpsertPVEServer(ctx, serverName, "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	stID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{
 		Storage: "local-bak",
 		Content: "backup",
 		Type:    "dir",
 	})
 	total := int64(1000)
 	used := total * int64(usedPct) / 100
-	_ = st.InsertPVEStorageInfo(stID, domain.StorageInfoPayload{
+	_ = st.InsertPVEStorageInfo(ctx, stID, domain.StorageInfoPayload{
 		Total:   total,
 		Used:    used,
 		Avail:   total - used,
@@ -32,11 +34,12 @@ func seedPVEWithBackupStorage(t *testing.T, st *Store, serverName string, usedPc
 // seedPBSWithStore inserts a PBS server with one datastore at the given usage %.
 func seedPBSWithStore(t *testing.T, st *Store, serverName string, usedPct int) {
 	t.Helper()
-	serverID, _ := st.UpsertPBSServer(serverName, "10.0.0.1", "", "1.0", "")
-	reportID, _ := st.InsertPBSReport(serverID)
+	ctx := context.Background()
+	serverID, _ := st.UpsertPBSServer(ctx, serverName, "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
 	total := int64(1000)
 	used := total * int64(usedPct) / 100
-	_, _ = st.InsertPBSStore(reportID, domain.PBSDatastorePayload{
+	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{
 		Store: "backup",
 		Total: total,
 		Used:  used,
@@ -45,11 +48,12 @@ func seedPBSWithStore(t *testing.T, st *Store, serverName string, usedPct int) {
 }
 
 func TestGetAlerts_DiskPctZero_NoCheck(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 	seedPBSWithStore(t, st, "pbs-full", 95)
 	seedPVEWithBackupStorage(t, st, "pve-full", 95)
 
-	alerts, err := st.GetAlerts(0, false)
+	alerts, err := st.GetAlerts(ctx, 0, false)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}
@@ -61,10 +65,11 @@ func TestGetAlerts_DiskPctZero_NoCheck(t *testing.T) {
 }
 
 func TestGetAlerts_PBSDisk_OverThreshold(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 	seedPBSWithStore(t, st, "pbs-heavy", 90)
 
-	alerts, err := st.GetAlerts(85, false)
+	alerts, err := st.GetAlerts(ctx, 85, false)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}
@@ -87,10 +92,11 @@ func TestGetAlerts_PBSDisk_OverThreshold(t *testing.T) {
 }
 
 func TestGetAlerts_PBSDisk_UnderThreshold(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 	seedPBSWithStore(t, st, "pbs-light", 50)
 
-	alerts, err := st.GetAlerts(85, false)
+	alerts, err := st.GetAlerts(ctx, 85, false)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}
@@ -102,10 +108,11 @@ func TestGetAlerts_PBSDisk_UnderThreshold(t *testing.T) {
 }
 
 func TestGetAlerts_PVEDisk_OverThreshold(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 	seedPVEWithBackupStorage(t, st, "pve-heavy", 90)
 
-	alerts, err := st.GetAlerts(85, false)
+	alerts, err := st.GetAlerts(ctx, 85, false)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}
@@ -122,12 +129,13 @@ func TestGetAlerts_PVEDisk_OverThreshold(t *testing.T) {
 }
 
 func TestGetAlerts_BackupError(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-err", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-err", "10.0.0.1", "", "1.0", "")
 	bs := &domain.BackupStatus{Status: json.RawMessage(`"ERROR"`)}
-	_, _ = st.InsertPVEReport(serverID, bs)
+	_, _ = st.InsertPVEReport(ctx, serverID, bs)
 
-	alerts, err := st.GetAlerts(0, true)
+	alerts, err := st.GetAlerts(ctx, 0, true)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}
@@ -147,12 +155,13 @@ func TestGetAlerts_BackupError(t *testing.T) {
 }
 
 func TestGetAlerts_BackupOK_NoAlert(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
-	serverID, _ := st.UpsertPVEServer("pve-ok", "10.0.0.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-ok", "10.0.0.1", "", "1.0", "")
 	bs := &domain.BackupStatus{Status: json.RawMessage(`"OK"`)}
-	_, _ = st.InsertPVEReport(serverID, bs)
+	_, _ = st.InsertPVEReport(ctx, serverID, bs)
 
-	alerts, err := st.GetAlerts(0, true)
+	alerts, err := st.GetAlerts(ctx, 0, true)
 	if err != nil {
 		t.Fatalf("get alerts: %v", err)
 	}

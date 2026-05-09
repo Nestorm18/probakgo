@@ -21,7 +21,12 @@
       "Bash(xargs grep *)",
       "Bash(xargs wc *)",
       "Bash(Test-Path *)",
-      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\Traballo\\\\GolandProjects\\\\probakgo\\\\web\\\\templates\\\\server_pbs_detail.html'\\).Count\")"
+      "Bash(powershell -Command \"\\(Get-Content 'C:\\\\Users\\\\Traballo\\\\GolandProjects\\\\probakgo\\\\web\\\\templates\\\\server_pbs_detail.html'\\).Count\")",
+      "Bash(sqlite3 *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(sqlite3 *)",
+      "Bash(awk -F: '{print $1}')",
+      "Bash(awk -F: '{print $1 \":\" $2}')"
     ]
   }
 }

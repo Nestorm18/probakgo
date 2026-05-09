@@ -42,27 +42,16 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireServerKey).Post("/report/pve", h.ReportPVE)
 	r.With(s.requireServerKey).Post("/report/pbs", h.ReportPBS)
 
-	// Any valid key (read data)
-	r.With(s.requireAnyKey).Get("/auth/verify", h.VerifyKey)
-	r.With(s.requireAnyKey).Get("/servers/pve", h.ListPVEServers)
-	r.With(s.requireAnyKey).Get("/servers/pve/{id}/reports", h.ListPVEReports)
-	r.With(s.requireAnyKey).Get("/servers/pbs", h.ListPBSServers)
+	r.With(s.requireServerKey).Get("/auth/verify", h.VerifyKey)
+	r.With(s.requireServerKey).Get("/servers/pve", h.ListPVEServers)
+	r.With(s.requireServerKey).Get("/servers/pve/{id}/reports", h.ListPVEReports)
+	r.With(s.requireServerKey).Get("/servers/pbs", h.ListPBSServers)
 
-	// Backup config (server or admin key)
-	r.With(s.requireAnyKey).Get("/backup-config/pve/{server}", h.GetBackupConfig)
-	r.With(s.requireAnyKey).Post("/backup-config/pve/{server}/vms", h.CreateVMConfig)
-	r.With(s.requireAnyKey).Put("/backup-config/pve/{server}/vms/{vmid}", h.UpdateVMConfig)
-	r.With(s.requireAnyKey).Delete("/backup-config/pve/{server}/vms/{vmid}", h.DeleteVMConfig)
-	r.With(s.requireAnyKey).Put("/backup-config/pve/{server}/vms/{vmid}/toggle-exclude", h.ToggleVMExclude)
-
-	// Admin only
-	r.With(s.requireAdminKey).Get("/admin/config-info", h.ConfigInfo)
-	r.With(s.requireAdminKey).Post("/admin/api-keys", h.CreateAPIKey)
-	r.With(s.requireAdminKey).Get("/admin/api-keys", h.ListAPIKeys)
-	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}", h.UpdateAPIKey)
-	r.With(s.requireAdminKey).Delete("/admin/api-keys/{id}", h.DeleteAPIKey)
-	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/toggle", h.ToggleAPIKey)
-	r.With(s.requireAdminKey).Put("/admin/api-keys/{id}/unbind", h.UnbindAPIKey)
+	r.With(s.requireServerKey).Get("/backup-config/pve/{server}", h.GetBackupConfig)
+	r.With(s.requireServerKey).Post("/backup-config/pve/{server}/vms", h.CreateVMConfig)
+	r.With(s.requireServerKey).Put("/backup-config/pve/{server}/vms/{vmid}", h.UpdateVMConfig)
+	r.With(s.requireServerKey).Delete("/backup-config/pve/{server}/vms/{vmid}", h.DeleteVMConfig)
+	r.With(s.requireServerKey).Put("/backup-config/pve/{server}/vms/{vmid}/toggle-exclude", h.ToggleVMExclude)
 
 	return r
 }

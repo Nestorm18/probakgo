@@ -11,7 +11,7 @@ import (
 
 func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
-	configs, err := h.store.ListVMBackupConfigs(server)
+	configs, err := h.store.ListVMBackupConfigs(r.Context(), server)
 	if err != nil {
 		internalErr(w, "list vm backup configs", err)
 		return
@@ -34,7 +34,7 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "vm_id is required")
 		return
 	}
-	id, err := h.store.CreateVMBackupConfig(server, req)
+	id, err := h.store.CreateVMBackupConfig(r.Context(), server, req)
 	if err != nil {
 		internalErr(w, "create vm backup config", err)
 		return
@@ -50,7 +50,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if err := h.store.UpdateVMBackupConfig(server, vmid, req); err != nil {
+	if err := h.store.UpdateVMBackupConfig(r.Context(), server, vmid, req); err != nil {
 		internalErr(w, "update vm backup config", err)
 		return
 	}
@@ -60,7 +60,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
-	if err := h.store.DeleteVMBackupConfig(server, vmid); err != nil {
+	if err := h.store.DeleteVMBackupConfig(r.Context(), server, vmid); err != nil {
 		internalErr(w, "delete vm backup config", err)
 		return
 	}
@@ -70,7 +70,7 @@ func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
-	if err := h.store.ToggleVMExclude(server, vmid); err != nil {
+	if err := h.store.ToggleVMExclude(r.Context(), server, vmid); err != nil {
 		internalErr(w, "toggle vm exclude", err)
 		return
 	}

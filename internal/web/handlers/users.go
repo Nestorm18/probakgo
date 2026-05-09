@@ -11,8 +11,9 @@ import (
 )
 
 func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	users, err := h.store.ListUsers()
+	users, err := h.store.ListUsers(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -28,6 +29,7 @@ func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	uname := r.FormValue("username")
 	pass := r.FormValue("password")
 	role := r.FormValue("role")
@@ -43,7 +45,7 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
-	if _, err := h.store.CreateUser(uname, string(hash), role); err != nil {
+	if _, err := h.store.CreateUser(ctx, uname, string(hash), role); err != nil {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -51,6 +53,7 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	newUsername := r.FormValue("username")
 	if newUsername == "" {
@@ -58,12 +61,12 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	curUsername, _, _ := session.GetUser(r)
-	u, err := h.store.GetUser(id)
+	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
 	}
-	if err := h.store.UpdateUserUsername(id, newUsername); err != nil {
+	if err := h.store.UpdateUserUsername(ctx, id, newUsername); err != nil {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -77,6 +80,7 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	pass := r.FormValue("password")
 	confirm := r.FormValue("password_confirm")
@@ -89,7 +93,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	curUsername, _, _ := session.GetUser(r)
-	u, err := h.store.GetUser(id)
+	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
@@ -99,7 +103,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
-	_ = h.store.UpdateUserPassword(id, string(hash))
+	_ = h.store.UpdateUserPassword(ctx, id, string(hash))
 	// If changing own password, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
@@ -110,6 +114,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	role := r.FormValue("role")
 	if role != "admin" && role != "editor" && role != "reader" {
@@ -117,7 +122,7 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	curUsername, sessionRole, _ := session.GetUser(r)
-	u, err := h.store.GetUser(id)
+	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
@@ -127,14 +132,15 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash=No+puedes+cambiar+tu+propio+rol", http.StatusSeeOther)
 		return
 	}
-	_ = h.store.UpdateUserRole(id, role)
+	_ = h.store.UpdateUserRole(ctx, id, role)
 	http.Redirect(w, r, "/users?flash=Rol+actualizado&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	curUsername, sessionRole, _ := session.GetUser(r)
-	u, err := h.store.GetUser(id)
+	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
@@ -144,13 +150,14 @@ func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash=No+puedes+desactivarte+a+ti+mismo", http.StatusSeeOther)
 		return
 	}
-	_ = h.store.ToggleUser(id)
+	_ = h.store.ToggleUser(ctx, id)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
 func (h *WebH) DeleteUserPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	u, err := h.store.GetUser(id)
+	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
 		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
 		return
@@ -159,6 +166,6 @@ func (h *WebH) DeleteUserPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash=No+se+puede+eliminar+un+usuario+admin", http.StatusSeeOther)
 		return
 	}
-	_ = h.store.DeleteUser(id)
+	_ = h.store.DeleteUser(ctx, id)
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }

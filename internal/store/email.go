@@ -1,13 +1,16 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
-func (s *Store) GetEmailConfig() (*domain.EmailConfig, error) {
-	row := s.db.QueryRow(`
+func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error) {
+	debug.RecordQuery(ctx, `SELECT id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours FROM email_config LIMIT 1`)
+	row := s.db.QueryRowContext(ctx, `
 		SELECT id, smtp_host, smtp_port, smtp_user, smtp_password, recipients,
 		       is_enabled, send_time,
 		       retention_months, retention_enabled, alert_disk_pct, alert_backup_err,
@@ -40,8 +43,9 @@ func (s *Store) GetEmailConfig() (*domain.EmailConfig, error) {
 	return &c, nil
 }
 
-func (s *Store) UpsertEmailConfig(c domain.EmailConfig) error {
-	_, err := s.db.Exec(`
+func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) error {
+	debug.RecordQuery(ctx, `INSERT INTO email_config (id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`)
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO email_config (
 			id, smtp_host, smtp_port, smtp_user, smtp_password, recipients,
 			is_enabled, send_time,

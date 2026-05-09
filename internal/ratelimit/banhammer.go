@@ -1,6 +1,7 @@
 package ratelimit
 
 import (
+	"context"
 	"log/slog"
 	"sync"
 	"time"
@@ -19,9 +20,9 @@ type IPBan struct {
 
 // BanStore persists bans across server restarts. Implemented by *store.Store.
 type BanStore interface {
-	ListIPBans() ([]IPBan, error)
-	UpsertIPBan(IPBan) error
-	DeleteIPBan(ip string) error
+	ListIPBans(ctx context.Context) ([]IPBan, error)
+	UpsertIPBan(ctx context.Context, b IPBan) error
+	DeleteIPBan(ctx context.Context, ip string) error
 }
 
 type ipState struct {
@@ -64,7 +65,7 @@ func (b *Banhammer) Load() error {
 	if b.store == nil {
 		return nil
 	}
-	bans, err := b.store.ListIPBans()
+	bans, err := b.store.ListIPBans(context.Background())
 	if err != nil {
 		return err
 	}
@@ -194,7 +195,7 @@ func (b *Banhammer) RecordFailure(ip string) bool {
 			e := s.banExpiry
 			expiry = &e
 		}
-		_ = b.store.UpsertIPBan(IPBan{
+		_ = b.store.UpsertIPBan(context.Background(), IPBan{
 			IP: ip, BanCount: s.banCount,
 			BanExpiry: expiry, BannedAt: now,
 		})
@@ -218,7 +219,7 @@ func (b *Banhammer) UnbanIP(ip string) {
 	defer b.mu.Unlock()
 	delete(b.states, ip)
 	if b.store != nil {
-		_ = b.store.DeleteIPBan(ip)
+		_ = b.store.DeleteIPBan(context.Background(), ip)
 	}
 	slog.Info("ip unbanned by admin", "ip", ip)
 }

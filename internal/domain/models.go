@@ -157,6 +157,7 @@ type APIKey struct {
 	MachineID  string     `db:"machine_id"`
 	LastUsed   *time.Time `db:"last_used"`
 	ServerName string     `db:"server_name"`
+	ServerURL  string     `db:"server_url"`
 	CreatedAt  time.Time  `db:"created_at"`
 }
 
@@ -228,7 +229,9 @@ const (
 	AlertTypePBSFill     = "pbs_fill"
 	AlertTypePBSStale    = "pbs_stale"
 	AlertTypePBSVerify   = "pbs_verify"
-	AlertTypePVEStale    = "pve_stale"
+	AlertTypePVEStale     = "pve_stale"
+	AlertTypePVEMissingVM = "pve_missing_vm"
+	AlertTypePVEUnknownVM = "pve_unknown_vm"
 )
 
 const (

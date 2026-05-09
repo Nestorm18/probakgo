@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,8 +9,9 @@ import (
 )
 
 func TestGetBackupConfig_Empty(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/backup-config/pve/pve-01", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -23,8 +25,9 @@ func TestGetBackupConfig_Empty(t *testing.T) {
 }
 
 func TestCreateVMConfig_HappyPath(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	body := `{"vm_id":"100","vm_name":"web","monday":true}`
 	req := httptest.NewRequest(http.MethodPost, "/backup-config/pve/pve-01/vms", strings.NewReader(body))
@@ -40,8 +43,9 @@ func TestCreateVMConfig_HappyPath(t *testing.T) {
 }
 
 func TestCreateVMConfig_MissingVMID(t *testing.T) {
+	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey("client", "server", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
 
 	body := `{"vm_name":"web"}`
 	req := httptest.NewRequest(http.MethodPost, "/backup-config/pve/pve-01/vms", strings.NewReader(body))

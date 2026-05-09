@@ -7,14 +7,15 @@ import (
 )
 
 func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 
-	pveServers, err := h.store.ListPVEServers()
+	pveServers, err := h.store.ListPVEServers(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	pbsServers, err := h.store.ListPBSServers()
+	pbsServers, err := h.store.ListPBSServers(ctx)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -22,7 +23,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	var pveOK, pveStale int
 	for _, sv := range pveServers {
-		rep, err := h.store.GetLatestPVEReport(sv.ID)
+		rep, err := h.store.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil || rep.IsStale {
 			pveStale++
 		} else {
@@ -31,7 +32,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	var pbsOK, pbsStale int
 	for _, sv := range pbsServers {
-		rep, err := h.store.GetLatestPBSReport(sv.ID)
+		rep, err := h.store.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil || rep.IsStale {
 			pbsStale++
 		} else {

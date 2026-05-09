@@ -8,7 +8,7 @@ import (
 )
 
 func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
-	servers, err := h.store.ListPVEServers()
+	servers, err := h.store.ListPVEServers(r.Context())
 	if err != nil {
 		internalErr(w, "list pve servers", err)
 		return
@@ -21,7 +21,7 @@ func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) ListPBSServers(w http.ResponseWriter, r *http.Request) {
-	servers, err := h.store.ListPBSServers()
+	servers, err := h.store.ListPBSServers(r.Context())
 	if err != nil {
 		internalErr(w, "list pbs servers", err)
 		return
@@ -39,7 +39,7 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "invalid server id")
 		return
 	}
-	sv, err := h.store.GetPVEServer(id)
+	sv, err := h.store.GetPVEServer(r.Context(), id)
 	if err != nil {
 		errJSON(w, http.StatusNotFound, "server not found")
 		return
@@ -50,7 +50,7 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	reports, err := h.store.ListPVEReports(id, limit)
+	reports, err := h.store.ListPVEReports(r.Context(), id, limit)
 	if err != nil {
 		internalErr(w, "list pve reports", err)
 		return

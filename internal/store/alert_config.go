@@ -1,13 +1,16 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 )
 
-func (s *Store) GetPVEAlertConfig(serverID int64) (domain.PVEAlertConfig, error) {
-	row := s.db.QueryRow(
+func (s *Store) GetPVEAlertConfig(ctx context.Context, serverID int64) (domain.PVEAlertConfig, error) {
+	debug.RecordQuery(ctx, `SELECT disk_pct, stale_hours, backup_err FROM pve_alert_config WHERE server_id = ?`)
+	row := s.db.QueryRowContext(ctx,
 		`SELECT disk_pct, stale_hours, backup_err FROM pve_alert_config WHERE server_id = ?`,
 		serverID,
 	)
@@ -34,8 +37,9 @@ func (s *Store) GetPVEAlertConfig(serverID int64) (domain.PVEAlertConfig, error)
 	return cfg, nil
 }
 
-func (s *Store) UpsertPVEAlertConfig(cfg domain.PVEAlertConfig) error {
-	_, err := s.db.Exec(`
+func (s *Store) UpsertPVEAlertConfig(ctx context.Context, cfg domain.PVEAlertConfig) error {
+	debug.RecordQuery(ctx, `INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, updated_at)
 		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(server_id) DO UPDATE SET
@@ -48,8 +52,9 @@ func (s *Store) UpsertPVEAlertConfig(cfg domain.PVEAlertConfig) error {
 	return err
 }
 
-func (s *Store) GetPVEVMAlertConfigs(serverID int64) ([]domain.PVEVMAlertConfig, error) {
-	rows, err := s.db.Query(
+func (s *Store) GetPVEVMAlertConfigs(ctx context.Context, serverID int64) ([]domain.PVEVMAlertConfig, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, vmid, backup_err, min_size_mb FROM pve_vm_alert_config WHERE server_id = ?`)
+	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, server_id, vmid, backup_err, min_size_mb FROM pve_vm_alert_config WHERE server_id = ?`,
 		serverID,
 	)
@@ -77,8 +82,9 @@ func (s *Store) GetPVEVMAlertConfigs(serverID int64) ([]domain.PVEVMAlertConfig,
 	return configs, rows.Err()
 }
 
-func (s *Store) UpsertPVEVMAlertConfig(cfg domain.PVEVMAlertConfig) error {
-	_, err := s.db.Exec(`
+func (s *Store) UpsertPVEVMAlertConfig(ctx context.Context, cfg domain.PVEVMAlertConfig) error {
+	debug.RecordQuery(ctx, `INSERT INTO pve_vm_alert_config (server_id, vmid, backup_err, min_size_mb) VALUES (?, ?, ?, ?) ON CONFLICT(server_id, vmid) DO UPDATE SET ...`)
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO pve_vm_alert_config (server_id, vmid, backup_err, min_size_mb)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(server_id, vmid) DO UPDATE SET
@@ -89,16 +95,18 @@ func (s *Store) UpsertPVEVMAlertConfig(cfg domain.PVEVMAlertConfig) error {
 	return err
 }
 
-func (s *Store) DeletePVEVMAlertConfig(serverID, vmid int64) error {
-	_, err := s.db.Exec(
+func (s *Store) DeletePVEVMAlertConfig(ctx context.Context, serverID, vmid int64) error {
+	debug.RecordQuery(ctx, `DELETE FROM pve_vm_alert_config WHERE server_id = ? AND vmid = ?`)
+	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM pve_vm_alert_config WHERE server_id = ? AND vmid = ?`,
 		serverID, vmid,
 	)
 	return err
 }
 
-func (s *Store) GetPBSAlertConfig(serverID int64) (domain.PBSAlertConfig, error) {
-	row := s.db.QueryRow(
+func (s *Store) GetPBSAlertConfig(ctx context.Context, serverID int64) (domain.PBSAlertConfig, error) {
+	debug.RecordQuery(ctx, `SELECT disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config WHERE server_id = ?`)
+	row := s.db.QueryRowContext(ctx,
 		`SELECT disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config WHERE server_id = ?`,
 		serverID,
 	)
@@ -128,12 +136,13 @@ func (s *Store) GetPBSAlertConfig(serverID int64) (domain.PBSAlertConfig, error)
 	return cfg, nil
 }
 
-func (s *Store) UpsertPBSAlertConfig(cfg domain.PBSAlertConfig) error {
+func (s *Store) UpsertPBSAlertConfig(ctx context.Context, cfg domain.PBSAlertConfig) error {
 	verifyInt := 0
 	if cfg.VerifyAlert {
 		verifyInt = 1
 	}
-	_, err := s.db.Exec(`
+	debug.RecordQuery(ctx, `INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, updated_at)
 		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(server_id) DO UPDATE SET

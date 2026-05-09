@@ -1,0 +1,1 @@
+ALTER TABLE api_keys ADD COLUMN server_url TEXT NOT NULL DEFAULT '';

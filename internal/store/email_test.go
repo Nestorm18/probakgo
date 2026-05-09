@@ -1,15 +1,17 @@
 package store
 
 import (
+	"context"
 	"testing"
 
 	"probakgo/internal/domain"
 )
 
 func TestGetEmailConfig_Defaults(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
-	cfg, err := st.GetEmailConfig()
+	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		t.Fatalf("get config: %v", err)
 	}
@@ -31,6 +33,7 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 }
 
 func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
 	want := domain.EmailConfig{
@@ -47,11 +50,11 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		AlertBackupErr:   false,
 	}
 
-	if err := st.UpsertEmailConfig(want); err != nil {
+	if err := st.UpsertEmailConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	got, err := st.GetEmailConfig()
+	got, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		t.Fatalf("get config: %v", err)
 	}
@@ -81,15 +84,16 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 }
 
 func TestUpsertEmailConfig_UpdateInPlace(t *testing.T) {
+	ctx := context.Background()
 	st := openTestDB(t)
 
 	first := domain.EmailConfig{SMTPHost: "smtp1.example.com", SMTPPort: 587, SendTime: "08:00", RetentionMonths: 3}
 	second := domain.EmailConfig{SMTPHost: "smtp2.example.com", SMTPPort: 587, SendTime: "10:00", RetentionMonths: 6}
 
-	if err := st.UpsertEmailConfig(first); err != nil {
+	if err := st.UpsertEmailConfig(ctx, first); err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
-	if err := st.UpsertEmailConfig(second); err != nil {
+	if err := st.UpsertEmailConfig(ctx, second); err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
 
@@ -101,7 +105,7 @@ func TestUpsertEmailConfig_UpdateInPlace(t *testing.T) {
 		t.Errorf("want 1 row in email_config, got %d", count)
 	}
 
-	cfg, err := st.GetEmailConfig()
+	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		t.Fatalf("get config: %v", err)
 	}

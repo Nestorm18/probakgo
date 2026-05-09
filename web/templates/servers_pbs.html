@@ -30,6 +30,9 @@
           <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
             {{.Server.Name}}
           </a>
+          {{if .ServerURL}}
+          <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1" title="Abrir interfaz Proxmox" style="color:var(--txt-muted);font-size:.8rem"><i class="bi bi-box-arrow-up-right"></i></a>
+          {{end}}
           {{if .Server.MachineID}}
           <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
           {{end}}
@@ -44,23 +47,31 @@
         </td>
         <td style="font-size:.82rem">
           {{range .Stores}}
-          <div class="mb-1 d-flex align-items-center gap-2 flex-wrap">
-            <span style="color:var(--txt-primary);font-weight:500">{{.Store}}</span>
-            <span style="color:var(--txt-muted)">{{formatBytes .Used}} / {{formatBytes .Total}}</span>
-            {{if and .EstimatedFullDate (not (isPast .EstimatedFullDate))}}
-              {{$days := daysUntil .EstimatedFullDate}}
-              {{if lt $days 7}}
-                <span class="status-pill bad" title="Se llena en menos de 7 días">{{$days}}d</span>
-              {{else}}
-                <span style="color:var(--txt-muted);font-size:.75rem">~{{$days}}d</span>
+          {{$noFill := false}}
+          <div class="mb-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span style="color:var(--txt-primary);font-weight:500">{{.Store}}</span>
+              <span style="color:var(--txt-muted)">{{formatBytes .Used}} / {{formatBytes .Total}}</span>
+              {{if and .EstimatedFullDate (not (isPast .EstimatedFullDate))}}
+                {{$days := daysUntil .EstimatedFullDate}}
+                {{if lt $days 14}}
+                  <span class="status-pill bad" title="Se llena en menos de 14 días">{{$days}}d</span>
+                {{else}}
+                  <span style="color:var(--txt-muted);font-size:.75rem">~{{$days}}d</span>
+                {{end}}
+              {{else if .Total}}
+                {{$p := pct .Used .Total}}
+                {{if gt $p 95}}
+                  <span class="status-pill bad" title="Disco al {{$p}}%">{{$p}}%</span>
+                  {{$noFill = true}}
+                {{else if gt $p 85}}
+                  <span class="status-pill warn" title="Disco al {{$p}}%">{{$p}}%</span>
+                  {{$noFill = true}}
+                {{end}}
               {{end}}
-            {{else if .Total}}
-              {{$p := pct .Used .Total}}
-              {{if gt $p 95}}
-                <span class="status-pill bad" title="Disco al {{$p}}%">{{$p}}%</span>
-              {{else if gt $p 85}}
-                <span class="status-pill warn" title="Disco al {{$p}}%">{{$p}}%</span>
-              {{end}}
+            </div>
+            {{if $noFill}}
+              <div style="color:var(--clr-ok);font-size:.7rem;margin-top:2px">Sin riesgo de llenado</div>
             {{end}}
           </div>
           {{end}}

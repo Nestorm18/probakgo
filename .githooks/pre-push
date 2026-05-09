@@ -1,23 +1,28 @@
 #!/bin/sh
-# Blocks pushing to master if the version in main.go already has a git tag.
-# Install once: git config core.hooksPath .githooks
+# Bump patch version in main.go and client/main.go before each push
 
-while read local_ref local_sha remote_ref remote_sha; do
-  case "$remote_ref" in
-    refs/heads/master)
-      SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
-      CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
-      if [ "$SERVER_VER" != "$CLIENT_VER" ]; then
-        echo "ERROR: server version ($SERVER_VER) != client version ($CLIENT_VER) - keep them in sync"
-        exit 1
-      fi
-      LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
-      if [ -n "$LATEST_TAG" ] && [ "$SERVER_VER" = "$LATEST_TAG" ]; then
-        echo "ERROR: version $SERVER_VER already released as v$LATEST_TAG"
-        echo "       Bump var version in main.go and client/main.go before pushing to master."
-        exit 1
-      fi
-      ;;
-  esac
-done
-exit 0
+set -e
+
+# Read current version from main.go
+CURRENT=$(grep -oP '(?<=var version = ")\d+\.\d+\.\d+' main.go)
+if [ -z "$CURRENT" ]; then
+    echo "pre-push: could not read version from main.go" >&2
+    exit 1
+fi
+
+# Split and increment patch
+MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+MINOR=$(echo "$CURRENT" | cut -d. -f2)
+PATCH=$(echo "$CURRENT" | cut -d. -f3)
+NEW_PATCH=$((PATCH + 1))
+NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+
+echo "pre-push: bumping version $CURRENT → $NEW_VERSION"
+
+# Update both files
+sed -i "s/var version = \"$CURRENT\"/var version = \"$NEW_VERSION\"/" main.go
+sed -i "s/var version = \"$CURRENT\"/var version = \"$NEW_VERSION\"/" client/main.go
+
+# Commit the bump
+git add main.go client/main.go
+git commit -m "chore: bump version to $NEW_VERSION"

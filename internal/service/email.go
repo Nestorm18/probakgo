@@ -70,7 +70,8 @@ type emailData struct {
 
 // SendDailyReport builds and sends the daily status email.
 func SendDailyReport(st *store.Store, rep *ReportService) error {
-	cfg, err := st.GetEmailConfig()
+	ctx := context.Background()
+	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get email config: %w", err)
 	}
@@ -106,12 +107,13 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 }
 
 func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig) (emailData, error) {
+	ctx := context.Background()
 	sendTime := cfg.SendTime
-	pveServers, err := st.ListPVEServers()
+	pveServers, err := st.ListPVEServers(ctx)
 	if err != nil {
 		return emailData{}, err
 	}
-	pbsServers, err := st.ListPBSServers()
+	pbsServers, err := st.ListPBSServers(ctx)
 	if err != nil {
 		return emailData{}, err
 	}
@@ -119,14 +121,14 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 	var pveIssues, pveOk []serverRow
 	for _, sv := range pveServers {
 		row := serverRow{Name: sv.Name, IP: sv.IP}
-		r, err := st.GetLatestPVEReport(sv.ID)
+		r, err := st.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil {
 			row.StaleReason = "no reports received"
 			pveIssues = append(pveIssues, row)
 			continue
 		}
 
-		tasks, _ := st.GetPVEBackupTasksForReport(r.ID)
+		tasks, _ := st.GetPVEBackupTasksForReport(ctx, r.ID)
 		for _, t := range tasks {
 			name := t.VMName
 			if name == "" {
@@ -141,7 +143,7 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 			})
 		}
 		if len(tasks) > 0 {
-			configs, _ := st.ListVMBackupConfigs(sv.Name)
+			configs, _ := st.ListVMBackupConfigs(ctx, sv.Name)
 			if len(configs) > 0 {
 				jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
 				seenVMIDs := make(map[string]bool)
@@ -179,13 +181,13 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 	var pbsIssues, pbsOk []serverRow
 	for _, sv := range pbsServers {
 		row := serverRow{Name: sv.Name, IP: sv.IP}
-		r, err := st.GetLatestPBSReport(sv.ID)
+		r, err := st.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil {
 			row.StaleReason = "no reports received"
 			pbsIssues = append(pbsIssues, row)
 			continue
 		}
-		if stores, err := st.GetPBSStoresForReport(r.ID); err == nil {
+		if stores, err := st.GetPBSStoresForReport(ctx, r.ID); err == nil {
 			for _, ds := range stores {
 				usedPct := 0
 				if ds.Total > 0 {
@@ -214,7 +216,7 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 	// Alerts: disk usage and backup errors
 	var diskAlerts []diskAlertRow
 	var backupErrors []serverRow
-	if alerts, err := st.GetAlerts(cfg.AlertDiskPct, cfg.AlertBackupErr); err == nil {
+	if alerts, err := st.GetAlerts(ctx, cfg.AlertDiskPct, cfg.AlertBackupErr); err == nil {
 		for _, a := range alerts {
 			switch a.Type {
 			case domain.AlertTypeDisk:
@@ -300,7 +302,7 @@ func buildMIMEMessage(from string, to []string, subject, html string) []byte {
 
 func parseRecipients(raw string) []string {
 	var out []string
-	for _, s := range strings.Split(raw, ",") {
+	for s := range strings.SplitSeq(raw, ",") {
 		s = strings.TrimSpace(s)
 		if s != "" {
 			out = append(out, s)
@@ -313,7 +315,7 @@ func parseRecipients(raw string) []string {
 func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportService) {
 	go func() {
 		for {
-			cfg, err := st.GetEmailConfig()
+			cfg, err := st.GetEmailConfig(context.Background())
 			if err != nil || !cfg.IsEnabled {
 				select {
 				case <-ctx.Done():
