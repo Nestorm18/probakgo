@@ -221,3 +221,102 @@ func TestGetPVEBackupTasksForReport_OrderedByStarttime(t *testing.T) {
 		t.Errorf("want tasks ordered by starttime ASC, got VMIDs %d, %d", tasks[0].VMID, tasks[1].VMID)
 	}
 }
+
+func TestListPVEReports_LimitAndOrder(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+
+	id1, _ := st.InsertPVEReport(ctx, serverID, nil)
+	id2, _ := st.InsertPVEReport(ctx, serverID, nil)
+	id3, _ := st.InsertPVEReport(ctx, serverID, nil)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-72*time.Hour), id1)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-48*time.Hour), id2)
+
+	reports, err := st.ListPVEReports(ctx, serverID, 2)
+	if err != nil {
+		t.Fatalf("ListPVEReports: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("want 2 reports (limit), got %d", len(reports))
+	}
+	if reports[0].ID != id3 || reports[1].ID != id2 {
+		t.Errorf("want newest first: want [%d,%d], got [%d,%d]", id3, id2, reports[0].ID, reports[1].ID)
+	}
+}
+
+func TestListPVEReportsByDays_Filter(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().AddDate(0, 0, -5), oldID)
+	_, _ = st.InsertPVEReport(ctx, serverID, nil) // recent
+
+	recent, err := st.ListPVEReportsByDays(ctx, serverID, 1)
+	if err != nil {
+		t.Fatalf("ListPVEReportsByDays: %v", err)
+	}
+	if len(recent) != 1 {
+		t.Errorf("days=1: want 1 report, got %d", len(recent))
+	}
+
+	all, err := st.ListPVEReportsByDays(ctx, serverID, 7)
+	if err != nil {
+		t.Fatalf("ListPVEReportsByDays days=7: %v", err)
+	}
+	if len(all) != 2 {
+		t.Errorf("days=7: want 2 reports, got %d", len(all))
+	}
+}
+
+func TestMarkPVEReportStale(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+
+	if err := st.MarkPVEReportStale(ctx, reportID, "test stale reason"); err != nil {
+		t.Fatalf("MarkPVEReportStale: %v", err)
+	}
+
+	rep, err := st.GetLatestPVEReport(ctx, serverID)
+	if err != nil {
+		t.Fatalf("GetLatestPVEReport: %v", err)
+	}
+	if !rep.IsStale {
+		t.Error("want IsStale=true after marking stale")
+	}
+	if rep.StaleReason != "test stale reason" {
+		t.Errorf("StaleReason: want %q, got %q", "test stale reason", rep.StaleReason)
+	}
+}
+
+func TestDeletePVEServer_SoftDelete(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	id, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+
+	if err := st.DeletePVEServer(ctx, id); err != nil {
+		t.Fatalf("DeletePVEServer: %v", err)
+	}
+
+	if _, err := st.GetPVEServer(ctx, id); err == nil {
+		t.Error("want error for deleted server from GetPVEServer")
+	}
+
+	servers, err := st.ListPVEServers(ctx)
+	if err != nil {
+		t.Fatalf("ListPVEServers: %v", err)
+	}
+	if len(servers) != 0 {
+		t.Errorf("want 0 servers after delete, got %d", len(servers))
+	}
+
+	var count int
+	st.db.QueryRow("SELECT COUNT(*) FROM pve_servers WHERE id=? AND is_deleted=1", id).Scan(&count)
+	if count != 1 {
+		t.Error("want soft-deleted row to remain in DB with is_deleted=1")
+	}
+}
