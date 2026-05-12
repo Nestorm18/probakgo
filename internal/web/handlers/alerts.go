@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,12 +17,14 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 
 	cfg, err := service.LoadAlertConfigs(h.store)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("load alert configs", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	allAlerts, err := service.RunAll(h.store, cfg)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("run alerts", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 

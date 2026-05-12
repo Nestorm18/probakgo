@@ -32,33 +32,8 @@ Consecuencias:
 
 ---
 
-## SEGURIDAD: Filtración de errores internos al cliente web
-
-Los handlers web devuelven `http.Error(w, err.Error(), ...)` con mensajes de error internos del store/DB expuestos al navegador:
-
-- `internal/web/handlers/alerts.go:19, 24`
-- `internal/web/handlers/email.go:35, 92, 144`
-- `internal/web/handlers/servers.go:19, 262`
-- `internal/web/handlers/dashboard.go:15, 20`
-
-**Fix**: Loggear el error internamente con `slog.Error(...)` y devolver un mensaje genérico al cliente: `http.Error(w, "error interno del servidor", http.StatusInternalServerError)`.
-
----
 
 
-## RENDIMIENTO: Falta índice en `alert_suppressions`
-
-`internal/db/migrations/008_alert_suppressions.up.sql` crea la tabla sin índice en `suppressed_until`:
-
-```sql
--- migration 009 o siguiente
-CREATE INDEX IF NOT EXISTS idx_alert_suppressions_until
-ON alert_suppressions(suppressed_until);
-```
-
-La query `WHERE suppressed_until > ?` hace table scan. Con muchas supresiones acumuladas el coste crece linealmente.
-
----
 
 ## CALIDAD: Sesiones no se invalidan al cambiar rol o desactivar usuario
 

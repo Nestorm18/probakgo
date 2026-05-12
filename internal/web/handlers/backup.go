@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -15,7 +16,8 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	configs, err := h.store.ListVMBackupConfigs(ctx, server)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list vm backup configs", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	h.tmpl.Render(w, r, "backup_config.html", map[string]any{

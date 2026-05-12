@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -17,7 +18,8 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	keys, err := h.store.ListAPIKeys(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list api keys", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	type keyRow struct {

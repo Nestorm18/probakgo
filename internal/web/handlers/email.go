@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -32,7 +33,8 @@ func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("load email config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	h.tmpl.Render(w, r, "email_settings.html", map[string]any{
@@ -89,7 +91,8 @@ func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("load email config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	h.tmpl.Render(w, r, "maintenance_settings.html", map[string]any{
@@ -141,7 +144,8 @@ func (h *WebH) AlertsSettings(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	cfg, err := h.store.GetEmailConfig(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("load email config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	h.tmpl.Render(w, r, "alerts_settings.html", map[string]any{

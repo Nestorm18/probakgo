@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -15,7 +16,8 @@ func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	users, err := h.store.ListUsers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list users", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	h.tmpl.Render(w, r, "users.html", map[string]any{
