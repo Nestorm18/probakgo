@@ -35,12 +35,6 @@ Consecuencias:
 
 
 
-## CALIDAD: Sesiones no se invalidan al cambiar rol o desactivar usuario
-
-Si un admin degrada un usuario a `reader`, o desactiva su cuenta, la sesión activa sigue válida hasta que expire (horas/días).
-
-**Fix simple**: Añadir un check en el middleware de sesión (`internal/web/handlers/auth.go`) que verifique el estado del usuario en DB en cada request (o con TTL corto). Alternativa: al guardar cambios de usuario, incrementar un `session_version` en la tabla `users` y validarlo en sesión.
-
 ---
 
 ---

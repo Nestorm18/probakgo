@@ -53,7 +53,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.Get("/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
-		r.Use(RequireLogin)
+		r.Use(RequireLogin(st))
 
 		r.Get("/", h.Dashboard)
 		r.Get("/alerts", h.Alerts)
