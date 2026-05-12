@@ -36,7 +36,7 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		if banned, remaining := h.ban.IsBanned(ratelimit.ExtractIP(r)); banned {
 			h.tmpl.Render(w, r, "login.html", map[string]any{
-				"Error": fmt.Sprintf("Too many failed attempts. Try again in %s.", formatRemaining(remaining)),
+				"Error": fmt.Sprintf("Demasiados intentos fallidos. Inténtalo de nuevo en %s.", formatRemaining(remaining)),
 			})
 			return
 		}
@@ -63,14 +63,14 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
-		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Invalid credentials"})
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos"})
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
-		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Invalid credentials"})
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos"})
 		return
 	}
 
@@ -96,14 +96,26 @@ func (h *WebH) Logout(w http.ResponseWriter, r *http.Request) {
 
 func formatRemaining(d time.Duration) string {
 	if d < 0 {
-		return "permanently"
+		return "permanentemente"
 	}
 	switch {
 	case d >= 24*time.Hour:
-		return fmt.Sprintf("%d day(s)", int(d.Hours()/24)+1)
+		days := int(d.Hours()/24) + 1
+		if days == 1 {
+			return "1 día"
+		}
+		return fmt.Sprintf("%d días", days)
 	case d >= time.Hour:
-		return fmt.Sprintf("%d hour(s)", int(d.Hours())+1)
+		hours := int(d.Hours()) + 1
+		if hours == 1 {
+			return "1 hora"
+		}
+		return fmt.Sprintf("%d horas", hours)
 	default:
-		return fmt.Sprintf("%d minute(s)", int(d.Minutes())+1)
+		mins := int(d.Minutes()) + 1
+		if mins == 1 {
+			return "1 minuto"
+		}
+		return fmt.Sprintf("%d minutos", mins)
 	}
 }

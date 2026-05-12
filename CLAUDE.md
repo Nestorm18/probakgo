@@ -120,7 +120,7 @@ go build -o probakgo-client ./client/
 - PBS: queries datastore usage; sends to `POST /report/pbs`
 - Machine ID binding via `/etc/machine-id`
 - TLS: configurable verify/skip/CA bundle via env vars
-- Subcommands: `install`, `update`, `version` (report mode is default, `--vzdump-hook` flag)
+- Subcommands: `install`, `uninstall`, `update`, `version` (report mode is default, `--vzdump-hook` flag)
 - File mode: `--file path.json` for testing without a live Proxmox node
 
 **Self-update (2026-04):**
@@ -204,6 +204,12 @@ The `install` subcommand:
 - Generates and installs vzdump hook script in `/etc/vzdump.conf`
 - Configures logrotate
 - Installs `/etc/cron.d/probakgo-client` for daily self-update at 01:00
+
+The `uninstall` subcommand (requires root):
+- Removes the `script:` hook line from `/etc/vzdump.conf`
+- Revokes the Proxmox API token (`pveum` on PVE, `proxmox-backup-manager` on PBS)
+- Deletes `/etc/cron.d/probakgo-client` and `/etc/logrotate.d/probakgo`
+- Removes `/opt/probakgo/` and `/var/log/probakgo/`
 
 **Updates**: `probakgo-client update` or automatic via cron. No service restart needed - the client runs per-backup, not as a daemon.
 
