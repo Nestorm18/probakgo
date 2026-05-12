@@ -66,12 +66,12 @@ func main() {
 	})))
 
 	cfg := config.Load()
-
-	loc, err := time.LoadLocation(cfg.Timezone)
-	if err != nil {
-		slog.Warn("unknown timezone, falling back to UTC", "tz", cfg.Timezone)
-		loc = time.UTC
+	if err := cfg.Validate(); err != nil {
+		slog.Error("invalid configuration", "err", err)
+		os.Exit(1)
 	}
+
+	loc, _ := time.LoadLocation(cfg.Timezone)
 
 	db, err := dbpkg.Open(cfg.DBPath)
 	if err != nil {

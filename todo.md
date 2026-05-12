@@ -43,16 +43,6 @@ Si un admin degrada un usuario a `reader`, o desactiva su cuenta, la sesión act
 
 ---
 
-## CALIDAD: Validación de configuración al arranque
-
-`internal/config/config.go` no valida los valores cargados. Errores de configuración se descubren tarde:
-
-- Timezone inválida: crash en `main.go:70` en lugar de error claro al arrancar
-- SESSION_KEY < 32 bytes: sesiones débiles sin aviso
-- Puerto fuera de rango: fallo al bind sin contexto
-
-**Fix**: Añadir `func (c *Config) Validate() error` que valide los campos críticos y llamarla en `main.go` justo después de `config.Load()`. Salir con mensaje descriptivo si salida falla.
-
 ---
 
 ## COBERTURA DE TESTS

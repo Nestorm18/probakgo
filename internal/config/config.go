@@ -3,10 +3,12 @@ package config
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -59,6 +61,20 @@ func loadSessionKey() string {
 	}
 	slog.Warn("SESSION_KEY not set - using random key, all sessions will be lost on restart. Set SESSION_KEY in .env for persistent sessions.")
 	return hex.EncodeToString(b)
+}
+
+func (c *Config) Validate() error {
+	if _, err := time.LoadLocation(c.Timezone); err != nil {
+		return fmt.Errorf("invalid TIMEZONE %q: %w", c.Timezone, err)
+	}
+	port, err := strconv.Atoi(c.APIPort)
+	if err != nil || port < 1 || port > 65535 {
+		return fmt.Errorf("invalid API_PORT %q: must be an integer between 1 and 65535", c.APIPort)
+	}
+	if len(c.SessionKey) < 32 {
+		return fmt.Errorf("SESSION_KEY is too short (%d bytes): minimum 32 bytes required", len(c.SessionKey))
+	}
+	return nil
 }
 
 func getEnv(key, fallback string) string {
