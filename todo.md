@@ -17,23 +17,6 @@ Arquitectura implementada. El motor unificado `alertengine.go → RunAll()` es l
 
 ---
 
-## PLAN: Refactor de duplicidades — domain shared
-
-### Problema
-Hay tres implementaciones idénticas de la misma lógica de días de backup:
-
-| Función | Fichero |
-|---|---|
-| `vmScheduledForDay` | `internal/web/handlers/servers.go:347` |
-| `alertVMScheduledForDay` | `internal/service/alertengine.go:624` |
-| `emailVMScheduledForDay` | `internal/service/email.go:383` |
-
-### Plan
-- Mover a `internal/domain/schedule.go → VMScheduledForDay(c VMBackupConfig, day time.Weekday) bool`
-- Actualizar los tres call-sites para importar desde domain
-- Añadir un test unitario en domain
-
----
 
 
 ## MEJORA: Propagación de contexto en servicios

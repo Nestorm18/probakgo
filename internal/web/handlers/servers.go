@@ -55,7 +55,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 					}
 					missing, unknown := 0, 0
 					for _, c := range configs {
-						if !c.IsExcluded && vmScheduledForDay(c, jobDay) && !seenVMIDs[c.VMID] {
+						if !c.IsExcluded && domain.VMScheduledForDay(c, jobDay) && !seenVMIDs[c.VMID] {
 							missing++
 						}
 					}
@@ -128,7 +128,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 				seenVMIDs[strconv.FormatInt(t.VMID, 10)] = true
 			}
 			for _, c := range configs {
-				if c.IsExcluded || !vmScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+				if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
 					continue
 				}
 				missingVMs = append(missingVMs, map[string]any{
@@ -359,22 +359,3 @@ func buildServerURLMap(keys []domain.APIKey, _ error) map[string]string {
 	return m
 }
 
-func vmScheduledForDay(c domain.VMBackupConfig, day time.Weekday) bool {
-	switch day {
-	case time.Monday:
-		return c.Monday
-	case time.Tuesday:
-		return c.Tuesday
-	case time.Wednesday:
-		return c.Wednesday
-	case time.Thursday:
-		return c.Thursday
-	case time.Friday:
-		return c.Friday
-	case time.Saturday:
-		return c.Saturday
-	case time.Sunday:
-		return c.Sunday
-	}
-	return false
-}
