@@ -108,11 +108,11 @@ go build -o probakgo-client ./client/
 - API: all endpoints (health, auth, PVE/PBS reports, backup config, admin API keys, download)
 - Web UI: dashboard, PVE servers + detail + historical reports, PBS servers + detail (snapshots, estimated fill, mount status), API keys, users, email settings, profile
 - Email: daily report scheduler (configurable time via DB, SMTP with STARTTLS)
-- DB: SQLite with embedded migrations (001–006; 007 planned for alert config)
+- DB: SQLite with embedded migrations (001–011)
 - Auth: bcrypt passwords, session cookies (gorilla/sessions)
 - Roles: 3-tier RBAC - `reader` (read-only), `editor` (backup config), `admin` (full access)
 - API key types: `pbk-` (client), `adm-` (admin)
-- Alerts: global thresholds in `email_config` evaluated by `internal/store/alerts.go`; per-server/VM alert config planned (see TODO.md)
+- Alerts: unified engine in `internal/service/alertengine.go`; global thresholds + per-server/VM overrides; alert suppressions; web UI at `/alerts`
 
 **Client:**
 - Detects server type (PVE/PBS) from `/etc/issue`
@@ -157,8 +157,7 @@ Email, Mantenimiento y Alertas son páginas separadas bajo `/settings/`:
 - `/settings/ip-bans` - gestión de IPs baneadas
 Cada POST carga el config existente y sobreescribe solo sus campos.
 
-`/settings/alerts` son los umbrales **globales** (fallback). La config per-servidor/VM
-está planificada en TODO.md y vivirá en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`.
+`/settings/alerts` son los umbrales **globales** (fallback). La config per-servidor/VM vive en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`.
 
 ### Testing strategy (2026-04)
 Tests de store usan `internal/store/testhelpers_test.go` → `openTestDB(t)`:
@@ -259,7 +258,11 @@ Embedded in `internal/db/migrations/`. Applied automatically on server startup v
 | `004_backup_tasks.up.sql` | `pve_backup_tasks` table |
 | `005_remove_mobile_key_type.up.sql` | Remove deprecated key type |
 | `006_pbs_snapshots.up.sql` | `pbs_snapshots` table + `alert_pbs_stale_hours` column in email_config |
-| `007_alert_config.up.sql` | (planned) `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config` |
+| `007_alert_config.up.sql` | `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config` tables |
+| `008_alert_suppressions.up.sql` | `alert_suppressions` table (snooze alerts until timestamp) |
+| `009_remove_admin_keys.up.sql` | Remove deprecated `admin` key type rows |
+| `010_apikey_server_url.up.sql` | `server_url` column in `api_keys` |
+| `011_alert_suppressions_idx.up.sql` | Index on `alert_suppressions.suppressed_until` |
 
 ### Test fixtures (`testdata/`)
 
@@ -322,14 +325,12 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 - Tarjeta de datastore: muestra `EstimatedFullDate` (con `isPast` para detectar si ya pasó sin riesgo real), `MountStatus`.
 - `<details>` colapsable "Grupos de backup": tabla con tipo/ID/último backup/copias/tamaño/verificación/propietario.
 
-### Alert system - estado actual y roadmap (2026-05)
+### Alert system (2026-05)
 
-**Estado actual:** todo pasa por `internal/service/alertengine.go → RunAll()`. Tanto la web UI como el email usan `LoadAlertConfigs(st)` + `RunAll(st, cfg)`. El email filtra por tipo (`AlertTypeDisk`, `AlertTypeBackupError`) para rellenar sus secciones. `store/alerts.go` fue eliminado (era la implementación antigua, solo usada por email).
+Todo pasa por `internal/service/alertengine.go → RunAll()`. Tanto la web UI como el email usan `LoadAlertConfigs(ctx, st)` + `RunAll(st, cfg)`. El email filtra por tipo (`AlertTypeDisk`, `AlertTypeBackupError`) para rellenar sus secciones.
 
-**Roadmap completo:** ver `TODO.md → PLAN: Sistema de Alertas por Servidor/VM`.
+**Arquitectura:** slice de `AlertEvaluator` functions registradas en `evaluators`. Añadir un tipo de alerta = escribir una función `func(st, cfg) ([]Alert, error)` y añadirla al slice.
 
-Resumen de la arquitectura planificada:
-- Migration 007: `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config`
-- `internal/service/alertengine.go`: slice de `AlertEvaluator` functions - añadir tipo = añadir función
-- Página `/alerts` (entre Dashboard y Proxmox VE en el nav): vista tipo Grafana/Zabbix
-- Config por servidor en `/servers/pve/{id}/alerts` y `/servers/pbs/{id}/alerts`
+**Config:** umbrales globales en `email_config` como fallback. Overrides por servidor en `pve_alert_config`/`pbs_alert_config` (migration 007). Overrides por VM en `pve_vm_alert_config`. Supresiones temporales en `alert_suppressions` (migration 008).
+
+**Páginas:** `/alerts` (vista global), `/servers/pve/{id}/alerts`, `/servers/pbs/{id}/alerts`.
