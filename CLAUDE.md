@@ -324,7 +324,7 @@ Cada reporte PVE tiene N filas, una por tarea vzdump del último job. Campos: `r
 
 ### Alert system - estado actual y roadmap (2026-05)
 
-**Estado actual:** umbrales globales en `email_config`. `internal/store/alerts.go` contiene `GetAlerts(diskPct, backupErr)` (PVE disk + PBS disk + PVE backup errors) y `GetPBSStaleAlerts(hours)`. El dashboard llama ambos y añade task-level alerts manualmente.
+**Estado actual:** todo pasa por `internal/service/alertengine.go → RunAll()`. Tanto la web UI como el email usan `LoadAlertConfigs(st)` + `RunAll(st, cfg)`. El email filtra por tipo (`AlertTypeDisk`, `AlertTypeBackupError`) para rellenar sus secciones. `store/alerts.go` fue eliminado (era la implementación antigua, solo usada por email).
 
 **Roadmap completo:** ver `TODO.md → PLAN: Sistema de Alertas por Servidor/VM`.
 

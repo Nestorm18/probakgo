@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/csrf"
 
 	"probakgo/internal/debug"
+	"probakgo/internal/domain"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -74,18 +75,7 @@ func makeFuncMap() template.FuncMap {
 				return "–"
 			}
 		},
-		"formatBytes": func(b int64) string {
-			const unit = 1000
-			if b < unit {
-				return fmt.Sprintf("%d B", b)
-			}
-			div, exp := int64(unit), 0
-			for n := b / unit; n >= unit; n /= unit {
-				div *= unit
-				exp++
-			}
-			return fmt.Sprintf("%.2f %cB", float64(b)/float64(div), "KMGTPE"[exp])
-		},
+		"formatBytes": domain.FormatBytes,
 		"pct": func(used, total int64) int {
 			if total == 0 {
 				return 0

@@ -6,32 +6,14 @@ Tareas pendientes ordenadas por área y prioridad.
 
 ## PLAN: Sistema de Alertas por Servidor/VM
 
-Arquitectura planificada, parcialmente implementada.
-
-### Estado actual
-- `internal/store/alerts.go → GetAlerts()` — implementación antigua, usada solo por email
-- `internal/service/alertengine.go → RunAll()` — nueva, per-servidor, usada por la web UI
-- Las dos conviven y el email usa la vieja (ignora configs por servidor)
+Arquitectura implementada. El motor unificado `alertengine.go → RunAll()` es la única fuente de alertas tanto en la web UI como en el email.
 
 ### Trabajo pendiente
-
-**Migration 007** — `internal/db/migrations/007_alert_config.up.sql`  
-Crear tablas `pve_alert_config`, `pve_vm_alert_config`, `pbs_alert_config` si aún no existen.
-
-**Unificar el motor de alertas**
-- Migrar `service/email.go:219` para que use `service.RunAll()` en lugar de `store.GetAlerts()`
-- Eliminar `store.GetAlerts()` y sus tests una vez migrado el email
-- El email incluirá entonces las mismas alertas que la web (per-servidor, supresiones, etc.)
 
 **UI de configuración por servidor**
 - `/servers/pve/{id}/alerts` — umbrales por servidor PVE
 - `/servers/pbs/{id}/alerts` — umbrales por servidor PBS
 - Enlace desde la tarjeta del servidor en la lista
-
-**Página `/alerts`**
-- Vista tipo Grafana: listado de alertas activas con severidad, servidor, descripción
-- Filtros por tipo (disco, backup, staleness), por servidor, por severidad
-- Botón de suprimir desde la propia lista
 
 ---
 
@@ -53,22 +35,6 @@ Hay tres implementaciones idénticas de la misma lógica de días de backup:
 
 ---
 
-## BUG: Inconsistencia de unidades en formatBytes
-
-`formatBytes` tiene **dos bases distintas** según dónde se llame:
-
-| Fichero | Base |
-|---|---|
-| `internal/web/handlers/templates.go:78` | 1000 (SI) |
-| `internal/service/alertengine.go:673` | 1000 (SI) |
-| `internal/store/alerts.go:203` | 1024 (binario) |
-| `internal/service/email.go:355` | 1024 (binario) |
-
-El dashboard y el motor de alertas muestran "1.05 GB" pero el email y los alerts del store muestran "977 MiB" para el mismo dato.
-
-**Fix**: Mover `formatBytes(b int64) string` a `internal/domain/format.go` con base 1000 (coherente con la UI), importarla desde los cuatro sitios y eliminar las copias locales.
-
----
 
 ## MEJORA: Propagación de contexto en servicios
 
@@ -96,19 +62,6 @@ Los handlers web devuelven `http.Error(w, err.Error(), ...)` con mensajes de err
 
 ---
 
-## RENDIMIENTO: N+1 queries en detalle de servidor PVE
-
-`internal/web/handlers/servers.go → PVEServerDetail` ejecuta hasta 14 queries extra:
-
-```go
-for i := 1; i < len(reports); i++ {
-    tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, reports[i].ID)  // 1 query por iteración
-}
-```
-
-**Fix**: Añadir `GetPVEBackupTasksForReports(ctx, reportIDs []int64) (map[int64][]domain.PVEBackupTask, error)` en el store usando `WHERE report_id IN (...)`, y cargar todos los tasks de una vez.
-
----
 
 ## RENDIMIENTO: Falta índice en `alert_suppressions`
 
@@ -140,7 +93,7 @@ Si un admin degrada un usuario a `reader`, o desactiva su cuenta, la sesión act
 - SESSION_KEY < 32 bytes: sesiones débiles sin aviso
 - Puerto fuera de rango: fallo al bind sin contexto
 
-**Fix**: Añadir `func (c *Config) Validate() error` que valide los campos críticos y llamarla en `main.go` justo después de `config.Load()`. Salir con mensaje descriptivo si falla.
+**Fix**: Añadir `func (c *Config) Validate() error` que valide los campos críticos y llamarla en `main.go` justo después de `config.Load()`. Salir con mensaje descriptivo si salida falla.
 
 ---
 
@@ -165,4 +118,3 @@ Ningún handler web tiene tests. Mínimo útil sería cubrir los handlers que ti
 - `internal/store/pve.go` y `pbs.go` usan `s.db.Begin()` sin contexto; debería ser `s.db.BeginTx(ctx, nil)` para consistencia con el resto del store.
 - El alert badge del sidebar llama a `service.ActiveAlertCounts(st)` en cada render de página (DB query). Considerar cachear con TTL de 30s si hay problemas de latencia.
 - Los errores de `tx.Rollback()` se ignoran con `defer tx.Rollback()` — correcto en Go cuando hay `Commit()`, pero añadir `//nolint:errcheck` explícito o wrappear el patrón en un helper para que quede claro que es intencional.
-- Migración `007_alert_config.up.sql` mencionada en CLAUDE.md como "planificada" — confirmar si fue aplicada o sigue pendiente.
