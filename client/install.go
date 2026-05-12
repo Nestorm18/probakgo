@@ -175,6 +175,61 @@ func runInstall(args []string) {
 	fmt.Printf("  Update: %s update\n", binaryPath)
 }
 
+func runUninstall(_ []string) {
+	if os.Getuid() != 0 {
+		fatalf("uninstall must be run as root (sudo or su -)")
+	}
+
+	// 1. Remove hook line from /etc/vzdump.conf
+	if data, err := os.ReadFile(vzdumpConfPath); err == nil {
+		hookLine := "script: " + hookPath
+		var kept []string
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.TrimSpace(line) != hookLine {
+				kept = append(kept, line)
+			}
+		}
+		updated := strings.Join(kept, "\n")
+		if updated != string(data) {
+			if err := os.WriteFile(vzdumpConfPath, []byte(updated), 0644); err != nil {
+				fmt.Printf("WARN: could not update %s: %v\n", vzdumpConfPath, err)
+			} else {
+				fmt.Printf("Hook removed from %s\n", vzdumpConfPath)
+			}
+		}
+	}
+
+	// 2. Revoke Proxmox API token
+	tokenID := "probakgo-client"
+	if _, err := exec.LookPath("pveum"); err == nil {
+		if err := exec.Command("pveum", "user", "token", "remove", "root@pam", tokenID).Run(); err != nil {
+			fmt.Printf("WARN: could not remove PVE token: %v\n", err)
+		} else {
+			fmt.Println("PVE API token revoked")
+		}
+	} else if _, err := exec.LookPath("proxmox-backup-manager"); err == nil {
+		if err := exec.Command("proxmox-backup-manager", "user", "delete-token", "root@pam", tokenID).Run(); err != nil {
+			fmt.Printf("WARN: could not remove PBS token: %v\n", err)
+		} else {
+			fmt.Println("PBS API token revoked")
+		}
+	}
+
+	// 3. Remove installed files and directories
+	for _, path := range []string{clientCronPath, logrotateConfPath} {
+		if err := os.Remove(path); err == nil {
+			fmt.Printf("Removed: %s\n", path)
+		}
+	}
+	for _, dir := range []string{installDir, logDir} {
+		if err := os.RemoveAll(dir); err == nil {
+			fmt.Printf("Removed: %s\n", dir)
+		}
+	}
+
+	fmt.Println("\nUninstall complete.")
+}
+
 func generateProxmoxToken(tokenID string) (token, secret string, err error) {
 	if _, e := exec.LookPath("pveum"); e == nil {
 		fmt.Println("Generating Proxmox VE API token...")

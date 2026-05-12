@@ -30,6 +30,9 @@ func main() {
 		case "install":
 			runInstall(os.Args[2:])
 			return
+		case "uninstall":
+			runUninstall(os.Args[2:])
+			return
 		case "update":
 			if err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version); err != nil {
 				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
@@ -58,9 +61,10 @@ func main() {
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: probakgo-client [subcommand] [flags]\n\n")
 		fmt.Fprintf(os.Stderr, "Subcommands:\n")
-		fmt.Fprintf(os.Stderr, "  install   Install on this Proxmox node and configure the vzdump hook\n")
-		fmt.Fprintf(os.Stderr, "  update    Self-update to the latest GitHub release\n")
-		fmt.Fprintf(os.Stderr, "  version   Print version\n\n")
+		fmt.Fprintf(os.Stderr, "  install     Install on this Proxmox node and configure the vzdump hook\n")
+		fmt.Fprintf(os.Stderr, "  uninstall   Remove all installed files and revoke the Proxmox API token\n")
+		fmt.Fprintf(os.Stderr, "  update      Self-update to the latest GitHub release\n")
+		fmt.Fprintf(os.Stderr, "  version     Print version\n\n")
 		fmt.Fprintf(os.Stderr, "Flags (report mode):\n")
 		flag.PrintDefaults()
 	}

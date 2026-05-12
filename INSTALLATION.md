@@ -138,6 +138,21 @@ El subcomando `install` hace automáticamente:
 
 El nodo debería aparecer en el dashboard del servidor en pocos segundos.
 
+### Desinstalar el cliente
+
+```bash
+/opt/probakgo/probakgo-client uninstall
+```
+
+El subcomando `uninstall` (requiere root) deshace la instalación completamente:
+
+1. Elimina la línea del hook en `/etc/vzdump.conf`
+2. Revoca el token API de Proxmox (`pveum` en PVE, `proxmox-backup-manager` en PBS)
+3. Elimina `/etc/cron.d/probakgo-client` y `/etc/logrotate.d/probakgo`
+4. Elimina los directorios `/opt/probakgo/` y `/var/log/probakgo/`
+
+> Si el binario ya no está en `/opt/probakgo/`, copia una versión reciente al nodo y ejecútala con `uninstall` antes de eliminarla.
+
 ### Múltiples nodos
 
 Repite los pasos 1-2 para cada nodo. Se recomienda crear una API key por nodo para poder revocarlas individualmente.
