@@ -32,6 +32,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"Server":      sv,
 			"IsStale":     stale,
 			"TaskMissing": 0,
+			"TaskUnknown": 0,
 			"AlertConfig": alertCfg,
 			"ServerURL":   serverURLs[sv.Name],
 		}
