@@ -550,7 +550,7 @@ func evalPVEMissingVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 			seenVMIDs[strconv.FormatInt(t.VMID, 10)] = true
 		}
 		for _, c := range configs {
-			if c.IsExcluded || !alertVMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+			if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
 				continue
 			}
 			name := c.VMName
@@ -621,25 +621,6 @@ func evalPVEUnknownVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 	return alerts, nil
 }
 
-func alertVMScheduledForDay(c domain.VMBackupConfig, day time.Weekday) bool {
-	switch day {
-	case time.Monday:
-		return c.Monday
-	case time.Tuesday:
-		return c.Tuesday
-	case time.Wednesday:
-		return c.Wednesday
-	case time.Thursday:
-		return c.Thursday
-	case time.Friday:
-		return c.Friday
-	case time.Saturday:
-		return c.Saturday
-	case time.Sunday:
-		return c.Sunday
-	}
-	return false
-}
 
 // ── Priority resolution helpers ───────────────────────────────────────────────
 

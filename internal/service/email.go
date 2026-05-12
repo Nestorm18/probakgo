@@ -151,7 +151,7 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 					seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
 				}
 				for _, c := range configs {
-					if c.IsExcluded || !emailVMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+					if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
 						continue
 					}
 					name := c.VMName
@@ -368,25 +368,6 @@ func emailFmtDuration(secs int64) string {
 	return fmt.Sprintf("%ds", s)
 }
 
-func emailVMScheduledForDay(c domain.VMBackupConfig, day time.Weekday) bool {
-	switch day {
-	case time.Monday:
-		return c.Monday
-	case time.Tuesday:
-		return c.Tuesday
-	case time.Wednesday:
-		return c.Wednesday
-	case time.Thursday:
-		return c.Thursday
-	case time.Friday:
-		return c.Friday
-	case time.Saturday:
-		return c.Saturday
-	case time.Sunday:
-		return c.Sunday
-	}
-	return false
-}
 
 // nextRunTime returns the next wall-clock moment matching HH:MM in the given timezone.
 func nextRunTime(sendTime string, loc *time.Location) time.Time {
