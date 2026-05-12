@@ -49,6 +49,7 @@ API_PORT=36748           # puerto (default: 36748)
 TIMEZONE=Europe/Madrid   # zona horaria del scheduler de email
 SESSION_SECURE=true      # activar si hay un proxy HTTPS delante
 DATABASE_PATH=./probakgo_data.db
+# GITHUB_TOKEN=ghp_...  # token GitHub para auto-actualización (necesario si el repo es privado)
 ```
 
 ### Proxy inverso nginx con HTTPS (opcional)
@@ -117,7 +118,8 @@ chmod +x /tmp/probakgo-client
 
 /tmp/probakgo-client install \
   --api-url http://<ip-servidor>:36748 \
-  --api-key pbk-<tu-clave>
+  --api-key pbk-<tu-clave> \
+  --github-token ghp-<tu-token>   # opcional, necesario si el repo es privado
 ```
 
 El subcomando `install` hace automáticamente:
@@ -168,6 +170,7 @@ PROXMOX_TOKEN=root@pam!probakgo-client
 PROXMOX_SECRET=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 PROXMOX_VERIFY_TLS=false          # false para certificados auto-firmados (habitual en Proxmox)
 # PROXMOX_CA_BUNDLE=/ruta/a/ca.pem
+# GITHUB_TOKEN=ghp_...            # token GitHub para auto-actualización (necesario si el repo es privado)
 ```
 
 ### Forzar tipo de servidor

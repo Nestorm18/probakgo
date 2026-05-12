@@ -69,6 +69,7 @@ func runInstall(args []string) {
 	apiKey := fs.String("api-key", "", "API key from probakgo web UI (must start with pbk-)")
 	proxmoxToken := fs.String("proxmox-token", "", "Proxmox API token (auto-generated if omitted)")
 	proxmoxSecret := fs.String("proxmox-secret", "", "Proxmox API token secret (auto-generated if omitted)")
+	githubToken := fs.String("github-token", "", "GitHub token for self-update (required for private repos)")
 	replaceEnv := fs.Bool("replace-env", false, "Overwrite existing .env (default: preserve on reinstall)")
 	fs.Usage = func() {
 		fmt.Println("Usage: probakgo-client install [flags]")
@@ -118,7 +119,7 @@ func runInstall(args []string) {
 				*proxmoxSecret = sec
 			}
 		}
-		must(writeEnv(*apiKey, *apiURL, *proxmoxToken, *proxmoxSecret), "write .env")
+		must(writeEnv(*apiKey, *apiURL, *proxmoxToken, *proxmoxSecret, *githubToken), "write .env")
 		fmt.Printf(".env written: %s\n", envPath)
 		if *apiKey == "" {
 			fmt.Println("WARN: API key not set - edit " + envPath + " and add API_KEY=pbk-...")
@@ -316,9 +317,13 @@ func jsonField(data []byte, key string) string {
 	return v
 }
 
-func writeEnv(apiKey, apiURL, proxmoxToken, proxmoxSecret string) error {
+func writeEnv(apiKey, apiURL, proxmoxToken, proxmoxSecret, githubToken string) error {
 	if apiURL == "" {
 		apiURL = "http://localhost:36748"
+	}
+	ghLine := "# GITHUB_TOKEN=ghp_..."
+	if githubToken != "" {
+		ghLine = "GITHUB_TOKEN=" + githubToken
 	}
 	content := fmt.Sprintf(`# probakgo client configuration
 API_KEY=%s
@@ -327,7 +332,9 @@ PROXMOX_TOKEN=%s
 PROXMOX_SECRET=%s
 # Set to false for self-signed certificates (Proxmox default)
 PROXMOX_VERIFY_TLS=false
-`, apiKey, apiURL, proxmoxToken, proxmoxSecret)
+# GitHub token for self-update (required if repo is private)
+%s
+`, apiKey, apiURL, proxmoxToken, proxmoxSecret, ghLine)
 	return os.WriteFile(envPath, []byte(content), 0600)
 }
 
