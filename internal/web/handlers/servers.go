@@ -100,11 +100,15 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	if len(reports) > 0 {
 		latestReportID = reports[0].ID
 		sts, _ := h.store.GetPVEStoragesForReport(ctx, latestReportID)
+		storageIDs := make([]int64, len(sts))
+		for i, st := range sts {
+			storageIDs[i] = st.ID
+		}
+		contentByStorage, _ := h.store.GetPVEStorageContentForStorages(ctx, storageIDs)
 		for _, st := range sts {
-			content, _ := h.store.GetPVEStorageContent(ctx, st.ID)
 			storages = append(storages, map[string]any{
 				"Storage": st,
-				"Content": content,
+				"Content": contentByStorage[st.ID],
 			})
 		}
 	}
@@ -136,9 +140,14 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Job history: up to 6 previous reports with tasks (reports[0] is already the latest)
+	var historyIDs []int64
+	for i := 1; i < len(reports); i++ {
+		historyIDs = append(historyIDs, reports[i].ID)
+	}
+	historyTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, historyIDs)
 	var jobHistory []map[string]any
 	for i := 1; i < len(reports) && len(jobHistory) < 6; i++ {
-		tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, reports[i].ID)
+		tasks := historyTasks[reports[i].ID]
 		if len(tasks) == 0 {
 			continue
 		}
@@ -208,9 +217,14 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 	var totalBackups int
 	if len(reports) > 0 {
 		sts, _ := h.store.GetPVEStoragesForReport(ctx, reports[0].ID)
+		storageIDs := make([]int64, len(sts))
+		for i, st := range sts {
+			storageIDs[i] = st.ID
+		}
+		infoByStorage, _ := h.store.GetPVEStorageInfoForStorages(ctx, storageIDs)
+		contentByStorage, _ := h.store.GetPVEStorageContentForStorages(ctx, storageIDs)
 		for _, st := range sts {
-			info, _ := h.store.GetPVEStorageInfo(ctx, st.ID)
-			content, _ := h.store.GetPVEStorageContent(ctx, st.ID)
+			content := contentByStorage[st.ID]
 			backupCount := 0
 			for _, c := range content {
 				if c.Content == "backup" {
@@ -220,7 +234,7 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 			totalBackups += backupCount
 			storages = append(storages, map[string]any{
 				"Storage":     st,
-				"Info":        info,
+				"Info":        infoByStorage[st.ID],
 				"Content":     content,
 				"BackupCount": backupCount,
 			})

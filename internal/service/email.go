@@ -213,25 +213,27 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 		}
 	}
 
-	// Alerts: disk usage and backup errors
+	// Alerts: disk usage and backup errors via unified alert engine
 	var diskAlerts []diskAlertRow
 	var backupErrors []serverRow
-	if alerts, err := st.GetAlerts(ctx, cfg.AlertDiskPct, cfg.AlertBackupErr); err == nil {
-		for _, a := range alerts {
-			switch a.Type {
-			case domain.AlertTypeDisk:
-				pct, _ := strconv.Atoi(a.Value)
-				diskAlerts = append(diskAlerts, diskAlertRow{
-					ServerName: a.ServerName,
-					StoreName:  a.StoreName,
-					UsedPct:    pct,
-					Detail:     a.Message,
-				})
-			case domain.AlertTypeBackupError:
-				backupErrors = append(backupErrors, serverRow{
-					Name:        a.ServerName,
-					StaleReason: a.Message,
-				})
+	if alertCfg, err := LoadAlertConfigs(st); err == nil {
+		if alerts, err := RunAll(st, alertCfg); err == nil {
+			for _, a := range alerts {
+				switch a.Type {
+				case domain.AlertTypeDisk:
+					pct, _ := strconv.Atoi(a.Value)
+					diskAlerts = append(diskAlerts, diskAlertRow{
+						ServerName: a.ServerName,
+						StoreName:  a.StoreName,
+						UsedPct:    pct,
+						Detail:     a.Message,
+					})
+				case domain.AlertTypeBackupError:
+					backupErrors = append(backupErrors, serverRow{
+						Name:        a.ServerName,
+						StaleReason: a.Message,
+					})
+				}
 			}
 		}
 	}
@@ -348,21 +350,7 @@ func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportServic
 	}()
 }
 
-func emailFmtBytes(b int64) string {
-	if b <= 0 {
-		return "–"
-	}
-	const unit = 1024
-	if b < unit {
-		return fmt.Sprintf("%d B", b)
-	}
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
-}
+func emailFmtBytes(b int64) string { return domain.FormatBytes(b) }
 
 func emailFmtDuration(secs int64) string {
 	if secs <= 0 {

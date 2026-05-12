@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"probakgo/internal/debug"
@@ -294,6 +295,91 @@ func (s *Store) GetPVEBackupTasksForReport(ctx context.Context, reportID int64) 
 		tasks = append(tasks, t)
 	}
 	return tasks, rows.Err()
+}
+
+func (s *Store) GetPVEBackupTasksForReports(ctx context.Context, reportIDs []int64) (map[int64][]domain.PVEBackupTask, error) {
+	if len(reportIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(reportIDs)
+	q := `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
+		FROM pve_backup_tasks WHERE report_id IN (` + ph + `) ORDER BY report_id, starttime ASC`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.PVEBackupTask)
+	for rows.Next() {
+		var t domain.PVEBackupTask
+		if err := rows.Scan(&t.ID, &t.ReportID, &t.VMID, &t.VMName, &t.Status,
+			&t.StartTime, &t.EndTime, &t.Duration, &t.Size, &t.Filename); err != nil {
+			return nil, err
+		}
+		result[t.ReportID] = append(result[t.ReportID], t)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) GetPVEStorageContentForStorages(ctx context.Context, storageIDs []int64) (map[int64][]domain.PVEStorageContent, error) {
+	if len(storageIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(storageIDs)
+	q := `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
+		FROM pve_storage_content WHERE storage_id IN (` + ph + `) ORDER BY storage_id, ctime DESC`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.PVEStorageContent)
+	for rows.Next() {
+		var c domain.PVEStorageContent
+		if err := rows.Scan(&c.ID, &c.StorageID, &c.VMID, &c.Format, &c.Size,
+			&c.Content, &c.VolID, &c.CTime, &c.Subtype, &c.Notes, &c.Verification); err != nil {
+			return nil, err
+		}
+		result[c.StorageID] = append(result[c.StorageID], c)
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) GetPVEStorageInfoForStorages(ctx context.Context, storageIDs []int64) (map[int64]*domain.PVEStorageInfo, error) {
+	if len(storageIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(storageIDs)
+	q := `SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl
+		FROM pve_storage_info WHERE storage_id IN (` + ph + `)`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64]*domain.PVEStorageInfo)
+	for rows.Next() {
+		var info domain.PVEStorageInfo
+		var active, enabled int
+		if err := rows.Scan(&info.ID, &info.StorageID, &info.Total, &info.Used, &info.Avail,
+			&info.UsedPct, &active, &enabled, &info.Lvl); err != nil {
+			return nil, err
+		}
+		info.Active = active != 0
+		info.Enabled = enabled != 0
+		result[info.StorageID] = &info
+	}
+	return result, rows.Err()
+}
+
+func int64InArgs(ids []int64) (placeholders string, args []any) {
+	ph := make([]string, len(ids))
+	args = make([]any, len(ids))
+	for i, id := range ids {
+		ph[i] = "?"
+		args[i] = id
+	}
+	return strings.Join(ph, ","), args
 }
 
 func (s *Store) MarkPVEReportStale(ctx context.Context, reportID int64, reason string) error {
