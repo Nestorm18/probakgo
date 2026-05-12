@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/sha256"
 	"embed"
 	"io/fs"
@@ -23,7 +24,7 @@ import (
 // staticFS is a sub-FS rooted at web/static (served under /static/).
 func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS, version, func() (int, int) {
-		return service.ActiveAlertCounts(st)
+		return service.ActiveAlertCounts(context.Background(), st)
 	})
 	h := webhandlers.New(st, tmpl, rep)
 

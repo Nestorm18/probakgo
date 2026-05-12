@@ -2,45 +2,6 @@
 
 Tareas pendientes ordenadas por área y prioridad.
 
----
-
-## PLAN: Sistema de Alertas por Servidor/VM
-
-Arquitectura implementada. El motor unificado `alertengine.go → RunAll()` es la única fuente de alertas tanto en la web UI como en el email.
-
-### Trabajo pendiente
-
-**UI de configuración por servidor**
-- `/servers/pve/{id}/alerts` — umbrales por servidor PVE
-- `/servers/pbs/{id}/alerts` — umbrales por servidor PBS
-- Enlace desde la tarjeta del servidor en la lista
-
----
-
-
-
-## MEJORA: Propagación de contexto en servicios
-
-`internal/service/report.go` y `internal/service/alertengine.go` crean `context.Background()` internamente en lugar de recibir el contexto de quien llama.
-
-Consecuencias:
-- Las operaciones de DB no pueden cancelarse si el request HTTP se cancela
-- No se pueden añadir timeouts por request
-- Bloquea instrumentación futura (tracing, logging con request-id)
-
-**Fix**: Cambiar firmas para que los métodos reciban `ctx context.Context` como primer parámetro y lo propagen a las llamadas de store. Empezar por `report.SavePVEReport` y `report.SavePBSReport` ya que son los puntos de entrada del cliente.
-
----
-
-
-
-
----
-
----
-
----
-
 ## DEUDA TÉCNICA MENOR
 
 - `internal/store/pve.go` y `pbs.go` usan `s.db.Begin()` sin contexto; debería ser `s.db.BeginTx(ctx, nil)` para consistencia con el resto del store.

@@ -167,7 +167,7 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 			}
 		}
 
-		if stale, reason := rep.IsStaleForServer(r.ReportedAt, sv.Name); stale {
+		if stale, reason := rep.IsStaleForServer(ctx, r.ReportedAt, sv.Name); stale {
 			row.StaleReason = reason
 			pveIssues = append(pveIssues, row)
 		} else if r.IsStale {
@@ -216,7 +216,7 @@ func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig
 	// Alerts: disk usage and backup errors via unified alert engine
 	var diskAlerts []diskAlertRow
 	var backupErrors []serverRow
-	if alertCfg, err := LoadAlertConfigs(st); err == nil {
+	if alertCfg, err := LoadAlertConfigs(ctx, st); err == nil {
 		if alerts, err := RunAll(st, alertCfg); err == nil {
 			for _, a := range alerts {
 				switch a.Type {
