@@ -27,7 +27,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
 		stale := rep == nil
 		if rep != nil {
-			stale, _ = h.report.IsStaleForServer(rep.ReportedAt, sv.Name)
+			stale, _ = h.report.IsStaleForServer(ctx, rep.ReportedAt, sv.Name)
 		}
 		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
 		r2 := map[string]any{

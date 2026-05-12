@@ -17,7 +17,7 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
 		return
 	}
-	if err := h.report.SavePVEReport(&req); err != nil {
+	if err := h.report.SavePVEReport(r.Context(), &req); err != nil {
 		internalErr(w, "save pve report", err)
 		return
 	}
@@ -34,7 +34,7 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
 		return
 	}
-	if err := h.report.SavePBSReport(&req); err != nil {
+	if err := h.report.SavePBSReport(r.Context(), &req); err != nil {
 		internalErr(w, "save pbs report", err)
 		return
 	}

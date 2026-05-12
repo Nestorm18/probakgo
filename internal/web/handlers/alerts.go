@@ -15,7 +15,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 
-	cfg, err := service.LoadAlertConfigs(h.store)
+	cfg, err := service.LoadAlertConfigs(ctx, h.store)
 	if err != nil {
 		slog.Error("load alert configs", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)

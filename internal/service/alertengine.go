@@ -58,8 +58,7 @@ func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 // LoadAlertConfigs builds AlertConfigs from the store using email_config as global fallback.
-func LoadAlertConfigs(st *store.Store) (AlertConfigs, error) {
-	ctx := context.Background()
+func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error) {
 	emailCfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		return AlertConfigs{}, err
@@ -503,9 +502,8 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 
 // ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.
 // Used by the web UI to show the sidebar badge on every page.
-func ActiveAlertCounts(st *store.Store) (critical, warning int) {
-	ctx := context.Background()
-	cfg, err := LoadAlertConfigs(st)
+func ActiveAlertCounts(ctx context.Context, st *store.Store) (critical, warning int) {
+	cfg, err := LoadAlertConfigs(ctx, st)
 	if err != nil {
 		return
 	}

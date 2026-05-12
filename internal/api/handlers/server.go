@@ -15,7 +15,7 @@ func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := make([]any, 0, len(servers))
 	for _, sv := range servers {
-		resp = append(resp, h.report.BuildPVEServerResponse(sv))
+		resp = append(resp, h.report.BuildPVEServerResponse(r.Context(), sv))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": resp})
 }
@@ -28,7 +28,7 @@ func (h *H) ListPBSServers(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := make([]any, 0, len(servers))
 	for _, sv := range servers {
-		resp = append(resp, h.report.BuildPBSServerResponse(sv))
+		resp = append(resp, h.report.BuildPBSServerResponse(r.Context(), sv))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": resp})
 }
@@ -56,7 +56,7 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"server":  h.report.BuildPVEServerResponse(*sv),
+		"server":  h.report.BuildPVEServerResponse(r.Context(), *sv),
 		"reports": reports,
 	})
 }

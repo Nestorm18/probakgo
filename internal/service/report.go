@@ -20,8 +20,7 @@ func NewReport(st *store.Store, tz *time.Location) *ReportService {
 	return &ReportService{store: st, tz: tz, now: time.Now}
 }
 
-func (r *ReportService) SavePVEReport(req *domain.PVEReportRequest) error {
-	ctx := context.Background()
+func (r *ReportService) SavePVEReport(ctx context.Context, req *domain.PVEReportRequest) error {
 	serverID, err := r.store.UpsertPVEServer(ctx,
 		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
 	)
@@ -58,8 +57,7 @@ func (r *ReportService) SavePVEReport(req *domain.PVEReportRequest) error {
 	return nil
 }
 
-func (r *ReportService) SavePBSReport(req *domain.PBSReportRequest) error {
-	ctx := context.Background()
+func (r *ReportService) SavePBSReport(ctx context.Context, req *domain.PBSReportRequest) error {
 	serverID, err := r.store.UpsertPBSServer(ctx,
 		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
 	)
@@ -103,8 +101,8 @@ func (r *ReportService) IsStale(reportedAt time.Time) bool {
 // Returns (isStale, reason). If no schedule is configured, falls back to IsStale.
 // A backup day is considered "completed" when now > dayStart + 28h, giving a grace period
 // for backups that start late at night and finish after midnight.
-func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string) (bool, string) {
-	configs, err := r.store.ListVMBackupConfigs(context.Background(), serverName)
+func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Time, serverName string) (bool, string) {
+	configs, err := r.store.ListVMBackupConfigs(ctx, serverName)
 	if err != nil || len(configs) == 0 {
 		return r.IsStale(reportedAt), "no report received today"
 	}
@@ -158,8 +156,7 @@ func (r *ReportService) IsStaleForServer(reportedAt time.Time, serverName string
 }
 
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.
-func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVEServerResponse {
-	ctx := context.Background()
+func (r *ReportService) BuildPVEServerResponse(ctx context.Context, sv domain.PVEServer) domain.PVEServerResponse {
 	resp := domain.PVEServerResponse{
 		ID:            sv.ID,
 		Name:          sv.Name,
@@ -176,7 +173,7 @@ func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVESe
 	}
 	resp.LastReport = &rep.ReportedAt
 	resp.BackupStatus = rep.BackupStatus
-	if stale, reason := r.IsStaleForServer(rep.ReportedAt, sv.Name); stale {
+	if stale, reason := r.IsStaleForServer(ctx, rep.ReportedAt, sv.Name); stale {
 		resp.IsStale = true
 		resp.StaleReason = reason
 	} else {
@@ -187,8 +184,7 @@ func (r *ReportService) BuildPVEServerResponse(sv domain.PVEServer) domain.PVESe
 }
 
 // BuildPBSServerResponse assembles a PBSServerResponse enriched with latest report data.
-func (r *ReportService) BuildPBSServerResponse(sv domain.PBSServer) domain.PBSServerResponse {
-	ctx := context.Background()
+func (r *ReportService) BuildPBSServerResponse(ctx context.Context, sv domain.PBSServer) domain.PBSServerResponse {
 	resp := domain.PBSServerResponse{
 		ID:            sv.ID,
 		Name:          sv.Name,

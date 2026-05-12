@@ -27,14 +27,15 @@ func newSvcAt(t *testing.T, now time.Time) (*ReportService, func(domain.CreateVM
 }
 
 func TestIsStaleForServer_NoConfig_FallsBackToIsStale(t *testing.T) {
+	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	stale, _ := svc.IsStaleForServer(time.Now().Add(-25*time.Hour), "pve-noconfig")
+	stale, _ := svc.IsStaleForServer(ctx, time.Now().Add(-25*time.Hour), "pve-noconfig")
 	if !stale {
 		t.Error("want stale=true: yesterday's report, no config")
 	}
-	stale2, _ := svc.IsStaleForServer(time.Now(), "pve-noconfig")
+	stale2, _ := svc.IsStaleForServer(ctx, time.Now(), "pve-noconfig")
 	if stale2 {
 		t.Error("want stale=false: today's report, no config")
 	}
@@ -49,7 +50,7 @@ func TestIsStaleForServer_WeekendNoStale_FreshFridayReport(t *testing.T) {
 
 	// Report arrived Friday 22:00 - Saturday 04:00 (28h after Fri 00:00) has passed, report covers Friday
 	fridayEvening := time.Date(2026, 5, 1, 22, 0, 0, 0, time.UTC)
-	stale, reason := svc.IsStaleForServer(fridayEvening, "pve-01")
+	stale, reason := svc.IsStaleForServer(context.Background(), fridayEvening, "pve-01")
 	if stale {
 		t.Errorf("want stale=false: Fri-only schedule, Fri report, checked on Sat; got reason=%q", reason)
 	}
@@ -64,7 +65,7 @@ func TestIsStaleForServer_WeekendStale_NoFridayReport(t *testing.T) {
 
 	// No report since Thursday - Friday backup was missed
 	thursdayOld := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
-	stale, _ := svc.IsStaleForServer(thursdayOld, "pve-01")
+	stale, _ := svc.IsStaleForServer(context.Background(), thursdayOld, "pve-01")
 	if !stale {
 		t.Error("want stale=true: Fri-only schedule, last report is Thursday, checked on Sat")
 	}
@@ -85,7 +86,7 @@ func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
 	// Thu 00:00 + 28h = Fri 04:00 < Sat 02:00 → completed.
 	// reportedAt (Thu 20:00) >= Thu 00:00 → not stale.
 	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
-	stale, reason := svc.IsStaleForServer(thursdayEvening, "pve-01")
+	stale, reason := svc.IsStaleForServer(context.Background(), thursdayEvening, "pve-01")
 	if stale {
 		t.Errorf("want stale=false: within 28h grace for Fri, Thu report covers Thu; got reason=%q", reason)
 	}
@@ -106,7 +107,7 @@ func TestIsStaleForServer_AllConfigsExcluded_FallsBack(t *testing.T) {
 	}
 
 	// All excluded → no expected days → falls back to IsStale (yesterday = stale)
-	stale, _ := svc.IsStaleForServer(time.Now().Add(-25*time.Hour), "pve-ex")
+	stale, _ := svc.IsStaleForServer(context.Background(), time.Now().Add(-25*time.Hour), "pve-ex")
 	if !stale {
 		t.Error("want stale=true: all configs excluded, yesterday's report")
 	}

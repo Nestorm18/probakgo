@@ -59,7 +59,7 @@ func TestSavePVEReport_FullRoundTrip(t *testing.T) {
 		},
 	}
 
-	if err := svc.SavePVEReport(req); err != nil {
+	if err := svc.SavePVEReport(ctx, req); err != nil {
 		t.Fatalf("SavePVEReport: %v", err)
 	}
 
@@ -127,7 +127,7 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 		},
 	}
 
-	if err := svc.SavePBSReport(req); err != nil {
+	if err := svc.SavePBSReport(ctx, req); err != nil {
 		t.Fatalf("SavePBSReport: %v", err)
 	}
 
@@ -180,7 +180,7 @@ func TestBuildPVEServerResponse_NoReport(t *testing.T) {
 		t.Fatalf("upsert server: %v", err)
 	}
 
-	resp := svc.BuildPVEServerResponse(domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
+	resp := svc.BuildPVEServerResponse(ctx, domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
 
 	if !resp.IsStale {
 		t.Error("want IsStale=true for server with no reports")
@@ -206,7 +206,7 @@ func TestBuildPVEServerResponse_StaleReport(t *testing.T) {
 		t.Fatalf("backdate report: %v", err)
 	}
 
-	resp := svc.BuildPVEServerResponse(domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
+	resp := svc.BuildPVEServerResponse(ctx, domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
 
 	if !resp.IsStale {
 		t.Error("want IsStale=true for yesterday's report")
