@@ -39,20 +39,6 @@ Consecuencias:
 
 ---
 
-## COBERTURA DE TESTS
-
-### Store — sin tests
-- `internal/store/pve.go` — funciones de gestión de servidores, reportes, tasks (solo las de backup tienen tests)
-- `internal/store/pbs.go` — funciones de gestión PBS (solo snaps básicos)
-- `internal/store/email.go` — `GetEmailConfig`, `SaveEmailConfig`
-
-### Service — sin tests
-- `internal/service/cleanup.go` — lógica de retención (solo paths de éxito)
-- `internal/service/report.go → IsStaleForServer` — lógica compleja de staleness, crítica
-
-### Web handlers — sin tests de integración
-Ningún handler web tiene tests. Mínimo útil sería cubrir los handlers que tienen lógica de negocio no trivial: `PVEServerDetail`, `Dashboard`, `CreateAPIKeyPost`.
-
 ---
 
 ## DEUDA TÉCNICA MENOR
