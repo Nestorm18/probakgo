@@ -1,7 +1,7 @@
 {
   "hostname": "pbs-test",
   "ip_address": "192.168.1.248",
-  "public_ip": "203.0.113.10",
+  "public_ip": "12.23.45.67",
   "client_version": "testdata-1.0",
   "machine_id": "aabbccdd-eeff-0011-2233-445566778899",
   "pbs_information": {
