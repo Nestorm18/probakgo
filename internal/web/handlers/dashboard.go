@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"probakgo/internal/session"
@@ -12,12 +13,14 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	pveServers, err := h.store.ListPVEServers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list pve servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	pbsServers, err := h.store.ListPBSServers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list pbs servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 

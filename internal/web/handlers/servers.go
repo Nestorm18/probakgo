@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,7 +17,8 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	servers, err := h.store.ListPVEServers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list pve servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
@@ -274,7 +276,8 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 	username, role, _ := session.GetUser(r)
 	servers, err := h.store.ListPBSServers(ctx)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("list pbs servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))

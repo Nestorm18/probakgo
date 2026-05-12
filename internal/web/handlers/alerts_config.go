@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -35,7 +36,8 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpsertPVEAlertConfig(ctx, cfg); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("upsert pve alert config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	if r.FormValue("back") == "list" {
@@ -76,7 +78,8 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err := h.store.UpsertPVEVMAlertConfig(ctx, cfg); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			slog.Error("upsert pve vm alert config", "err", err)
+			http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -112,7 +115,8 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.store.UpsertPBSAlertConfig(ctx, cfg); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		slog.Error("upsert pbs alert config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
 	if r.FormValue("back") == "list" {
