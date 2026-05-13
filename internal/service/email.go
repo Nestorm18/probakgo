@@ -70,7 +70,8 @@ type emailData struct {
 
 // SendDailyReport builds and sends the daily status email.
 func SendDailyReport(st *store.Store, rep *ReportService) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get email config: %w", err)
@@ -88,7 +89,7 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 		return fmt.Errorf("no email recipients configured")
 	}
 
-	data, err := buildEmailData(st, rep, cfg)
+	data, err := buildEmailData(ctx, st, rep, cfg)
 	if err != nil {
 		return fmt.Errorf("build email data: %w", err)
 	}
@@ -106,8 +107,7 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 	return sendSMTP(cfg, recipients, subject, html)
 }
 
-func buildEmailData(st *store.Store, rep *ReportService, cfg *domain.EmailConfig) (emailData, error) {
-	ctx := context.Background()
+func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cfg *domain.EmailConfig) (emailData, error) {
 	sendTime := cfg.SendTime
 	pveServers, err := st.ListPVEServers(ctx)
 	if err != nil {

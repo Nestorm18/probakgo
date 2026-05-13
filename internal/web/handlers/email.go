@@ -161,11 +161,21 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	existing, _ := h.store.GetEmailConfig(ctx)
 
-	alertDisk, _ := strconv.Atoi(r.FormValue("alert_disk_pct"))
+	alertDiskStr := r.FormValue("alert_disk_pct")
+	alertDisk, err := strconv.Atoi(alertDiskStr)
+	if alertDiskStr != "" && err != nil {
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+no+valido", http.StatusSeeOther)
+		return
+	}
 	if alertDisk < 0 || alertDisk > 99 {
 		alertDisk = 0
 	}
-	pbsStaleHours, _ := strconv.Atoi(r.FormValue("alert_pbs_stale_hours"))
+	pbsStaleStr := r.FormValue("alert_pbs_stale_hours")
+	pbsStaleHours, err := strconv.Atoi(pbsStaleStr)
+	if pbsStaleStr != "" && err != nil {
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+horas+PBS+no+valido", http.StatusSeeOther)
+		return
+	}
 	if pbsStaleHours < 0 {
 		pbsStaleHours = 0
 	}
