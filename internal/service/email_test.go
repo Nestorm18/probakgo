@@ -58,7 +58,7 @@ func TestBuildEmailData_AllOK(t *testing.T) {
 	cfg.AlertDiskPct = 0
 	cfg.AlertBackupErr = false
 
-	data, err := buildEmailData(st, svc, cfg)
+	data, err := buildEmailData(ctx, st, svc, cfg)
 	if err != nil {
 		t.Fatalf("buildEmailData: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	cfg.AlertDiskPct = 0
 	cfg.AlertBackupErr = false
 
-	data, err := buildEmailData(st, svc, cfg)
+	data, err := buildEmailData(ctx, st, svc, cfg)
 	if err != nil {
 		t.Fatalf("buildEmailData: %v", err)
 	}

@@ -29,7 +29,9 @@
       "Bash(awk -F: '{print $1 \":\" $2}')",
       "Bash(Get-ChildItem -Path C:\\\\Users\\\\Traballo\\\\GolandProjects\\\\probakgo -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(Get-ChildItem -Path \"D:\\\\apps_go\\\\probakgo\\\\probakgo\" -Recurse -File)",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

@@ -249,12 +249,28 @@ func ensureDefaults(st *store.Store) error {
 		return err
 	}
 	if !hasUsers {
-		hash, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		pass := randomPassword()
+		hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
 		if _, err := st.CreateUser(ctx, "probakgo", string(hash), "admin"); err != nil {
 			return err
 		}
 		slog.Warn("⚠  default user created - CHANGE PASSWORD IMMEDIATELY",
-			"username", "probakgo", "password", "admin123")
+			"username", "probakgo", "password", pass)
 	}
 	return nil
+}
+
+func randomPassword() string {
+	const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "changeme-restart-server"
+	}
+	for i, v := range b {
+		b[i] = chars[v%byte(len(chars))]
+	}
+	return string(b)
 }

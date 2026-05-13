@@ -24,7 +24,8 @@ func StartCleanupScheduler(ctx context.Context, st *store.Store) {
 }
 
 func runCleanup(st *store.Store) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		slog.Error("cleanup: get config", "err", err)
