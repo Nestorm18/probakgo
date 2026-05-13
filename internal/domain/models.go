@@ -162,12 +162,14 @@ type APIKey struct {
 }
 
 type User struct {
-	ID           int64     `db:"id"`
-	Username     string    `db:"username"`
-	PasswordHash string    `db:"password_hash"`
-	Role         string    `db:"role"`
-	IsActive     bool      `db:"is_active"`
-	CreatedAt    time.Time `db:"created_at"`
+	ID           int64      `db:"id"`
+	Username     string     `db:"username"`
+	PasswordHash string     `db:"password_hash"`
+	Role         string     `db:"role"`
+	IsActive     bool       `db:"is_active"`
+	CreatedAt    time.Time  `db:"created_at"`
+	LastLoginAt  *time.Time `db:"last_login_at"`
+	LastLoginIP  string     `db:"last_login_ip"`
 }
 
 type VMBackupConfig struct {

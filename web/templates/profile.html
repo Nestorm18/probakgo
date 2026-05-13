@@ -5,12 +5,6 @@
 <div class="row">
   <div class="col-lg-5">
 
-    {{if .Flash}}
-    <div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible mb-4">
-      {{.Flash}}
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-    {{end}}
 
     <div class="card mb-3">
       <div class="card-header">
@@ -26,6 +20,26 @@
               {{else if eq .User.Role "editor"}}<span class="status-pill ok">editor</span>
               {{else}}<span class="status-pill muted">reader</span>{{end}}
             </div>
+          </div>
+        </div>
+        <div class="row g-2" style="font-size:.82rem">
+          <div class="col-6">
+            <div style="color:var(--txt-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Último acceso</div>
+            <div style="color:var(--txt-primary)">
+              {{if .User.LastLoginAt}}
+                <span title="{{formatTime .User.LastLoginAt}}">{{formatTimeAgo .User.LastLoginAt}}</span>
+              {{else}}<span style="color:var(--txt-muted)">Primera sesión</span>{{end}}
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="color:var(--txt-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">IP de acceso</div>
+            <div style="color:var(--txt-primary);font-family:'DM Mono',monospace">
+              {{if .User.LastLoginIP}}{{.User.LastLoginIP}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="color:var(--txt-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Cuenta creada</div>
+            <div style="color:var(--txt-primary)">{{formatTime .User.CreatedAt}}</div>
           </div>
         </div>
       </div>

@@ -1,0 +1,77 @@
+{{block "page_title" .}}Acerca de - Probakgo{{end}}
+{{block "page_heading" .}}Acerca de{{end}}
+{{block "page_content" .}}
+
+<div class="row g-4">
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-info-circle me-2" style="color:var(--clr-accent)"></i>Instancia
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Versión</div>
+            <div class="fw-semibold" style="color:var(--txt-primary);font-family:'DM Mono',monospace">v{{.Version}}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Tiempo activo</div>
+            <div class="fw-semibold" style="color:var(--txt-primary)">{{.Uptime}}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Inicio</div>
+            <div style="color:var(--txt-primary);font-size:.88rem">{{formatTime .StartTime}}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem">Tamaño BD</div>
+            <div style="color:var(--txt-primary);font-size:.88rem">{{formatBytes .DBSize}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <i class="bi bi-hdd-rack me-2" style="color:var(--clr-accent)"></i>Servidores monitorizados
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="stat-card">
+              <div class="stat-icon ok"><i class="bi bi-server"></i></div>
+              <div>
+                <div class="stat-value">{{.PVECount}}</div>
+                <div class="stat-label">Proxmox VE</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="stat-card">
+              <div class="stat-icon ok"><i class="bi bi-archive"></i></div>
+              <div>
+                <div class="stat-value">{{.PBSCount}}</div>
+                <div class="stat-label">Proxmox BS</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-arrow-repeat me-2" style="color:var(--clr-accent)"></i>Actualizaciones
+      </div>
+      <div class="card-body" style="font-size:.88rem;color:var(--txt-secondary)">
+        <p class="mb-2">Las actualizaciones automáticas se comprueban diariamente a las <strong>01:00</strong> via cron (<code>/etc/cron.d/probakgo</code>).</p>
+        <p class="mb-0">Para actualizar manualmente: <code>probakgo update</code></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{end}}

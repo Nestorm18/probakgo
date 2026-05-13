@@ -63,6 +63,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/servers/pve", h.PVEServers)
 		r.Get("/servers/pve/{id}", h.PVEServerDetail)
 		r.Get("/servers/pve/{id}/reports", h.PVEServerReports)
+		r.Get("/servers/pve/{id}/reports/csv", h.PVEServerReportsCSV)
 		r.Get("/servers/pbs", h.PBSServers)
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
 		r.With(RequireEditor).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
@@ -113,6 +114,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/ip-bans/unban", h.UnbanIPPost)
 		r.With(RequireAdmin).Get("/settings/reset", h.ResetSettings)
 		r.With(RequireAdmin).Post("/settings/reset", h.ResetDatabasePost)
+
+		r.With(RequireAdmin).Get("/about", h.About)
 	})
 
 	csrfKey := sha256.Sum256([]byte(sessionKey))
