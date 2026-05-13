@@ -16,8 +16,7 @@ import (
 )
 
 var standaloneTemplates = map[string]bool{
-	"login.html":           true,
-	"api_key_created.html": true,
+	"login.html": true,
 }
 
 // templateActive maps template name → sidebar active key
@@ -42,6 +41,7 @@ var templateActive = map[string]string{
 	"profile.html":            "",
 	"api_key_edit.html":       "keys",
 	"reports_pve.html":        "pve",
+	"about.html":              "settings",
 }
 
 type Templates struct {
@@ -118,6 +118,36 @@ func makeFuncMap() template.FuncMap {
 		},
 		"isAdmin": func(role string) bool { return role == "admin" },
 		"canEdit": func(role string) bool { return role == "admin" || role == "editor" },
+		"not":     func(v bool) bool { return !v },
+		"formatTimeAgo": func(v any) string {
+			var t time.Time
+			switch tv := v.(type) {
+			case *time.Time:
+				if tv == nil {
+					return "nunca"
+				}
+				t = *tv
+			case time.Time:
+				t = tv
+			default:
+				return "–"
+			}
+			d := time.Since(t)
+			switch {
+			case d < 2*time.Minute:
+				return "hace un momento"
+			case d < time.Hour:
+				return fmt.Sprintf("hace %dm", int(d.Minutes()))
+			case d < 2*time.Hour:
+				return "hace 1 hora"
+			case d < 24*time.Hour:
+				return fmt.Sprintf("hace %dh", int(d.Hours()))
+			case d < 48*time.Hour:
+				return "ayer"
+			default:
+				return fmt.Sprintf("hace %dd", int(d.Hours()/24))
+			}
+		},
 		"keyPreview": func(key string) string {
 			if len(key) <= 12 {
 				return key

@@ -14,14 +14,15 @@ import (
 )
 
 type WebH struct {
-	store  *store.Store
-	tmpl   *Templates
-	report *service.ReportService
-	ban    *ratelimit.Banhammer
+	store     *store.Store
+	tmpl      *Templates
+	report    *service.ReportService
+	ban       *ratelimit.Banhammer
+	startTime time.Time
 }
 
 func New(st *store.Store, tmpl *Templates, rep *service.ReportService) *WebH {
-	return &WebH{store: st, tmpl: tmpl, report: rep}
+	return &WebH{store: st, tmpl: tmpl, report: rep, startTime: time.Now()}
 }
 
 func (h *WebH) SetBanhammer(b *ratelimit.Banhammer) {
@@ -82,6 +83,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
+	_ = h.store.UpdateUserLastLogin(r.Context(), user.ID, ratelimit.ExtractIP(r))
 	next := r.URL.Query().Get("next")
 	if len(next) == 0 || next[0] != '/' || (len(next) > 1 && next[1] == '/') || next == "/login" {
 		next = "/"

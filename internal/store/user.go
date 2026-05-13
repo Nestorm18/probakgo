@@ -9,22 +9,22 @@ import (
 )
 
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at FROM users WHERE username = ?`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users WHERE username = ?`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
 		FROM users WHERE username = ?`, username)
 	return scanUser(row)
 }
 
 func (s *Store) GetUser(ctx context.Context, id int64) (*domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at FROM users WHERE id = ?`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users WHERE id = ?`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
 		FROM users WHERE id = ?`, id)
 	return scanUser(row)
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at FROM users ORDER BY username`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users ORDER BY username`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
 		FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
@@ -34,13 +34,25 @@ func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
 	for rows.Next() {
 		var u domain.User
 		var isActive int
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt); err != nil {
+		var lastLoginAt sql.NullTime
+		var lastLoginIP sql.NullString
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP); err != nil {
 			return nil, err
 		}
 		u.IsActive = isActive != 0
+		if lastLoginAt.Valid {
+			u.LastLoginAt = &lastLoginAt.Time
+		}
+		u.LastLoginIP = lastLoginIP.String
 		users = append(users, u)
 	}
 	return users, rows.Err()
+}
+
+func (s *Store) UpdateUserLastLogin(ctx context.Context, id int64, ip string) error {
+	debug.RecordQuery(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET last_login_at = CURRENT_TIMESTAMP, last_login_ip = ? WHERE id = ?`, ip, id)
+	return err
 }
 
 func (s *Store) CreateUser(ctx context.Context, username, hash, role string) (int64, error) {
@@ -92,9 +104,15 @@ func (s *Store) HasUsers(ctx context.Context) (bool, error) {
 func scanUser(row *sql.Row) (*domain.User, error) {
 	var u domain.User
 	var isActive int
-	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt); err != nil {
+	var lastLoginAt sql.NullTime
+	var lastLoginIP sql.NullString
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP); err != nil {
 		return nil, err
 	}
 	u.IsActive = isActive != 0
+	if lastLoginAt.Valid {
+		u.LastLoginAt = &lastLoginAt.Time
+	}
+	u.LastLoginIP = lastLoginIP.String
 	return &u, nil
 }

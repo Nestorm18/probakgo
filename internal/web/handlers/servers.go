@@ -1,6 +1,8 @@
 package webhandlers
 
 import (
+	"encoding/csv"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -350,6 +352,52 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Flash":       r.URL.Query().Get("flash"),
 		"FlashOK":     r.URL.Query().Get("ok") == "1",
 	})
+}
+
+func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	sv, err := h.store.GetPVEServer(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	days := 90
+	if d := r.URL.Query().Get("days"); d != "" {
+		if n, err2 := strconv.Atoi(d); err2 == nil && n >= 1 && n <= 365 {
+			days = n
+		}
+	}
+	reports, _ := h.store.ListPVEReportsByDays(ctx, id, days)
+
+	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.Name, time.Now().Format("20060102"))
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+
+	wr := csv.NewWriter(w)
+	_ = wr.Write([]string{"Fecha", "Estado backup", "Inicio backup", "Duracion (s)", "Sin reporte"})
+	for _, rep := range reports {
+		stale := "no"
+		if rep.IsStale {
+			stale = "si"
+		}
+		start := ""
+		if rep.BackupStarttime != 0 {
+			start = time.Unix(rep.BackupStarttime, 0).Format("02/01/2006 15:04")
+		}
+		_ = wr.Write([]string{
+			rep.ReportedAt.Format("02/01/2006 15:04"),
+			rep.BackupStatus,
+			start,
+			strconv.FormatInt(rep.BackupDuration, 10),
+			stale,
+		})
+	}
+	wr.Flush()
 }
 
 func buildServerURLMap(keys []domain.APIKey, _ error) map[string]string {

@@ -62,17 +62,35 @@ Tareas pendientes ordenadas por prioridad. Las ideas marcadas con 🔍 están in
 
 ### UI y UX
 
-- [ ] **Búsqueda y filtros en la lista de servidores**
-  Con muchos servidores, la lista del dashboard se vuelve difícil de navegar. Añadir filtro en tiempo real por nombre/IP y filtro por estado (stale / ok / error).
+- [x] **Filtro en tiempo real en las listas de servidores**
+  Input de búsqueda por JS encima de las tablas en `servers_pve.html` y `servers_pbs.html`. Filtra por cualquier texto visible (nombre, IP, estado) sin reload.
 
-- [ ] **Exportar reportes a CSV/JSON**
-  Añadir botón en la vista de historial (PVE y PBS) para descargar los datos como CSV. Útil para análisis externo o auditorías.
+- [x] **Timestamps relativos en las tablas**
+  `formatTimeAgo` añadida a `makeFuncMap()`. Las tablas de servidores y el dashboard muestran "hace 3h" con la fecha absoluta en el tooltip `title`.
 
-- [ ] **Página de estado de la instancia (`/about`)**
-  Mostrar: versión actual, última versión disponible en GitHub (via `selfupdate.LatestTag`), fecha de próxima actualización automática, espacio en disco usado por la BD, uptime.
+- [x] **Empty state útil cuando no hay servidores**
+  Reemplazado "Sin servidores registrados" por un panel con los 3 pasos de instalación del cliente, botón de copy en cada línea y enlace a API Keys.
 
-- [ ] **Dark mode**
-  Toggle en el perfil de usuario que persiste en cookie/localStorage. La mayor parte del CSS ya usa variables, lo que lo haría sencillo de implementar.
+- [x] **Exportar historial a CSV**
+  Botón "CSV" en `reports_pve.html` → `GET /servers/pve/{id}/reports/csv`. Descarga todas las filas del período seleccionado.
+
+- [x] **Estado en las tarjetas del dashboard**
+  `dashboard.html` ahora muestra badge "Activo"/"Sin reporte" y el timestamp relativo en cada tarjeta de servidor.
+
+- [x] **`api_key_created.html` integrado en el layout base**
+  Refactorizado para usar `base.html`. Mismo sidebar, mismo tema, misma consistencia visual que el resto de la app.
+
+- [x] **Página `/about` con estado de la instancia**
+  Nueva página admin-only `/about` con versión, uptime, nodos monitorizados, tamaño de BD. Enlace "Acerca de" en el sidebar (sección Sistema).
+
+- [x] **Ordenación de columnas en tablas**
+  Click en headers "Servidor", "Dirección", "Último reporte" y "Estado" ordena las filas del DOM. Icono de dirección en el header activo.
+
+- [x] **Perfil: mostrar último acceso y sesiones activas**
+  Migración `012` añade `last_login_at` y `last_login_ip` a `users`. `LoginPost` los guarda. `profile.html` muestra último acceso (relativo + absoluto en tooltip) e IP.
+
+- [x] **Toasts en lugar de flash en acciones no críticas**
+  `base.html` muestra todas las notificaciones como Bootstrap toasts: éxitos (4s, esquina inferior derecha) y errores (10s, parte superior centrada). Eliminados los bloques inline `{{if .Flash}}` de todas las páginas.
 
 ### Operaciones
 

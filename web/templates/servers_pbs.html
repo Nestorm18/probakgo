@@ -2,28 +2,29 @@
 {{block "page_heading" .}}Proxmox Backup Server{{end}}
 {{block "page_content" .}}
 
-{{if .Flash}}
-<div class="alert alert-{{if .FlashOK}}success{{else}}danger{{end}} alert-dismissible fade show mb-4" role="alert">
-  {{.Flash}}
-  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <div class="input-group input-group-sm" style="max-width:280px">
+    <span class="input-group-text" style="background:var(--input-grp-bg);border-color:var(--input-border)"><i class="bi bi-search" style="color:var(--txt-muted)"></i></span>
+    <input type="text" id="serverFilter" class="form-control form-control-sm" placeholder="Filtrar por nombre, IP o estado…" style="border-color:var(--input-border)">
+  </div>
+  <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
 </div>
-{{end}}
 
 <div class="card">
   <div class="card-body p-0" style="overflow:hidden;border-radius:.75rem">
     <table class="table table-hover mb-0">
       <thead>
         <tr>
-          <th>Servidor</th>
-          <th>Dirección</th>
+          <th data-sort="0" style="cursor:pointer;user-select:none">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="1" style="cursor:pointer;user-select:none">Dirección <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th>Cliente</th>
-          <th>Último reporte</th>
+          <th data-sort="3" style="cursor:pointer;user-select:none">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th>Datastores</th>
-          <th>Estado</th>
+          <th data-sort="5" style="cursor:pointer;user-select:none">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th></th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="server-tbody">
       {{range .Rows}}
       <tr>
         <td>
@@ -43,7 +44,7 @@
         </td>
         <td><code>{{.Server.ClientVersion}}</code></td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">
-          {{if .LastReport}}{{formatTime .LastReport}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
         <td style="font-size:.82rem">
           {{range .Stores}}
@@ -97,7 +98,19 @@
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="7" class="text-center py-5" style="color:var(--txt-muted)">Sin servidores registrados</td></tr>
+      <tr class="empty-state-row"><td colspan="7">
+        <div class="p-4">
+          <div class="text-center mb-3" style="color:var(--txt-muted)"><i class="bi bi-archive" style="font-size:2rem"></i></div>
+          <p class="text-center fw-semibold mb-3" style="color:var(--txt-primary)">Sin servidores PBS registrados</p>
+          <p class="text-center mb-3" style="font-size:.83rem;color:var(--txt-muted)">El servidor se registra automáticamente cuando el cliente envía su primer reporte.<br>Crea una API key y sigue estos pasos en el nodo Proxmox Backup Server:</p>
+          <div class="d-flex flex-column gap-2 mx-auto" style="max-width:520px">
+            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary);overflow-x:auto">wget [URL-del-servidor]/static/client/probakgo-client_linux_amd64 -O /tmp/probakgo-client</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
+            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
+            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url http://tu-servidor:36748 --api-key pbk-...</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
+          </div>
+          <div class="text-center mt-3"><a href="/api-keys" class="btn btn-sm btn-primary"><i class="bi bi-key me-1"></i>Crear API Key</a></div>
+        </div>
+      </td></tr>
       {{end}}
       </tbody>
     </table>
@@ -156,6 +169,48 @@
 
 {{block "page_scripts" .}}
 <script>
+// Filter
+(function() {
+  const input = document.getElementById('serverFilter');
+  const tbody = document.querySelector('.server-tbody');
+  const countEl = document.getElementById('filterCount');
+  if (!input || !tbody) return;
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase();
+    let visible = 0;
+    tbody.querySelectorAll('tr:not(.empty-state-row)').forEach(row => {
+      const match = !q || row.textContent.toLowerCase().includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    const total = tbody.querySelectorAll('tr:not(.empty-state-row)').length;
+    countEl.textContent = q ? `${visible} de ${total}` : '';
+  });
+})();
+
+// Sort
+(function() {
+  const tbody = document.querySelector('.server-tbody');
+  if (!tbody) return;
+  let sortCol = -1, sortAsc = true;
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = parseInt(th.dataset.sort);
+      sortAsc = sortCol === col ? !sortAsc : true;
+      sortCol = col;
+      const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state-row)'));
+      rows.sort((a, b) => {
+        const av = a.cells[col]?.textContent.trim() || '';
+        const bv = b.cells[col]?.textContent.trim() || '';
+        return sortAsc ? av.localeCompare(bv, 'es') : bv.localeCompare(av, 'es');
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      document.querySelectorAll('th[data-sort] .sort-icon').forEach(i => { i.className = 'bi sort-icon'; });
+      th.querySelector('.sort-icon').className = `bi bi-caret-${sortAsc ? 'up' : 'down'}-fill sort-icon`;
+    });
+  });
+})();
+
 document.addEventListener('click', e => {
   const btn = e.target.closest('.pbs-alert-cfg-btn');
   if (!btn) return;
