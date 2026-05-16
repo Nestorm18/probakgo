@@ -180,6 +180,56 @@ func TestLastBackupStatusMostRecentOK(t *testing.T) {
 	}
 }
 
+func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"starttime": float64(10000),
+					"endtime":   float64(10200),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "101",
+					"starttime": float64(100),
+					"endtime":   float64(200),
+					"status":    "ERROR",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	filesByVMID := map[int64][]backupFile{
+		101: {{ctime: 10010, size: 39_000_000, volid: "nas:backup/vzdump-qemu-101.vma.zst"}},
+		3100: {{ctime: 10130, size: 3_730_000_000,
+			volid: "nas:backup/vzdump-qemu-3100.vma.zst"}},
+	}
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{101: "mikrotik-routeros-chr", 3100: "plik"},
+		filesByVMID,
+	)
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 reconstructed tasks, got %d", len(tasks))
+	}
+	if got := tasks[0]["vmid"]; got != int64(101) {
+		t.Errorf("first vmid: got %v, want 101", got)
+	}
+	if got := tasks[1]["vmid"]; got != int64(3100) {
+		t.Errorf("second vmid: got %v, want 3100", got)
+	}
+	for _, task := range tasks {
+		if got := task["status"]; got != "OK" {
+			t.Errorf("status: got %v, want OK", got)
+		}
+	}
+}
+
 func TestGenerateReportStorageOfflineOnContentError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api2/json/storage", func(w http.ResponseWriter, r *http.Request) {

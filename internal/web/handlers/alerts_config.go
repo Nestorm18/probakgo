@@ -40,6 +40,11 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	h.audit(r, "alert_config.pve_update", "pve_server", strconv.FormatInt(id, 10), "", map[string]any{
+		"disk_pct":    cfg.DiskPct,
+		"stale_hours": cfg.StaleHours,
+		"backup_err":  cfg.BackupErr,
+	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/pve?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
 		return
@@ -65,6 +70,7 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 
 	if backupErrStr == "" && minSizeStr == "" {
 		_ = h.store.DeletePVEVMAlertConfig(ctx, id, vmid)
+		h.audit(r, "alert_config.pve_vm_delete", "pve_vm", strconv.FormatInt(vmid, 10), "", map[string]any{"server_id": id})
 	} else {
 		cfg := domain.PVEVMAlertConfig{ServerID: id, VMID: vmid}
 		if backupErrStr != "" {
@@ -82,6 +88,11 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 			return
 		}
+		h.audit(r, "alert_config.pve_vm_update", "pve_vm", strconv.FormatInt(vmid, 10), "", map[string]any{
+			"server_id":   id,
+			"backup_err":  cfg.BackupErr,
+			"min_size_mb": cfg.MinSizeMB,
+		})
 	}
 	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+VM+guardada&ok=1", http.StatusSeeOther)
 }
@@ -119,6 +130,12 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	h.audit(r, "alert_config.pbs_update", "pbs_server", strconv.FormatInt(id, 10), "", map[string]any{
+		"disk_pct":        cfg.DiskPct,
+		"days_until_full": cfg.DaysUntilFull,
+		"stale_hours":     cfg.StaleHours,
+		"verify_alert":    cfg.VerifyAlert,
+	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/pbs?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
 		return

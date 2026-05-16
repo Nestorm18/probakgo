@@ -26,6 +26,9 @@ func getSession(r *http.Request) (*sessions.Session, error) {
 }
 
 func GetUser(r *http.Request) (username, role string, ok bool) {
+	if store == nil {
+		return "", "", false
+	}
 	sess, err := getSession(r)
 	if err != nil {
 		return "", "", false

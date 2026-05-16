@@ -48,19 +48,22 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 	ip := ratelimit.ExtractIP(r)
+	username := r.FormValue("username")
+	userAgent := r.UserAgent()
 
 	if h.ban != nil {
 		if banned, _ := h.ban.IsBanned(ip); banned {
+			_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "blocked", "ip_banned")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 	}
 
-	username := r.FormValue("username")
 	password := r.FormValue("password")
 
 	user, err := h.store.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
+		_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "failed", "invalid_credentials")
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
@@ -68,6 +71,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+		_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "failed", "invalid_credentials")
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
 		}
@@ -83,6 +87,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
+	_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "success", "")
 	_ = h.store.UpdateUserLastLogin(r.Context(), user.ID, ratelimit.ExtractIP(r))
 	next := r.URL.Query().Get("next")
 	if len(next) == 0 || next[0] != '/' || (len(next) > 1 && next[1] == '/') || next == "/login" {

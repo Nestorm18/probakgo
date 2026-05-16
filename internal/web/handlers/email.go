@@ -83,6 +83,15 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/email?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "settings.email_update", "settings", "email", "Email", map[string]any{
+		"smtp_host":      cfg.SMTPHost,
+		"smtp_port":      cfg.SMTPPort,
+		"smtp_user_set":  cfg.SMTPUser != "",
+		"smtp_pass_set":  cfg.SMTPPass != "",
+		"recipients_set": cfg.Recipients != "",
+		"is_enabled":     cfg.IsEnabled,
+		"send_time":      cfg.SendTime,
+	})
 	http.Redirect(w, r, "/settings/email?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
 
@@ -136,6 +145,10 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "settings.maintenance_update", "settings", "maintenance", "Mantenimiento", map[string]any{
+		"retention_months":  cfg.RetentionMonths,
+		"retention_enabled": cfg.RetentionEnabled,
+	})
 	http.Redirect(w, r, "/settings/maintenance?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
 
@@ -200,6 +213,11 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/alerts?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "settings.alerts_update", "settings", "alerts", "Alertas globales", map[string]any{
+		"alert_disk_pct":        cfg.AlertDiskPct,
+		"alert_backup_err":      cfg.AlertBackupErr,
+		"alert_pbs_stale_hours": cfg.AlertPBSStaleHours,
+	})
 	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
 
@@ -239,6 +257,7 @@ func (h *WebH) ResetDatabasePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/reset?flash=Error:+"+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "settings.reset_database", "settings", "reset", "Reiniciar BD", nil)
 
 	if h.ban != nil {
 		_ = h.ban.Load()
@@ -257,5 +276,6 @@ func (h *WebH) EmailTest(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/email?flash=Error:+"+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "settings.email_test", "settings", "email", "Email", nil)
 	http.Redirect(w, r, "/settings/email?flash=Email+de+prueba+enviado&ok=1", http.StatusSeeOther)
 }

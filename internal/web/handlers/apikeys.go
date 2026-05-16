@@ -67,13 +67,19 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api-keys?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "api_key.create", "api_key", strconv.FormatInt(k.ID, 10), k.Name, map[string]any{
+		"server_name": k.ServerName,
+		"server_url":  k.ServerURL,
+		"key_preview": service.KeyPreview(k.Key),
+	})
 	scheme := "http"
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	username, _, _ := session.GetUser(r)
+	username, role, _ := session.GetUser(r)
 	h.tmpl.Render(w, r, "api_key_created.html", map[string]any{
 		"Username": username,
+		"Role":     role,
 		"Key":      k.Key,
 		"Name":     k.Name,
 		"APIURL":   scheme + "://" + r.Host,
@@ -83,7 +89,11 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) ToggleAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	k, _ := h.store.GetAPIKey(ctx, id)
 	_ = h.store.ToggleAPIKey(ctx, id)
+	if k != nil {
+		h.audit(r, "api_key.toggle", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"was_active": k.IsActive, "new_active": !k.IsActive})
+	}
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
@@ -96,15 +106,23 @@ func (h *WebH) DeleteAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/api-keys?flash=Error+al+borrar+servidor:+"+err.Error(), http.StatusSeeOther)
 			return
 		}
+		h.audit(r, "server.hard_delete", "server", "", k.ServerName, map[string]any{"api_key_id": id})
 	}
 	_ = h.store.DeleteAPIKey(ctx, id)
+	if err == nil {
+		h.audit(r, "api_key.delete", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"server_name": k.ServerName})
+	}
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
 func (h *WebH) UnbindAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	k, _ := h.store.GetAPIKey(ctx, id)
 	_ = h.store.UnbindAPIKeyMachineID(ctx, id)
+	if k != nil {
+		h.audit(r, "api_key.unbind", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"machine_id_was_set": k.MachineID != ""})
+	}
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
@@ -137,6 +155,7 @@ func (h *WebH) RevealAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Key no encontrada"})
 		return
 	}
+	h.audit(r, "api_key.reveal", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"key_preview": service.KeyPreview(k.Key)})
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"key": k.Key})
 }
@@ -180,5 +199,6 @@ func (h *WebH) EditAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api-keys/"+chi.URLParam(r, "id")+"/edit?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "api_key.update", "api_key", strconv.FormatInt(id, 10), name, map[string]any{"server_name": serverName, "server_url": serverURL})
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }

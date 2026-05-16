@@ -22,6 +22,7 @@ const (
 	hookPath          = installDir + "/vzdump_client.sh"
 	envPath           = installDir + "/.env"
 	binaryPath        = installDir + "/probakgo-client"
+	binaryLinkPath    = "/usr/local/bin/probakgo-client"
 )
 
 // Generated and written to hookPath during install - no separate shell script needed.
@@ -103,6 +104,7 @@ func runInstall(args []string) {
 	} else {
 		fmt.Println("Binary already at install location")
 	}
+	installBinaryLink()
 
 	// 3. .env: generate Proxmox token if not provided, then write
 	preserveEnv := !*replaceEnv
@@ -172,8 +174,8 @@ func runInstall(args []string) {
 	if *apiKey == "" {
 		fmt.Printf("  Next: edit %s\n", envPath)
 	}
-	fmt.Printf("  Test:   %s\n", binaryPath)
-	fmt.Printf("  Update: %s update\n", binaryPath)
+	fmt.Printf("  Test:   %s\n", binaryLinkPath)
+	fmt.Printf("  Update: %s update\n", binaryLinkPath)
 }
 
 func runUninstall(_ []string) {
@@ -217,6 +219,7 @@ func runUninstall(_ []string) {
 	}
 
 	// 3. Remove installed files and directories
+	removeBinaryLink()
 	for _, path := range []string{clientCronPath, logrotateConfPath} {
 		if err := os.Remove(path); err == nil {
 			fmt.Printf("Removed: %s\n", path)
@@ -229,6 +232,42 @@ func runUninstall(_ []string) {
 	}
 
 	fmt.Println("\nUninstall complete.")
+}
+
+func installBinaryLink() {
+	if err := os.MkdirAll(filepath.Dir(binaryLinkPath), 0755); err != nil {
+		fmt.Printf("WARN: could not create %s: %v\n", filepath.Dir(binaryLinkPath), err)
+		return
+	}
+	if info, err := os.Lstat(binaryLinkPath); err == nil {
+		if info.Mode()&os.ModeSymlink == 0 {
+			fmt.Printf("WARN: %s exists and is not a symlink - leaving it unchanged\n", binaryLinkPath)
+			return
+		}
+		if err := os.Remove(binaryLinkPath); err != nil {
+			fmt.Printf("WARN: could not update %s: %v\n", binaryLinkPath, err)
+			return
+		}
+	}
+	if err := os.Symlink(binaryPath, binaryLinkPath); err != nil {
+		fmt.Printf("WARN: could not create %s: %v\n", binaryLinkPath, err)
+		return
+	}
+	fmt.Printf("PATH link: %s -> %s\n", binaryLinkPath, binaryPath)
+}
+
+func removeBinaryLink() {
+	target, err := os.Readlink(binaryLinkPath)
+	if err != nil {
+		return
+	}
+	if target != binaryPath {
+		fmt.Printf("WARN: %s points to %s - leaving it unchanged\n", binaryLinkPath, target)
+		return
+	}
+	if err := os.Remove(binaryLinkPath); err == nil {
+		fmt.Printf("Removed: %s\n", binaryLinkPath)
+	}
 }
 
 func generateProxmoxToken(tokenID string) (token, secret string, err error) {

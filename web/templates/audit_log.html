@@ -1,0 +1,53 @@
+{{block "page_title" .}}Audit log - Probakgo{{end}}
+{{block "page_heading" .}}Audit log{{end}}
+{{block "page_content" .}}
+
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-journal-text" style="color:var(--clr-accent)"></i>
+    Cambios administrativos recientes
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Usuario</th>
+          <th>IP</th>
+          <th>Accion</th>
+          <th>Objetivo</th>
+          <th>Metadata</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Rows}}
+      <tr>
+        <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .CreatedAt}}</td>
+        <td style="font-size:.82rem">
+          {{if .ActorUsername}}{{.ActorUsername}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}
+          {{if .ActorRole}}<span class="badge bg-secondary ms-1">{{.ActorRole}}</span>{{end}}
+        </td>
+        <td><code style="font-size:.78rem">{{.ActorIP}}</code></td>
+        <td><span class="status-pill muted">{{.Action}}</span></td>
+        <td style="font-size:.82rem">
+          {{if .TargetType}}<span style="color:var(--txt-muted)">{{.TargetType}}</span>{{end}}
+          {{if .TargetName}}<span>{{.TargetName}}</span>{{end}}
+          {{if .TargetID}}<code style="font-size:.72rem">{{.TargetID}}</code>{{end}}
+        </td>
+        <td class="text-truncate" style="max-width:420px;font-size:.78rem;color:var(--txt-muted)" title="{{.Metadata}}">
+          {{.Metadata}}
+        </td>
+      </tr>
+      {{else}}
+      <tr>
+        <td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">
+          <i class="bi bi-journal-text me-2"></i>No hay eventos registrados
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{end}}

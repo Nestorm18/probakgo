@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"time"
 
+	"probakgo/internal/debug"
+	"probakgo/internal/domain"
 	"probakgo/internal/ratelimit"
 )
 
@@ -52,4 +54,40 @@ func (s *Store) UpsertIPBan(ctx context.Context, b ratelimit.IPBan) error {
 func (s *Store) DeleteIPBan(ctx context.Context, ip string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM ip_bans WHERE ip = ?`, ip)
 	return err
+}
+
+func (s *Store) InsertLoginAttempt(ctx context.Context, username, ip, userAgent, result, reason string) error {
+	debug.RecordQuery(ctx, `INSERT INTO login_attempts (username, ip, user_agent, result, reason) VALUES (?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO login_attempts (username, ip, user_agent, result, reason)
+		VALUES (?, ?, ?, ?, ?)`,
+		username, ip, userAgent, result, reason,
+	)
+	return err
+}
+
+func (s *Store) ListLoginAttempts(ctx context.Context, limit int) ([]domain.LoginAttempt, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	debug.RecordQuery(ctx, `SELECT id, username, ip, user_agent, result, reason, attempted_at FROM login_attempts ORDER BY attempted_at DESC LIMIT ?`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, username, ip, user_agent, result, reason, attempted_at
+		FROM login_attempts
+		ORDER BY attempted_at DESC
+		LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []domain.LoginAttempt
+	for rows.Next() {
+		var a domain.LoginAttempt
+		if err := rows.Scan(&a.ID, &a.Username, &a.IP, &a.UserAgent, &a.Result, &a.Reason, &a.AttemptedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	return out, rows.Err()
 }

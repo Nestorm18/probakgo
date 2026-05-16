@@ -71,6 +71,41 @@ func TestCreateAPIKeyPost_EmptyName(t *testing.T) {
 	}
 }
 
+func TestCreateUserPostWritesAuditLog(t *testing.T) {
+	st := openHandlerDB(t)
+	h := webhandlers.New(st, nil, nil)
+
+	req := httptest.NewRequest("POST", "/users",
+		strings.NewReader("username=alice&password=secret123&role=reader"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	for _, c := range sessionCookies(t, "admin", "admin") {
+		req.AddCookie(c)
+	}
+
+	rr := httptest.NewRecorder()
+	h.CreateUserPost(rr, req)
+
+	if rr.Code != http.StatusSeeOther {
+		t.Fatalf("want 303, got %d", rr.Code)
+	}
+	rows, err := st.ListAuditLogs(context.Background(), 10)
+	if err != nil {
+		t.Fatalf("ListAuditLogs: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("audit rows: got %d, want 1", len(rows))
+	}
+	if rows[0].Action != "user.create" {
+		t.Fatalf("action: got %q, want user.create", rows[0].Action)
+	}
+	if rows[0].ActorUsername != "admin" {
+		t.Fatalf("actor: got %q, want admin", rows[0].ActorUsername)
+	}
+	if strings.Contains(rows[0].Metadata, "secret123") {
+		t.Fatal("audit metadata contains the submitted password")
+	}
+}
+
 // TestRevealAPIKeyPost_InvalidID verifies that a non-numeric id path param returns 400.
 func TestRevealAPIKeyPost_InvalidID(t *testing.T) {
 	st := openHandlerDB(t)

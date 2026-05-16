@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -21,27 +22,28 @@ var standaloneTemplates = map[string]bool{
 
 // templateActive maps template name → sidebar active key
 var templateActive = map[string]string{
-	"alerts.html":             "alerts-view",
-	"dashboard.html":          "dashboard",
-	"servers_pve.html":        "pve",
-	"server_pve_detail.html":  "pve",
-	"backup_config.html":      "pve",
+	"alerts.html":                "alerts-view",
+	"dashboard.html":             "dashboard",
+	"servers_pve.html":           "pve",
+	"server_pve_detail.html":     "pve",
+	"backup_config.html":         "pve",
 	"vm_backup_config_form.html": "pve",
-	"servers_pbs.html":        "pbs",
-	"server_pbs_detail.html":  "pbs",
-	"api_keys.html":           "keys",
-	"api_key_created.html":    "keys",
-	"users.html":              "users",
+	"servers_pbs.html":           "pbs",
+	"server_pbs_detail.html":     "pbs",
+	"api_keys.html":              "keys",
+	"api_key_created.html":       "keys",
+	"users.html":                 "users",
 	"settings_hub.html":          "settings",
 	"email_settings.html":        "settings",
 	"maintenance_settings.html":  "settings",
 	"alerts_settings.html":       "settings",
 	"ip_bans.html":               "settings",
+	"audit_log.html":             "settings",
 	"reset_settings.html":        "settings",
-	"profile.html":            "",
-	"api_key_edit.html":       "keys",
-	"reports_pve.html":        "pve",
-	"about.html":              "settings",
+	"profile.html":               "",
+	"api_key_edit.html":          "keys",
+	"reports_pve.html":           "pve",
+	"about.html":                 "about",
 }
 
 type Templates struct {
@@ -51,16 +53,19 @@ type Templates struct {
 	badgeCounts func() (int, int)
 }
 
-func NewTemplates(fs embed.FS, version string, badgeCounts func() (int, int)) *Templates {
+func NewTemplates(fs embed.FS, version string, loc *time.Location, badgeCounts func() (int, int)) *Templates {
 	return &Templates{
 		fs:          fs,
-		funcMap:     makeFuncMap(),
+		funcMap:     makeFuncMap(loc),
 		version:     version,
 		badgeCounts: badgeCounts,
 	}
 }
 
-func makeFuncMap() template.FuncMap {
+func makeFuncMap(loc *time.Location) template.FuncMap {
+	if loc == nil {
+		loc = time.Local
+	}
 	return template.FuncMap{
 		"formatTime": func(v any) string {
 			switch t := v.(type) {
@@ -68,9 +73,9 @@ func makeFuncMap() template.FuncMap {
 				if t == nil {
 					return "nunca"
 				}
-				return t.Format("02 Jan 2006 15:04")
+				return t.In(loc).Format("02 Jan 2006 15:04")
 			case time.Time:
-				return t.Format("02 Jan 2006 15:04")
+				return t.In(loc).Format("02 Jan 2006 15:04")
 			default:
 				return "–"
 			}
@@ -98,7 +103,7 @@ func makeFuncMap() template.FuncMap {
 			if ts == 0 {
 				return "–"
 			}
-			return time.Unix(ts, 0).Format("02 Jan 2006 15:04")
+			return time.Unix(ts, 0).In(loc).Format("02 Jan 2006 15:04")
 		},
 		"isPast": func(ts int64) bool {
 			return ts > 0 && time.Unix(ts, 0).Before(time.Now())
@@ -202,24 +207,71 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		tmpl, err = template.New("").Funcs(t.funcMap).
 			ParseFS(t.fs, "web/templates/"+name)
 		if err != nil {
-			http.Error(w, "template parse: "+err.Error(), http.StatusInternalServerError)
+			renderTemplateError(w, r, name, "parse", err)
+			return
+		}
+		var buf bytes.Buffer
+		if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
+			renderTemplateError(w, r, name, "exec", err)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
-			http.Error(w, "template exec: "+err.Error(), http.StatusInternalServerError)
-		}
+		_, _ = w.Write(buf.Bytes())
 		return
 	}
 
 	tmpl, err = template.New("").Funcs(t.funcMap).
 		ParseFS(t.fs, "web/templates/base.html", "web/templates/"+name)
 	if err != nil {
-		http.Error(w, "template parse: "+err.Error(), http.StatusInternalServerError)
+		renderTemplateError(w, r, name, "parse", err)
+		return
+	}
+	var buf bytes.Buffer
+	if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
+		renderTemplateError(w, r, name, "exec", err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
-		http.Error(w, "template exec: "+err.Error(), http.StatusInternalServerError)
-	}
+	_, _ = w.Write(buf.Bytes())
+}
+
+func renderTemplateError(w http.ResponseWriter, r *http.Request, name, phase string, err error) {
+	debug.RecordVar(r.Context(), "template_error", phase+": "+err.Error())
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusInternalServerError)
+
+	title := "Error renderizando plantilla"
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>%s</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#f8fafc;color:#0f172a}
+    main{max-width:960px;margin:48px auto;padding:0 24px}
+    .box{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:24px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
+    h1{font-size:24px;margin:0 0 8px}
+    p{color:#475569;margin:0 0 16px}
+    code{background:#f1f5f9;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px}
+    pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;border-radius:6px;padding:16px;overflow:auto}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="box">
+      <h1>%s</h1>
+      <p>Falló la fase <code>%s</code> de <code>%s</code>.</p>
+      <pre>%s</pre>
+    </div>
+  </main>
+</body>
+</html>`,
+		template.HTMLEscapeString(title),
+		template.HTMLEscapeString(title),
+		template.HTMLEscapeString(phase),
+		template.HTMLEscapeString(name),
+		template.HTMLEscapeString(err.Error()),
+	)
 }
