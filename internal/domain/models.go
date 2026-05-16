@@ -3,15 +3,15 @@ package domain
 import "time"
 
 type PVEServer struct {
-	ID            int64      `db:"id"`
-	Name          string     `db:"name"`
-	IP            string     `db:"ip"`
-	PublicIP      string     `db:"public_ip"`
-	ClientVersion string     `db:"client_version"`
-	MachineID     string     `db:"machine_id"`
-	IsDeleted     bool       `db:"is_deleted"`
-	CreatedAt     time.Time  `db:"created_at"`
-	UpdatedAt     time.Time  `db:"updated_at"`
+	ID            int64     `db:"id"`
+	Name          string    `db:"name"`
+	IP            string    `db:"ip"`
+	PublicIP      string    `db:"public_ip"`
+	ClientVersion string    `db:"client_version"`
+	MachineID     string    `db:"machine_id"`
+	IsDeleted     bool      `db:"is_deleted"`
+	CreatedAt     time.Time `db:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"`
 }
 
 type PVEReport struct {
@@ -41,15 +41,15 @@ type PVEStorage struct {
 }
 
 type PVEStorageInfo struct {
-	ID         int64   `db:"id"`
-	StorageID  int64   `db:"storage_id"`
-	Total      int64   `db:"total"`
-	Used       int64   `db:"used"`
-	Avail      int64   `db:"avail"`
-	UsedPct    float64 `db:"used_percent"`
-	Active     bool    `db:"active"`
-	Enabled    bool    `db:"enabled"`
-	Lvl        int     `db:"lvl"`
+	ID        int64   `db:"id"`
+	StorageID int64   `db:"storage_id"`
+	Total     int64   `db:"total"`
+	Used      int64   `db:"used"`
+	Avail     int64   `db:"avail"`
+	UsedPct   float64 `db:"used_percent"`
+	Active    bool    `db:"active"`
+	Enabled   bool    `db:"enabled"`
+	Lvl       int     `db:"lvl"`
 }
 
 type PVEStorageContent struct {
@@ -67,15 +67,15 @@ type PVEStorageContent struct {
 }
 
 type PBSServer struct {
-	ID            int64      `db:"id"`
-	Name          string     `db:"name"`
-	IP            string     `db:"ip"`
-	PublicIP      string     `db:"public_ip"`
-	ClientVersion string     `db:"client_version"`
-	MachineID     string     `db:"machine_id"`
-	IsDeleted     bool       `db:"is_deleted"`
-	CreatedAt     time.Time  `db:"created_at"`
-	UpdatedAt     time.Time  `db:"updated_at"`
+	ID            int64     `db:"id"`
+	Name          string    `db:"name"`
+	IP            string    `db:"ip"`
+	PublicIP      string    `db:"public_ip"`
+	ClientVersion string    `db:"client_version"`
+	MachineID     string    `db:"machine_id"`
+	IsDeleted     bool      `db:"is_deleted"`
+	CreatedAt     time.Time `db:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"`
 }
 
 type PBSReport struct {
@@ -120,19 +120,19 @@ type PBSSnapshot struct {
 }
 
 type PBSGCStatus struct {
-	ID              int64  `db:"id"`
-	StoreID         int64  `db:"store_id"`
-	DiskBytes       int64  `db:"disk_bytes"`
-	DiskChunks      int64  `db:"disk_chunks"`
-	IndexDataBytes  int64  `db:"index_data_bytes"`
-	IndexFileCount  int64  `db:"index_file_count"`
-	PendingBytes    int64  `db:"pending_bytes"`
-	PendingChunks   int64  `db:"pending_chunks"`
-	RemovedBad      int64  `db:"removed_bad"`
-	RemovedBytes    int64  `db:"removed_bytes"`
-	RemovedChunks   int64  `db:"removed_chunks"`
-	StillBad        int64  `db:"still_bad"`
-	UPID            string `db:"upid"`
+	ID             int64  `db:"id"`
+	StoreID        int64  `db:"store_id"`
+	DiskBytes      int64  `db:"disk_bytes"`
+	DiskChunks     int64  `db:"disk_chunks"`
+	IndexDataBytes int64  `db:"index_data_bytes"`
+	IndexFileCount int64  `db:"index_file_count"`
+	PendingBytes   int64  `db:"pending_bytes"`
+	PendingChunks  int64  `db:"pending_chunks"`
+	RemovedBad     int64  `db:"removed_bad"`
+	RemovedBytes   int64  `db:"removed_bytes"`
+	RemovedChunks  int64  `db:"removed_chunks"`
+	StillBad       int64  `db:"still_bad"`
+	UPID           string `db:"upid"`
 }
 
 type PVEBackupTask struct {
@@ -172,6 +172,29 @@ type User struct {
 	LastLoginIP  string     `db:"last_login_ip"`
 }
 
+type LoginAttempt struct {
+	ID          int64     `db:"id"`
+	Username    string    `db:"username"`
+	IP          string    `db:"ip"`
+	UserAgent   string    `db:"user_agent"`
+	Result      string    `db:"result"`
+	Reason      string    `db:"reason"`
+	AttemptedAt time.Time `db:"attempted_at"`
+}
+
+type AuditLog struct {
+	ID            int64     `db:"id"`
+	ActorUsername string    `db:"actor_username"`
+	ActorRole     string    `db:"actor_role"`
+	ActorIP       string    `db:"actor_ip"`
+	Action        string    `db:"action"`
+	TargetType    string    `db:"target_type"`
+	TargetID      string    `db:"target_id"`
+	TargetName    string    `db:"target_name"`
+	Metadata      string    `db:"metadata"`
+	CreatedAt     time.Time `db:"created_at"`
+}
+
 type VMBackupConfig struct {
 	ID         int64      `db:"id"`
 	ServerName string     `db:"server_name"`
@@ -191,24 +214,24 @@ type VMBackupConfig struct {
 }
 
 type EmailConfig struct {
-	ID               int64  `db:"id"`
-	SMTPHost         string `db:"smtp_host"`
-	SMTPPort         int    `db:"smtp_port"`
-	SMTPUser         string `db:"smtp_user"`
-	SMTPPass         string `db:"smtp_password"`
-	Recipients       string `db:"recipients"`
-	IsEnabled        bool   `db:"is_enabled"`
-	SendTime         string `db:"send_time"`
-	RetentionMonths  int    `db:"retention_months"`
-	RetentionEnabled bool   `db:"retention_enabled"`
-	AlertDiskPct        int  `db:"alert_disk_pct"`   // 0 = disabled
-	AlertBackupErr      bool `db:"alert_backup_err"`
-	AlertPBSStaleHours  int  `db:"alert_pbs_stale_hours"` // 0 = disabled
+	ID                 int64  `db:"id"`
+	SMTPHost           string `db:"smtp_host"`
+	SMTPPort           int    `db:"smtp_port"`
+	SMTPUser           string `db:"smtp_user"`
+	SMTPPass           string `db:"smtp_password"`
+	Recipients         string `db:"recipients"`
+	IsEnabled          bool   `db:"is_enabled"`
+	SendTime           string `db:"send_time"`
+	RetentionMonths    int    `db:"retention_months"`
+	RetentionEnabled   bool   `db:"retention_enabled"`
+	AlertDiskPct       int    `db:"alert_disk_pct"` // 0 = disabled
+	AlertBackupErr     bool   `db:"alert_backup_err"`
+	AlertPBSStaleHours int    `db:"alert_pbs_stale_hours"` // 0 = disabled
 }
 
 // Alert represents a detected condition requiring attention.
 type Alert struct {
-	ID         string    // dedup key: "type:serverType:serverID:store:vmid"
+	ID         string // dedup key: "type:serverType:serverID:store:vmid"
 	ServerName string
 	ServerID   int64
 	ServerType string // "pve" | "pbs"
@@ -225,12 +248,12 @@ type Alert struct {
 }
 
 const (
-	AlertTypeDisk        = "disk"
-	AlertTypeBackupError = "backup_error"
-	AlertTypeBackupSize  = "backup_size"
-	AlertTypePBSFill     = "pbs_fill"
-	AlertTypePBSStale    = "pbs_stale"
-	AlertTypePBSVerify   = "pbs_verify"
+	AlertTypeDisk         = "disk"
+	AlertTypeBackupError  = "backup_error"
+	AlertTypeBackupSize   = "backup_size"
+	AlertTypePBSFill      = "pbs_fill"
+	AlertTypePBSStale     = "pbs_stale"
+	AlertTypePBSVerify    = "pbs_verify"
 	AlertTypePVEStale     = "pve_stale"
 	AlertTypePVEMissingVM = "pve_missing_vm"
 	AlertTypePVEUnknownVM = "pve_unknown_vm"

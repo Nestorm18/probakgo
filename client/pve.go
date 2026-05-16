@@ -193,6 +193,44 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		}
 		result = append(result, task)
 	}
+	if len(result) > 0 {
+		return result
+	}
+
+	// Some scheduled multi-VM jobs are reported by PVE only as an aggregate task
+	// with an empty id (vzdump::root@pam:). In that case, reconstruct per-VM
+	// rows from backup files created during the aggregate job window.
+	aggregate := jobTasks[0]
+	var vmids []int64
+	for vmid, files := range filesByVMID {
+		for _, f := range files {
+			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
+				vmids = append(vmids, vmid)
+				break
+			}
+		}
+	}
+	sort.Slice(vmids, func(i, j int) bool { return vmids[i] < vmids[j] })
+	for _, vmid := range vmids {
+		task := map[string]any{
+			"vmid":      vmid,
+			"vm_name":   names[vmid],
+			"status":    aggregate.status,
+			"starttime": int64(aggregate.start),
+			"endtime":   int64(aggregate.end),
+			"duration":  int64(aggregate.end - aggregate.start),
+			"size":      int64(0),
+			"filename":  "",
+		}
+		for _, f := range filesByVMID[vmid] {
+			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
+				task["size"] = f.size
+				task["filename"] = f.volid
+				break
+			}
+		}
+		result = append(result, task)
+	}
 	return result
 }
 

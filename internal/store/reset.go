@@ -34,6 +34,7 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		"vm_backup_configs",
 		"email_config",
 		"ip_bans",
+		"login_attempts",
 	}
 	for _, table := range tables {
 		if _, err := tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {

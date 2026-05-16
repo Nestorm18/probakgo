@@ -47,10 +47,12 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
-	if _, err := h.store.CreateUser(ctx, uname, string(hash), role); err != nil {
+	id, err := h.store.CreateUser(ctx, uname, string(hash), role)
+	if err != nil {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "user.create", "user", strconv.FormatInt(id, 10), uname, map[string]any{"role": role})
 	http.Redirect(w, r, "/users?flash=Usuario+creado&ok=1", http.StatusSeeOther)
 }
 
@@ -72,6 +74,7 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	h.audit(r, "user.rename", "user", strconv.FormatInt(id, 10), newUsername, map[string]any{"old_username": u.Username, "new_username": newUsername})
 	// If changing own username, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
@@ -106,6 +109,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.UpdateUserPassword(ctx, id, string(hash))
+	h.audit(r, "user.password_change", "user", strconv.FormatInt(id, 10), u.Username, nil)
 	// If changing own password, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
@@ -135,6 +139,7 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.UpdateUserRole(ctx, id, role)
+	h.audit(r, "user.role_change", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"old_role": u.Role, "new_role": role})
 	http.Redirect(w, r, "/users?flash=Rol+actualizado&ok=1", http.StatusSeeOther)
 }
 
@@ -153,6 +158,7 @@ func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.ToggleUser(ctx, id)
+	h.audit(r, "user.toggle", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"was_active": u.IsActive, "new_active": !u.IsActive})
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }
 
@@ -169,5 +175,6 @@ func (h *WebH) DeleteUserPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = h.store.DeleteUser(ctx, id)
+	h.audit(r, "user.delete", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"role": u.Role})
 	http.Redirect(w, r, "/users", http.StatusSeeOther)
 }

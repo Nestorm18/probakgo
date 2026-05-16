@@ -22,8 +22,8 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool) (http.Handler, error) {
-	tmpl := webhandlers.NewTemplates(templateFS, version, func() (int, int) {
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
+	tmpl := webhandlers.NewTemplates(templateFS, version, loc, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st)
 	})
 	h := webhandlers.New(st, tmpl, rep)
@@ -112,6 +112,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/alerts", h.AlertsSettingsPost)
 		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)
 		r.With(RequireAdmin).Post("/settings/ip-bans/unban", h.UnbanIPPost)
+		r.With(RequireAdmin).Get("/settings/audit-log", h.AuditLogPage)
 		r.With(RequireAdmin).Get("/settings/reset", h.ResetSettings)
 		r.With(RequireAdmin).Post("/settings/reset", h.ResetDatabasePost)
 

@@ -67,4 +67,51 @@
   3 intentos fallidos en 30 min → ban 24h · siguiente ofensa → 7 días · 3ª en adelante → permanente
 </div>
 
+<div class="card mt-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history" style="color:var(--clr-accent)"></i>
+    Intentos de inicio de sesión
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>IP</th>
+          <th>Usuario</th>
+          <th>Resultado</th>
+          <th>User-Agent</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .LoginAttempts}}
+      <tr>
+        <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .AttemptedAt}}</td>
+        <td><code style="font-size:.82rem">{{.IP}}</code></td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Username}}{{.Username}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td>
+          {{if eq .Result "success"}}
+            <span class="status-pill ok">Correcto</span>
+          {{else if eq .Result "blocked"}}
+            <span class="status-pill bad">Bloqueado</span>
+          {{else}}
+            <span class="status-pill warn">Fallido</span>
+          {{end}}
+        </td>
+        <td class="text-truncate" style="max-width:360px;font-size:.78rem;color:var(--txt-muted)" title="{{.UserAgent}}">
+          {{if .UserAgent}}{{.UserAgent}}{{else}}–{{end}}
+        </td>
+      </tr>
+      {{else}}
+      <tr>
+        <td colspan="5" class="text-center py-5" style="color:var(--txt-muted)">
+          <i class="bi bi-clock-history me-2"></i>No hay intentos registrados
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {{end}}

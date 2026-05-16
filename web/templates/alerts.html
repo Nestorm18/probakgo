@@ -16,7 +16,7 @@
     <span style="font-weight:600;color:var(--clr-warn)">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>
   </div>
   {{end}}
-  {{if and (not .AlertCritical) (not .AlertWarning)}}
+  {{if and (eq .AlertCritical 0) (eq .AlertWarning 0)}}
   <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-ok) 30%,transparent)">
     <i class="bi bi-check-circle-fill" style="color:var(--clr-ok)"></i>
     <span style="font-weight:600;color:var(--clr-ok)">Sin alertas activas</span>

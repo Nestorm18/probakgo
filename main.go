@@ -24,11 +24,12 @@ import (
 	dbpkg "probakgo/internal/db"
 	"probakgo/internal/selfupdate"
 	"probakgo/internal/service"
+	"probakgo/internal/session"
 	"probakgo/internal/store"
 	"probakgo/internal/web"
 )
 
-var version = "0.0.36"
+var version = "0.0.37"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -87,7 +88,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	web.InitSessions(cfg.SessionKey, cfg.SecureSession)
+	session.Init(cfg.SessionKey, cfg.SecureSession)
 
 	authSvc := service.NewAuth(st)
 	reportSvc := service.NewReport(st, loc)
@@ -100,7 +101,7 @@ func main() {
 	}
 
 	apiSrv := api.NewServer(st, authSvc, reportSvc)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version, cfg.Dev)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version, cfg.Dev, loc)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)

@@ -33,7 +33,11 @@ func DebugBarMiddleware(dev bool) func(http.Handler) http.Handler {
 			var ms runtime.MemStats
 			runtime.ReadMemStats(&ms)
 
-			username, role, _ := session.GetUser(r)
+			username, role, loggedIn := session.GetUser(r)
+			if !loggedIn {
+				bw.flush(nil)
+				return
+			}
 
 			di := debug.FromContext(ctx)
 			di.Mu.Lock()
@@ -50,22 +54,22 @@ func DebugBarMiddleware(dev bool) func(http.Handler) http.Handler {
 
 			ct := bw.Header().Get("Content-Type")
 			bar := debugBarHTML(debugBarParams{
-				elapsed:      elapsed,
-				ms:           ms,
-				method:       r.Method,
-				path:         r.URL.Path,
-				query:        r.URL.RawQuery,
-				route:        routePattern,
-				tmpl:         tmplName,
-				username:     username,
-				role:         role,
-				status:       bw.status,
-				respSize:     bw.buf.Len(),
-				ct:           ct,
-				queries:      queries,
-				vars:         vars,
-				tmplData:     tmplData,
-				userAgent:    r.UserAgent(),
+				elapsed:   elapsed,
+				ms:        ms,
+				method:    r.Method,
+				path:      r.URL.Path,
+				query:     r.URL.RawQuery,
+				route:     routePattern,
+				tmpl:      tmplName,
+				username:  username,
+				role:      role,
+				status:    bw.status,
+				respSize:  bw.buf.Len(),
+				ct:        ct,
+				queries:   queries,
+				vars:      vars,
+				tmplData:  tmplData,
+				userAgent: r.UserAgent(),
 			})
 			bw.flush([]byte(bar))
 		})
@@ -79,15 +83,15 @@ type bufferedWriter struct {
 	status int
 }
 
-func (bw *bufferedWriter) WriteHeader(code int) { bw.status = code }
+func (bw *bufferedWriter) WriteHeader(code int)        { bw.status = code }
 func (bw *bufferedWriter) Write(b []byte) (int, error) { return bw.buf.Write(b) }
-func (bw *bufferedWriter) Unwrap() http.ResponseWriter  { return bw.ResponseWriter }
+func (bw *bufferedWriter) Unwrap() http.ResponseWriter { return bw.ResponseWriter }
 
 func (bw *bufferedWriter) flush(injection []byte) {
 	ct := bw.Header().Get("Content-Type")
 	bw.ResponseWriter.WriteHeader(bw.status)
 	body := bw.buf.Bytes()
-	if bw.status == http.StatusOK && strings.Contains(ct, "text/html") && len(injection) > 0 {
+	if strings.Contains(ct, "text/html") && len(injection) > 0 {
 		if idx := bytes.LastIndex(body, []byte("</body>")); idx >= 0 {
 			var nb []byte
 			nb = append(nb, body[:idx]...)
