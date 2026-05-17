@@ -81,7 +81,7 @@ func TestDeleteOldPBSReports(t *testing.T) {
 	_, _ = st.InsertPBSReport(ctx, serverID)
 
 	cutoff := time.Now().AddDate(0, -1, 0)
-	n, err := st.DeleteOldPBSReports(cutoff)
+	n, err := st.DeleteOldPBSReports(ctx, cutoff)
 	if err != nil {
 		t.Fatalf("delete old reports: %v", err)
 	}

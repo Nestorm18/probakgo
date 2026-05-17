@@ -114,7 +114,7 @@ func TestDeleteOldPVEReports(t *testing.T) {
 	_, _ = st.InsertPVEReport(ctx, serverID, nil)
 
 	cutoff := time.Now().AddDate(0, -1, 0)
-	n, err := st.DeleteOldPVEReports(cutoff)
+	n, err := st.DeleteOldPVEReports(ctx, cutoff)
 	if err != nil {
 		t.Fatalf("delete old reports: %v", err)
 	}

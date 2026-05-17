@@ -396,8 +396,8 @@ func (s *Store) DeletePVEServer(ctx context.Context, id int64) error {
 
 // DeleteOldPVEReports removes PVE reports (and their child rows) older than cutoff.
 // Returns the number of reports deleted.
-func (s *Store) DeleteOldPVEReports(cutoff time.Time) (int64, error) {
-	tx, err := s.db.Begin()
+func (s *Store) DeleteOldPVEReports(ctx context.Context, cutoff time.Time) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -418,12 +418,12 @@ func (s *Store) DeleteOldPVEReports(cutoff time.Time) (int64, error) {
 			SELECT id FROM pve_reports WHERE reported_at < ?)`,
 	}
 	for _, q := range steps {
-		if _, err := tx.Exec(q, cutoff); err != nil {
+		if _, err := tx.ExecContext(ctx, q, cutoff); err != nil {
 			return 0, err
 		}
 	}
 
-	res, err := tx.Exec(`DELETE FROM pve_reports WHERE reported_at < ?`, cutoff)
+	res, err := tx.ExecContext(ctx, `DELETE FROM pve_reports WHERE reported_at < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}
