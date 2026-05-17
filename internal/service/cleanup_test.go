@@ -27,7 +27,7 @@ func TestRunCleanup_Disabled(t *testing.T) {
 		t.Fatalf("backdate report: %v", err)
 	}
 
-	runCleanup(st)
+	runCleanup(ctx, st)
 
 	rep, err := st.GetLatestPVEReport(ctx, serverID)
 	if err != nil {
@@ -64,7 +64,7 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 	db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", twoMonthsAgo, oldPBS)
 	_, _ = st.InsertPBSReport(ctx, pbsID)
 
-	runCleanup(st)
+	runCleanup(ctx, st)
 
 	var count int
 	db.QueryRow("SELECT COUNT(*) FROM pve_reports WHERE id = ?", oldPVE).Scan(&count)
@@ -81,5 +81,37 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 	}
 	if _, err := st.GetLatestPBSReport(ctx, pbsID); err != nil {
 		t.Fatalf("current PBS report should remain: %v", err)
+	}
+}
+
+func TestRunCleanup_CanceledContextDoesNotDelete(t *testing.T) {
+	ctx := context.Background()
+	db, st := openTestStore(t)
+
+	if err := st.UpsertEmailConfig(ctx, domain.EmailConfig{
+		RetentionEnabled: true,
+		RetentionMonths:  1,
+		SendTime:         "08:00",
+	}); err != nil {
+		t.Fatalf("UpsertEmailConfig: %v", err)
+	}
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	if _, err := db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?",
+		time.Now().AddDate(0, -2, 0), oldID); err != nil {
+		t.Fatalf("backdate report: %v", err)
+	}
+
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	runCleanup(canceled, st)
+
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM pve_reports WHERE id = ?", oldID).Scan(&count); err != nil {
+		t.Fatalf("count report: %v", err)
+	}
+	if count != 1 {
+		t.Fatal("cleanup should not delete reports after context cancellation")
 	}
 }

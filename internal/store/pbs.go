@@ -253,8 +253,8 @@ func (s *Store) DeletePBSServer(ctx context.Context, id int64) error {
 
 // DeleteOldPBSReports removes PBS reports (and their child rows) older than cutoff.
 // Returns the number of reports deleted.
-func (s *Store) DeleteOldPBSReports(cutoff time.Time) (int64, error) {
-	tx, err := s.db.Begin()
+func (s *Store) DeleteOldPBSReports(ctx context.Context, cutoff time.Time) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -277,12 +277,12 @@ func (s *Store) DeleteOldPBSReports(cutoff time.Time) (int64, error) {
 			SELECT id FROM pbs_reports WHERE reported_at < ?)`,
 	}
 	for _, q := range steps {
-		if _, err := tx.Exec(q, cutoff); err != nil {
+		if _, err := tx.ExecContext(ctx, q, cutoff); err != nil {
 			return 0, err
 		}
 	}
 
-	res, err := tx.Exec(`DELETE FROM pbs_reports WHERE reported_at < ?`, cutoff)
+	res, err := tx.ExecContext(ctx, `DELETE FROM pbs_reports WHERE reported_at < ?`, cutoff)
 	if err != nil {
 		return 0, err
 	}

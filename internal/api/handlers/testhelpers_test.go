@@ -1,12 +1,15 @@
 package handlers_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	dbpkg "probakgo/internal/db"
 	"probakgo/internal/api"
+	dbpkg "probakgo/internal/db"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
 )
@@ -31,4 +34,31 @@ func newTestServer(t *testing.T) *testServer {
 	rep := service.NewReport(st, time.UTC)
 	srv := api.NewServer(st, auth, rep)
 	return &testServer{handler: srv.Router(), store: st}
+}
+
+func (ts *testServer) doJSON(t *testing.T, method, path, key string, body any) *httptest.ResponseRecorder {
+	t.Helper()
+	var buf bytes.Buffer
+	if body != nil {
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			t.Fatalf("encode request body: %v", err)
+		}
+	}
+	req := httptest.NewRequest(method, path, &buf)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	return rr
+}
+
+func decodeJSON(t *testing.T, rr *httptest.ResponseRecorder, out any) {
+	t.Helper()
+	if err := json.NewDecoder(rr.Body).Decode(out); err != nil {
+		t.Fatalf("decode response JSON: %v; body=%s", err, rr.Body.String())
+	}
 }
