@@ -151,6 +151,10 @@ func runInstall(args []string) {
 		fmt.Println("PBS node: report cron will be installed (no vzdump hook needed)")
 	}
 
+	if !isPBS {
+		autoConfigureBackupConfig(*apiURL, *apiKey, *proxmoxToken, *proxmoxSecret)
+	}
+
 	// 6. Configure logrotate
 	must(os.WriteFile(logrotateConfPath, []byte(logrotateConf), 0644), "write logrotate config")
 	fmt.Println("logrotate: " + logrotateConfPath)
@@ -176,6 +180,55 @@ func runInstall(args []string) {
 	}
 	fmt.Printf("  Test:   %s\n", binaryLinkPath)
 	fmt.Printf("  Update: %s update\n", binaryLinkPath)
+}
+
+func autoConfigureBackupConfig(apiURL, apiKey, proxmoxToken, proxmoxSecret string) {
+	if apiURL == "" {
+		apiURL = os.Getenv("API_URL")
+	}
+	if apiKey == "" {
+		apiKey = os.Getenv("API_KEY")
+	}
+	if proxmoxToken == "" {
+		proxmoxToken = os.Getenv("PROXMOX_TOKEN")
+	}
+	if proxmoxSecret == "" {
+		proxmoxSecret = os.Getenv("PROXMOX_SECRET")
+	}
+	if apiURL == "" || apiKey == "" || proxmoxToken == "" || proxmoxSecret == "" {
+		fmt.Println("Backup config auto-sync skipped: API and Proxmox credentials are required")
+		return
+	}
+
+	cfg := &Config{
+		APIURL:        apiURL,
+		APIKey:        apiKey,
+		ProxmoxToken:  proxmoxToken,
+		ProxmoxSecret: proxmoxSecret,
+		VerifyTLS:     false,
+		ServerType:    "pve",
+	}
+	si := newSysInfo(cfg)
+	vms, err := newPVEClient(cfg, si).discoverPVEVMs()
+	if err != nil {
+		fmt.Printf("WARN: could not list VMs for backup config: %v\n", err)
+		return
+	}
+	machineID := si.machineID()
+	created, updated, skipped, err := syncBackupConfig(cfg, si.Hostname, machineID, vms)
+	if err != nil {
+		fmt.Printf("WARN: could not sync backup config: %v\n", err)
+	} else if len(vms) == 0 {
+		fmt.Println("Backup config auto-sync: no VMs or containers found")
+	} else {
+		fmt.Printf("Backup config auto-sync: %d created, %d updated, %d already configured\n", created, updated, skipped)
+	}
+
+	if err := sendReport(cfg, si, ""); err != nil {
+		fmt.Printf("WARN: could not send initial report: %v\n", err)
+		return
+	}
+	fmt.Println("Initial report sent: server should now appear in /servers/pve")
 }
 
 func runUninstall(_ []string) {
