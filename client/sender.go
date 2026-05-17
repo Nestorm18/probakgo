@@ -63,6 +63,9 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 	req.Header.Set("Content-Type", "application/json")
+	if machineID := si.machineID(); machineID != "" {
+		req.Header.Set("X-Machine-ID", machineID)
+	}
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
