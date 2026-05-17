@@ -2,10 +2,10 @@ package webhandlers
 
 import (
 	"bytes"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"net/http"
 	"strings"
 	"time"
@@ -47,13 +47,13 @@ var templateActive = map[string]string{
 }
 
 type Templates struct {
-	fs          embed.FS
+	fs          fs.FS
 	funcMap     template.FuncMap
 	version     string
 	badgeCounts func() (int, int)
 }
 
-func NewTemplates(fs embed.FS, version string, loc *time.Location, badgeCounts func() (int, int)) *Templates {
+func NewTemplates(fs fs.FS, version string, loc *time.Location, badgeCounts func() (int, int)) *Templates {
 	return &Templates{
 		fs:          fs,
 		funcMap:     makeFuncMap(loc),
