@@ -123,12 +123,34 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		row := serverRow{Name: sv.Name, IP: sv.IP}
 		r, err := st.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil {
-			row.StaleReason = "no reports received"
+			row.StaleReason = "no se han recibido reportes"
 			pveIssues = append(pveIssues, row)
 			continue
 		}
 
 		tasks, _ := st.GetPVEBackupTasksForReport(ctx, r.ID)
+		configs, _ := st.ListVMBackupConfigs(ctx, sv.Name)
+		isStale := false
+		if stale, reason := rep.IsStaleForServer(ctx, r.ReportedAt, sv.Name); stale {
+			isStale = true
+			row.StaleReason = reason
+			pveIssues = append(pveIssues, row)
+		} else if r.IsStale {
+			isStale = true
+			row.StaleReason = r.StaleReason
+			pveIssues = append(pveIssues, row)
+		} else {
+			pveOk = append(pveOk, row)
+		}
+
+		if isStale {
+			row.VMTasks = staleVMRows(configs, tasks)
+			if len(pveIssues) > 0 {
+				pveIssues[len(pveIssues)-1].VMTasks = row.VMTasks
+			}
+			continue
+		}
+
 		for _, t := range tasks {
 			name := t.VMName
 			if name == "" {
@@ -142,39 +164,29 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 				Size:     emailFmtBytes(t.Size),
 			})
 		}
-		if len(tasks) > 0 {
-			configs, _ := st.ListVMBackupConfigs(ctx, sv.Name)
-			if len(configs) > 0 {
-				jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
-				seenVMIDs := make(map[string]bool)
-				for _, t := range tasks {
-					seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
+		if len(tasks) > 0 && len(configs) > 0 {
+			jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
+			seenVMIDs := make(map[string]bool)
+			for _, t := range tasks {
+				seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
+			}
+			for _, c := range configs {
+				if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+					continue
 				}
-				for _, c := range configs {
-					if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
-						continue
-					}
-					name := c.VMName
-					if name == "" {
-						name = c.VMID
-					}
-					row.VMTasks = append(row.VMTasks, vmTaskRow{
-						VMID:      c.VMID,
-						VMName:    name,
-						IsMissing: true,
-					})
+				name := c.VMName
+				if name == "" {
+					name = c.VMID
 				}
+				row.VMTasks = append(row.VMTasks, vmTaskRow{
+					VMID:      c.VMID,
+					VMName:    name,
+					IsMissing: true,
+				})
 			}
 		}
-
-		if stale, reason := rep.IsStaleForServer(ctx, r.ReportedAt, sv.Name); stale {
-			row.StaleReason = reason
-			pveIssues = append(pveIssues, row)
-		} else if r.IsStale {
-			row.StaleReason = r.StaleReason
-			pveIssues = append(pveIssues, row)
-		} else {
-			pveOk = append(pveOk, row)
+		if len(pveOk) > 0 {
+			pveOk[len(pveOk)-1].VMTasks = row.VMTasks
 		}
 	}
 
@@ -183,7 +195,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		row := serverRow{Name: sv.Name, IP: sv.IP}
 		r, err := st.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil {
-			row.StaleReason = "no reports received"
+			row.StaleReason = "no se han recibido reportes"
 			pbsIssues = append(pbsIssues, row)
 			continue
 		}
@@ -203,7 +215,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			}
 		}
 		if rep.IsStale(r.ReportedAt) {
-			row.StaleReason = "no report received today"
+			row.StaleReason = "No se ha recibido el reporte de hoy"
 			pbsIssues = append(pbsIssues, row)
 		} else if r.IsStale {
 			row.StaleReason = r.StaleReason
@@ -239,13 +251,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	}
 
 	totalIssues := len(pveIssues) + len(pbsIssues)
-	totalProblems := totalIssues + len(diskAlerts) + len(backupErrors)
+	backupProblems := totalIssues + len(backupErrors)
 	totalOK := len(pveOk) + len(pbsOk)
 	headerColor := "#28a745"
 	statusText := "Todos los servidores operativos"
-	if totalProblems > 0 {
+	if backupProblems > 0 {
 		headerColor = "#dc3545"
-		statusText = fmt.Sprintf("%d problema(s) detectado(s)", totalProblems)
+		statusText = fmt.Sprintf("%d problema(s) de backup detectado(s)", backupProblems)
 	}
 
 	return emailData{
@@ -255,7 +267,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		StatusText:   statusText,
 		TotalPVE:     len(pveServers),
 		TotalPBS:     len(pbsServers),
-		TotalIssues:  totalProblems,
+		TotalIssues:  backupProblems,
 		TotalOK:      totalOK,
 		PVEIssues:    pveIssues,
 		PBSIssues:    pbsIssues,
@@ -264,6 +276,39 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		DiskAlerts:   diskAlerts,
 		BackupErrors: backupErrors,
 	}, nil
+}
+
+func staleVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask) []vmTaskRow {
+	var rows []vmTaskRow
+	if len(configs) > 0 {
+		for _, c := range configs {
+			if c.IsExcluded {
+				continue
+			}
+			name := c.VMName
+			if name == "" {
+				name = c.VMID
+			}
+			rows = append(rows, vmTaskRow{
+				VMID:      c.VMID,
+				VMName:    name,
+				IsMissing: true,
+			})
+		}
+		return rows
+	}
+	for _, t := range tasks {
+		name := t.VMName
+		if name == "" {
+			name = fmt.Sprintf("%d", t.VMID)
+		}
+		rows = append(rows, vmTaskRow{
+			VMID:      fmt.Sprintf("%d", t.VMID),
+			VMName:    name,
+			IsMissing: true,
+		})
+	}
+	return rows
 }
 
 func renderEmailTemplate(data emailData) (string, error) {
@@ -367,7 +412,6 @@ func emailFmtDuration(secs int64) string {
 	}
 	return fmt.Sprintf("%ds", s)
 }
-
 
 // nextRunTime returns the next wall-clock moment matching HH:MM in the given timezone.
 func nextRunTime(sendTime string, loc *time.Location) time.Time {

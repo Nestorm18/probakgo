@@ -9,6 +9,8 @@ import (
 
 func intPtr(v int) *int { return &v }
 
+func stringPtr(v string) *string { return &v }
+
 func TestPVEAlertConfig_NotFound(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)
@@ -16,7 +18,7 @@ func TestPVEAlertConfig_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.DiskPct != nil || cfg.StaleHours != nil || cfg.BackupErr != nil {
+	if cfg.DiskPct != nil || cfg.StaleHours != nil || cfg.BackupErr != nil || cfg.ExpectedFinishTime != nil {
 		t.Error("expected all nil fields when no row exists")
 	}
 }
@@ -27,10 +29,11 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 	serverID, _ := st.UpsertPVEServer(ctx, "pve1", "1.2.3.4", "", "1.0", "")
 
 	want := domain.PVEAlertConfig{
-		ServerID:   serverID,
-		DiskPct:    intPtr(90),
-		StaleHours: intPtr(0),
-		BackupErr:  intPtr(1),
+		ServerID:           serverID,
+		DiskPct:            intPtr(90),
+		StaleHours:         intPtr(0),
+		BackupErr:          intPtr(1),
+		ExpectedFinishTime: stringPtr("10:30"),
 	}
 	if err := st.UpsertPVEAlertConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -49,6 +52,9 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 	if got.BackupErr == nil || *got.BackupErr != 1 {
 		t.Errorf("BackupErr: got %v, want 1", got.BackupErr)
 	}
+	if got.ExpectedFinishTime == nil || *got.ExpectedFinishTime != "10:30" {
+		t.Errorf("ExpectedFinishTime: got %v, want 10:30", got.ExpectedFinishTime)
+	}
 }
 
 func TestPVEAlertConfig_NullFields(t *testing.T) {
@@ -65,7 +71,7 @@ func TestPVEAlertConfig_NullFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.DiskPct != nil || got.StaleHours != nil || got.BackupErr != nil {
+	if got.DiskPct != nil || got.StaleHours != nil || got.BackupErr != nil || got.ExpectedFinishTime != nil {
 		t.Error("expected all nil after upsert with nil fields")
 	}
 }

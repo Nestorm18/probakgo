@@ -6,6 +6,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -118,6 +120,7 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	type rawTask struct {
 		start, end float64
 		status, id string
+		upid       string
 	}
 	var finished []rawTask
 	for _, t := range raw {
@@ -129,10 +132,11 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		start, hasStart := m["starttime"].(float64)
 		status, hasStatus := m["status"].(string)
 		id, _ := m["id"].(string)
+		upid, _ := m["upid"].(string)
 		if !hasEnd || !hasStart || !hasStatus {
 			continue
 		}
-		finished = append(finished, rawTask{start, end, status, id})
+		finished = append(finished, rawTask{start, end, status, id, upid})
 	}
 	if len(finished) == 0 {
 		return nil
@@ -201,6 +205,7 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	// with an empty id (vzdump::root@pam:). In that case, reconstruct per-VM
 	// rows from backup files created during the aggregate job window.
 	aggregate := jobTasks[0]
+	durations := c.aggregateTaskDurations(aggregate.upid)
 	var vmids []int64
 	for vmid, files := range filesByVMID {
 		for _, f := range files {
@@ -212,26 +217,104 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 	sort.Slice(vmids, func(i, j int) bool { return vmids[i] < vmids[j] })
 	for _, vmid := range vmids {
+		start := int64(aggregate.start)
+		end := int64(aggregate.end)
+		duration := end - start
+		var matchedFile backupFile
+		var hasFile bool
+		for _, f := range filesByVMID[vmid] {
+			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
+				matchedFile = f
+				hasFile = true
+				break
+			}
+		}
+		if d := durations[vmid]; d > 0 {
+			duration = d
+			if hasFile {
+				start = matchedFile.ctime
+				end = matchedFile.ctime + d
+			}
+		}
 		task := map[string]any{
 			"vmid":      vmid,
 			"vm_name":   names[vmid],
 			"status":    aggregate.status,
-			"starttime": int64(aggregate.start),
-			"endtime":   int64(aggregate.end),
-			"duration":  int64(aggregate.end - aggregate.start),
+			"starttime": start,
+			"endtime":   end,
+			"duration":  duration,
 			"size":      int64(0),
 			"filename":  "",
 		}
-		for _, f := range filesByVMID[vmid] {
-			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
-				task["size"] = f.size
-				task["filename"] = f.volid
-				break
-			}
+		if hasFile {
+			task["size"] = matchedFile.size
+			task["filename"] = matchedFile.volid
 		}
 		result = append(result, task)
 	}
 	return result
+}
+
+func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
+	if upid == "" {
+		return nil
+	}
+	data, err := c.get(fmt.Sprintf("nodes/%s/tasks/%s/log", c.si.Hostname, url.PathEscape(upid)))
+	if err != nil {
+		return nil
+	}
+	raw, _ := data["data"].([]any)
+	var lines []string
+	for _, item := range raw {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if text, ok := m["t"].(string); ok {
+			lines = append(lines, text)
+		}
+	}
+	return parseBackupDurations(lines)
+}
+
+var finishedBackupRE = regexp.MustCompile(`(?i)Finished Backup of VM\s+(\d+)\s+\((\d{1,2}:\d{2}(?::\d{2})?)\)`)
+
+func parseBackupDurations(lines []string) map[int64]int64 {
+	durations := make(map[int64]int64)
+	for _, line := range lines {
+		matches := finishedBackupRE.FindStringSubmatch(line)
+		if len(matches) != 3 {
+			continue
+		}
+		vmid, err := strconv.ParseInt(matches[1], 10, 64)
+		if err != nil {
+			continue
+		}
+		duration, ok := parseClockDuration(matches[2])
+		if ok {
+			durations[vmid] = duration
+		}
+	}
+	return durations
+}
+
+func parseClockDuration(s string) (int64, bool) {
+	parts := strings.Split(s, ":")
+	if len(parts) != 2 && len(parts) != 3 {
+		return 0, false
+	}
+	var nums []int64
+	for _, part := range parts {
+		n, err := strconv.ParseInt(part, 10, 64)
+		if err != nil {
+			return 0, false
+		}
+		nums = append(nums, n)
+	}
+	if len(nums) == 2 {
+		return nums[0]*60 + nums[1], true
+	}
+	return nums[0]*3600 + nums[1]*60 + nums[2], true
 }
 
 func (c *pveClient) lastBackupStatus() backupStatus {

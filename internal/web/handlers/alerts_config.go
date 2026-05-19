@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -29,10 +30,17 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 			cfg.StaleHours = &n
 		}
 	}
-	if v := r.FormValue("backup_err"); v != "" {
+	if v := r.FormValue("backup_err"); v != "" && v != "-1" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.BackupErr = &n
 		}
+	}
+	if v := r.FormValue("expected_finish_time"); v != "" {
+		if _, err := time.Parse("15:04", v); err != nil {
+			http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Hora+limite+no+valida", http.StatusSeeOther)
+			return
+		}
+		cfg.ExpectedFinishTime = &v
 	}
 
 	if err := h.store.UpsertPVEAlertConfig(ctx, cfg); err != nil {
@@ -44,6 +52,7 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"disk_pct":    cfg.DiskPct,
 		"stale_hours": cfg.StaleHours,
 		"backup_err":  cfg.BackupErr,
+		"finish_time": cfg.ExpectedFinishTime,
 	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/pve?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)

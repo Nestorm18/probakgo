@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"probakgo/internal/domain"
 )
 
 func TestParseRecipients_Multiple(t *testing.T) {
@@ -105,5 +107,93 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	}
 	if data.HeaderColor != "#dc3545" {
 		t.Errorf("want red header, got %q", data.HeaderColor)
+	}
+}
+
+func TestBuildEmailData_StaleReportDoesNotShowOldTasksOK(t *testing.T) {
+	ctx := context.Background()
+	db, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "10.0.0.1", "", "1.0", "")
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	if err := st.InsertPVEBackupTask(ctx, oldID, domain.BackupTaskPayload{
+		VMID:      101,
+		VMName:    "mikrotik-routeros-chr",
+		Status:    "OK",
+		StartTime: time.Now().Add(-26 * time.Hour).Unix(),
+		EndTime:   time.Now().Add(-26*time.Hour + 175*time.Second).Unix(),
+		Duration:  175,
+		Size:      41_860_000,
+	}); err != nil {
+		t.Fatalf("InsertPVEBackupTask: %v", err)
+	}
+	yesterday := time.Now().Add(-25 * time.Hour)
+	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, oldID)
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertBackupErr = false
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.PVEIssues) != 1 {
+		t.Fatalf("want 1 in PVEIssues, got %d", len(data.PVEIssues))
+	}
+	tasks := data.PVEIssues[0].VMTasks
+	if len(tasks) != 1 {
+		t.Fatalf("want 1 VM task, got %d", len(tasks))
+	}
+	if !tasks[0].IsMissing {
+		t.Fatal("want stale old task to be shown as missing")
+	}
+	if tasks[0].Status == "OK" {
+		t.Fatal("stale old task must not be shown as OK")
+	}
+}
+
+func TestBuildEmailData_DiskAlertsDoNotCountAsBackupProblems(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-disk-alert", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	storageID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{
+		Storage: "backup-store",
+		Content: "backup",
+	})
+	_ = st.InsertPVEStorageInfo(ctx, storageID, domain.StorageInfoPayload{
+		Total:   1000,
+		Used:    900,
+		Avail:   100,
+		Active:  true,
+		Enabled: true,
+	})
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 85
+	cfg.AlertBackupErr = false
+	if err := st.UpsertEmailConfig(ctx, *cfg); err != nil {
+		t.Fatalf("UpsertEmailConfig: %v", err)
+	}
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.DiskAlerts) != 1 {
+		t.Fatalf("want 1 disk alert, got %d", len(data.DiskAlerts))
+	}
+	if data.TotalIssues != 0 {
+		t.Errorf("want TotalIssues=0 for disk-only alert, got %d", data.TotalIssues)
+	}
+	if data.HeaderColor != "#28a745" {
+		t.Errorf("want green header for disk-only alert, got %q", data.HeaderColor)
+	}
+	if data.StatusText != "Todos los servidores operativos" {
+		t.Errorf("unexpected status text: %q", data.StatusText)
 	}
 }

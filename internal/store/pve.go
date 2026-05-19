@@ -136,6 +136,18 @@ func (s *Store) GetPVEServer(ctx context.Context, id int64) (*domain.PVEServer, 
 	return &sv, nil
 }
 
+func (s *Store) GetPVEServerByName(ctx context.Context, name string) (*domain.PVEServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+		FROM pve_servers WHERE name = ? AND is_deleted = 0`, name)
+	var sv domain.PVEServer
+	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
+		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &sv, nil
+}
+
 type PVEReportRow struct {
 	domain.PVEReport
 	ServerName string `db:"server_name"`

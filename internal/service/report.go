@@ -99,12 +99,12 @@ func (r *ReportService) IsStale(reportedAt time.Time) bool {
 
 // IsStaleForServer checks staleness considering the server's configured backup schedule.
 // Returns (isStale, reason). If no schedule is configured, falls back to IsStale.
-// A backup day is considered "completed" when now > dayStart + 28h, giving a grace period
-// for backups that start late at night and finish after midnight.
+// A backup day is considered "completed" at the server's expected finish time
+// the next morning, defaulting to 09:00 for overnight backups.
 func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Time, serverName string) (bool, string) {
 	configs, err := r.store.ListVMBackupConfigs(ctx, serverName)
 	if err != nil || len(configs) == 0 {
-		return r.IsStale(reportedAt), "no report received today"
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 	}
 
 	expected := make(map[time.Weekday]bool)
@@ -135,10 +135,11 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 		}
 	}
 	if len(expected) == 0 {
-		return r.IsStale(reportedAt), "no report received today"
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 	}
 
 	now := r.now().In(r.tz)
+	finishHour, finishMinute := r.expectedFinishTime(ctx, serverName)
 	// Look back up to 14 days for the most recent completed expected backup day.
 	for i := 1; i <= 14; i++ {
 		candidate := now.AddDate(0, 0, -i)
@@ -146,13 +147,31 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 			continue
 		}
 		dayStart := time.Date(candidate.Year(), candidate.Month(), candidate.Day(), 0, 0, 0, 0, r.tz)
-		if now.Before(dayStart.Add(28 * time.Hour)) {
+		cutoff := dayStart.AddDate(0, 0, 1).Add(time.Duration(finishHour)*time.Hour + time.Duration(finishMinute)*time.Minute)
+		if now.Before(cutoff) {
 			// This day's backup window hasn't closed yet - keep looking back
 			continue
 		}
-		return reportedAt.Before(dayStart), "no report received on last backup day"
+		return reportedAt.Before(dayStart), "no se ha recibido reporte del ultimo dia de backup"
 	}
-	return r.IsStale(reportedAt), "no report received today"
+	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+}
+
+func (r *ReportService) expectedFinishTime(ctx context.Context, serverName string) (int, int) {
+	const defaultHour, defaultMinute = 9, 0
+	sv, err := r.store.GetPVEServerByName(ctx, serverName)
+	if err != nil {
+		return defaultHour, defaultMinute
+	}
+	cfg, err := r.store.GetPVEAlertConfig(ctx, sv.ID)
+	if err != nil || cfg.ExpectedFinishTime == nil {
+		return defaultHour, defaultMinute
+	}
+	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
+	if err != nil {
+		return defaultHour, defaultMinute
+	}
+	return t.Hour(), t.Minute()
 }
 
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.
@@ -168,7 +187,7 @@ func (r *ReportService) BuildPVEServerResponse(ctx context.Context, sv domain.PV
 	rep, err := r.store.GetLatestPVEReport(ctx, sv.ID)
 	if err != nil {
 		resp.IsStale = true
-		resp.StaleReason = "no reports received"
+		resp.StaleReason = "no se han recibido reportes"
 		return resp
 	}
 	resp.LastReport = &rep.ReportedAt
@@ -196,13 +215,13 @@ func (r *ReportService) BuildPBSServerResponse(ctx context.Context, sv domain.PB
 	rep, err := r.store.GetLatestPBSReport(ctx, sv.ID)
 	if err != nil {
 		resp.IsStale = true
-		resp.StaleReason = "no reports received"
+		resp.StaleReason = "no se han recibido reportes"
 		return resp
 	}
 	resp.LastReport = &rep.ReportedAt
 	if r.IsStale(rep.ReportedAt) {
 		resp.IsStale = true
-		resp.StaleReason = "no report received today"
+		resp.StaleReason = "No se ha recibido el reporte de hoy"
 	} else {
 		resp.IsStale = rep.IsStale
 		resp.StaleReason = rep.StaleReason

@@ -267,10 +267,11 @@ const (
 // PVEAlertConfig holds per-server alert thresholds for a PVE server.
 // nil fields inherit from the global email_config values.
 type PVEAlertConfig struct {
-	ServerID   int64
-	DiskPct    *int // nil = use global; storage usage threshold %
-	StaleHours *int // nil = use global; 0 = disabled
-	BackupErr  *int // nil = use global; 0 = ignore; 1 = alert
+	ServerID           int64
+	DiskPct            *int    // nil = use global; storage usage threshold %
+	StaleHours         *int    // nil = use global; 0 = disabled
+	BackupErr          *int    // nil = use global; 0 = ignore; 1 = alert
+	ExpectedFinishTime *string // nil = 09:00; HH:MM cutoff for previous night's report
 }
 
 // PVEVMAlertConfig holds per-VM overrides within a PVE server.

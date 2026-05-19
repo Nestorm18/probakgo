@@ -48,7 +48,7 @@ func TestIsStaleForServer_WeekendNoStale_FreshFridayReport(t *testing.T) {
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
 	})
 
-	// Report arrived Friday 22:00 - Saturday 04:00 (28h after Fri 00:00) has passed, report covers Friday
+	// Report arrived Friday 22:00. Saturday 09:00 has passed, so the Friday report is required.
 	fridayEvening := time.Date(2026, 5, 1, 22, 0, 0, 0, time.UTC)
 	stale, reason := svc.IsStaleForServer(context.Background(), fridayEvening, "pve-01")
 	if stale {
@@ -72,7 +72,7 @@ func TestIsStaleForServer_WeekendStale_NoFridayReport(t *testing.T) {
 }
 
 func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
-	// "now" = Saturday 02:00 - within the 28h grace window of Friday's backup
+	// "now" = Saturday 02:00 - before the Friday backup window closes at 09:00.
 	earlysat := time.Date(2026, 5, 2, 2, 0, 0, 0, time.UTC)
 	svc, create := newSvcAt(t, earlysat)
 	create(domain.CreateVMBackupConfigRequest{
@@ -80,15 +80,90 @@ func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
 	})
 
-	// Friday 00:00 + 28h = Saturday 04:00; now=02:00 is still inside the window.
+	// Friday 00:00 + 33h = Saturday 09:00; now=02:00 is still inside the window.
 	// So Friday is not yet "completed" → look further back → Thursday.
 	// Report is from Thursday 20:00. Fri not checked yet, so check Thu.
-	// Thu 00:00 + 28h = Fri 04:00 < Sat 02:00 → completed.
+	// Thu 00:00 + 33h = Fri 09:00 < Sat 02:00 → completed.
 	// reportedAt (Thu 20:00) >= Thu 00:00 → not stale.
 	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
 	stale, reason := svc.IsStaleForServer(context.Background(), thursdayEvening, "pve-01")
 	if stale {
-		t.Errorf("want stale=false: within 28h grace for Fri, Thu report covers Thu; got reason=%q", reason)
+		t.Errorf("want stale=false: before 09:00 cutoff for Fri, Thu report covers Thu; got reason=%q", reason)
+	}
+}
+
+func TestIsStaleForServer_StaleAtNineWhenPreviousNightReportMissing(t *testing.T) {
+	nineSat := time.Date(2026, 5, 2, 9, 0, 0, 0, time.UTC)
+	svc, create := newSvcAt(t, nineSat)
+	create(domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm",
+		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
+	})
+
+	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
+	stale, _ := svc.IsStaleForServer(context.Background(), thursdayEvening, "pve-01")
+	if !stale {
+		t.Error("want stale=true: at 09:00 the previous night's Friday report is required")
+	}
+}
+
+func TestIsStaleForServer_UsesServerExpectedFinishTime(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	tenSat := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	svc := &ReportService{store: st, tz: time.UTC, now: func() time.Time { return tenSat }}
+
+	serverID, err := st.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+	finish := "11:00"
+	if err := st.UpsertPVEAlertConfig(ctx, domain.PVEAlertConfig{
+		ServerID:           serverID,
+		ExpectedFinishTime: &finish,
+	}); err != nil {
+		t.Fatalf("upsert alert config: %v", err)
+	}
+	if _, err := st.CreateVMBackupConfig(ctx, "pve-01", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Friday: true,
+	}); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+
+	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
+	stale, reason := svc.IsStaleForServer(ctx, thursdayEvening, "pve-01")
+	if stale {
+		t.Errorf("want stale=false before custom 11:00 cutoff; got reason=%q", reason)
+	}
+}
+
+func TestIsStaleForServer_StaleAfterServerExpectedFinishTime(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	elevenSat := time.Date(2026, 5, 2, 11, 0, 0, 0, time.UTC)
+	svc := &ReportService{store: st, tz: time.UTC, now: func() time.Time { return elevenSat }}
+
+	serverID, err := st.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+	finish := "11:00"
+	if err := st.UpsertPVEAlertConfig(ctx, domain.PVEAlertConfig{
+		ServerID:           serverID,
+		ExpectedFinishTime: &finish,
+	}); err != nil {
+		t.Fatalf("upsert alert config: %v", err)
+	}
+	if _, err := st.CreateVMBackupConfig(ctx, "pve-01", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Friday: true,
+	}); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+
+	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
+	stale, _ := svc.IsStaleForServer(ctx, thursdayEvening, "pve-01")
+	if !stale {
+		t.Error("want stale=true at custom 11:00 cutoff")
 	}
 }
 
