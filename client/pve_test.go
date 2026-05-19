@@ -230,6 +230,76 @@ func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
 	}
 }
 
+func TestBackupJobTasksUsesAggregateLogDurations(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"upid":      "UPID:test-node:000123:ABCDEF:664BEEF0:vzdump::root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(11000),
+					"status":    "OK",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Starting Backup of VM 101 (qemu)"},
+				map[string]any{"n": float64(2), "t": "INFO: Finished Backup of VM 101 (00:02:15)"},
+				map[string]any{"n": float64(3), "t": "INFO: Starting Backup of VM 3100 (qemu)"},
+				map[string]any{"n": float64(4), "t": "INFO: Finished Backup of VM 3100 (01:00:05)"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	filesByVMID := map[int64][]backupFile{
+		101:  {{ctime: 10010, size: 39_000_000, volid: "nas:backup/vzdump-qemu-101.vma.zst"}},
+		3100: {{ctime: 10130, size: 3_730_000_000, volid: "nas:backup/vzdump-qemu-3100.vma.zst"}},
+	}
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{101: "mikrotik-routeros-chr", 3100: "plik"},
+		filesByVMID,
+	)
+
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 reconstructed tasks, got %d", len(tasks))
+	}
+	if got := tasks[0]["duration"]; got != int64(135) {
+		t.Errorf("vm 101 duration: got %v, want 135", got)
+	}
+	if got := tasks[0]["starttime"]; got != int64(10010) {
+		t.Errorf("vm 101 starttime: got %v, want 10010", got)
+	}
+	if got := tasks[0]["endtime"]; got != int64(10145) {
+		t.Errorf("vm 101 endtime: got %v, want 10145", got)
+	}
+	if got := tasks[1]["duration"]; got != int64(3605) {
+		t.Errorf("vm 3100 duration: got %v, want 3605", got)
+	}
+}
+
+func TestParseBackupDurations(t *testing.T) {
+	got := parseBackupDurations([]string{
+		"INFO: Finished Backup of VM 101 (00:02:15)",
+		"INFO: Finished Backup of VM 202 (12:34)",
+		"INFO: unrelated",
+	})
+
+	if got[101] != 135 {
+		t.Errorf("VM 101: got %d, want 135", got[101])
+	}
+	if got[202] != 754 {
+		t.Errorf("VM 202: got %d, want 754", got[202])
+	}
+}
+
 func TestGenerateReportStorageOfflineOnContentError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api2/json/storage", func(w http.ResponseWriter, r *http.Request) {

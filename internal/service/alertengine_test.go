@@ -211,7 +211,7 @@ func TestEvalPVEStale_StaleServer(t *testing.T) {
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "1.1.1.1", "", "1.0", "")
 	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	// backdate report so is_stale=1 gets set
-	_, _ = db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason='no report received today' WHERE id=?`, reportID)
+	_, _ = db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason='No se ha recibido el reporte de hoy' WHERE id=?`, reportID)
 
 	cfg := defaultCfg()
 	alerts, _ := evalPVEStale(st, cfg)

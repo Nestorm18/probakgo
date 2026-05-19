@@ -9,15 +9,16 @@ import (
 )
 
 func (s *Store) GetPVEAlertConfig(ctx context.Context, serverID int64) (domain.PVEAlertConfig, error) {
-	debug.RecordQuery(ctx, `SELECT disk_pct, stale_hours, backup_err FROM pve_alert_config WHERE server_id = ?`)
+	debug.RecordQuery(ctx, `SELECT disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config WHERE server_id = ?`)
 	row := s.db.QueryRowContext(ctx,
-		`SELECT disk_pct, stale_hours, backup_err FROM pve_alert_config WHERE server_id = ?`,
+		`SELECT disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config WHERE server_id = ?`,
 		serverID,
 	)
 	var cfg domain.PVEAlertConfig
 	cfg.ServerID = serverID
 	var diskPct, staleHours, backupErr sql.NullInt64
-	if err := row.Scan(&diskPct, &staleHours, &backupErr); err == sql.ErrNoRows {
+	var expectedFinish sql.NullString
+	if err := row.Scan(&diskPct, &staleHours, &backupErr, &expectedFinish); err == sql.ErrNoRows {
 		return cfg, nil
 	} else if err != nil {
 		return cfg, err
@@ -34,20 +35,25 @@ func (s *Store) GetPVEAlertConfig(ctx context.Context, serverID int64) (domain.P
 		v := int(backupErr.Int64)
 		cfg.BackupErr = &v
 	}
+	if expectedFinish.Valid {
+		v := expectedFinish.String
+		cfg.ExpectedFinishTime = &v
+	}
 	return cfg, nil
 }
 
 func (s *Store) UpsertPVEAlertConfig(ctx context.Context, cfg domain.PVEAlertConfig) error {
-	debug.RecordQuery(ctx, `INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	debug.RecordQuery(ctx, `INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, updated_at)
-		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, updated_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(server_id) DO UPDATE SET
 			disk_pct=excluded.disk_pct,
 			stale_hours=excluded.stale_hours,
 			backup_err=excluded.backup_err,
+			expected_finish_time=excluded.expected_finish_time,
 			updated_at=excluded.updated_at`,
-		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.StaleHours), nullInt(cfg.BackupErr),
+		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.StaleHours), nullInt(cfg.BackupErr), nullString(cfg.ExpectedFinishTime),
 	)
 	return err
 }
@@ -158,6 +164,13 @@ func (s *Store) UpsertPBSAlertConfig(ctx context.Context, cfg domain.PBSAlertCon
 
 // nullInt converts *int to a SQL-compatible value (nil → NULL, &v → v).
 func nullInt(p *int) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func nullString(p *string) any {
 	if p == nil {
 		return nil
 	}

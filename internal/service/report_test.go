@@ -211,8 +211,8 @@ func TestBuildPVEServerResponse_StaleReport(t *testing.T) {
 	if !resp.IsStale {
 		t.Error("want IsStale=true for yesterday's report")
 	}
-	if resp.StaleReason != "no report received today" {
-		t.Errorf("StaleReason: want 'no report received today', got %q", resp.StaleReason)
+	if resp.StaleReason != "No se ha recibido el reporte de hoy" {
+		t.Errorf("StaleReason: want 'No se ha recibido el reporte de hoy', got %q", resp.StaleReason)
 	}
 	if resp.LastReport == nil {
 		t.Error("want LastReport to be set")

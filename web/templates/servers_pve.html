@@ -68,7 +68,8 @@
                   data-server-name="{{.Server.Name}}"
                   data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}"
                   data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
-                  data-backup-err="{{if .AlertConfig.BackupErr}}{{deref .AlertConfig.BackupErr}}{{else}}-1{{end}}">
+                  data-backup-err="{{if .AlertConfig.BackupErr}}{{deref .AlertConfig.BackupErr}}{{else}}-1{{end}}"
+                  data-expected-finish-time="{{with .AlertConfig.ExpectedFinishTime}}{{.}}{{end}}">
             <i class="bi bi-bell"></i>
           </button>
           {{end}}{{end}}
@@ -130,6 +131,12 @@
                   <option value="0">Desactivado</option>
                 </select>
               </div>
+            </div>
+            <div class="col-12 col-md-6">
+              <label class="form-label" style="font-size:.82rem">Hora lÃ­mite del reporte</label>
+              <input type="time" id="pveExpectedFinishTime" name="expected_finish_time" class="form-control form-control-sm"
+                     placeholder="09:00">
+              <div class="form-text" style="font-size:.72rem">VacÃ­o = 09:00 Â· si se supera sin reporte, alerta</div>
             </div>
           </div>
         </div>
@@ -194,6 +201,7 @@ document.addEventListener('click', e => {
   document.getElementById('pveAlertCfgForm').action = '/servers/pve/' + d.serverId + '/alerts';
   document.getElementById('pveAlertDiskPct').value = d.diskPct || '';
   document.getElementById('pveAlertStaleHours').value = d.staleHours || '';
+  document.getElementById('pveExpectedFinishTime').value = d.expectedFinishTime || '';
   const sel = document.getElementById('pveAlertBackupErr');
   sel.value = d.backupErr === '-1' || d.backupErr === '' ? '-1' : d.backupErr;
   bootstrap.Modal.getOrCreateInstance(document.getElementById('pveAlertCfgModal')).show();
