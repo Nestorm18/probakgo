@@ -227,6 +227,9 @@ func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
 		if got := task["status"]; got != "OK" {
 			t.Errorf("status: got %v, want OK", got)
 		}
+		if got := task["duration"]; got != int64(0) {
+			t.Errorf("duration without per-VM log: got %v, want 0", got)
+		}
 	}
 }
 
@@ -289,6 +292,8 @@ func TestParseBackupDurations(t *testing.T) {
 	got := parseBackupDurations([]string{
 		"INFO: Finished Backup of VM 101 (00:02:15)",
 		"INFO: Finished Backup of VM 202 (12:34)",
+		"INFO: Finished Backup of CT 303 in 00:01:02",
+		"INFO: Backup of VM 404 finished (00:03:04)",
 		"INFO: unrelated",
 	})
 
@@ -297,6 +302,12 @@ func TestParseBackupDurations(t *testing.T) {
 	}
 	if got[202] != 754 {
 		t.Errorf("VM 202: got %d, want 754", got[202])
+	}
+	if got[303] != 62 {
+		t.Errorf("CT 303: got %d, want 62", got[303])
+	}
+	if got[404] != 184 {
+		t.Errorf("VM 404: got %d, want 184", got[404])
 	}
 }
 

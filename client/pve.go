@@ -219,7 +219,7 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	for _, vmid := range vmids {
 		start := int64(aggregate.start)
 		end := int64(aggregate.end)
-		duration := end - start
+		duration := int64(0)
 		var matchedFile backupFile
 		var hasFile bool
 		for _, f := range filesByVMID[vmid] {
@@ -277,22 +277,29 @@ func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
 	return parseBackupDurations(lines)
 }
 
-var finishedBackupRE = regexp.MustCompile(`(?i)Finished Backup of VM\s+(\d+)\s+\((\d{1,2}:\d{2}(?::\d{2})?)\)`)
+var finishedBackupREs = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)Finished Backup of (?:VM|CT)\s+(\d+)\s+\((\d{1,2}:\d{2}(?::\d{2})?)\)`),
+	regexp.MustCompile(`(?i)Finished Backup of (?:VM|CT)\s+(\d+).*?\b(?:duration|in|took)\s+(\d{1,2}:\d{2}(?::\d{2})?)`),
+	regexp.MustCompile(`(?i)Backup of (?:VM|CT)\s+(\d+).*?finished.*?\((\d{1,2}:\d{2}(?::\d{2})?)\)`),
+}
 
 func parseBackupDurations(lines []string) map[int64]int64 {
 	durations := make(map[int64]int64)
 	for _, line := range lines {
-		matches := finishedBackupRE.FindStringSubmatch(line)
-		if len(matches) != 3 {
-			continue
-		}
-		vmid, err := strconv.ParseInt(matches[1], 10, 64)
-		if err != nil {
-			continue
-		}
-		duration, ok := parseClockDuration(matches[2])
-		if ok {
-			durations[vmid] = duration
+		for _, re := range finishedBackupREs {
+			matches := re.FindStringSubmatch(line)
+			if len(matches) != 3 {
+				continue
+			}
+			vmid, err := strconv.ParseInt(matches[1], 10, 64)
+			if err != nil {
+				continue
+			}
+			duration, ok := parseClockDuration(matches[2])
+			if ok {
+				durations[vmid] = duration
+			}
+			break
 		}
 	}
 	return durations
