@@ -288,6 +288,178 @@ func TestBackupJobTasksUsesAggregateLogDurations(t *testing.T) {
 	}
 }
 
+func TestBackupJobTasksDoesNotRepeatAggregateDurationForPerVMTasks(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"upid":      "UPID:test-node:000123:ABCDEF:664BEEF0:vzdump::root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "400",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "500",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Finished Backup of VM 400 (00:00:45)"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	filesByVMID := map[int64][]backupFile{
+		400: {{ctime: 10020, size: 268_440_000_000, volid: "pbs:backup/vm/400"}},
+		500: {{ctime: 10100, size: 273_800_000_000, volid: "pbs:backup/vm/500"}},
+	}
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{400: "debian", 500: "WIN19TUBANOR"},
+		filesByVMID,
+	)
+
+	byVMID := make(map[int64]map[string]any)
+	for _, task := range tasks {
+		byVMID[task["vmid"].(int64)] = task
+	}
+	if got := byVMID[400]["duration"]; got != int64(45) {
+		t.Errorf("vm 400 duration: got %v, want 45", got)
+	}
+	if got := byVMID[400]["starttime"]; got != int64(10020) {
+		t.Errorf("vm 400 starttime: got %v, want 10020", got)
+	}
+	if got := byVMID[500]["duration"]; got != int64(0) {
+		t.Errorf("vm 500 duration without log entry: got %v, want 0", got)
+	}
+}
+
+func TestBackupJobTasksClearsRepeatedJobDurationWithoutAggregateTask(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "100",
+					"starttime": float64(10000),
+					"endtime":   float64(10040),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "400",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "500",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{100: "adguard", 400: "debian", 500: "WIN19TUBANOR"},
+		nil,
+	)
+
+	byVMID := make(map[int64]map[string]any)
+	for _, task := range tasks {
+		byVMID[task["vmid"].(int64)] = task
+	}
+	if got := byVMID[100]["duration"]; got != int64(40) {
+		t.Errorf("vm 100 duration: got %v, want 40", got)
+	}
+	if got := byVMID[400]["duration"]; got != int64(0) {
+		t.Errorf("vm 400 repeated job duration: got %v, want 0", got)
+	}
+	if got := byVMID[500]["duration"]; got != int64(0) {
+		t.Errorf("vm 500 repeated job duration: got %v, want 0", got)
+	}
+}
+
+func TestBackupJobTasksUsesLogDurationsWithoutAggregateTask(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "100",
+					"upid":      "UPID:test-node:000100:ABCDEF:664BEEF0:vzdump:100:root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "400",
+					"upid":      "UPID:test-node:000400:ABCDEF:664BEEF0:vzdump:400:root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+				map[string]any{
+					"id":        "500",
+					"upid":      "UPID:test-node:000500:ABCDEF:664BEEF0:vzdump:500:root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(12172),
+					"status":    "OK",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Finished Backup of VM 100 (00:00:40)"},
+				map[string]any{"n": float64(2), "t": "INFO: Finished Backup of VM 400 (00:00:07)"},
+				map[string]any{"n": float64(3), "t": "INFO: Finished Backup of VM 500 (00:14:56)"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{100: "adguard", 400: "debian", 500: "WIN19TUBANOR"},
+		nil,
+	)
+
+	byVMID := make(map[int64]map[string]any)
+	for _, task := range tasks {
+		byVMID[task["vmid"].(int64)] = task
+	}
+	if got := byVMID[100]["duration"]; got != int64(40) {
+		t.Errorf("vm 100 duration: got %v, want 40", got)
+	}
+	if got := byVMID[400]["duration"]; got != int64(7) {
+		t.Errorf("vm 400 duration: got %v, want 7", got)
+	}
+	if got := byVMID[500]["duration"]; got != int64(896) {
+		t.Errorf("vm 500 duration: got %v, want 896", got)
+	}
+}
+
 func TestParseBackupDurations(t *testing.T) {
 	got := parseBackupDurations([]string{
 		"INFO: Finished Backup of VM 101 (00:02:15)",

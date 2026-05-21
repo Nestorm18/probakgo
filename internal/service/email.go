@@ -36,12 +36,13 @@ type datastoreRow struct {
 }
 
 type vmTaskRow struct {
-	VMID      string
-	VMName    string
-	Status    string
-	Duration  string
-	Size      string
-	IsMissing bool
+	VMID       string
+	VMName     string
+	Status     string
+	Duration   string
+	Size       string
+	IsMissing  bool
+	IsExcluded bool
 }
 
 type diskAlertRow struct {
@@ -131,23 +132,19 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		tasks, _ := st.GetPVEBackupTasksForReport(ctx, r.ID)
 		configs, _ := st.ListVMBackupConfigs(ctx, sv.Name)
 		isStale := false
+		staleReason := ""
 		if stale, reason := rep.IsStaleForServer(ctx, r.ReportedAt, sv.Name); stale {
 			isStale = true
-			row.StaleReason = reason
-			pveIssues = append(pveIssues, row)
+			staleReason = reason
 		} else if r.IsStale {
 			isStale = true
-			row.StaleReason = r.StaleReason
-			pveIssues = append(pveIssues, row)
-		} else {
-			pveOk = append(pveOk, row)
+			staleReason = r.StaleReason
 		}
 
 		if isStale {
+			row.StaleReason = staleReason
 			row.VMTasks = staleVMRows(configs, tasks)
-			if len(pveIssues) > 0 {
-				pveIssues[len(pveIssues)-1].VMTasks = row.VMTasks
-			}
+			pveIssues = append(pveIssues, row)
 			continue
 		}
 
@@ -164,29 +161,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 				Size:     emailFmtBytes(t.Size),
 			})
 		}
-		if len(tasks) > 0 && len(configs) > 0 {
-			jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
-			seenVMIDs := make(map[string]bool)
-			for _, t := range tasks {
-				seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
-			}
-			for _, c := range configs {
-				if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
-					continue
-				}
-				name := c.VMName
-				if name == "" {
-					name = c.VMID
-				}
-				row.VMTasks = append(row.VMTasks, vmTaskRow{
-					VMID:      c.VMID,
-					VMName:    name,
-					IsMissing: true,
-				})
-			}
-		}
-		if len(pveOk) > 0 {
-			pveOk[len(pveOk)-1].VMTasks = row.VMTasks
+		missingRows, activeMissing := missingVMRows(configs, tasks)
+		row.VMTasks = append(row.VMTasks, missingRows...)
+		if activeMissing > 0 {
+			row.StaleReason = fmt.Sprintf("%d VM activa(s) sin backup en el ultimo job", activeMissing)
+			pveIssues = append(pveIssues, row)
+		} else {
+			pveOk = append(pveOk, row)
 		}
 	}
 
@@ -309,6 +290,38 @@ func staleVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask) 
 		})
 	}
 	return rows
+}
+
+func missingVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask) ([]vmTaskRow, int) {
+	if len(tasks) == 0 || len(configs) == 0 {
+		return nil, 0
+	}
+	jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
+	seenVMIDs := make(map[string]bool)
+	for _, t := range tasks {
+		seenVMIDs[fmt.Sprintf("%d", t.VMID)] = true
+	}
+	var rows []vmTaskRow
+	activeMissing := 0
+	for _, c := range configs {
+		if !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+			continue
+		}
+		name := c.VMName
+		if name == "" {
+			name = c.VMID
+		}
+		if !c.IsExcluded {
+			activeMissing++
+		}
+		rows = append(rows, vmTaskRow{
+			VMID:       c.VMID,
+			VMName:     name,
+			IsMissing:  true,
+			IsExcluded: c.IsExcluded,
+		})
+	}
+	return rows, activeMissing
 }
 
 func renderEmailTemplate(data emailData) (string, error) {

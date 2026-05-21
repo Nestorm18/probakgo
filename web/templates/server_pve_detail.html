@@ -80,7 +80,10 @@
       <tr>
         <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
         <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
-        <td><span class="status-pill warn">No recibido</span></td>
+        <td>
+          <span class="status-pill warn">SIN BACKUP</span>
+          {{if .IsExcluded}}<span class="status-pill muted ms-1">Excluida</span>{{end}}
+        </td>
         <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup en el último job</td>
       </tr>
       {{end}}

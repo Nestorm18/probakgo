@@ -50,7 +50,7 @@
           {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
           {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
-          {{if gt .TaskMissing 0}}<span class="status-pill bad ms-1">{{.TaskMissing}} sin backup</span>{{end}}
+          {{if gt .TaskMissing 0}}<span class="status-pill warn ms-1">{{.TaskMissing}} sin backup</span>{{end}}
           {{if gt .TaskUnknown 0}}<span class="status-pill info ms-1">{{.TaskUnknown}} no configurada{{if gt .TaskUnknown 1}}s{{end}}</span>{{end}}
         </td>
         <td>
