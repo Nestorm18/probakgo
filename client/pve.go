@@ -164,6 +164,34 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	// Build results; deduplicate by VMID (first = most recent within the job).
 	// Skip tasks with non-numeric id (job orchestration tasks, not per-VM tasks).
 	// PBS pull-mode tasks use id format "vm/101" or "ct/101" instead of just "101".
+	var jobStart int64 = 1 << 62
+	var jobEnd int64
+	var perVMTaskCount int
+	for _, t := range jobTasks {
+		if parseVMID(t.id) == 0 {
+			continue
+		}
+		perVMTaskCount++
+		if int64(t.start) < jobStart {
+			jobStart = int64(t.start)
+		}
+		if int64(t.end) > jobEnd {
+			jobEnd = int64(t.end)
+		}
+	}
+	jobDuration := jobEnd - jobStart
+
+	logDurations := make(map[int64]int64)
+	var aggregateDuration int64
+	for _, t := range jobTasks {
+		if parseVMID(t.id) == 0 && aggregateDuration == 0 {
+			aggregateDuration = int64(t.end - t.start)
+		}
+		for vmid, duration := range c.aggregateTaskDurations(t.upid) {
+			logDurations[vmid] = duration
+		}
+	}
+
 	seen := make(map[int64]bool)
 	var result []map[string]any
 	for _, t := range jobTasks {
@@ -176,13 +204,25 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		}
 		seen[vmid] = true
 
+		start := int64(t.start)
+		end := int64(t.end)
+		duration := int64(t.end - t.start)
+		var matchedFile backupFile
+		var hasFile bool
+		if d := logDurations[vmid]; d > 0 {
+			duration = d
+		} else if aggregateDuration > 0 && duration == aggregateDuration {
+			duration = 0
+		} else if perVMTaskCount > 1 && jobDuration > 0 && duration == jobDuration {
+			duration = 0
+		}
 		task := map[string]any{
 			"vmid":      vmid,
 			"vm_name":   names[vmid],
 			"status":    t.status,
-			"starttime": int64(t.start),
-			"endtime":   int64(t.end),
-			"duration":  int64(t.end - t.start),
+			"starttime": start,
+			"endtime":   end,
+			"duration":  duration,
 			"size":      int64(0),
 			"filename":  "",
 		}
@@ -190,9 +230,17 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 			// File must have been created during this task's execution window.
 			// ±300s of starttime caused cross-matching between consecutive jobs.
 			if f.ctime >= int64(t.start)-60 && f.ctime <= int64(t.end)+60 {
-				task["size"] = f.size
-				task["filename"] = f.volid
+				matchedFile = f
+				hasFile = true
 				break
+			}
+		}
+		if hasFile {
+			task["size"] = matchedFile.size
+			task["filename"] = matchedFile.volid
+			if logDurations[vmid] > 0 {
+				task["starttime"] = matchedFile.ctime
+				task["endtime"] = matchedFile.ctime + duration
 			}
 		}
 		result = append(result, task)

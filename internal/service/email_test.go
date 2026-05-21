@@ -197,3 +197,87 @@ func TestBuildEmailData_DiskAlertsDoNotCountAsBackupProblems(t *testing.T) {
 		t.Errorf("unexpected status text: %q", data.StatusText)
 	}
 }
+
+func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "soporte2", "192.168.10.250", "", "0.0.44", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	now := time.Now()
+	if err := st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{
+		VMID:      100,
+		VMName:    "adguard",
+		Status:    "OK",
+		StartTime: now.Unix(),
+		EndTime:   now.Add(40 * time.Second).Unix(),
+		Duration:  40,
+		Size:      783_350_000,
+	}); err != nil {
+		t.Fatalf("InsertPVEBackupTask: %v", err)
+	}
+	for _, vm := range []struct {
+		id       string
+		name     string
+		excluded bool
+	}{
+		{"100", "adguard", false},
+		{"300", "wireguard", false},
+		{"301", "wireguard-externos", false},
+		{"1000", "pbs-anteva", true},
+	} {
+		_, err := st.CreateVMBackupConfig(ctx, "soporte2", domain.CreateVMBackupConfigRequest{
+			VMID:      vm.id,
+			VMName:    vm.name,
+			Monday:    true,
+			Tuesday:   true,
+			Wednesday: true,
+			Thursday:  true,
+			Friday:    true,
+			Saturday:  true,
+			Sunday:    true,
+		})
+		if err != nil {
+			t.Fatalf("CreateVMBackupConfig %s: %v", vm.id, err)
+		}
+		if vm.excluded {
+			if err := st.ToggleVMExclude(ctx, "soporte2", vm.id); err != nil {
+				t.Fatalf("ToggleVMExclude %s: %v", vm.id, err)
+			}
+		}
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertBackupErr = false
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.PVEIssues) != 1 {
+		t.Fatalf("want 1 PVE issue, got %d", len(data.PVEIssues))
+	}
+	if data.PVEIssues[0].Name != "soporte2" {
+		t.Errorf("issue server: got %q, want soporte2", data.PVEIssues[0].Name)
+	}
+	if data.TotalIssues != 1 {
+		t.Errorf("TotalIssues: got %d, want 1", data.TotalIssues)
+	}
+	missing := make(map[string]vmTaskRow)
+	for _, task := range data.PVEIssues[0].VMTasks {
+		if task.IsMissing {
+			missing[task.VMID] = task
+		}
+	}
+	if !missing["300"].IsMissing || missing["300"].IsExcluded {
+		t.Errorf("VM 300 should be active missing, got %+v", missing["300"])
+	}
+	if !missing["301"].IsMissing || missing["301"].IsExcluded {
+		t.Errorf("VM 301 should be active missing, got %+v", missing["301"])
+	}
+	if !missing["1000"].IsMissing || !missing["1000"].IsExcluded {
+		t.Errorf("VM 1000 should be excluded missing warning, got %+v", missing["1000"])
+	}
+}

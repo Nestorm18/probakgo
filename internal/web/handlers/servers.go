@@ -132,12 +132,13 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 				seenVMIDs[strconv.FormatInt(t.VMID, 10)] = true
 			}
 			for _, c := range configs {
-				if c.IsExcluded || !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
+				if !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
 					continue
 				}
 				missingVMs = append(missingVMs, map[string]any{
-					"VMID":   c.VMID,
-					"VMName": c.VMName,
+					"VMID":       c.VMID,
+					"VMName":     c.VMName,
+					"IsExcluded": c.IsExcluded,
 				})
 			}
 		}
@@ -409,4 +410,3 @@ func buildServerURLMap(keys []domain.APIKey, _ error) map[string]string {
 	}
 	return m
 }
-

@@ -94,8 +94,8 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"PBSCount":  1,
 		}),
 		"alerts.html": base(map[string]any{
-			"Alerts":         []domain.Alert{},
-			"Suppressed":     []struct {
+			"Alerts": []domain.Alert{},
+			"Suppressed": []struct {
 				Alert domain.Alert
 				Until time.Time
 			}{},
@@ -152,14 +152,14 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Reports": []domain.PBSReport{},
 		}),
 		"server_pve_detail.html": base(map[string]any{
-			"Server":         pveServer,
-			"BackupTasks":    []domain.PVEBackupTask{},
-			"MissingVMs":     []domain.PVEBackupTask{},
+			"Server":          pveServer,
+			"BackupTasks":     []domain.PVEBackupTask{},
+			"MissingVMs":      []map[string]any{},
 			"ConfiguredVMIDs": map[string]bool{},
-			"VMAlertConfigs": map[int64]domain.PVEVMAlertConfig{},
-			"Storages":       []map[string]any{},
-			"JobHistory":     []map[string]any{},
-			"Reports":        []domain.PVEReport{},
+			"VMAlertConfigs":  map[int64]domain.PVEVMAlertConfig{},
+			"Storages":        []map[string]any{},
+			"JobHistory":      []map[string]any{},
+			"Reports":         []domain.PVEReport{},
 		}),
 		"servers_pbs.html": base(map[string]any{
 			"Rows": []map[string]any{},
