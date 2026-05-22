@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.45"
+var version = "0.0.46"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -42,7 +42,7 @@ const (
 )
 
 func main() {
-	_ = godotenv.Load()
+	loadEnv()
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -59,7 +59,6 @@ func main() {
 		}
 	}
 
-	_ = godotenv.Load()
 	ensureSessionKey()
 
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
@@ -146,6 +145,16 @@ func main() {
 	_ = srv.Shutdown(shutCtx)
 }
 
+func loadEnv() {
+	_ = godotenv.Load()
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
+	_ = godotenv.Load(filepath.Join(filepath.Dir(exe), ".env"))
+}
+
 // ensureSessionKey generates a SESSION_KEY and persists it to .env if not already set.
 func ensureSessionKey() {
 	if os.Getenv("SESSION_KEY") != "" {
@@ -223,7 +232,11 @@ func ensureUpdateCron() {
 		return
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
-	content := fmt.Sprintf("0 1 * * * root \"%s\" update >> /var/log/probakgo-update.log 2>&1\n", exe)
+	workDir := filepath.Dir(exe)
+	content := fmt.Sprintf("0 1 * * * root cd \"%s\" && \"%s\" update >> /var/log/probakgo-update.log 2>&1\n", workDir, exe)
+	if existing, err := os.ReadFile(serverCronPath); err == nil && string(existing) == content {
+		return
+	}
 	if err := os.WriteFile(serverCronPath, []byte(content), 0644); err != nil {
 		slog.Warn("could not install update cron", "err", err)
 	} else {

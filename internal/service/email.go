@@ -164,7 +164,11 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		missingRows, activeMissing := missingVMRows(configs, tasks)
 		row.VMTasks = append(row.VMTasks, missingRows...)
 		if activeMissing > 0 {
-			row.StaleReason = fmt.Sprintf("%d VM activa(s) sin backup en el ultimo job", activeMissing)
+			if activeMissing == 1 {
+				row.StaleReason = "1 VM activa sin backup en el ultimo job"
+			} else {
+				row.StaleReason = fmt.Sprintf("%d VMs activas sin backup en el ultimo job", activeMissing)
+			}
 			pveIssues = append(pveIssues, row)
 		} else {
 			pveOk = append(pveOk, row)
