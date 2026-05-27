@@ -52,21 +52,28 @@ type diskAlertRow struct {
 	Detail     string
 }
 
+type summaryIssueRow struct {
+	Name   string
+	Kind   string
+	Detail string
+}
+
 type emailData struct {
-	ReportDate   string
-	SendTime     string
-	HeaderColor  string
-	StatusText   string
-	TotalPVE     int
-	TotalPBS     int
-	TotalIssues  int
-	TotalOK      int
-	PVEIssues    []serverRow
-	PBSIssues    []serverRow
-	PVEOk        []serverRow
-	PBSOk        []serverRow
-	DiskAlerts   []diskAlertRow
-	BackupErrors []serverRow
+	ReportDate    string
+	SendTime      string
+	HeaderColor   string
+	StatusText    string
+	SummaryIssues []summaryIssueRow
+	TotalPVE      int
+	TotalPBS      int
+	TotalIssues   int
+	TotalOK       int
+	PVEIssues     []serverRow
+	PBSIssues     []serverRow
+	PVEOk         []serverRow
+	PBSOk         []serverRow
+	DiskAlerts    []diskAlertRow
+	BackupErrors  []serverRow
 }
 
 // SendDailyReport builds and sends the daily status email.
@@ -245,21 +252,24 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		statusText = fmt.Sprintf("%d problema(s) de backup detectado(s)", backupProblems)
 	}
 
+	summaryIssues := buildSummaryIssues(pveIssues, pbsIssues, backupErrors)
+
 	return emailData{
-		ReportDate:   time.Now().In(rep.tz).Format("2006-01-02"),
-		SendTime:     sendTime,
-		HeaderColor:  headerColor,
-		StatusText:   statusText,
-		TotalPVE:     len(pveServers),
-		TotalPBS:     len(pbsServers),
-		TotalIssues:  backupProblems,
-		TotalOK:      totalOK,
-		PVEIssues:    pveIssues,
-		PBSIssues:    pbsIssues,
-		PVEOk:        pveOk,
-		PBSOk:        pbsOk,
-		DiskAlerts:   diskAlerts,
-		BackupErrors: backupErrors,
+		ReportDate:    time.Now().In(rep.tz).Format("2006-01-02"),
+		SendTime:      sendTime,
+		HeaderColor:   headerColor,
+		StatusText:    statusText,
+		SummaryIssues: summaryIssues,
+		TotalPVE:      len(pveServers),
+		TotalPBS:      len(pbsServers),
+		TotalIssues:   backupProblems,
+		TotalOK:       totalOK,
+		PVEIssues:     pveIssues,
+		PBSIssues:     pbsIssues,
+		PVEOk:         pveOk,
+		PBSOk:         pbsOk,
+		DiskAlerts:    diskAlerts,
+		BackupErrors:  backupErrors,
 	}, nil
 }
 
@@ -326,6 +336,27 @@ func missingVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask
 		})
 	}
 	return rows, activeMissing
+}
+
+func buildSummaryIssues(pveIssues, pbsIssues, backupErrors []serverRow) []summaryIssueRow {
+	var rows []summaryIssueRow
+	add := func(kind string, items []serverRow) {
+		for _, item := range items {
+			detail := item.StaleReason
+			if detail == "" {
+				detail = "Problema de backup"
+			}
+			rows = append(rows, summaryIssueRow{
+				Name:   item.Name,
+				Kind:   kind,
+				Detail: detail,
+			})
+		}
+	}
+	add("PVE", pveIssues)
+	add("PBS", pbsIssues)
+	add("Backup", backupErrors)
+	return rows
 }
 
 func renderEmailTemplate(data emailData) (string, error) {

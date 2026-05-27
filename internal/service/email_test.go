@@ -76,6 +76,9 @@ func TestBuildEmailData_AllOK(t *testing.T) {
 	if len(data.PVEIssues) != 0 {
 		t.Errorf("want 0 in PVEIssues, got %d", len(data.PVEIssues))
 	}
+	if len(data.SummaryIssues) != 0 {
+		t.Errorf("want 0 summary issues, got %d", len(data.SummaryIssues))
+	}
 }
 
 func TestBuildEmailData_WithStale(t *testing.T) {
@@ -261,6 +264,12 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 	}
 	if data.PVEIssues[0].Name != "soporte2" {
 		t.Errorf("issue server: got %q, want soporte2", data.PVEIssues[0].Name)
+	}
+	if len(data.SummaryIssues) != 1 {
+		t.Fatalf("want 1 summary issue, got %d", len(data.SummaryIssues))
+	}
+	if data.SummaryIssues[0].Name != "soporte2" || data.SummaryIssues[0].Kind != "PVE" {
+		t.Errorf("summary issue: got %+v, want soporte2/PVE", data.SummaryIssues[0])
 	}
 	if data.TotalIssues != 1 {
 		t.Errorf("TotalIssues: got %d, want 1", data.TotalIssues)
