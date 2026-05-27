@@ -82,9 +82,9 @@
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
         <td class="text-end" style="white-space:nowrap">
-          <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
+          <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
           {{if $.Role}}{{if canEdit $.Role}}
-          <button class="btn btn-sm btn-secondary pbs-alert-cfg-btn"
+          <button class="btn btn-sm btn-outline-secondary pbs-alert-cfg-btn"
                   title="Alertas"
                   data-server-id="{{.Server.ID}}"
                   data-server-name="{{.Server.Name}}"

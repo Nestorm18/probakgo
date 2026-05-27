@@ -117,6 +117,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/settings/reset", h.ResetDatabasePost)
 
 		r.With(RequireAdmin).Get("/about", h.About)
+		r.With(RequireAdmin).Post("/about/update", h.AboutUpdatePost)
 	})
 
 	csrfKey := sha256.Sum256([]byte(sessionKey))

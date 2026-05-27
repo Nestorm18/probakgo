@@ -366,6 +366,11 @@ code {
 .server-row:hover { background: var(--row-hover-bg); }
 .alert-row { transition: background .1s; }
 .alert-row:hover { background: var(--row-hover-bg); }
+.alert-group-header {
+  background: color-mix(in srgb, var(--txt-muted) 12%, var(--card-bg));
+  border-top: 1px solid var(--card-border);
+  border-bottom: 1px solid var(--card-border);
+}
 .server-row-icon {
   width: 34px; height: 34px; border-radius: .4rem;
   display: flex; align-items: center; justify-content: center;
@@ -419,6 +424,14 @@ code {
 }
 .key-type-badge.server { background: var(--kbg-server-bg); color: var(--kbg-server-txt); border-color: var(--kbg-server-bd); }
 .key-type-badge.admin  { background: var(--kbg-admin-bg);  color: var(--kbg-admin-txt);  border-color: var(--kbg-admin-bd); }
+
+.compact-badge {
+  font-size: .68rem; font-weight: 600; border-radius: .35rem;
+}
+.compact-badge.pve { background: var(--clr-accent); }
+.compact-badge.pbs { background: var(--pill-muted-txt); }
+.compact-badge.critical { background: var(--clr-danger); }
+.compact-badge.warning { background: var(--clr-warn); }
 
 /* ─── Forms ──────────────────────────────────────────────────── */
 .form-control, .form-select {

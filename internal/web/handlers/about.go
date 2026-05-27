@@ -3,6 +3,9 @@ package webhandlers
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
 	"probakgo/internal/session"
@@ -25,6 +28,22 @@ func (h *WebH) About(w http.ResponseWriter, r *http.Request) {
 		"Uptime":    uptimeStr(time.Since(h.startTime)),
 		"StartTime": h.startTime,
 	})
+}
+
+func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
+	exe, err := os.Executable()
+	if err != nil {
+		http.Redirect(w, r, "/about?flash=No+se+pudo+localizar+el+binario", http.StatusSeeOther)
+		return
+	}
+	exe, _ = filepath.EvalSymlinks(exe)
+	cmd := exec.Command(exe, "update")
+	cmd.Dir = filepath.Dir(exe)
+	if err := cmd.Start(); err != nil {
+		http.Redirect(w, r, "/about?flash=No+se+pudo+iniciar+la+actualizacion", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/about?flash=Buscando+actualizaciones.+Si+hay+una+nueva+version,+el+servicio+se+reiniciara.&ok=1", http.StatusSeeOther)
 }
 
 func uptimeStr(d time.Duration) string {

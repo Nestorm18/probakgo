@@ -45,12 +45,37 @@
 </div>
 
 <!-- Active alert list -->
-{{if .Alerts}}
+{{if .AlertGroups}}
 <div class="card mb-4">
   <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
+    {{range .AlertGroups}}
+    <div class="alert-group-header px-4 py-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+      <div class="d-flex align-items-center gap-2 min-w-0">
+        <i class="bi bi-server" style="color:var(--clr-accent)"></i>
+        <span style="font-weight:700;font-size:.88rem;color:var(--txt-primary)">{{.ServerName}}</span>
+        {{if eq .ServerType "pve"}}
+          <span class="badge compact-badge pve">PVE</span>
+        {{else}}
+          <span class="badge compact-badge pbs">PBS</span>
+        {{end}}
+      </div>
+      <div class="d-flex align-items-center gap-1">
+        {{if gt .Critical 0}}<span class="badge compact-badge critical">{{.Critical}} crítica{{if gt .Critical 1}}s{{end}}</span>{{end}}
+        {{if gt .Warning 0}}<span class="badge compact-badge warning">{{.Warning}} advertencia{{if gt .Warning 1}}s{{end}}</span>{{end}}
+        {{if $.Role}}{{if canEdit $.Role}}
+        <button class="btn btn-sm btn-outline-secondary suppress-open-btn ms-1"
+                title="Suprimir todas las alertas de este servidor"
+                data-alert-id="{{range $i, $a := .Alerts}}{{if $i}},{{end}}{{$a.ID}}{{end}}"
+                data-alert-title="Todas las alertas"
+                data-server-name="{{.ServerName}}">
+          <i class="bi bi-bell-slash"></i>
+        </button>
+        {{end}}{{end}}
+      </div>
+    </div>
     {{range .Alerts}}
-    <div class="alert-row d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
-      <div class="mt-1" style="flex-shrink:0;width:1.1rem;text-align:center">
+    <div class="alert-row d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
+      <div style="flex-shrink:0;width:1.1rem;text-align:center">
         {{if eq .Severity "critical"}}
           <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
         {{else}}
@@ -61,29 +86,27 @@
         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
           <span style="font-weight:600;font-size:.88rem;color:var(--txt-primary)">{{.Title}}</span>
           {{if eq .Severity "critical"}}
-            <span class="badge" style="background:var(--clr-danger);font-size:.68rem">crítica</span>
+            <span class="badge compact-badge critical">crítica</span>
           {{else}}
-            <span class="badge" style="background:var(--clr-warn);font-size:.68rem">advertencia</span>
+            <span class="badge compact-badge warning">advertencia</span>
           {{end}}
         </div>
         <div style="font-size:.8rem;color:var(--txt-secondary)">{{.Message}}</div>
         <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size:.75rem;color:var(--txt-muted)">
-          <span><i class="bi bi-server me-1"></i>{{.ServerName}}</span>
           {{if .StoreName}}<span><i class="bi bi-hdd me-1"></i>{{.StoreName}}</span>{{end}}
           {{if .VMName}}<span><i class="bi bi-pc me-1"></i>{{.VMName}}</span>{{end}}
           {{if .Value}}<span>Valor: <strong style="color:var(--txt-primary)">{{.Value}}</strong></span>{{end}}
           {{if .Threshold}}<span>Umbral: {{.Threshold}}</span>{{end}}
         </div>
       </a>
-      <div class="d-flex gap-1 align-items-start mt-1" style="flex-shrink:0">
+      <div class="d-flex gap-2 align-items-center" style="flex-shrink:0">
         {{if eq .ServerType "pve"}}
-          <span class="badge" style="background:var(--clr-accent);font-size:.68rem">PVE</span>
+          <span class="badge compact-badge pve">PVE</span>
         {{else}}
-          <span class="badge" style="background:#6c757d;font-size:.68rem">PBS</span>
+          <span class="badge compact-badge pbs">PBS</span>
         {{end}}
         {{if $.Role}}{{if canEdit $.Role}}
-        <button class="btn btn-sm suppress-open-btn ms-1"
-                style="padding:.15rem .4rem;font-size:.75rem;color:var(--txt-muted);background:none;border:1px solid var(--border-color)"
+        <button class="btn btn-sm btn-outline-secondary suppress-open-btn"
                 title="Suprimir temporalmente"
                 data-alert-id="{{.ID}}"
                 data-alert-title="{{.Title}}"
@@ -93,6 +116,7 @@
         {{end}}{{end}}
       </div>
     </div>
+    {{end}}
     {{end}}
   </div>
 </div>
@@ -106,7 +130,7 @@
 {{end}}
 
 <!-- Suppressed alerts -->
-{{if .Suppressed}}
+{{if .SuppressedGroups}}
 <details class="mb-3">
   <summary style="cursor:pointer;font-size:.82rem;color:var(--txt-muted);list-style:none;display:flex;align-items:center;gap:.5rem">
     <i class="bi bi-bell-slash"></i>
@@ -114,8 +138,30 @@
   </summary>
   <div class="card mt-2">
     <div class="card-body p-0" style="border-radius:.75rem;overflow:hidden">
-      {{range .Suppressed}}
-      <div class="alert-row d-flex align-items-start gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
+      {{range .SuppressedGroups}}
+      <div class="alert-group-header px-4 py-2 d-flex align-items-center justify-content-between gap-2 flex-wrap" style="opacity:.75">
+        <div class="d-flex align-items-center gap-2 min-w-0">
+          <i class="bi bi-server" style="color:var(--clr-accent)"></i>
+          <span style="font-weight:700;font-size:.88rem;color:var(--txt-primary)">{{.ServerName}}</span>
+          {{if eq .ServerType "pve"}}
+            <span class="badge compact-badge pve">PVE</span>
+          {{else}}
+            <span class="badge compact-badge pbs">PBS</span>
+          {{end}}
+          <span class="badge compact-badge pbs">{{len .Rows}} suprimida{{if gt (len .Rows) 1}}s{{end}}</span>
+        </div>
+        {{if $.Role}}{{if canEdit $.Role}}
+        <form method="post" action="/alerts/unsuppress" class="m-0">
+          {{$.CSRFField}}
+          {{range .Rows}}<input type="hidden" name="alert_id" value="{{.Alert.ID}}">{{end}}
+          <button type="submit" class="btn btn-sm btn-outline-secondary" title="Reactivar todas las alertas de este servidor">
+            <i class="bi bi-bell me-1"></i>Reactivar servidor
+          </button>
+        </form>
+        {{end}}{{end}}
+      </div>
+      {{range .Rows}}
+      <div class="alert-row d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
         <div class="flex-grow-1 min-w-0">
           <div style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</div>
           <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>
@@ -132,6 +178,7 @@
           </button>
         </form>
       </div>
+      {{end}}
       {{end}}
     </div>
   </div>
@@ -158,7 +205,10 @@
               <option value="3" selected>3 días</option>
               <option value="7">7 días</option>
               <option value="14">14 días</option>
-              <option value="30">30 días</option>
+              <option value="30">1 mes</option>
+              <option value="90">3 meses</option>
+              <option value="180">6 meses</option>
+              <option value="365">1 año</option>
             </select>
           </div>
           <div>

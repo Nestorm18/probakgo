@@ -58,11 +58,11 @@
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
         <td class="text-end" style="white-space:nowrap">
-          <a href="/servers/pve/{{.Server.ID}}" class="btn btn-sm btn-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
-          <a href="/servers/pve/{{.Server.ID}}/reports" class="btn btn-sm btn-secondary me-1" title="Reportes"><i class="bi bi-bar-chart"></i></a>
+          <a href="/servers/pve/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
+          <a href="/servers/pve/{{.Server.ID}}/reports" class="btn btn-sm btn-outline-secondary me-1" title="Reportes"><i class="bi bi-bar-chart"></i></a>
           {{if $.Role}}{{if canEdit $.Role}}
           <a href="/backup-config/{{.Server.Name}}" class="btn btn-sm btn-primary me-1" title="Backup Config"><i class="bi bi-calendar-check"></i></a>
-          <button class="btn btn-sm btn-secondary pve-alert-cfg-btn"
+          <button class="btn btn-sm btn-outline-secondary pve-alert-cfg-btn"
                   title="Alertas"
                   data-server-id="{{.Server.ID}}"
                   data-server-name="{{.Server.Name}}"
