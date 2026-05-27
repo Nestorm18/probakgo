@@ -39,6 +39,16 @@ func Run(repo, binaryName, currentVersion string) error {
 		return fmt.Errorf("check release: %w", err)
 	}
 
+	cmp, ok := compareVersions(tag, currentVersion)
+	if !ok {
+		fmt.Printf("Cannot compare versions (%s vs %s) - skipping update\n", tag, currentVersion)
+		return nil
+	}
+	if cmp <= 0 {
+		fmt.Printf("No newer version available (local %s, remote %s)\n", currentVersion, tag)
+		return nil
+	}
+
 	if tag == currentVersion || strings.TrimPrefix(tag, "v") == strings.TrimPrefix(currentVersion, "v") {
 		fmt.Printf("Already up to date (%s)\n", currentVersion)
 		return nil
@@ -84,6 +94,63 @@ func latestRelease(repo, binaryName string) (tag string, binID, sha256ID int64, 
 		return rel.TagName, 0, 0, "", "", fmt.Errorf("asset %q not found in release %s", assetName, rel.TagName)
 	}
 	return rel.TagName, binID, sha256ID, binaryURL, sha256URL, nil
+}
+
+func compareVersions(remote, current string) (int, bool) {
+	remoteParts, ok := versionParts(remote)
+	if !ok {
+		return 0, false
+	}
+	currentParts, ok := versionParts(current)
+	if !ok {
+		return 0, false
+	}
+	maxLen := len(remoteParts)
+	if len(currentParts) > maxLen {
+		maxLen = len(currentParts)
+	}
+	for i := 0; i < maxLen; i++ {
+		var r, c int
+		if i < len(remoteParts) {
+			r = remoteParts[i]
+		}
+		if i < len(currentParts) {
+			c = currentParts[i]
+		}
+		if r > c {
+			return 1, true
+		}
+		if r < c {
+			return -1, true
+		}
+	}
+	return 0, true
+}
+
+func versionParts(v string) ([]int, bool) {
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	if i := strings.IndexAny(v, "-+"); i >= 0 {
+		v = v[:i]
+	}
+	if v == "" {
+		return nil, false
+	}
+	raw := strings.Split(v, ".")
+	parts := make([]int, 0, len(raw))
+	for _, part := range raw {
+		if part == "" {
+			return nil, false
+		}
+		n := 0
+		for _, ch := range part {
+			if ch < '0' || ch > '9' {
+				return nil, false
+			}
+			n = n*10 + int(ch-'0')
+		}
+		parts = append(parts, n)
+	}
+	return parts, true
 }
 
 func githubToken() string {

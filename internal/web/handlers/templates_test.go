@@ -94,14 +94,15 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"PBSCount":  1,
 		}),
 		"alerts.html": base(map[string]any{
-			"Alerts": []domain.Alert{},
+			"AlertGroups": []alertGroup{},
 			"Suppressed": []struct {
 				Alert domain.Alert
 				Until time.Time
 			}{},
-			"ServerNames":    []string{"pve-1"},
-			"FilterSeverity": "",
-			"FilterServer":   "",
+			"SuppressedGroups": []suppressedAlertGroup{},
+			"ServerNames":      []string{"pve-1"},
+			"FilterSeverity":   "",
+			"FilterServer":     "",
 		}),
 		"alerts_settings.html": base(map[string]any{"Config": emailConfig}),
 		"api_key_created.html": base(map[string]any{
