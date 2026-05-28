@@ -248,15 +248,16 @@ type Alert struct {
 }
 
 const (
-	AlertTypeDisk         = "disk"
-	AlertTypeBackupError  = "backup_error"
-	AlertTypeBackupSize   = "backup_size"
-	AlertTypePBSFill      = "pbs_fill"
-	AlertTypePBSStale     = "pbs_stale"
-	AlertTypePBSVerify    = "pbs_verify"
-	AlertTypePVEStale     = "pve_stale"
-	AlertTypePVEMissingVM = "pve_missing_vm"
-	AlertTypePVEUnknownVM = "pve_unknown_vm"
+	AlertTypeDisk           = "disk"
+	AlertTypeBackupError    = "backup_error"
+	AlertTypeBackupSize     = "backup_size"
+	AlertTypePBSFill        = "pbs_fill"
+	AlertTypePBSStale       = "pbs_stale"
+	AlertTypePBSVerify      = "pbs_verify"
+	AlertTypePVEStale       = "pve_stale"
+	AlertTypePBSReportStale = "pbs_report_stale"
+	AlertTypePVEMissingVM   = "pve_missing_vm"
+	AlertTypePVEUnknownVM   = "pve_unknown_vm"
 )
 
 const (

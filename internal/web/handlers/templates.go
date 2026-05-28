@@ -173,6 +173,12 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		m["CSRFField"] = csrf.TemplateField(r)
 		m["CSRFToken"] = csrf.Token(r)
 		m["Version"] = t.version
+		if _, has := m["Flash"]; !has {
+			m["Flash"] = r.URL.Query().Get("flash")
+		}
+		if _, has := m["FlashOK"]; !has {
+			m["FlashOK"] = r.URL.Query().Get("ok") == "1"
+		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
 		}

@@ -63,7 +63,11 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	if machineID := si.machineID(); machineID != "" {
+	machineID := si.machineID()
+	if machineID == "" {
+		machineID, _ = data["machine_id"].(string)
+	}
+	if machineID != "" {
 		req.Header.Set("X-Machine-ID", machineID)
 	}
 

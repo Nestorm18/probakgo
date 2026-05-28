@@ -11,6 +11,9 @@ import (
 
 func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
 	configs, err := h.store.ListVMBackupConfigs(r.Context(), server)
 	if err != nil {
 		internalErr(w, "list vm backup configs", err)
@@ -25,6 +28,9 @@ func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 
 func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
 	var req domain.CreateVMBackupConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
@@ -45,6 +51,9 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
 	var req domain.CreateVMBackupConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
@@ -60,6 +69,9 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
 	if err := h.store.DeleteVMBackupConfig(r.Context(), server, vmid); err != nil {
 		internalErr(w, "delete vm backup config", err)
 		return
@@ -70,6 +82,9 @@ func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
 	server := chi.URLParam(r, "server")
 	vmid := chi.URLParam(r, "vmid")
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
 	if err := h.store.ToggleVMExclude(r.Context(), server, vmid); err != nil {
 		internalErr(w, "toggle vm exclude", err)
 		return

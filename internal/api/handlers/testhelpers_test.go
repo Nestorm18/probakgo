@@ -37,6 +37,10 @@ func newTestServer(t *testing.T) *testServer {
 }
 
 func (ts *testServer) doJSON(t *testing.T, method, path, key string, body any) *httptest.ResponseRecorder {
+	return ts.doJSONWithMachine(t, method, path, key, "machine-1", body)
+}
+
+func (ts *testServer) doJSONWithMachine(t *testing.T, method, path, key, machineID string, body any) *httptest.ResponseRecorder {
 	t.Helper()
 	var buf bytes.Buffer
 	if body != nil {
@@ -50,6 +54,9 @@ func (ts *testServer) doJSON(t *testing.T, method, path, key string, body any) *
 	}
 	if key != "" {
 		req.Header.Set("Authorization", "Bearer "+key)
+	}
+	if machineID != "" {
+		req.Header.Set("X-Machine-ID", machineID)
 	}
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)

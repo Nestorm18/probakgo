@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -198,6 +199,44 @@ func TestBuildEmailData_DiskAlertsDoNotCountAsBackupProblems(t *testing.T) {
 	}
 	if data.StatusText != "Todos los servidores operativos" {
 		t.Errorf("unexpected status text: %q", data.StatusText)
+	}
+}
+
+func TestBuildEmailData_SuppressedDiskAlertExcluded(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-suppressed", "10.0.0.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	storageID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{
+		Storage: "backup-store",
+		Content: "backup",
+	})
+	_ = st.InsertPVEStorageInfo(ctx, storageID, domain.StorageInfoPayload{
+		Total:   1000,
+		Used:    900,
+		Avail:   100,
+		Active:  true,
+		Enabled: true,
+	})
+	if err := st.UpsertAlertSuppression(ctx, fmt.Sprintf("disk:pve:%d:backup-store", serverID), time.Now().Add(24*time.Hour), "test"); err != nil {
+		t.Fatalf("UpsertAlertSuppression: %v", err)
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 85
+	cfg.AlertBackupErr = false
+	if err := st.UpsertEmailConfig(ctx, *cfg); err != nil {
+		t.Fatalf("UpsertEmailConfig: %v", err)
+	}
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.DiskAlerts) != 0 {
+		t.Fatalf("want suppressed disk alert excluded, got %d", len(data.DiskAlerts))
 	}
 }
 

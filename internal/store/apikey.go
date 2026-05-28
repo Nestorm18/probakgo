@@ -75,6 +75,15 @@ func (s *Store) BindAPIKeyMachineID(ctx context.Context, id int64, machineID str
 	return err
 }
 
+func (s *Store) BindAPIKeyServerName(ctx context.Context, id int64, serverName string) error {
+	debug.RecordQuery(ctx, `UPDATE api_keys SET server_name=? WHERE id=? AND (server_name IS NULL OR server_name='')`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE api_keys SET server_name=? WHERE id=? AND (server_name IS NULL OR server_name='')`,
+		serverName, id,
+	)
+	return err
+}
+
 func (s *Store) UnbindAPIKeyMachineID(ctx context.Context, id int64) error {
 	debug.RecordQuery(ctx, `UPDATE api_keys SET machine_id='' WHERE id=?`)
 	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET machine_id='' WHERE id=?`, id)

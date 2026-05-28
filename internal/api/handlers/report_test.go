@@ -20,6 +20,7 @@ func TestReportPVE_HappyPath(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -38,6 +39,7 @@ func TestReportPVE_MissingHostname(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -55,12 +57,79 @@ func TestReportPVE_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader("{bad json"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusBadRequest {
 		t.Errorf("want 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_MissingMachineID(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+
+	body := `{"hostname":"pve-01","ip_address":"10.0.0.1","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("want 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_ServerNameMismatch(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
+
+	body := `{"hostname":"pve-02","ip_address":"10.0.0.2","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_MachineIDMismatch(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+
+	body := `{"hostname":"pve-01","ip_address":"10.0.0.1","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("first report: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-2")
+
+	rr = httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("second report: want 401, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -91,6 +160,7 @@ func TestReportPBS_HappyPath(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/report/pbs", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)

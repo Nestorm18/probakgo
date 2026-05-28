@@ -82,6 +82,12 @@
       </div>
     </header>
     <main class="page-body">
+      {{if .Flash}}
+      <div class="alert {{if .FlashOK}}alert-success{{else}}alert-danger{{end}} d-flex align-items-center gap-2 mb-3" role="alert">
+        {{if .FlashOK}}<i class="bi bi-check-circle-fill"></i>{{else}}<i class="bi bi-exclamation-triangle-fill"></i>{{end}}
+        <span>{{.Flash}}</span>
+      </div>
+      {{end}}
       {{block "page_content" .}}{{end}}
     </main>
   </div>
@@ -114,19 +120,6 @@
   </div>
 </div>
 
-{{if .Flash}}
-<div class="toast-container position-fixed {{if .FlashOK}}bottom-0 end-0{{else}}top-0 start-50 translate-middle-x{{end}} p-3" style="z-index:1100">
-  <div id="pageToast" class="toast {{if not .FlashOK}}align-items-center text-bg-danger border-0{{end}}" role="alert" aria-live="assertive">
-    <div class="d-flex">
-      <div class="toast-body d-flex align-items-center gap-2">
-        {{if .FlashOK}}<i class="bi bi-check-circle-fill" style="color:var(--clr-ok)"></i>{{else}}<i class="bi bi-exclamation-triangle-fill"></i>{{end}}
-        {{.Flash}}
-      </div>
-      <button type="button" class="btn-close {{if not .FlashOK}}btn-close-white{{end}} me-2 m-auto" data-bs-dismiss="toast"></button>
-    </div>
-  </div>
-</div>
-{{end}}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Sidebar toggle
@@ -167,12 +160,6 @@
     bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
   });
 
-  // Auto-show page toast
-  const toastEl = document.getElementById('pageToast');
-  if (toastEl) {
-    const isOk = !toastEl.classList.contains('text-bg-danger');
-    bootstrap.Toast.getOrCreateInstance(toastEl, { delay: isOk ? 4000 : 10000, autohide: isOk }).show();
-  }
 </script>
 {{block "page_scripts" .}}{{end}}
 </body>

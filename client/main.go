@@ -12,7 +12,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.53"
+var version = "0.0.59"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -34,7 +34,7 @@ func main() {
 			runUninstall(os.Args[2:])
 			return
 		case "update":
-			if err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version); err != nil {
+			if _, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version); err != nil {
 				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
 				os.Exit(1)
 			}

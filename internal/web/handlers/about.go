@@ -3,11 +3,13 @@ package webhandlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
+	"probakgo/internal/selfupdate"
 	"probakgo/internal/session"
 )
 
@@ -31,19 +33,43 @@ func (h *WebH) About(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
+	latest, err := selfupdate.LatestTag("Nestorm18/probakgo")
+	if err != nil {
+		redirectFlash(w, r, "No se pudo comprobar la version online: "+err.Error(), false)
+		return
+	}
+	newer, ok := selfupdate.IsNewer(latest, h.tmpl.version)
+	if !ok {
+		redirectFlash(w, r, "No se pudo comparar la version local con la online", false)
+		return
+	}
+	if !newer {
+		redirectFlash(w, r, "Probakgo ya esta totalmente actualizado ("+h.tmpl.version+")", true)
+		return
+	}
+
 	exe, err := os.Executable()
 	if err != nil {
-		http.Redirect(w, r, "/about?flash=No+se+pudo+localizar+el+binario", http.StatusSeeOther)
+		redirectFlash(w, r, "No se pudo localizar el binario", false)
 		return
 	}
 	exe, _ = filepath.EvalSymlinks(exe)
 	cmd := exec.Command(exe, "update")
 	cmd.Dir = filepath.Dir(exe)
 	if err := cmd.Start(); err != nil {
-		http.Redirect(w, r, "/about?flash=No+se+pudo+iniciar+la+actualizacion", http.StatusSeeOther)
+		redirectFlash(w, r, "No se pudo iniciar la actualizacion", false)
 		return
 	}
-	http.Redirect(w, r, "/about?flash=Buscando+actualizaciones.+Si+hay+una+nueva+version,+el+servicio+se+reiniciara.&ok=1", http.StatusSeeOther)
+	redirectFlash(w, r, "Hay una nueva version ("+latest+"). Actualizacion iniciada; el servicio se reiniciara al instalarla.", true)
+}
+
+func redirectFlash(w http.ResponseWriter, r *http.Request, msg string, ok bool) {
+	q := url.Values{}
+	q.Set("flash", msg)
+	if ok {
+		q.Set("ok", "1")
+	}
+	http.Redirect(w, r, "/about?"+q.Encode(), http.StatusSeeOther)
 }
 
 func uptimeStr(d time.Duration) string {

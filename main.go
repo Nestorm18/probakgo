@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.53"
+var version = "0.0.59"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -50,11 +50,14 @@ func main() {
 			fmt.Printf("probakgo v%s\n", version)
 			return
 		case "update":
-			if err := selfupdate.Run("Nestorm18/probakgo", "probakgo", version); err != nil {
+			updated, err := selfupdate.Run("Nestorm18/probakgo", "probakgo", version)
+			if err != nil {
 				slog.Error("update failed", "err", err)
 				os.Exit(1)
 			}
-			restartService()
+			if updated {
+				restartService()
+			}
 			return
 		}
 	}

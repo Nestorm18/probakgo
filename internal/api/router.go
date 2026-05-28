@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -17,13 +16,19 @@ import (
 )
 
 type Server struct {
-	auth   *service.AuthService
-	report *service.ReportService
-	store  *store.Store
+	auth          *service.AuthService
+	report        *service.ReportService
+	store         *store.Store
+	clientLimiter *ratelimit.Limiter
 }
 
 func NewServer(st *store.Store, auth *service.AuthService, rep *service.ReportService) *Server {
-	return &Server{store: st, auth: auth, report: rep}
+	return &Server{
+		store:         st,
+		auth:          auth,
+		report:        rep,
+		clientLimiter: ratelimit.New(300, time.Minute),
+	}
 }
 
 func (s *Server) Router() http.Handler {
@@ -78,8 +83,4 @@ func apiSecurityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		next.ServeHTTP(w, r)
 	})
-}
-
-func withValue(ctx context.Context, key, val any) context.Context {
-	return context.WithValue(ctx, key, val)
 }

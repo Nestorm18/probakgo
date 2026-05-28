@@ -29,3 +29,15 @@ func TestCompareVersions(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNewer(t *testing.T) {
+	newer, ok := IsNewer("v0.0.59", "0.0.58")
+	if !ok || !newer {
+		t.Fatalf("IsNewer newer = %v, %v; want true, true", newer, ok)
+	}
+
+	newer, ok = IsNewer("v0.0.58", "0.0.58")
+	if !ok || newer {
+		t.Fatalf("IsNewer same = %v, %v; want false, true", newer, ok)
+	}
+}

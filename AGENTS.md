@@ -127,6 +127,7 @@ go build -o probakgo-client ./client/
 - Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
 - Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00).
 - `var version` (not `const`) required for `-ldflags "-X main.version=..."` injection at release build time.
+- Always bump the application version after any code change. Update both `main.go` and `client/main.go` together so server and client versions stay aligned.
 - `GITHUB_TOKEN` env var: if set, selfupdate uses it as a Bearer token for GitHub API requests and downloads assets via the API assets endpoint (required for private repos). Without it, uses public `browser_download_url` directly.
 - Note: GitHub API returns 404 for unauthenticated requests on private repos - selfupdate requires the repo to be public or `GITHUB_TOKEN` to be set.
 

@@ -26,12 +26,24 @@ func TestValidateServerKey_HappyPath(t *testing.T) {
 	auth := NewAuth(st)
 
 	k, _ := st.CreateAPIKey(ctx, "client", "", "")
-	result, err := auth.ValidateServerKey(k.Key, "")
+	result, err := auth.ValidateServerKey(k.Key, "machine-abc")
 	if err != nil {
 		t.Fatalf("ValidateServerKey: %v", err)
 	}
 	if result.Key != k.Key {
 		t.Errorf("want key %q, got %q", k.Key, result.Key)
+	}
+}
+
+func TestValidateServerKey_MissingMachineID(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	auth := NewAuth(st)
+
+	k, _ := st.CreateAPIKey(ctx, "client", "", "")
+	_, err := auth.ValidateServerKey(k.Key, "")
+	if !errors.Is(err, ErrMachineID) {
+		t.Errorf("want ErrMachineID, got %v", err)
 	}
 }
 
