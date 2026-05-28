@@ -2,13 +2,11 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
+	"probakgo/internal/api/apictx"
 	"probakgo/internal/service"
 )
-
-type contextKey string
-
-const ctxAPIKey contextKey = "api_key"
 
 func (s *Server) requireServerKey(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -19,8 +17,12 @@ func (s *Server) requireServerKey(next http.Handler) http.Handler {
 			jsonError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
-		r = r.WithContext(withValue(r.Context(), ctxAPIKey, k))
+		if s.clientLimiter != nil && !s.clientLimiter.AllowKey(strconv.FormatInt(k.ID, 10)) {
+			w.Header().Set("Retry-After", "60")
+			jsonError(w, http.StatusTooManyRequests, "too many requests for this API key")
+			return
+		}
+		r = r.WithContext(apictx.WithAPIKey(r.Context(), k))
 		next.ServeHTTP(w, r)
 	})
 }
-

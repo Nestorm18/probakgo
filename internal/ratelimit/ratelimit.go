@@ -60,6 +60,10 @@ func (l *Limiter) allow(ip string) bool {
 	return b.count <= l.max
 }
 
+func (l *Limiter) AllowKey(key string) bool {
+	return l.allow(key)
+}
+
 // Middleware returns a plain-text 429 when the limit is exceeded (for web UI).
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

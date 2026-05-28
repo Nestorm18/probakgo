@@ -15,6 +15,7 @@ func TestGetBackupConfig_Empty(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/backup-config/pve/pve-01", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -33,6 +34,7 @@ func TestCreateVMConfig_HappyPath(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/backup-config/pve/pve-01/vms", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -51,6 +53,7 @@ func TestCreateVMConfig_MissingVMID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/backup-config/pve/pve-01/vms", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)

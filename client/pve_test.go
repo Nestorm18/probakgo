@@ -74,6 +74,19 @@ func newTestPVEClient(srv *httptest.Server) *pveClient {
 	}
 }
 
+func TestPVEGetHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":{"_":"boom"}}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	_, err := newTestPVEClient(srv).get("version")
+	if err == nil {
+		t.Fatal("expected error for non-2xx response")
+	}
+}
+
 func TestGenerateReportVerification(t *testing.T) {
 	srv := newPVEMockServer(t)
 	defer srv.Close()

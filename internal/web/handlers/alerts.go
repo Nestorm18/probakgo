@@ -44,6 +44,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	cfg.Report = h.report
 	allAlerts, err := service.RunAll(h.store, cfg)
 	if err != nil {
 		slog.Error("run alerts", "err", err)
@@ -218,6 +219,8 @@ func alertTitleFromID(alertID string) string {
 		return "Verificacion fallida"
 	case domain.AlertTypePVEStale:
 		return "PVE sin reporte"
+	case domain.AlertTypePBSReportStale:
+		return "PBS sin reporte"
 	case domain.AlertTypePVEMissingVM:
 		return "VM sin backup"
 	case domain.AlertTypePVEUnknownVM:

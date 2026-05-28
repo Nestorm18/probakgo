@@ -54,6 +54,9 @@ func (c *pveClient) get(endpoint string) (map[string]any, error) {
 		case 403:
 			return nil, fmt.Errorf("PVE permission error (403): token lacks required privileges")
 		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("PVE API %s returned HTTP %d: %s", endpoint, resp.StatusCode, strings.TrimSpace(string(body)))
+		}
 		var result map[string]any
 		if err := json.Unmarshal(body, &result); err != nil {
 			lastErr = fmt.Errorf("invalid JSON: %w", err)

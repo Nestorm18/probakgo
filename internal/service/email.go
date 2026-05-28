@@ -221,8 +221,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	var diskAlerts []diskAlertRow
 	var backupErrors []serverRow
 	if alertCfg, err := LoadAlertConfigs(ctx, st); err == nil {
+		alertCfg.Report = rep
 		if alerts, err := RunAll(st, alertCfg); err == nil {
+			suppressed, _ := st.GetActiveSuppressions(ctx)
 			for _, a := range alerts {
+				if _, ok := suppressed[a.ID]; ok {
+					continue
+				}
 				switch a.Type {
 				case domain.AlertTypeDisk:
 					pct, _ := strconv.Atoi(a.Value)

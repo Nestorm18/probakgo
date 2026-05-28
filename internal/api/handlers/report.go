@@ -17,6 +17,9 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
 		return
 	}
+	if !h.requireKeyServer(w, r, req.Hostname) {
+		return
+	}
 	if err := h.report.SavePVEReport(r.Context(), &req); err != nil {
 		internalErr(w, "save pve report", err)
 		return
@@ -32,6 +35,9 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Hostname == "" {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
+		return
+	}
+	if !h.requireKeyServer(w, r, req.Hostname) {
 		return
 	}
 	if err := h.report.SavePBSReport(r.Context(), &req); err != nil {

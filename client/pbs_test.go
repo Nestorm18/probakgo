@@ -61,21 +61,35 @@ func TestPBSGetAuth401(t *testing.T) {
 	}
 }
 
+func TestPBSGetHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"errors":{"_":"boom"}}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	c := newTestPBSClient(srv)
+	_, err := c.get("version")
+	if err == nil {
+		t.Fatal("expected error for non-2xx response")
+	}
+}
+
 func TestPBSDatastoreUsageParsing(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api2/json/status/datastore-usage", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
 			"data": []any{
 				map[string]any{
-					"store":                "synology",
-					"total":                float64(2948636082176),
-					"used":                 float64(1572864000000),
-					"avail":                float64(1375772082176),
-					"estimated-full-date":  float64(1800000000),
-					"mount-status":         "nonremovable",
-					"history-start":        float64(1745500000),
-					"history-delta":        float64(1800),
-					"history":              []any{float64(0.50), float64(0.51), float64(0.52)},
+					"store":               "synology",
+					"total":               float64(2948636082176),
+					"used":                float64(1572864000000),
+					"avail":               float64(1375772082176),
+					"estimated-full-date": float64(1800000000),
+					"mount-status":        "nonremovable",
+					"history-start":       float64(1745500000),
+					"history-delta":       float64(1800),
+					"history":             []any{float64(0.50), float64(0.51), float64(0.52)},
 					"gc-status": map[string]any{
 						"disk-bytes":       float64(1000000000),
 						"disk-chunks":      float64(1000),

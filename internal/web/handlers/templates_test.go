@@ -51,6 +51,24 @@ func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 	}
 }
 
+func TestTemplatesRenderFlashFromQuery(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, func() (int, int) { return 0, 0 })
+	req := httptest.NewRequest(http.MethodGet, "/about?flash=Mensaje+visible&ok=1", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "Mensaje visible") {
+		t.Fatalf("flash message not rendered:\n%s", body)
+	}
+	if !strings.Contains(body, "alert-success") {
+		t.Fatalf("success flash style not rendered:\n%s", body)
+	}
+}
+
 func templateFixtures(now time.Time) map[string]map[string]any {
 	base := func(extra map[string]any) map[string]any {
 		data := map[string]any{

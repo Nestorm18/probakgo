@@ -24,45 +24,52 @@ type githubRelease struct {
 }
 
 // Run checks GitHub for a newer release of binaryName and self-updates if one exists.
+// It returns true only when the binary was replaced.
 // repo is "owner/repo", e.g. "Nestorm18/probakgo".
 // currentVersion is the running binary's version (e.g. "dev" or "v1.2.0").
-func Run(repo, binaryName, currentVersion string) error {
+func Run(repo, binaryName, currentVersion string) (bool, error) {
 	if currentVersion == "dev" {
 		fmt.Println("Dev build - skipping version check")
-		return nil
+		return false, nil
 	}
 
 	fmt.Printf("Checking for updates (%s %s)...\n", binaryName, currentVersion)
 
 	tag, binID, sha256ID, binaryURL, sha256URL, err := latestRelease(repo, binaryName)
 	if err != nil {
-		return fmt.Errorf("check release: %w", err)
+		return false, fmt.Errorf("check release: %w", err)
 	}
 
 	cmp, ok := compareVersions(tag, currentVersion)
 	if !ok {
 		fmt.Printf("Cannot compare versions (%s vs %s) - skipping update\n", tag, currentVersion)
-		return nil
+		return false, nil
 	}
 	if cmp <= 0 {
 		fmt.Printf("No newer version available (local %s, remote %s)\n", currentVersion, tag)
-		return nil
+		return false, nil
 	}
 
 	if tag == currentVersion || strings.TrimPrefix(tag, "v") == strings.TrimPrefix(currentVersion, "v") {
 		fmt.Printf("Already up to date (%s)\n", currentVersion)
-		return nil
+		return false, nil
 	}
 
 	fmt.Printf("New version: %s → %s\n", currentVersion, tag)
 	fmt.Println("Downloading...")
 
 	if err := replace(repo, binID, sha256ID, binaryURL, sha256URL, binaryName); err != nil {
-		return fmt.Errorf("update: %w", err)
+		return false, fmt.Errorf("update: %w", err)
 	}
 
 	fmt.Printf("Updated to %s. Restart to apply.\n", tag)
-	return nil
+	return true, nil
+}
+
+// IsNewer reports whether remote is a newer semantic version than current.
+func IsNewer(remote, current string) (bool, bool) {
+	cmp, ok := compareVersions(remote, current)
+	return cmp > 0, ok
 }
 
 // LatestTag returns the tag of the latest GitHub release (for display purposes).
@@ -223,6 +230,9 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 		return fmt.Errorf("download: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
+	}
 
 	tmpPath := executable + ".new"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
@@ -275,6 +285,9 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 		return fmt.Errorf("fetch checksums: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("checksum download returned HTTP %d", resp.StatusCode)
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("read checksums: %w", err)

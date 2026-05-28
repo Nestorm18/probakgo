@@ -18,6 +18,7 @@ type AlertConfigs struct {
 	GlobalDiskPct    int
 	GlobalStaleHours int
 	GlobalBackupErr  bool
+	Report           *ReportService
 
 	PVEConfigs   map[int64]domain.PVEAlertConfig
 	PVEVMConfigs map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
@@ -36,6 +37,7 @@ var evaluators = []AlertEvaluator{
 	evalPVEMissingVM,
 	evalPVEUnknownVM,
 	evalPVEStale,
+	evalPBSReportStale,
 	evalPBSDisk,
 	evalPBSFill,
 	evalPBSStale,
@@ -263,10 +265,26 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	var alerts []domain.Alert
 	for _, sv := range servers {
 		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil || !rep.IsStale {
+		if err != nil {
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("pve_stale:pve:%d", sv.ID),
+				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				Type:       domain.AlertTypePVEStale,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Sin reporte",
+				Message:    "no se han recibido reportes",
+				DetectedAt: time.Now(),
+			})
 			continue
 		}
+		stale := rep.IsStale
 		reason := rep.StaleReason
+		if cfg.Report != nil {
+			stale, reason = cfg.Report.IsStaleForServer(ctx, rep.ReportedAt, sv.Name)
+		}
+		if !stale {
+			continue
+		}
 		if reason == "" {
 			reason = "sin reporte reciente"
 		}
@@ -274,6 +292,52 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			ID:         fmt.Sprintf("pve_stale:pve:%d", sv.ID),
 			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
 			Type:       domain.AlertTypePVEStale,
+			Severity:   domain.AlertSeverityCritical,
+			Title:      "Sin reporte",
+			Message:    reason,
+			DetectedAt: time.Now(),
+		})
+	}
+	return alerts, nil
+}
+
+func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	servers, err := st.ListPBSServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
+		if err != nil {
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
+				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+				Type:       domain.AlertTypePBSReportStale,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Sin reporte",
+				Message:    "no se han recibido reportes",
+				DetectedAt: time.Now(),
+			})
+			continue
+		}
+		stale := rep.IsStale
+		reason := rep.StaleReason
+		if cfg.Report != nil && cfg.Report.IsStale(rep.ReportedAt) {
+			stale = true
+			reason = "No se ha recibido el reporte de hoy"
+		}
+		if !stale {
+			continue
+		}
+		if reason == "" {
+			reason = "sin reporte reciente"
+		}
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
+			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+			Type:       domain.AlertTypePBSReportStale,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Sin reporte",
 			Message:    reason,
@@ -502,11 +566,12 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 
 // ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.
 // Used by the web UI to show the sidebar badge on every page.
-func ActiveAlertCounts(ctx context.Context, st *store.Store) (critical, warning int) {
+func ActiveAlertCounts(ctx context.Context, st *store.Store, rep *ReportService) (critical, warning int) {
 	cfg, err := LoadAlertConfigs(ctx, st)
 	if err != nil {
 		return
 	}
+	cfg.Report = rep
 	all, _ := RunAll(st, cfg)
 	supps, _ := st.GetActiveSuppressions(ctx)
 	for _, a := range all {
@@ -618,7 +683,6 @@ func evalPVEUnknownVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 	}
 	return alerts, nil
 }
-
 
 // ── Priority resolution helpers ───────────────────────────────────────────────
 

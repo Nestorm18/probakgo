@@ -36,15 +36,17 @@ func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKe
 	if k.KeyType != "server" {
 		return nil, ErrKeyType
 	}
-	if machineID != "" {
-		if k.MachineID == "" {
-			if err := a.store.BindAPIKeyMachineID(ctx, k.ID, machineID); err != nil {
-				slog.Error("bind machine id", "err", err)
-			}
-			k.MachineID = machineID
-		} else if k.MachineID != machineID {
-			return nil, fmt.Errorf("%w: key bound to different machine", ErrMachineID)
+	if machineID == "" {
+		return nil, fmt.Errorf("%w: missing X-Machine-ID", ErrMachineID)
+	}
+	if k.MachineID == "" {
+		if err := a.store.BindAPIKeyMachineID(ctx, k.ID, machineID); err != nil {
+			slog.Error("bind machine id", "err", err)
+			return nil, fmt.Errorf("bind machine id: %w", err)
 		}
+		k.MachineID = machineID
+	} else if k.MachineID != machineID {
+		return nil, fmt.Errorf("%w: key bound to different machine", ErrMachineID)
 	}
 	_ = a.store.UpdateAPIKeyLastUsed(ctx, k.ID)
 	return k, nil

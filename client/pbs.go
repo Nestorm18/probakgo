@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type pbsClient struct {
@@ -45,6 +46,9 @@ func (c *pbsClient) get(endpoint string) (map[string]any, error) {
 		resp.Body.Close()
 		if resp.StatusCode == 401 {
 			return nil, fmt.Errorf("PBS auth error (401): check PROXMOX_TOKEN and PROXMOX_SECRET")
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return nil, fmt.Errorf("PBS API %s returned HTTP %d: %s", endpoint, resp.StatusCode, strings.TrimSpace(string(body)))
 		}
 		var result map[string]any
 		if err := json.Unmarshal(body, &result); err != nil {
@@ -90,8 +94,8 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 			// Fetch snapshot sizes and verification states (groups endpoint omits both).
 			// Build map (backup-type/backup-id/backup-time) → {size, verification-state}.
 			type snapInfo struct {
-				size         int64
-				verifState   string
+				size       int64
+				verifState string
 			}
 			snapData := map[string]snapInfo{}
 			if snaps, err := c.get(fmt.Sprintf("admin/datastore/%s/snapshots", storeName)); err == nil {

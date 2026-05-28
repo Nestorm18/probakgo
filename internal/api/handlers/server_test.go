@@ -16,6 +16,7 @@ func TestListPVEServers_Empty(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -30,18 +31,19 @@ func TestListPVEServers_Empty(t *testing.T) {
 		t.Fatal("want servers array in response")
 	}
 	if len(servers) != 0 {
-		t.Errorf("want empty servers list, got %d", len(servers))
+		t.Errorf("want empty servers list for unbound key, got %d", len(servers))
 	}
 }
 
 func TestListPVEServers_WithServer(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
 	ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -68,6 +70,7 @@ func TestListPVEReports_NotFound(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve/9999/reports", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
@@ -80,12 +83,13 @@ func TestListPVEReports_NotFound(t *testing.T) {
 func TestListPVEReports_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
 	serverID, _ := ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
 	ts.store.InsertPVEReport(ctx, serverID, nil)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/servers/pve/%d/reports", serverID), nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
 
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)

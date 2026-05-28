@@ -5,6 +5,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+
+	"probakgo/internal/api/apictx"
 )
 
 func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
@@ -14,7 +16,11 @@ func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := make([]any, 0, len(servers))
+	k, _ := apictx.APIKey(r.Context())
 	for _, sv := range servers {
+		if k == nil || k.ServerName == "" || sv.Name != k.ServerName {
+			continue
+		}
 		resp = append(resp, h.report.BuildPVEServerResponse(r.Context(), sv))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": resp})
@@ -27,7 +33,11 @@ func (h *H) ListPBSServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := make([]any, 0, len(servers))
+	k, _ := apictx.APIKey(r.Context())
 	for _, sv := range servers {
+		if k == nil || k.ServerName == "" || sv.Name != k.ServerName {
+			continue
+		}
 		resp = append(resp, h.report.BuildPBSServerResponse(r.Context(), sv))
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"servers": resp})
@@ -42,6 +52,9 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 	sv, err := h.store.GetPVEServer(r.Context(), id)
 	if err != nil {
 		errJSON(w, http.StatusNotFound, "server not found")
+		return
+	}
+	if !h.requireKeyServer(w, r, sv.Name) {
 		return
 	}
 	limit := 30

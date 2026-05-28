@@ -233,6 +233,19 @@ func TestEvalPVEStale_NotStale_NoAlert(t *testing.T) {
 	}
 }
 
+func TestEvalPVEStale_NoReport(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	_, _ = st.UpsertPVEServer(ctx, "pve-never", "1.1.1.1", "", "1.0", "")
+
+	cfg := defaultCfg()
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, _ := evalPVEStale(st, cfg)
+	if !hasAlert(alerts, domain.AlertTypePVEStale, "pve-never") {
+		t.Error("expected pve_stale alert for server without reports")
+	}
+}
+
 // ── evalPBSDisk ───────────────────────────────────────────────────────────────
 
 func TestEvalPBSDisk_OverThreshold(t *testing.T) {
@@ -246,6 +259,19 @@ func TestEvalPBSDisk_OverThreshold(t *testing.T) {
 	alerts, _ := evalPBSDisk(st, cfg)
 	if !hasAlert(alerts, domain.AlertTypeDisk, "pbs1") {
 		t.Error("expected disk alert for pbs1")
+	}
+}
+
+func TestEvalPBSReportStale_NoReport(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	_, _ = st.UpsertPBSServer(ctx, "pbs-never", "1.1.1.1", "", "1.0", "")
+
+	cfg := defaultCfg()
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, _ := evalPBSReportStale(st, cfg)
+	if !hasAlert(alerts, domain.AlertTypePBSReportStale, "pbs-never") {
+		t.Error("expected pbs_report_stale alert for server without reports")
 	}
 }
 

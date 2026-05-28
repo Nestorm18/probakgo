@@ -48,7 +48,7 @@ chmod +x probakgo
 ./probakgo
 ```
 
-Abre `http://localhost:36748` - usuario inicial: **probakgo** / **admin123** (cámbiala inmediatamente).
+Abre `http://localhost:36748`. El usuario inicial es **probakgo** y la contraseña se genera automáticamente en el primer arranque; revisa los logs del servidor y cámbiala inmediatamente.
 
 El primer arranque como root instala automáticamente el servicio systemd y el cron de auto-actualización.
 

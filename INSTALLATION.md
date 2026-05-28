@@ -28,7 +28,7 @@ En el **primer arranque como root**, el binario configura automáticamente:
 Abre `http://<ip-servidor>:36748` en el navegador.
 
 - **Usuario:** `probakgo`
-- **Contraseña:** `admin123` - **cambiar inmediatamente**
+- **Contraseña:** se genera automáticamente en el primer arranque y aparece en los logs del servidor - **cambiar inmediatamente**
 
 ### 3. Arrancar como servicio
 
