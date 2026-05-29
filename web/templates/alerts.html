@@ -25,6 +25,12 @@
 
   <!-- Filters -->
   <div class="ms-auto d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-sm btn-secondary" id="alertSoundBtn" title="Activar sonido de alertas">
+      <i class="bi bi-volume-mute"></i><span class="ms-1">Sonido</span>
+    </button>
+    <button type="button" class="btn btn-sm btn-secondary d-none" id="browserNotifyBtn" title="Activar notificaciones del navegador">
+      <i class="bi bi-bell"></i><span class="ms-1">Notificaciones</span>
+    </button>
     <form method="get" action="/alerts" class="d-flex gap-2 flex-wrap">
       <select name="severity" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
         <option value="" {{if eq .FilterSeverity ""}}selected{{end}}>Todas las severidades</option>

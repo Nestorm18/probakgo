@@ -265,14 +265,14 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 
 func buildHeartbeatView(hb domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
 	if hb.ID == 0 {
-		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
+		return heartbeatView{Label: "Sin datos", CSSClass: "muted", Threshold: thresholdMinutes}
 	}
 	return buildHeartbeatViewPtr(&hb, thresholdMinutes)
 }
 
 func buildHeartbeatViewPtr(hb *domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
 	if hb == nil || hb.ID == 0 {
-		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
+		return heartbeatView{Label: "Sin datos", CSSClass: "muted", Threshold: thresholdMinutes}
 	}
 	online := true
 	if thresholdMinutes > 0 {
@@ -285,7 +285,7 @@ func buildHeartbeatViewPtr(hb *domain.ServerHeartbeat, thresholdMinutes int) hea
 		}
 	}
 	return heartbeatView{
-		Seen: true, Online: false, Label: "Sin heartbeat", CSSClass: "bad",
+		Seen: true, Online: false, Label: "Offline", CSSClass: "bad",
 		LastSeen: hb.LastSeenAt, Threshold: thresholdMinutes,
 	}
 }

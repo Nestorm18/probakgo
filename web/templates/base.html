@@ -29,7 +29,7 @@
       <div class="sidebar-label">Monitor</div>
       <ul class="nav flex-column gap-1 mb-3">
         <li><a class="nav-link {{if eq .Active "dashboard"}}active{{end}}" href="/"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
-        <li><a class="nav-link {{if eq .Active "alerts-view"}}active{{end}}" href="/alerts"><i class="bi bi-bell"></i>Alertas{{if .AlertCritical}}<span class="badge ms-auto" style="background:var(--clr-danger);font-size:.65rem">{{.AlertCritical}}</span>{{end}}{{if .AlertWarning}}<span class="badge {{if .AlertCritical}}ms-1{{else}}ms-auto{{end}}" style="background:var(--clr-warn);font-size:.65rem">{{.AlertWarning}}</span>{{end}}</a></li>
+        <li><a class="nav-link {{if eq .Active "alerts-view"}}active{{end}}" href="/alerts" id="alertsNavLink"><i class="bi bi-bell"></i>Alertas<span id="alertCriticalBadge" class="badge ms-auto" style="background:var(--clr-danger);font-size:.65rem;{{if .AlertCritical}}{{else}}display:none{{end}}">{{.AlertCritical}}</span><span id="alertWarningBadge" class="badge {{if .AlertCritical}}ms-1{{else}}ms-auto{{end}}" style="background:var(--clr-warn);font-size:.65rem;{{if .AlertWarning}}{{else}}display:none{{end}}">{{.AlertWarning}}</span></a></li>
         <li><a class="nav-link {{if eq .Active "pve"}}active{{end}}" href="/servers/pve"><i class="bi bi-server"></i>Proxmox VE</a></li>
         <li><a class="nav-link {{if eq .Active "pbs"}}active{{end}}" href="/servers/pbs"><i class="bi bi-archive"></i>Proxmox BS</a></li>
       </ul>
@@ -93,6 +93,8 @@
   </div>
 
 </div>
+
+<div class="toast-container position-fixed top-0 end-0 p-3" id="alertToastContainer" style="z-index:1080"></div>
 
 <!-- Theme toggle -->
 <button class="theme-toggle" id="themeToggle" title="Cambiar tema">
@@ -159,6 +161,226 @@
     if (_confirmPendingForm) { _confirmPendingForm.submit(); _confirmPendingForm = null; }
     bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
   });
+
+  // Alert polling + browser notifications.
+  (function () {
+    const pollMs = 60000;
+    const statusURL = '/alerts/status.json';
+    const criticalBadge = document.getElementById('alertCriticalBadge');
+    const warningBadge = document.getElementById('alertWarningBadge');
+    const notifyBtn = document.getElementById('browserNotifyBtn');
+    const soundBtn = document.getElementById('alertSoundBtn');
+    const toastContainer = document.getElementById('alertToastContainer');
+    const seenKey = 'probakgo.seenCriticalAlerts';
+    const soundKey = 'probakgo.alertSoundEnabled';
+    let audioCtx = null;
+    let soundEnabled = false;
+    try {
+      soundEnabled = localStorage.getItem(soundKey) === '1';
+    } catch (_) {
+      soundEnabled = false;
+    }
+    let initialLoad = true;
+    let seen = new Set();
+    try {
+      seen = new Set(JSON.parse(localStorage.getItem(seenKey) || '[]'));
+    } catch (_) {
+      seen = new Set();
+    }
+
+    function updateBadge(el, value, solo) {
+      if (!el) return;
+      el.textContent = value || '';
+      el.style.display = value > 0 ? '' : 'none';
+      el.classList.toggle('ms-auto', solo);
+      el.classList.toggle('ms-1', !solo);
+    }
+
+    function saveSeen() {
+      try {
+        localStorage.setItem(seenKey, JSON.stringify(Array.from(seen).slice(-200)));
+      } catch (_) {
+      }
+    }
+
+    function updateSoundButton() {
+      if (!soundBtn) return;
+      const icon = soundBtn.querySelector('i');
+      const ready = soundEnabled && audioCtx;
+      if (icon) icon.className = ready ? 'bi bi-volume-up' : 'bi bi-volume-mute';
+      soundBtn.classList.toggle('btn-primary', ready);
+      soundBtn.classList.toggle('btn-secondary', !ready);
+      soundBtn.title = ready ? 'Desactivar sonido de alertas' : 'Activar sonido de alertas';
+    }
+
+    async function unlockAlertSound() {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) {
+        showInfoToast('Sonido no disponible', 'Este navegador no soporta audio web.');
+        return false;
+      }
+      audioCtx = audioCtx || new Ctx();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      playAlertSound(0.03, true);
+      return true;
+    }
+
+    function playAlertSound(volume, force) {
+      if ((!soundEnabled && !force) || !audioCtx) return;
+      const now = audioCtx.currentTime;
+      const gain = audioCtx.createGain();
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(volume || 0.12, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+      gain.connect(audioCtx.destination);
+
+      [880, 1175].forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.16);
+        osc.connect(gain);
+        osc.start(now + i * 0.16);
+        osc.stop(now + i * 0.16 + 0.22);
+      });
+    }
+
+    function showToast(alert) {
+      if (!toastContainer) return;
+      const el = document.createElement('div');
+      el.className = 'toast align-items-center text-bg-danger border-0';
+      el.setAttribute('role', 'alert');
+      el.setAttribute('aria-live', 'assertive');
+      el.setAttribute('aria-atomic', 'true');
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      el.querySelector('strong').textContent = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
+      el.querySelector('.toast-body div').textContent = alert.message || 'Nueva alerta critica';
+      toastContainer.appendChild(el);
+      const toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 12000 });
+      el.addEventListener('hidden.bs.toast', () => el.remove());
+      toast.show();
+    }
+
+    function showInfoToast(title, message) {
+      if (!toastContainer) return;
+      const el = document.createElement('div');
+      el.className = 'toast align-items-center text-bg-primary border-0';
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-atomic', 'true');
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      el.querySelector('strong').textContent = title;
+      el.querySelector('.toast-body div').textContent = message;
+      toastContainer.appendChild(el);
+      const toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 9000 });
+      el.addEventListener('hidden.bs.toast', () => el.remove());
+      toast.show();
+    }
+
+    function showNativeNotification(alert) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const title = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
+      const n = new Notification(title, {
+        body: alert.message || 'Nueva alerta critica en Probakgo',
+        tag: alert.id,
+        renotify: false
+      });
+      n.onclick = () => {
+        window.focus();
+        window.location.href = '/alerts';
+        n.close();
+      };
+    }
+
+    function updateNotifyButton() {
+      if (!notifyBtn) return;
+      const supported = 'Notification' in window;
+      const shouldShow = supported && Notification.permission !== 'granted';
+      notifyBtn.classList.toggle('d-none', !shouldShow);
+      if (supported && Notification.permission === 'denied') {
+        notifyBtn.title = 'Notificaciones bloqueadas en el navegador';
+      } else if (supported && !window.isSecureContext) {
+        notifyBtn.title = 'Las notificaciones requieren HTTPS o localhost';
+      } else {
+        notifyBtn.title = 'Activar notificaciones del navegador';
+      }
+    }
+
+    soundBtn?.addEventListener('click', async () => {
+      if (soundEnabled && audioCtx) {
+        soundEnabled = false;
+        try {
+          localStorage.setItem(soundKey, '0');
+        } catch (_) {
+        }
+        updateSoundButton();
+        showInfoToast('Sonido desactivado', 'Probakgo no reproducira sonido para nuevas alertas.');
+        return;
+      }
+      if (await unlockAlertSound()) {
+        soundEnabled = true;
+        try {
+          localStorage.setItem(soundKey, '1');
+        } catch (_) {
+        }
+        updateSoundButton();
+        showInfoToast('Sonido activado', 'Probakgo reproducira un aviso corto con nuevas alertas criticas.');
+      }
+    });
+    updateSoundButton();
+
+    notifyBtn?.addEventListener('click', async () => {
+      if (!('Notification' in window)) {
+        showInfoToast('Notificaciones no disponibles', 'Este navegador no soporta notificaciones nativas.');
+        return;
+      }
+      if (!window.isSecureContext) {
+        showInfoToast('Notificaciones no disponibles', 'El navegador requiere HTTPS o localhost para pedir permiso.');
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        showInfoToast('Notificaciones bloqueadas', 'Activalas desde los permisos del sitio en el navegador.');
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        showInfoToast('Notificaciones activadas', 'Probakgo avisara cuando aparezcan nuevas alertas criticas.');
+      }
+      updateNotifyButton();
+    });
+    updateNotifyButton();
+
+    async function pollAlerts() {
+      try {
+        const res = await fetch(statusURL, { credentials: 'same-origin', cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        updateBadge(criticalBadge, data.critical || 0, true);
+        updateBadge(warningBadge, data.warning || 0, !(data.critical > 0));
+
+        const activeIDs = new Set();
+        for (const alert of data.alerts || []) {
+          activeIDs.add(alert.id);
+          if (alert.severity !== 'critical') continue;
+          if (seen.has(alert.id)) continue;
+          seen.add(alert.id);
+          if (!initialLoad) {
+            showToast(alert);
+            playAlertSound(0.12);
+            showNativeNotification(alert);
+          }
+        }
+        for (const id of Array.from(seen)) {
+          if (!activeIDs.has(id)) seen.delete(id);
+        }
+        saveSeen();
+        initialLoad = false;
+      } catch (_) {
+      }
+    }
+
+    pollAlerts();
+    setInterval(pollAlerts, pollMs);
+  })();
 
 </script>
 {{block "page_scripts" .}}{{end}}
