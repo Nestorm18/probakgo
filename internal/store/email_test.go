@@ -30,6 +30,9 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 	if !cfg.AlertBackupErr {
 		t.Error("AlertBackupErr: want true")
 	}
+	if cfg.AlertPVEHeartbeatMinutes != 15 {
+		t.Errorf("AlertPVEHeartbeatMinutes: want 15, got %d", cfg.AlertPVEHeartbeatMinutes)
+	}
 }
 
 func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
@@ -37,18 +40,19 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 	st := openTestDB(t)
 
 	want := domain.EmailConfig{
-		SMTPHost:         "smtp.example.com",
-		SMTPPort:         465,
-		SMTPUser:         "user@example.com",
-		SMTPPass:         "s3cr3t",
-		Recipients:       "admin@example.com,ops@example.com",
-		IsEnabled:        true,
-		SendTime:         "09:30",
-		RetentionMonths:  12,
-		RetentionEnabled: false,
-		AlertDiskPct:     90,
-		AlertBackupErr:   false,
-		PublicAPIURL:     "https://probakgo.example.com",
+		SMTPHost:                 "smtp.example.com",
+		SMTPPort:                 465,
+		SMTPUser:                 "user@example.com",
+		SMTPPass:                 "s3cr3t",
+		Recipients:               "admin@example.com,ops@example.com",
+		IsEnabled:                true,
+		SendTime:                 "09:30",
+		RetentionMonths:          12,
+		RetentionEnabled:         false,
+		AlertDiskPct:             90,
+		AlertBackupErr:           false,
+		PublicAPIURL:             "https://probakgo.example.com",
+		AlertPVEHeartbeatMinutes: 10,
 	}
 
 	if err := st.UpsertEmailConfig(ctx, want); err != nil {
@@ -77,6 +81,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"AlertDiskPct", got.AlertDiskPct, want.AlertDiskPct},
 		{"AlertBackupErr", got.AlertBackupErr, want.AlertBackupErr},
 		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
+		{"AlertPVEHeartbeatMinutes", got.AlertPVEHeartbeatMinutes, want.AlertPVEHeartbeatMinutes},
 	}
 	for _, c := range checks {
 		if c.got != c.want {

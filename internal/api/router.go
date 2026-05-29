@@ -44,6 +44,7 @@ func (s *Server) Router() http.Handler {
 	r.Get("/health", h.Health)
 
 	// Server keys (client reports)
+	r.With(s.requireServerKey).Post("/heartbeat", h.Heartbeat)
 	r.With(s.requireServerKey).Post("/report/pve", h.ReportPVE)
 	r.With(s.requireServerKey).Post("/report/pbs", h.ReportPBS)
 

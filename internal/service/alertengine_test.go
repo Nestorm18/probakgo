@@ -13,12 +13,13 @@ import (
 
 func defaultCfg() AlertConfigs {
 	return AlertConfigs{
-		GlobalDiskPct:    85,
-		GlobalBackupErr:  true,
-		GlobalStaleHours: 48,
-		PVEConfigs:       make(map[int64]domain.PVEAlertConfig),
-		PVEVMConfigs:     make(map[int64][]domain.PVEVMAlertConfig),
-		PBSConfigs:       make(map[int64]domain.PBSAlertConfig),
+		GlobalDiskPct:             85,
+		GlobalBackupErr:           true,
+		GlobalStaleHours:          48,
+		GlobalPVEHeartbeatMinutes: 15,
+		PVEConfigs:                make(map[int64]domain.PVEAlertConfig),
+		PVEVMConfigs:              make(map[int64][]domain.PVEVMAlertConfig),
+		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
 	}
 }
 
@@ -91,6 +92,44 @@ func TestEvalPVEDisk_PerServerThreshold(t *testing.T) {
 	alerts, _ := evalPVEDisk(st, cfg)
 	if !hasAlert(alerts, domain.AlertTypeDisk, "pve3") {
 		t.Error("expected disk alert with per-server threshold=60, usage=70%")
+	}
+}
+
+func TestEvalPVEHeartbeat_Stale(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-heartbeat", "1.1.1.1", "", "1.0", "mid-1")
+	_ = st.UpsertServerHeartbeat(ctx, domain.ServerHeartbeat{
+		ServerType: "pve",
+		ServerID:   serverID,
+		Hostname:   "pve-heartbeat",
+		LastSeenAt: time.Now().Add(-20 * time.Minute),
+	})
+
+	cfg := defaultCfg()
+	cfg.GlobalPVEHeartbeatMinutes = 15
+	alerts, err := evalPVEHeartbeat(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypePVEHeartbeat, "pve-heartbeat") {
+		t.Fatal("expected heartbeat alert")
+	}
+}
+
+func TestEvalPVEHeartbeat_NoAlertBeforeFirstHeartbeat(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	_, _ = st.UpsertPVEServer(ctx, "pve-no-heartbeat-yet", "1.1.1.1", "", "1.0", "")
+
+	cfg := defaultCfg()
+	cfg.GlobalPVEHeartbeatMinutes = 15
+	alerts, err := evalPVEHeartbeat(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypePVEHeartbeat, "pve-no-heartbeat-yet") {
+		t.Fatal("did not expect alert before first heartbeat")
 	}
 }
 

@@ -15,10 +15,11 @@ import (
 // AlertConfigs holds resolved thresholds for all servers.
 // Global values from email_config act as fallback when a server has no per-server config.
 type AlertConfigs struct {
-	GlobalDiskPct    int
-	GlobalStaleHours int
-	GlobalBackupErr  bool
-	Report           *ReportService
+	GlobalDiskPct             int
+	GlobalStaleHours          int
+	GlobalBackupErr           bool
+	GlobalPVEHeartbeatMinutes int
+	Report                    *ReportService
 
 	PVEConfigs   map[int64]domain.PVEAlertConfig
 	PVEVMConfigs map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
@@ -37,6 +38,7 @@ var evaluators = []AlertEvaluator{
 	evalPVEMissingVM,
 	evalPVEUnknownVM,
 	evalPVEStale,
+	evalPVEHeartbeat,
 	evalPBSReportStale,
 	evalPBSDisk,
 	evalPBSFill,
@@ -66,12 +68,13 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 		return AlertConfigs{}, err
 	}
 	cfg := AlertConfigs{
-		GlobalDiskPct:    emailCfg.AlertDiskPct,
-		GlobalBackupErr:  emailCfg.AlertBackupErr,
-		GlobalStaleHours: emailCfg.AlertPBSStaleHours,
-		PVEConfigs:       make(map[int64]domain.PVEAlertConfig),
-		PVEVMConfigs:     make(map[int64][]domain.PVEVMAlertConfig),
-		PBSConfigs:       make(map[int64]domain.PBSAlertConfig),
+		GlobalDiskPct:             emailCfg.AlertDiskPct,
+		GlobalBackupErr:           emailCfg.AlertBackupErr,
+		GlobalStaleHours:          emailCfg.AlertPBSStaleHours,
+		GlobalPVEHeartbeatMinutes: emailCfg.AlertPVEHeartbeatMinutes,
+		PVEConfigs:                make(map[int64]domain.PVEAlertConfig),
+		PVEVMConfigs:              make(map[int64][]domain.PVEVMAlertConfig),
+		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
 	}
 
 	pveServers, err := st.ListPVEServers(ctx)
@@ -296,6 +299,47 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			Title:      "Sin reporte",
 			Message:    reason,
 			DetectedAt: time.Now(),
+		})
+	}
+	return alerts, nil
+}
+
+func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	if cfg.GlobalPVEHeartbeatMinutes <= 0 {
+		return nil, nil
+	}
+	ctx := context.Background()
+	servers, err := st.ListPVEServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	heartbeats, err := st.ListServerHeartbeatsByType(ctx, "pve")
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	threshold := time.Duration(cfg.GlobalPVEHeartbeatMinutes) * time.Minute
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		hb, ok := heartbeats[sv.ID]
+		if !ok {
+			continue
+		}
+		age := now.Sub(hb.LastSeenAt)
+		if age <= threshold {
+			continue
+		}
+		since := alertFmtAge(age)
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("pve_heartbeat:pve:%d", sv.ID),
+			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+			Type:       domain.AlertTypePVEHeartbeat,
+			Severity:   domain.AlertSeverityCritical,
+			Title:      "Servidor sin heartbeat",
+			Message:    fmt.Sprintf("No se recibe heartbeat desde hace %s", since),
+			Value:      since,
+			Threshold:  fmt.Sprintf("%d min", cfg.GlobalPVEHeartbeatMinutes),
+			DetectedAt: now,
 		})
 	}
 	return alerts, nil
@@ -710,6 +754,20 @@ func alertDiskSeverity(pct int) string {
 		return domain.AlertSeverityCritical
 	}
 	return domain.AlertSeverityWarning
+}
+
+func alertFmtAge(d time.Duration) string {
+	if d < time.Hour {
+		mins := int(d.Minutes())
+		if mins < 1 {
+			mins = 1
+		}
+		return fmt.Sprintf("%dmin", mins)
+	}
+	if d < 48*time.Hour {
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	}
+	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
 func alertFmtBytes(b int64) string { return domain.FormatBytes(b) }

@@ -118,14 +118,16 @@ go build -o probakgo-client ./client/
 - Detects server type (PVE/PBS) from `/etc/issue`
 - PVE: queries storages, backup tasks, content; sends to `POST /report/pve`
 - PBS: queries datastore usage; sends to `POST /report/pbs`
+- Heartbeat: `probakgo-client heartbeat` sends lightweight liveness to `POST /heartbeat`
 - Machine ID binding via `/etc/machine-id`
 - TLS: configurable verify/skip/CA bundle via env vars
-- Subcommands: `install`, `uninstall`, `update`, `version` (report mode is default, `--vzdump-hook` flag)
+- Subcommands: `install`, `uninstall`, `update`, `heartbeat`, `version` (report mode is default, `--vzdump-hook` flag)
 - File mode: `--file path.json` for testing without a live Proxmox node
 
 **Self-update (2026-04):**
 - Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
-- Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00).
+- Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)` and, when run as root, ensures `probakgo-client-heartbeat.timer` is installed. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00) and installs `probakgo-client-heartbeat.timer` (every 5 minutes).
+- The client also auto-ensures the heartbeat timer on normal root executions from `/opt/probakgo/probakgo-client`; this covers clients whose first update was performed by an older binary before the post-update hook existed.
 - `var version` (not `const`) required for `-ldflags "-X main.version=..."` injection at release build time.
 - Always bump the application version after any code change. Update both `main.go` and `client/main.go` together so server and client versions stay aligned.
 - `GITHUB_TOKEN` env var: if set, selfupdate uses it as a Bearer token for GitHub API requests and downloads assets via the API assets endpoint (required for private repos). Without it, uses public `browser_download_url` directly.
@@ -206,11 +208,13 @@ The `install` subcommand:
 - Generates and installs vzdump hook script in `/etc/vzdump.conf`
 - Configures logrotate
 - Installs `/etc/cron.d/probakgo-client` for daily self-update at 01:00
+- Installs `probakgo-client-heartbeat.timer` for `probakgo-client heartbeat` every 5 minutes
 
 The `uninstall` subcommand (requires root):
 - Removes the `script:` hook line from `/etc/vzdump.conf`
 - Revokes the Proxmox API token (`pveum` on PVE, `proxmox-backup-manager` on PBS)
 - Deletes `/etc/cron.d/probakgo-client` and `/etc/logrotate.d/probakgo`
+- Disables/removes `probakgo-client-heartbeat.timer` and `.service`
 - Removes `/opt/probakgo/` and `/var/log/probakgo/`
 
 **Updates**: `probakgo-client update` or automatic via cron. No service restart needed - the client runs per-backup, not as a daemon.
@@ -266,6 +270,7 @@ Embedded in `internal/db/migrations/`. Applied automatically on server startup v
 | `010_apikey_server_url.up.sql` | `server_url` column in `api_keys` |
 | `011_alert_suppressions_idx.up.sql` | Index on `alert_suppressions.suppressed_until` |
 | `012_public_api_url.up.sql` | `public_api_url` global para comandos de instalación |
+| `013_heartbeats.up.sql` | `server_heartbeats` + umbral global `alert_pve_heartbeat_minutes` |
 
 ### Test fixtures (`testdata/`)
 

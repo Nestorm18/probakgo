@@ -12,7 +12,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.64"
+var version = "0.0.68"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -34,10 +34,19 @@ func main() {
 			runUninstall(os.Args[2:])
 			return
 		case "update":
-			if _, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version); err != nil {
+			updated, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
 				os.Exit(1)
 			}
+			if os.Getuid() == 0 {
+				ensureHeartbeatTimerInstalled()
+			} else if updated {
+				fmt.Fprintln(os.Stderr, "WARN: run as root once to install the heartbeat systemd timer")
+			}
+			return
+		case "heartbeat":
+			runHeartbeat()
 			return
 		case "version":
 			fmt.Printf("probakgo-client v%s\n", version)
@@ -64,6 +73,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  install     Install on this Proxmox node and configure the vzdump hook\n")
 		fmt.Fprintf(os.Stderr, "  uninstall   Remove all installed files and revoke the Proxmox API token\n")
 		fmt.Fprintf(os.Stderr, "  update      Self-update to the latest GitHub release\n")
+		fmt.Fprintf(os.Stderr, "  heartbeat   Send a lightweight liveness heartbeat to Probakgo\n")
 		fmt.Fprintf(os.Stderr, "  version     Print version\n\n")
 		fmt.Fprintf(os.Stderr, "Flags (report mode):\n")
 		flag.PrintDefaults()
@@ -71,6 +81,7 @@ func main() {
 	flag.Parse()
 
 	log.Printf("probakgo-client v%s", version)
+	ensureHeartbeatTimerInstalled()
 
 	cfg := loadConfig()
 	if debug {
@@ -131,4 +142,32 @@ func main() {
 
 	fmt.Println("Configuration OK.")
 	fmt.Println("Use --vzdump-hook to send a report after each backup.")
+}
+
+func runHeartbeat() {
+	cfg := loadConfig()
+	if !strings.HasPrefix(cfg.APIKey, "pbk-") {
+		log.Println("ERROR: API key must start with 'pbk-'")
+		os.Exit(1)
+	}
+	if cfg.APIURL == "" {
+		log.Println("ERROR: API_URL not configured")
+		os.Exit(1)
+	}
+	si := newSysInfo(cfg)
+	if cfg.ServerType == "" || cfg.ServerType == "unknown" {
+		cfg.ServerType = si.detectServerType()
+	}
+	if cfg.ServerType == "unknown" {
+		log.Println("ERROR: could not detect server type (PVE or PBS)")
+		os.Exit(1)
+	}
+	log.Printf("probakgo-client v%s", version)
+	log.Printf("Server type : %s", cfg.ServerType)
+	log.Printf("Hostname    : %s", si.Hostname)
+	log.Printf("API URL     : %s", cfg.APIURL)
+	if err := sendHeartbeat(cfg, si); err != nil {
+		log.Printf("ERROR: %v", err)
+		os.Exit(1)
+	}
 }

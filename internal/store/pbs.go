@@ -153,6 +153,18 @@ func (s *Store) GetPBSServer(ctx context.Context, id int64) (*domain.PBSServer, 
 	return &sv, nil
 }
 
+func (s *Store) GetPBSServerByName(ctx context.Context, name string) (*domain.PBSServer, error) {
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+		FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
+	var sv domain.PBSServer
+	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
+		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		return nil, err
+	}
+	return &sv, nil
+}
+
 func (s *Store) GetLatestPBSReport(ctx context.Context, serverID int64) (*domain.PBSReport, error) {
 	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
 	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason

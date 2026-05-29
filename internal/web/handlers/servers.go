@@ -27,6 +27,15 @@ type pveBackupJobRow struct {
 	IsExcluded bool
 }
 
+type heartbeatView struct {
+	Seen      bool
+	Online    bool
+	Label     string
+	CSSClass  string
+	LastSeen  time.Time
+	Threshold int
+}
+
 func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
@@ -37,6 +46,12 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	emailCfg, _ := h.store.GetEmailConfig(ctx)
+	heartbeatThreshold := 15
+	if emailCfg != nil {
+		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
 	var rows []map[string]any
 	for _, sv := range servers {
 		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
@@ -52,6 +67,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"TaskUnknown": 0,
 			"AlertConfig": alertCfg,
 			"ServerURL":   serverURLs[sv.Name],
+			"Heartbeat":   buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -130,6 +146,12 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	backupTasks, _ := h.store.GetPVEBackupTasksForReport(ctx, latestReportID)
+	emailCfg, _ := h.store.GetEmailConfig(ctx)
+	heartbeatThreshold := 15
+	if emailCfg != nil {
+		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	hb, _ := h.store.GetServerHeartbeat(ctx, "pve", id)
 
 	configuredVMIDs := make(map[string]bool)
 	var missingVMs []map[string]any
@@ -230,6 +252,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"BackupTasks":     backupTasks,
 		"BackupRows":      backupRows,
 		"BackupJobStart":  backupJobStart,
+		"Heartbeat":       buildHeartbeatViewPtr(hb, heartbeatThreshold),
 		"MissingVMs":      missingVMs,
 		"ConfiguredVMIDs": configuredVMIDs,
 		"JobHistory":      jobHistory,
@@ -238,6 +261,33 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Flash":           r.URL.Query().Get("flash"),
 		"FlashOK":         r.URL.Query().Get("ok") == "1",
 	})
+}
+
+func buildHeartbeatView(hb domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
+	if hb.ID == 0 {
+		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
+	}
+	return buildHeartbeatViewPtr(&hb, thresholdMinutes)
+}
+
+func buildHeartbeatViewPtr(hb *domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
+	if hb == nil || hb.ID == 0 {
+		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
+	}
+	online := true
+	if thresholdMinutes > 0 {
+		online = time.Since(hb.LastSeenAt) <= time.Duration(thresholdMinutes)*time.Minute
+	}
+	if online {
+		return heartbeatView{
+			Seen: true, Online: true, Label: "Online", CSSClass: "ok",
+			LastSeen: hb.LastSeenAt, Threshold: thresholdMinutes,
+		}
+	}
+	return heartbeatView{
+		Seen: true, Online: false, Label: "Sin heartbeat", CSSClass: "bad",
+		LastSeen: hb.LastSeenAt, Threshold: thresholdMinutes,
+	}
 }
 
 func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {

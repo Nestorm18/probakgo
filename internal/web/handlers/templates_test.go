@@ -90,17 +90,18 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 	pveServer := domain.PVEServer{ID: 1, Name: "pve-1", IP: "10.0.0.1", PublicIP: "203.0.113.10", ClientVersion: "test"}
 	pbsServer := domain.PBSServer{ID: 2, Name: "pbs-1", IP: "10.0.0.2", PublicIP: "203.0.113.11", ClientVersion: "test"}
 	emailConfig := domain.EmailConfig{
-		SMTPHost:           "smtp.example.test",
-		SMTPPort:           587,
-		SMTPUser:           "admin@example.test",
-		Recipients:         "ops@example.test",
-		IsEnabled:          true,
-		SendTime:           "09:00",
-		RetentionMonths:    6,
-		RetentionEnabled:   true,
-		AlertDiskPct:       85,
-		AlertBackupErr:     true,
-		AlertPBSStaleHours: 36,
+		SMTPHost:                 "smtp.example.test",
+		SMTPPort:                 587,
+		SMTPUser:                 "admin@example.test",
+		Recipients:               "ops@example.test",
+		IsEnabled:                true,
+		SendTime:                 "09:00",
+		RetentionMonths:          6,
+		RetentionEnabled:         true,
+		AlertDiskPct:             85,
+		AlertBackupErr:           true,
+		AlertPBSStaleHours:       36,
+		AlertPVEHeartbeatMinutes: 15,
 	}
 
 	return map[string]map[string]any{
@@ -176,6 +177,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"BackupTasks":     []domain.PVEBackupTask{},
 			"BackupRows":      []pveBackupJobRow{},
 			"BackupJobStart":  int64(0),
+			"Heartbeat":       heartbeatView{Label: "Sin heartbeat", CSSClass: "muted"},
 			"MissingVMs":      []map[string]any{},
 			"ConfiguredVMIDs": map[string]bool{},
 			"VMAlertConfigs":  map[int64]domain.PVEVMAlertConfig{},
