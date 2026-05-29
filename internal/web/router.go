@@ -59,6 +59,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		r.Get("/", h.Dashboard)
 		r.Get("/alerts", h.Alerts)
+		r.Get("/alerts/status.json", h.AlertsStatus)
 		r.Post("/alerts/suppress", h.AlertSuppressPost)
 		r.Post("/alerts/unsuppress", h.AlertUnsuppressPost)
 		r.Get("/servers/pve", h.PVEServers)

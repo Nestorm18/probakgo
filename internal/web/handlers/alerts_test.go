@@ -1,13 +1,28 @@
 package webhandlers
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	dbpkg "probakgo/internal/db"
 	"probakgo/internal/domain"
+	"probakgo/internal/store"
 )
+
+func openAlertsHandlerDB(t *testing.T) *store.Store {
+	t.Helper()
+	db, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return store.New(db)
+}
 
 func TestGroupAlertsByServer(t *testing.T) {
 	alerts := []domain.Alert{
@@ -67,4 +82,45 @@ func TestFormAlertIDs(t *testing.T) {
 			t.Fatalf("got %v, want %v", got, want)
 		}
 	}
+}
+
+func TestAlertsStatusIncludesHeartbeatAlert(t *testing.T) {
+	st := openAlertsHandlerDB(t)
+	ctx := context.Background()
+	serverID, err := st.UpsertPVEServer(ctx, "pve-offline", "10.0.0.10", "", "0.0.71", "mid-1")
+	if err != nil {
+		t.Fatalf("UpsertPVEServer: %v", err)
+	}
+	if err := st.UpsertServerHeartbeat(ctx, domain.ServerHeartbeat{
+		ServerType:    "pve",
+		ServerID:      serverID,
+		Hostname:      "pve-offline",
+		ClientVersion: "0.0.71",
+		MachineID:     "mid-1",
+		LastSeenAt:    time.Now().Add(-30 * time.Minute),
+	}); err != nil {
+		t.Fatalf("UpsertServerHeartbeat: %v", err)
+	}
+
+	h := New(st, nil, nil)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/alerts/status.json", nil)
+	h.AlertsStatus(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: got %d, body %s", rr.Code, rr.Body.String())
+	}
+	var resp alertStatusResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Critical == 0 {
+		t.Fatal("expected at least one critical alert")
+	}
+	for _, a := range resp.Alerts {
+		if a.Type == domain.AlertTypePVEHeartbeat && a.ServerID == serverID && a.Title == "Servidor offline" {
+			return
+		}
+	}
+	t.Fatalf("heartbeat alert not found in response: %+v", resp.Alerts)
 }

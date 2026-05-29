@@ -79,13 +79,7 @@
           <div class="settings-hub-icon" style="color:#ef4444"><i class="bi bi-bell-fill"></i></div>
           <div>
             <div class="fw-semibold">Alertas</div>
-            <div class="text-secondary" style="font-size:.8rem">Umbrales globales de disco y backups</div>
-          </div>
-          <div class="mt-auto">
-            {{if .Config}}
-              {{if .Config.AlertDiskPct}}<span class="badge bg-secondary">Disco &gt;{{.Config.AlertDiskPct}}%</span>{{end}}
-              {{if .Config.AlertPBSStaleHours}}<span class="badge bg-secondary ms-1">PBS &gt;{{.Config.AlertPBSStaleHours}}h</span>{{end}}
-            {{end}}
+            <div class="text-secondary" style="font-size:.8rem">Umbrales y avisos</div>
           </div>
         </div>
       </div>
