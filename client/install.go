@@ -14,15 +14,17 @@ import (
 )
 
 const (
-	installDir        = "/opt/probakgo"
-	logDir            = "/var/log/probakgo"
-	logrotateConfPath = "/etc/logrotate.d/probakgo"
-	clientCronPath    = "/etc/cron.d/probakgo-client"
-	vzdumpConfPath    = "/etc/vzdump.conf"
-	hookPath          = installDir + "/vzdump_client.sh"
-	envPath           = installDir + "/.env"
-	binaryPath        = installDir + "/probakgo-client"
-	binaryLinkPath    = "/usr/local/bin/probakgo-client"
+	installDir           = "/opt/probakgo"
+	logDir               = "/var/log/probakgo"
+	logrotateConfPath    = "/etc/logrotate.d/probakgo"
+	clientCronPath       = "/etc/cron.d/probakgo-client"
+	heartbeatServicePath = "/etc/systemd/system/probakgo-client-heartbeat.service"
+	heartbeatTimerPath   = "/etc/systemd/system/probakgo-client-heartbeat.timer"
+	vzdumpConfPath       = "/etc/vzdump.conf"
+	hookPath             = installDir + "/vzdump_client.sh"
+	envPath              = installDir + "/.env"
+	binaryPath           = installDir + "/probakgo-client"
+	binaryLinkPath       = "/usr/local/bin/probakgo-client"
 )
 
 // Generated and written to hookPath during install - no separate shell script needed.
@@ -62,6 +64,30 @@ const logrotateConf = `/var/log/probakgo/*.log {
     missingok
     notifempty
 }
+`
+
+const heartbeatServiceUnit = `[Unit]
+Description=Probakgo client heartbeat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/probakgo/probakgo-client heartbeat
+`
+
+const heartbeatTimerUnit = `[Unit]
+Description=Run Probakgo client heartbeat every 5 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+Unit=probakgo-client-heartbeat.service
+
+[Install]
+WantedBy=timers.target
 `
 
 func runInstall(args []string) {
@@ -173,12 +199,14 @@ func runInstall(args []string) {
 			fmt.Printf("Auto-update cron installed: %s\n", clientCronPath)
 		}
 	}
+	installHeartbeatTimer()
 
 	fmt.Println("\nInstallation complete!")
 	if *apiKey == "" {
 		fmt.Printf("  Next: edit %s\n", envPath)
 	}
 	fmt.Printf("  Test:   %s\n", binaryLinkPath)
+	fmt.Printf("  Heartbeat: %s heartbeat\n", binaryLinkPath)
 	fmt.Printf("  Update: %s update\n", binaryLinkPath)
 }
 
@@ -272,11 +300,15 @@ func runUninstall(_ []string) {
 	}
 
 	// 3. Remove installed files and directories
+	removeHeartbeatTimer()
 	removeBinaryLink()
-	for _, path := range []string{clientCronPath, logrotateConfPath} {
+	for _, path := range []string{clientCronPath, logrotateConfPath, heartbeatServicePath, heartbeatTimerPath} {
 		if err := os.Remove(path); err == nil {
 			fmt.Printf("Removed: %s\n", path)
 		}
+	}
+	if _, err := exec.LookPath("systemctl"); err == nil {
+		_ = exec.Command("systemctl", "daemon-reload").Run()
 	}
 	for _, dir := range []string{installDir, logDir} {
 		if err := os.RemoveAll(dir); err == nil {
@@ -285,6 +317,56 @@ func runUninstall(_ []string) {
 	}
 
 	fmt.Println("\nUninstall complete.")
+}
+
+func installHeartbeatTimer() {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		fmt.Println("WARN: systemctl not found - heartbeat timer not installed")
+		return
+	}
+	if err := os.WriteFile(heartbeatServicePath, []byte(heartbeatServiceUnit), 0644); err != nil {
+		fmt.Printf("WARN: could not write heartbeat service: %v\n", err)
+		return
+	}
+	if err := os.WriteFile(heartbeatTimerPath, []byte(heartbeatTimerUnit), 0644); err != nil {
+		fmt.Printf("WARN: could not write heartbeat timer: %v\n", err)
+		return
+	}
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		fmt.Printf("WARN: systemctl daemon-reload failed: %v\n", err)
+		return
+	}
+	if err := exec.Command("systemctl", "enable", "--now", "probakgo-client-heartbeat.timer").Run(); err != nil {
+		fmt.Printf("WARN: could not enable heartbeat timer: %v\n", err)
+		return
+	}
+	fmt.Println("Heartbeat timer installed: probakgo-client-heartbeat.timer (every 5 min)")
+}
+
+func ensureHeartbeatTimerInstalled() {
+	if os.Getuid() != 0 {
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	self, err = filepath.EvalSymlinks(self)
+	if err != nil || self != binaryPath {
+		return
+	}
+	if _, err := os.Stat(heartbeatTimerPath); err == nil {
+		return
+	}
+	installHeartbeatTimer()
+}
+
+func removeHeartbeatTimer() {
+	if _, err := exec.LookPath("systemctl"); err != nil {
+		return
+	}
+	_ = exec.Command("systemctl", "disable", "--now", "probakgo-client-heartbeat.timer").Run()
+	_ = exec.Command("systemctl", "daemon-reload").Run()
 }
 
 func installBinaryLink() {

@@ -71,6 +71,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"
@@ -79,6 +80,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = 85
 		cfg.AlertBackupErr = true
 		cfg.AlertPBSStaleHours = 48
+		cfg.AlertPVEHeartbeatMinutes = 15
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/system?flash="+err.Error(), http.StatusSeeOther)
@@ -140,6 +142,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
@@ -203,6 +206,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
@@ -256,11 +260,21 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	if pbsStaleHours < 0 {
 		pbsStaleHours = 0
 	}
+	pveHeartbeatStr := r.FormValue("alert_pve_heartbeat_minutes")
+	pveHeartbeatMinutes, err := strconv.Atoi(pveHeartbeatStr)
+	if pveHeartbeatStr != "" && err != nil {
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+minutos+heartbeat+PVE+no+valido", http.StatusSeeOther)
+		return
+	}
+	if pveHeartbeatMinutes < 0 {
+		pveHeartbeatMinutes = 0
+	}
 
 	cfg := domain.EmailConfig{
-		AlertDiskPct:       alertDisk,
-		AlertBackupErr:     r.FormValue("alert_backup_err") == "on",
-		AlertPBSStaleHours: pbsStaleHours,
+		AlertDiskPct:             alertDisk,
+		AlertBackupErr:           r.FormValue("alert_backup_err") == "on",
+		AlertPBSStaleHours:       pbsStaleHours,
+		AlertPVEHeartbeatMinutes: pveHeartbeatMinutes,
 	}
 	if existing != nil {
 		cfg.SMTPHost = existing.SMTPHost
@@ -273,15 +287,21 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.PublicAPIURL = existing.PublicAPIURL
+	} else {
+		cfg.SMTPPort = 587
+		cfg.SendTime = "08:00"
+		cfg.RetentionMonths = 3
+		cfg.RetentionEnabled = true
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/alerts?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
 	h.audit(r, "settings.alerts_update", "settings", "alerts", "Alertas globales", map[string]any{
-		"alert_disk_pct":        cfg.AlertDiskPct,
-		"alert_backup_err":      cfg.AlertBackupErr,
-		"alert_pbs_stale_hours": cfg.AlertPBSStaleHours,
+		"alert_disk_pct":              cfg.AlertDiskPct,
+		"alert_backup_err":            cfg.AlertBackupErr,
+		"alert_pbs_stale_hours":       cfg.AlertPBSStaleHours,
+		"alert_pve_heartbeat_minutes": cfg.AlertPVEHeartbeatMinutes,
 	})
 	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }

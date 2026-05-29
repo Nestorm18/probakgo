@@ -8,14 +8,14 @@ import (
 // --- PVE report payload (sent by client) ---
 
 type PVEReportRequest struct {
-	Hostname         string               `json:"hostname"`
-	IPAddress        string               `json:"ip_address"`
-	PublicIP         string               `json:"public_ip"`
-	ClientVersion    string               `json:"client_version"`
-	MachineID        string               `json:"machine_id"`
-	LastBackupStatus *BackupStatus        `json:"last_backup_status"`
-	Storages         []StoragePayload     `json:"storages"`
-	BackupTasks      []BackupTaskPayload  `json:"backup_tasks"`
+	Hostname         string              `json:"hostname"`
+	IPAddress        string              `json:"ip_address"`
+	PublicIP         string              `json:"public_ip"`
+	ClientVersion    string              `json:"client_version"`
+	MachineID        string              `json:"machine_id"`
+	LastBackupStatus *BackupStatus       `json:"last_backup_status"`
+	Storages         []StoragePayload    `json:"storages"`
+	BackupTasks      []BackupTaskPayload `json:"backup_tasks"`
 }
 
 type BackupTaskPayload struct {
@@ -57,17 +57,17 @@ func (b *BackupStatus) StatusString() string {
 }
 
 type StoragePayload struct {
-	Digest       string            `json:"digest"`
-	PruneBackups json.RawMessage   `json:"prune_backups"`
-	Shared       bool              `json:"shared"`
-	Server       string            `json:"server"`
-	Storage      string            `json:"storage"`
-	Path         string            `json:"path"`
-	Content      string            `json:"content"`
-	Type         string            `json:"type"`
-	Status       string            `json:"status"`
-	StorageInfo  []StorageInfoPayload  `json:"storage_info"`
-	ContentData  []ContentDataPayload  `json:"content_data"`
+	Digest       string               `json:"digest"`
+	PruneBackups json.RawMessage      `json:"prune_backups"`
+	Shared       bool                 `json:"shared"`
+	Server       string               `json:"server"`
+	Storage      string               `json:"storage"`
+	Path         string               `json:"path"`
+	Content      string               `json:"content"`
+	Type         string               `json:"type"`
+	Status       string               `json:"status"`
+	StorageInfo  []StorageInfoPayload `json:"storage_info"`
+	ContentData  []ContentDataPayload `json:"content_data"`
 }
 
 type StorageInfoPayload struct {
@@ -103,21 +103,30 @@ type PBSReportRequest struct {
 	PBSInformation PBSInformation `json:"pbs_information"`
 }
 
+type HeartbeatRequest struct {
+	Hostname      string `json:"hostname"`
+	ServerType    string `json:"server_type"`
+	IPAddress     string `json:"ip_address"`
+	PublicIP      string `json:"public_ip"`
+	ClientVersion string `json:"client_version"`
+	MachineID     string `json:"machine_id"`
+}
+
 type PBSInformation struct {
 	Data []PBSDatastorePayload `json:"data"`
 }
 
 type PBSDatastorePayload struct {
-	Store             string     `json:"store"`
-	Total             int64      `json:"total"`
-	Used              int64      `json:"used"`
-	Avail             int64      `json:"avail"`
-	EstimatedFullDate int64      `json:"estimated-full-date"`
-	MountStatus       string     `json:"mount-status"`
-	HistoryStart      int64      `json:"history-start"`
-	HistoryDelta      int64      `json:"history-delta"`
-	History           []*float64 `json:"history"`
-	GCStatus          *GCStatusPayload `json:"gc-status"`
+	Store             string            `json:"store"`
+	Total             int64             `json:"total"`
+	Used              int64             `json:"used"`
+	Avail             int64             `json:"avail"`
+	EstimatedFullDate int64             `json:"estimated-full-date"`
+	MountStatus       string            `json:"mount-status"`
+	HistoryStart      int64             `json:"history-start"`
+	HistoryDelta      int64             `json:"history-delta"`
+	History           []*float64        `json:"history"`
+	GCStatus          *GCStatusPayload  `json:"gc-status"`
 	Groups            []PBSGroupPayload `json:"groups,omitempty"`
 }
 
@@ -149,27 +158,27 @@ type GCStatusPayload struct {
 // --- API responses ---
 
 type PVEServerResponse struct {
-	ID            int64     `json:"id"`
-	Name          string    `json:"name"`
-	IP            string    `json:"ip"`
-	PublicIP      string    `json:"public_ip"`
-	ClientVersion string    `json:"client_version"`
-	MachineBound  bool      `json:"machine_bound"`
-	IsStale       bool      `json:"is_stale"`
-	StaleReason   string    `json:"stale_reason,omitempty"`
+	ID            int64      `json:"id"`
+	Name          string     `json:"name"`
+	IP            string     `json:"ip"`
+	PublicIP      string     `json:"public_ip"`
+	ClientVersion string     `json:"client_version"`
+	MachineBound  bool       `json:"machine_bound"`
+	IsStale       bool       `json:"is_stale"`
+	StaleReason   string     `json:"stale_reason,omitempty"`
 	LastReport    *time.Time `json:"last_report"`
-	BackupStatus  string    `json:"backup_status"`
+	BackupStatus  string     `json:"backup_status"`
 }
 
 type PBSServerResponse struct {
-	ID            int64     `json:"id"`
-	Name          string    `json:"name"`
-	IP            string    `json:"ip"`
-	PublicIP      string    `json:"public_ip"`
-	ClientVersion string    `json:"client_version"`
-	MachineBound  bool      `json:"machine_bound"`
-	IsStale       bool      `json:"is_stale"`
-	StaleReason   string    `json:"stale_reason,omitempty"`
+	ID            int64      `json:"id"`
+	Name          string     `json:"name"`
+	IP            string     `json:"ip"`
+	PublicIP      string     `json:"public_ip"`
+	ClientVersion string     `json:"client_version"`
+	MachineBound  bool       `json:"machine_bound"`
+	IsStale       bool       `json:"is_stale"`
+	StaleReason   string     `json:"stale_reason,omitempty"`
 	LastReport    *time.Time `json:"last_report"`
 }
 
@@ -192,8 +201,8 @@ type CreateAPIKeyRequest struct {
 }
 
 type CreateAPIKeyResponse struct {
-	ID  int64  `json:"id"`
-	Key string `json:"key"`
+	ID   int64  `json:"id"`
+	Key  string `json:"key"`
 	Name string `json:"name"`
 }
 

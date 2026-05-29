@@ -42,6 +42,15 @@
               </div>
               <div class="form-text">Alerta cuando un grupo de PBS no reciba backup en este número de horas. 0 para desactivar.</div>
             </div>
+            <div class="col-md-5">
+              <label class="form-label">Heartbeat PVE</label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="alert_pve_heartbeat_minutes"
+                       value="{{.Config.AlertPVEHeartbeatMinutes}}" min="0" style="max-width:100px">
+                <span class="input-group-text">min</span>
+              </div>
+              <div class="form-text">Alerta si un PVE deja de enviar heartbeat durante este tiempo. 0 para desactivar.</div>
+            </div>
           </div>
           <div class="mt-4">
             <button type="submit" class="btn btn-primary">

@@ -148,6 +148,20 @@ type PVEBackupTask struct {
 	Filename  string `db:"filename"`
 }
 
+type ServerHeartbeat struct {
+	ID            int64     `db:"id"`
+	ServerType    string    `db:"server_type"`
+	ServerID      int64     `db:"server_id"`
+	Hostname      string    `db:"hostname"`
+	IP            string    `db:"ip"`
+	PublicIP      string    `db:"public_ip"`
+	ClientVersion string    `db:"client_version"`
+	MachineID     string    `db:"machine_id"`
+	LastSeenAt    time.Time `db:"last_seen_at"`
+	CreatedAt     time.Time `db:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"`
+}
+
 type APIKey struct {
 	ID         int64      `db:"id"`
 	Key        string     `db:"key"`
@@ -214,20 +228,21 @@ type VMBackupConfig struct {
 }
 
 type EmailConfig struct {
-	ID                 int64  `db:"id"`
-	SMTPHost           string `db:"smtp_host"`
-	SMTPPort           int    `db:"smtp_port"`
-	SMTPUser           string `db:"smtp_user"`
-	SMTPPass           string `db:"smtp_password"`
-	Recipients         string `db:"recipients"`
-	IsEnabled          bool   `db:"is_enabled"`
-	SendTime           string `db:"send_time"`
-	RetentionMonths    int    `db:"retention_months"`
-	RetentionEnabled   bool   `db:"retention_enabled"`
-	AlertDiskPct       int    `db:"alert_disk_pct"` // 0 = disabled
-	AlertBackupErr     bool   `db:"alert_backup_err"`
-	AlertPBSStaleHours int    `db:"alert_pbs_stale_hours"` // 0 = disabled
-	PublicAPIURL       string `db:"public_api_url"`
+	ID                       int64  `db:"id"`
+	SMTPHost                 string `db:"smtp_host"`
+	SMTPPort                 int    `db:"smtp_port"`
+	SMTPUser                 string `db:"smtp_user"`
+	SMTPPass                 string `db:"smtp_password"`
+	Recipients               string `db:"recipients"`
+	IsEnabled                bool   `db:"is_enabled"`
+	SendTime                 string `db:"send_time"`
+	RetentionMonths          int    `db:"retention_months"`
+	RetentionEnabled         bool   `db:"retention_enabled"`
+	AlertDiskPct             int    `db:"alert_disk_pct"` // 0 = disabled
+	AlertBackupErr           bool   `db:"alert_backup_err"`
+	AlertPBSStaleHours       int    `db:"alert_pbs_stale_hours"` // 0 = disabled
+	PublicAPIURL             string `db:"public_api_url"`
+	AlertPVEHeartbeatMinutes int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
 }
 
 // Alert represents a detected condition requiring attention.
@@ -256,6 +271,7 @@ const (
 	AlertTypePBSStale       = "pbs_stale"
 	AlertTypePBSVerify      = "pbs_verify"
 	AlertTypePVEStale       = "pve_stale"
+	AlertTypePVEHeartbeat   = "pve_heartbeat"
 	AlertTypePBSReportStale = "pbs_report_stale"
 	AlertTypePVEMissingVM   = "pve_missing_vm"
 	AlertTypePVEUnknownVM   = "pve_unknown_vm"
