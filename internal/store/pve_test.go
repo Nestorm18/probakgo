@@ -201,14 +201,14 @@ func TestGetPVEBackupTasksForReport_Empty(t *testing.T) {
 	}
 }
 
-func TestGetPVEBackupTasksForReport_OrderedByStarttime(t *testing.T) {
+func TestGetPVEBackupTasksForReport_OrderedByVMID(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
 	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
-	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 200, StartTime: 2000})
-	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 100, StartTime: 1000})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 200, StartTime: 1000})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 100, StartTime: 2000})
 
 	tasks, err := st.GetPVEBackupTasksForReport(ctx, reportID)
 	if err != nil {
@@ -218,7 +218,7 @@ func TestGetPVEBackupTasksForReport_OrderedByStarttime(t *testing.T) {
 		t.Fatalf("want 2 tasks, got %d", len(tasks))
 	}
 	if tasks[0].VMID != 100 || tasks[1].VMID != 200 {
-		t.Errorf("want tasks ordered by starttime ASC, got VMIDs %d, %d", tasks[0].VMID, tasks[1].VMID)
+		t.Errorf("want tasks ordered by VMID ASC, got VMIDs %d, %d", tasks[0].VMID, tasks[1].VMID)
 	}
 }
 

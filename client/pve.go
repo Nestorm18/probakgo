@@ -310,22 +310,33 @@ func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
 	if upid == "" {
 		return nil
 	}
-	data, err := c.get(fmt.Sprintf("nodes/%s/tasks/%s/log", c.si.Hostname, url.PathEscape(upid)))
-	if err != nil {
-		return nil
-	}
-	raw, _ := data["data"].([]any)
 	var lines []string
-	for _, item := range raw {
-		m, ok := item.(map[string]any)
-		if !ok {
-			continue
+	const pageLimit = 500
+	for start := 0; ; start += pageLimit {
+		data, err := c.get(fmt.Sprintf("nodes/%s/tasks/%s/log?start=%d&limit=%d", c.si.Hostname, url.PathEscape(upid), start, pageLimit))
+		if err != nil {
+			log.Printf("WARN: could not read vzdump task log %s: %v", upid, err)
+			return nil
 		}
-		if text, ok := m["t"].(string); ok {
-			lines = append(lines, text)
+		raw, _ := data["data"].([]any)
+		for _, item := range raw {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if text, ok := m["t"].(string); ok {
+				lines = append(lines, text)
+			}
+		}
+		if len(raw) < pageLimit {
+			break
 		}
 	}
-	return parseBackupDurations(lines)
+	durations := parseBackupDurations(lines)
+	if len(durations) == 0 {
+		log.Printf("WARN: no per-VM durations found in vzdump task log %s (%d lines)", upid, len(lines))
+	}
+	return durations
 }
 
 var finishedBackupREs = []*regexp.Regexp{

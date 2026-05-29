@@ -227,6 +227,7 @@ type EmailConfig struct {
 	AlertDiskPct       int    `db:"alert_disk_pct"` // 0 = disabled
 	AlertBackupErr     bool   `db:"alert_backup_err"`
 	AlertPBSStaleHours int    `db:"alert_pbs_stale_hours"` // 0 = disabled
+	PublicAPIURL       string `db:"public_api_url"`
 }
 
 // Alert represents a detected condition requiring attention.

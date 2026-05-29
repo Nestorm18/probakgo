@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -13,6 +14,18 @@ import (
 	"probakgo/internal/domain"
 	"probakgo/internal/session"
 )
+
+type pveBackupJobRow struct {
+	VMID       int64
+	VMIDText   string
+	VMName     string
+	Status     string
+	Duration   int64
+	Size       int64
+	Filename   string
+	IsMissing  bool
+	IsExcluded bool
+}
 
 func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -120,6 +133,22 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 
 	configuredVMIDs := make(map[string]bool)
 	var missingVMs []map[string]any
+	var backupRows []pveBackupJobRow
+	var backupJobStart int64
+	for _, t := range backupTasks {
+		if backupJobStart == 0 || (t.StartTime > 0 && t.StartTime < backupJobStart) {
+			backupJobStart = t.StartTime
+		}
+		backupRows = append(backupRows, pveBackupJobRow{
+			VMID:     t.VMID,
+			VMIDText: strconv.FormatInt(t.VMID, 10),
+			VMName:   t.VMName,
+			Status:   t.Status,
+			Duration: t.Duration,
+			Size:     t.Size,
+			Filename: t.Filename,
+		})
+	}
 	if len(backupTasks) > 0 {
 		configs, _ := h.store.ListVMBackupConfigs(ctx, sv.Name)
 		for _, c := range configs {
@@ -135,14 +164,28 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 				if !domain.VMScheduledForDay(c, jobDay) || seenVMIDs[c.VMID] {
 					continue
 				}
+				vmidNum, _ := strconv.ParseInt(c.VMID, 10, 64)
 				missingVMs = append(missingVMs, map[string]any{
 					"VMID":       c.VMID,
 					"VMName":     c.VMName,
 					"IsExcluded": c.IsExcluded,
 				})
+				backupRows = append(backupRows, pveBackupJobRow{
+					VMID:       vmidNum,
+					VMIDText:   c.VMID,
+					VMName:     c.VMName,
+					IsMissing:  true,
+					IsExcluded: c.IsExcluded,
+				})
 			}
 		}
 	}
+	sort.SliceStable(backupRows, func(i, j int) bool {
+		if backupRows[i].VMID == backupRows[j].VMID {
+			return backupRows[i].VMIDText < backupRows[j].VMIDText
+		}
+		return backupRows[i].VMID < backupRows[j].VMID
+	})
 
 	// Job history: up to 6 previous reports with tasks (reports[0] is already the latest)
 	var historyIDs []int64
@@ -185,6 +228,8 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Reports":         reports,
 		"Storages":        storages,
 		"BackupTasks":     backupTasks,
+		"BackupRows":      backupRows,
+		"BackupJobStart":  backupJobStart,
 		"MissingVMs":      missingVMs,
 		"ConfiguredVMIDs": configuredVMIDs,
 		"JobHistory":      jobHistory,

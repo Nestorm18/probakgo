@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -62,6 +63,7 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serverURL := r.FormValue("server_url")
+	githubToken := strings.TrimSpace(r.FormValue("github_token"))
 	k, err := h.store.CreateAPIKey(ctx, name, serverName, serverURL)
 	if err != nil {
 		http.Redirect(w, r, "/api-keys?flash="+err.Error(), http.StatusSeeOther)
@@ -76,13 +78,18 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	if r.TLS != nil {
 		scheme = "https"
 	}
+	apiURL := scheme + "://" + r.Host
+	if cfg, err := h.store.GetEmailConfig(ctx); err == nil && cfg.PublicAPIURL != "" {
+		apiURL = cfg.PublicAPIURL
+	}
 	username, role, _ := session.GetUser(r)
 	h.tmpl.Render(w, r, "api_key_created.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Key":      k.Key,
-		"Name":     k.Name,
-		"APIURL":   scheme + "://" + r.Host,
+		"Username":    username,
+		"Role":        role,
+		"Key":         k.Key,
+		"Name":        k.Name,
+		"APIURL":      apiURL,
+		"GitHubToken": githubToken,
 	})
 }
 

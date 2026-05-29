@@ -34,6 +34,7 @@ var templateActive = map[string]string{
 	"api_key_created.html":       "keys",
 	"users.html":                 "users",
 	"settings_hub.html":          "settings",
+	"system_settings.html":       "settings",
 	"email_settings.html":        "settings",
 	"maintenance_settings.html":  "settings",
 	"alerts_settings.html":       "settings",
