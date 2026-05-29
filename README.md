@@ -139,8 +139,6 @@ go build -ldflags "-X main.version=1.0.0" -o probakgo-client ./client/
 | Documento | Descripción |
 |---|---|
 | [INSTALLATION.md](INSTALLATION.md) | Guía completa: systemd, nginx, múltiples nodos, resolución de problemas |
-| [docs/EMAIL_NOTIFICATIONS.md](docs/EMAIL_NOTIFICATIONS.md) | Configuración de email e informes diarios |
-| [docs/MIGRATIONS.md](docs/MIGRATIONS.md) | Esquema de base de datos y migraciones |
 | [docs/DEVTEST.md](docs/DEVTEST.md) | Entorno de pruebas end-to-end desde Windows |
 
 ---

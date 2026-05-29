@@ -290,9 +290,9 @@ func (s *Store) InsertPVEBackupTask(ctx context.Context, reportID int64, t domai
 }
 
 func (s *Store) GetPVEBackupTasksForReport(ctx context.Context, reportID int64) ([]domain.PVEBackupTask, error) {
-	debug.RecordQuery(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename FROM pve_backup_tasks WHERE report_id = ? ORDER BY starttime ASC`)
+	debug.RecordQuery(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename FROM pve_backup_tasks WHERE report_id = ? ORDER BY vmid ASC`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
-		FROM pve_backup_tasks WHERE report_id = ? ORDER BY starttime ASC`, reportID)
+		FROM pve_backup_tasks WHERE report_id = ? ORDER BY vmid ASC`, reportID)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +315,7 @@ func (s *Store) GetPVEBackupTasksForReports(ctx context.Context, reportIDs []int
 	}
 	ph, args := int64InArgs(reportIDs)
 	q := `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
-		FROM pve_backup_tasks WHERE report_id IN (` + ph + `) ORDER BY report_id, starttime ASC`
+		FROM pve_backup_tasks WHERE report_id IN (` + ph + `) ORDER BY report_id, vmid ASC`
 	rows, err := s.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err

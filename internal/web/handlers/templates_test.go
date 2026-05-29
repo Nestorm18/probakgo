@@ -124,9 +124,10 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		}),
 		"alerts_settings.html": base(map[string]any{"Config": emailConfig}),
 		"api_key_created.html": base(map[string]any{
-			"Name":   "cliente-pve",
-			"Key":    "pbk-1234567890abcdef",
-			"APIURL": "http://probakgo.test:36748",
+			"Name":        "cliente-pve",
+			"Key":         "pbk-1234567890abcdef",
+			"APIURL":      "http://probakgo.test:36748",
+			"GitHubToken": "",
 		}),
 		"api_key_edit.html": base(map[string]any{
 			"Key": domain.APIKey{ID: 1, Name: "cliente-pve", Key: "pbk-1234567890abcdef", ServerName: "pve-1", ServerURL: "https://10.0.0.1:8006"},
@@ -173,6 +174,8 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		"server_pve_detail.html": base(map[string]any{
 			"Server":          pveServer,
 			"BackupTasks":     []domain.PVEBackupTask{},
+			"BackupRows":      []pveBackupJobRow{},
+			"BackupJobStart":  int64(0),
 			"MissingVMs":      []map[string]any{},
 			"ConfiguredVMIDs": map[string]bool{},
 			"VMAlertConfigs":  map[int64]domain.PVEVMAlertConfig{},
@@ -190,6 +193,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Config":   emailConfig,
 			"BanCount": 0,
 		}),
+		"system_settings.html": base(map[string]any{"Config": emailConfig}),
 		"users.html": base(map[string]any{
 			"Users":           []domain.User{},
 			"CurrentUsername": "admin",

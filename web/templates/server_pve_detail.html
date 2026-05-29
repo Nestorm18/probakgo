@@ -45,7 +45,7 @@
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between">
     <span><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Último job de backup</span>
-    {{if .BackupTasks}}<span style="font-size:.75rem;color:var(--txt-muted);font-weight:400">{{formatUnixTime (index .BackupTasks 0).StartTime}}</span>{{end}}
+    {{if .BackupJobStart}}<span style="font-size:.75rem;color:var(--txt-muted);font-weight:400">{{formatUnixTime .BackupJobStart}}</span>{{end}}
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -60,38 +60,36 @@
         </tr>
       </thead>
       <tbody>
-      {{range .BackupTasks}}
+      {{range .BackupRows}}
       <tr>
-        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMIDText}}</td>
         <td style="font-weight:500">
           {{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
-          {{if not (index $.ConfiguredVMIDs (printf "%d" .VMID))}}<span class="status-pill info ms-1" style="font-size:.65rem" title="Esta VM no está en el backup config">No configurada</span>{{end}}
+          {{if and (not .IsMissing) (not (index $.ConfiguredVMIDs .VMIDText))}}<span class="status-pill info ms-1" style="font-size:.65rem" title="Esta VM no está en el backup config">No configurada</span>{{end}}
         </td>
         <td>
-          {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
-          {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
-        </td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
-        <td style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace;word-break:break-all;max-width:260px">{{.Filename}}</td>
-      </tr>
-      {{end}}
-      {{range .MissingVMs}}
-      <tr>
-        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMID}}</td>
-        <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
-        <td>
+          {{if .IsMissing}}
           {{if .IsExcluded}}
           <span class="status-pill warn">SIN BACKUP</span>
           <span class="status-pill muted ms-1">Excluida</span>
           {{else}}
           <span class="status-pill bad">SIN BACKUP</span>
           {{end}}
+          {{else}}
+          {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
+          {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
+          {{end}}
         </td>
+        {{if .IsMissing}}
         <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup en el último job</td>
+        {{else}}
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace;word-break:break-all;max-width:260px">{{.Filename}}</td>
+        {{end}}
       </tr>
       {{end}}
-      {{if and (eq (len .BackupTasks) 0) (eq (len .MissingVMs) 0)}}
+      {{if eq (len .BackupRows) 0}}
       <tr><td colspan="6" class="text-center py-4" style="color:var(--txt-muted)">Sin datos de tareas</td></tr>
       {{end}}
       </tbody>

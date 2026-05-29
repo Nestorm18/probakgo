@@ -48,6 +48,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		RetentionEnabled: false,
 		AlertDiskPct:     90,
 		AlertBackupErr:   false,
+		PublicAPIURL:     "https://probakgo.example.com",
 	}
 
 	if err := st.UpsertEmailConfig(ctx, want); err != nil {
@@ -75,6 +76,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"RetentionEnabled", got.RetentionEnabled, want.RetentionEnabled},
 		{"AlertDiskPct", got.AlertDiskPct, want.AlertDiskPct},
 		{"AlertBackupErr", got.AlertBackupErr, want.AlertBackupErr},
+		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
 	}
 	for _, c := range checks {
 		if c.got != c.want {

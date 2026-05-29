@@ -152,6 +152,7 @@ Session code lives in `internal/session` (not `internal/web`) to avoid:
 
 ### Settings pages (2026-04)
 Email, Mantenimiento y Alertas son páginas separadas bajo `/settings/`:
+- `/settings/system` - URL pública/API de Probakgo usada en comandos de instalación
 - `/settings/email` - SMTP, destinatarios, hora de envío
 - `/settings/maintenance` - retención de reportes (meses + toggle)
 - `/settings/alerts` - umbrales globales: disco (%), backup fallido, PBS stale (h)
@@ -264,6 +265,7 @@ Embedded in `internal/db/migrations/`. Applied automatically on server startup v
 | `009_remove_admin_keys.up.sql` | Remove deprecated `admin` key type rows |
 | `010_apikey_server_url.up.sql` | `server_url` column in `api_keys` |
 | `011_alert_suppressions_idx.up.sql` | Index on `alert_suppressions.suppressed_until` |
+| `012_public_api_url.up.sql` | `public_api_url` global para comandos de instalación |
 
 ### Test fixtures (`testdata/`)
 

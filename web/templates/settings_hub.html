@@ -5,6 +5,27 @@
 <div class="row g-3">
 
   <div class="col-sm-6 col-xl-3">
+    <a href="/settings/system" class="text-decoration-none">
+      <div class="card h-100 settings-hub-card">
+        <div class="card-body d-flex flex-column gap-2">
+          <div class="settings-hub-icon" style="color:#0ea5e9"><i class="bi bi-globe2"></i></div>
+          <div>
+            <div class="fw-semibold">Sistema</div>
+            <div class="text-secondary" style="font-size:.8rem">URL pública para instalar clientes</div>
+          </div>
+          <div class="mt-auto">
+            {{if and .Config .Config.PublicAPIURL}}
+              <span class="badge bg-secondary">{{.Config.PublicAPIURL}}</span>
+            {{else}}
+              <span class="badge" style="background:var(--clr-secondary)">URL actual</span>
+            {{end}}
+          </div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-sm-6 col-xl-3">
     <a href="/settings/email" class="text-decoration-none">
       <div class="card h-100 settings-hub-card">
         <div class="card-body d-flex flex-column gap-2">

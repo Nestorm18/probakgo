@@ -113,6 +113,11 @@
             <label class="form-label">URL Proxmox <span style="color:var(--txt-muted)">(opcional)</span></label>
             <input type="url" name="server_url" class="form-control" placeholder="https://192.168.1.10:8006">
           </div>
+          <div class="mb-3">
+            <label class="form-label">Token GitHub para instalación <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="password" name="github_token" class="form-control" placeholder="ghp_...">
+            <div class="form-text">Solo se usa para generar el comando de instalación; no se guarda.</div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>

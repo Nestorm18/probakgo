@@ -42,7 +42,7 @@
               Descargar el cliente
             </div>
             <div style="position:relative">
-              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 -O /tmp/probakgo-client</pre>
+              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">{{if .GitHubToken}}wget --header "X-GitHub-Token: {{.GitHubToken}}" {{.APIURL}}/download/client/linux-amd64 -O /tmp/probakgo-client{{else}}wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 -O /tmp/probakgo-client{{end}}</pre>
               <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
                 <i class="bi bi-clipboard" style="font-size:.85rem"></i>
               </button>
@@ -68,7 +68,7 @@
               Instalar
             </div>
             <div style="position:relative">
-              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}</pre>
+              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}{{if .GitHubToken}} --github-token {{.GitHubToken}}{{end}}</pre>
               <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
                 <i class="bi bi-clipboard" style="font-size:.85rem"></i>
               </button>

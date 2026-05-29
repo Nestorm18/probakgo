@@ -46,6 +46,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.Use(webhandlers.DebugBarMiddleware(dev))
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	r.Get("/download/client/linux-amd64", h.DownloadClientLinuxAMD64)
 
 	loginLimiter := ratelimit.New(10, time.Minute)
 
@@ -103,6 +104,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		// Settings - admin only
 		r.With(RequireAdmin).Get("/settings", h.SettingsHub)
+		r.With(RequireAdmin).Get("/settings/system", h.SystemSettings)
+		r.With(RequireAdmin).Post("/settings/system", h.SystemSettingsPost)
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin).Post("/settings/email", h.EmailSettingsPost)
 		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)

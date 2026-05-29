@@ -103,6 +103,21 @@ En la web UI:
 
 ---
 
+### Token GitHub para repo privado
+
+Si la release de `probakgo` está en un repositorio privado, crea un token temporal en GitHub antes de generar el comando de instalación:
+
+1. En GitHub, entra en **Settings** → **Developer settings** → **Personal access tokens**.
+2. Preferible: **Fine-grained tokens** → **Generate new token**.
+3. Selecciona el repositorio `Nestorm18/probakgo`.
+4. En permisos, concede **Contents: Read-only**. No necesita permisos de escritura.
+5. Pon una expiración corta, por ejemplo 1 día o 7 días.
+6. Copia el token y pégalo en el campo **Token GitHub para instalación** al crear la API key en Probakgo.
+
+Probakgo usa ese token sólo para generar el comando de descarga con `wget` y el comando `install --github-token`. No se guarda en la base de datos.
+
+---
+
 ## 4. Cliente en el nodo Proxmox
 
 ### Subir el cliente al nodo

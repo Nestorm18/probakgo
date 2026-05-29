@@ -3,7 +3,9 @@ package webhandlers
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -26,6 +28,66 @@ func (h *WebH) SettingsHub(w http.ResponseWriter, r *http.Request) {
 		"Config":   cfg,
 		"BanCount": banCount,
 	})
+}
+
+func (h *WebH) SystemSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, role, _ := session.GetUser(r)
+	cfg, err := h.store.GetEmailConfig(ctx)
+	if err != nil {
+		slog.Error("load system config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	h.tmpl.Render(w, r, "system_settings.html", map[string]any{
+		"Username": username,
+		"Role":     role,
+		"Config":   cfg,
+	})
+}
+
+func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	existing, _ := h.store.GetEmailConfig(ctx)
+	publicURL := strings.TrimRight(strings.TrimSpace(r.FormValue("public_api_url")), "/")
+	if publicURL != "" {
+		u, err := url.Parse(publicURL)
+		if err != nil || u.Scheme == "" || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+			http.Redirect(w, r, "/settings/system?flash=URL+publica+no+valida", http.StatusSeeOther)
+			return
+		}
+	}
+	cfg := domain.EmailConfig{PublicAPIURL: publicURL}
+	if existing != nil {
+		cfg.SMTPHost = existing.SMTPHost
+		cfg.SMTPPort = existing.SMTPPort
+		cfg.SMTPUser = existing.SMTPUser
+		cfg.SMTPPass = existing.SMTPPass
+		cfg.Recipients = existing.Recipients
+		cfg.IsEnabled = existing.IsEnabled
+		cfg.SendTime = existing.SendTime
+		cfg.RetentionMonths = existing.RetentionMonths
+		cfg.RetentionEnabled = existing.RetentionEnabled
+		cfg.AlertDiskPct = existing.AlertDiskPct
+		cfg.AlertBackupErr = existing.AlertBackupErr
+		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+	} else {
+		cfg.SMTPPort = 587
+		cfg.SendTime = "08:00"
+		cfg.RetentionMonths = 3
+		cfg.RetentionEnabled = true
+		cfg.AlertDiskPct = 85
+		cfg.AlertBackupErr = true
+		cfg.AlertPBSStaleHours = 48
+	}
+	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
+		http.Redirect(w, r, "/settings/system?flash="+err.Error(), http.StatusSeeOther)
+		return
+	}
+	h.audit(r, "settings.system_update", "settings", "system", "Sistema", map[string]any{
+		"public_api_url_set": cfg.PublicAPIURL != "",
+	})
+	http.Redirect(w, r, "/settings/system?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +140,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.PublicAPIURL = existing.PublicAPIURL
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/email?flash="+err.Error(), http.StatusSeeOther)
@@ -140,6 +203,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertDiskPct = existing.AlertDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.PublicAPIURL = existing.PublicAPIURL
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
@@ -208,6 +272,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.SendTime = existing.SendTime
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
+		cfg.PublicAPIURL = existing.PublicAPIURL
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/alerts?flash="+err.Error(), http.StatusSeeOther)
