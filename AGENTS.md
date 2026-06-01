@@ -60,6 +60,17 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
+## 5. Commit Style
+
+**Use Conventional Commits for readable history.**
+
+When creating commits, use these prefixes:
+- `feat:` new functionality
+- `fix:` bug correction
+- `refactor:` refactoring without behavior change
+- `docs:` documentation-only changes
+- `chore:` maintenance tasks
+
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
