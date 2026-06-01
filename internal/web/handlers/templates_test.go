@@ -177,7 +177,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"BackupTasks":     []domain.PVEBackupTask{},
 			"BackupRows":      []pveBackupJobRow{},
 			"BackupJobStart":  int64(0),
-			"Heartbeat":       heartbeatView{Label: "Sin heartbeat", CSSClass: "muted"},
+			"Heartbeat":       heartbeatView{Label: "Sin datos", CSSClass: "muted"},
 			"MissingVMs":      []map[string]any{},
 			"ConfiguredVMIDs": map[string]bool{},
 			"VMAlertConfigs":  map[int64]domain.PVEVMAlertConfig{},

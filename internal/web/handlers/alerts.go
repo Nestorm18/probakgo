@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -32,6 +33,24 @@ type suppressedAlertGroup struct {
 	ServerType string
 	ServerID   int64
 	Rows       []suppressedAlertRow
+}
+
+type alertStatusItem struct {
+	ID         string `json:"id"`
+	Severity   string `json:"severity"`
+	Title      string `json:"title"`
+	Message    string `json:"message"`
+	ServerName string `json:"server_name"`
+	ServerType string `json:"server_type"`
+	ServerID   int64  `json:"server_id"`
+	Type       string `json:"type"`
+}
+
+type alertStatusResponse struct {
+	Critical    int               `json:"critical"`
+	Warning     int               `json:"warning"`
+	Alerts      []alertStatusItem `json:"alerts"`
+	GeneratedAt int64             `json:"generated_at"`
 }
 
 func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +139,66 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 		"FilterServer":     filterServer,
 		"ServerNames":      serverNames,
 	})
+}
+
+func (h *WebH) AlertsStatus(w http.ResponseWriter, r *http.Request) {
+	active, critical, warning, err := h.activeAlerts(r.Context())
+	if err != nil {
+		slog.Error("load alert status", "err", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": "error interno del servidor"})
+		return
+	}
+
+	resp := alertStatusResponse{
+		Critical:    critical,
+		Warning:     warning,
+		GeneratedAt: time.Now().Unix(),
+	}
+	for _, a := range active {
+		resp.Alerts = append(resp.Alerts, alertStatusItem{
+			ID:         a.ID,
+			Severity:   a.Severity,
+			Title:      a.Title,
+			Message:    a.Message,
+			ServerName: a.ServerName,
+			ServerType: a.ServerType,
+			ServerID:   a.ServerID,
+			Type:       a.Type,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, error) {
+	cfg, err := service.LoadAlertConfigs(ctx, h.store)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	cfg.Report = h.report
+	allAlerts, err := service.RunAll(h.store, cfg)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	suppressions, _ := h.store.GetActiveSuppressions(ctx)
+
+	var active []domain.Alert
+	var critical, warning int
+	for _, a := range allAlerts {
+		if _, ok := suppressions[a.ID]; ok {
+			continue
+		}
+		active = append(active, a)
+		if a.Severity == domain.AlertSeverityCritical {
+			critical++
+		} else {
+			warning++
+		}
+	}
+	return active, critical, warning, nil
 }
 
 func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
@@ -221,6 +300,8 @@ func alertTitleFromID(alertID string) string {
 		return "PVE sin reporte"
 	case domain.AlertTypePBSReportStale:
 		return "PBS sin reporte"
+	case domain.AlertTypePVEHeartbeat:
+		return "Servidor offline"
 	case domain.AlertTypePVEMissingVM:
 		return "VM sin backup"
 	case domain.AlertTypePVEUnknownVM:

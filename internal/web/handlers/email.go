@@ -263,7 +263,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	pveHeartbeatStr := r.FormValue("alert_pve_heartbeat_minutes")
 	pveHeartbeatMinutes, err := strconv.Atoi(pveHeartbeatStr)
 	if pveHeartbeatStr != "" && err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+minutos+heartbeat+PVE+no+valido", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+minutos+de+conexion+PVE+no+valido", http.StatusSeeOther)
 		return
 	}
 	if pveHeartbeatMinutes < 0 {
