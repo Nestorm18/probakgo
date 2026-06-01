@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -12,7 +14,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.69"
+var version = "0.0.77"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -39,11 +41,17 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
 				os.Exit(1)
 			}
-			if os.Getuid() == 0 {
-				ensureHeartbeatTimerInstalled()
-			} else if updated {
-				fmt.Fprintln(os.Stderr, "WARN: run as root once to install the heartbeat systemd timer")
+			if updated && os.Getuid() == 0 {
+				if err := runUpdatedClientPostUpdate(); err != nil {
+					fmt.Fprintf(os.Stderr, "WARN: post-update hook failed: %v\n", err)
+					runClientPostUpdate(updated)
+				}
+			} else {
+				runClientPostUpdate(updated)
 			}
+			return
+		case "post-update":
+			runClientPostUpdate(false)
 			return
 		case "heartbeat":
 			runHeartbeat()
@@ -142,6 +150,31 @@ func main() {
 
 	fmt.Println("Configuration OK.")
 	fmt.Println("Use --vzdump-hook to send a report after each backup.")
+}
+
+func runUpdatedClientPostUpdate() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(exe, "post-update")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func runClientPostUpdate(updated bool) {
+	if os.Getuid() == 0 {
+		ensureHeartbeatTimerInstalled()
+		return
+	}
+	if updated {
+		fmt.Fprintln(os.Stderr, "WARN: run as root once to install the heartbeat systemd timer")
+	}
 }
 
 func runHeartbeat() {
