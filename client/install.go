@@ -135,7 +135,19 @@ func runInstall(args []string) {
 	// 3. .env: generate Proxmox token if not provided, then write
 	preserveEnv := !*replaceEnv
 	if _, err := os.Stat(envPath); err == nil && preserveEnv {
-		fmt.Println(".env already exists - preserving (use --replace-env to overwrite)")
+		updated, err := updateEnvFile(envPath, map[string]string{
+			"API_KEY":        *apiKey,
+			"API_URL":        *apiURL,
+			"PROXMOX_TOKEN":  *proxmoxToken,
+			"PROXMOX_SECRET": *proxmoxSecret,
+			"GITHUB_TOKEN":   *githubToken,
+		})
+		must(err, "update .env")
+		if updated {
+			fmt.Printf(".env updated: %s\n", envPath)
+		} else {
+			fmt.Println(".env already exists - preserving (use --replace-env to overwrite)")
+		}
 	} else {
 		if *proxmoxToken == "" || *proxmoxSecret == "" {
 			tok, sec, err := generateProxmoxToken("probakgo-client")
@@ -510,6 +522,73 @@ PROXMOX_VERIFY_TLS=false
 %s
 `, apiKey, apiURL, proxmoxToken, proxmoxSecret, ghLine)
 	return os.WriteFile(envPath, []byte(content), 0600)
+}
+
+func updateEnvFile(path string, updates map[string]string) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	content, changed := mergeEnvContent(string(data), updates)
+	if !changed {
+		return false, nil
+	}
+	return true, os.WriteFile(path, []byte(content), 0600)
+}
+
+func mergeEnvContent(content string, updates map[string]string) (string, bool) {
+	clean := make(map[string]string)
+	for k, v := range updates {
+		if strings.TrimSpace(k) != "" && v != "" {
+			clean[k] = v
+		}
+	}
+	if len(clean) == 0 {
+		return content, false
+	}
+
+	normalized := strings.ReplaceAll(content, "\r\n", "\n")
+	lines := strings.Split(normalized, "\n")
+	seen := make(map[string]bool)
+	changed := false
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		key, _, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value, exists := clean[key]
+		if !exists {
+			continue
+		}
+		seen[key] = true
+		next := key + "=" + value
+		if line != next {
+			lines[i] = next
+			changed = true
+		}
+	}
+	for _, key := range []string{"API_KEY", "API_URL", "PROXMOX_TOKEN", "PROXMOX_SECRET", "GITHUB_TOKEN"} {
+		value, ok := clean[key]
+		if !ok || seen[key] {
+			continue
+		}
+		if len(lines) > 0 && lines[len(lines)-1] == "" {
+			lines[len(lines)-1] = key + "=" + value
+			lines = append(lines, "")
+		} else {
+			lines = append(lines, key+"="+value)
+		}
+		changed = true
+	}
+	if !changed {
+		return content, false
+	}
+	return strings.Join(lines, "\n"), true
 }
 
 func copyExec(src, dst string) error {
