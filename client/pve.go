@@ -133,9 +133,9 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		}
 		end, hasEnd := m["endtime"].(float64)
 		start, hasStart := m["starttime"].(float64)
-		status, hasStatus := m["status"].(string)
 		id, _ := m["id"].(string)
 		upid, _ := m["upid"].(string)
+		status, hasStatus := c.taskStatus(m)
 		if !hasEnd || !hasStart || !hasStatus {
 			continue
 		}
@@ -306,6 +306,34 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	return result
 }
 
+func (c *pveClient) taskStatus(task map[string]any) (string, bool) {
+	if exitstatus := str(task["exitstatus"]); exitstatus != "" {
+		return exitstatus, true
+	}
+	status := str(task["status"])
+	if status == "stopped" {
+		if upid := str(task["upid"]); upid != "" {
+			if exitstatus := c.taskExitStatus(upid); exitstatus != "" {
+				return exitstatus, true
+			}
+		}
+	}
+	if status != "" {
+		return status, true
+	}
+	return "", false
+}
+
+func (c *pveClient) taskExitStatus(upid string) string {
+	data, err := c.get(fmt.Sprintf("nodes/%s/tasks/%s/status", c.si.Hostname, url.PathEscape(upid)))
+	if err != nil {
+		log.Printf("WARN: could not read vzdump task status %s: %v", upid, err)
+		return ""
+	}
+	payload, _ := data["data"].(map[string]any)
+	return str(payload["exitstatus"])
+}
+
 func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
 	if upid == "" {
 		return nil
@@ -407,7 +435,7 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 		}
 		end, hasEnd := m["endtime"].(float64)
 		start, hasStart := m["starttime"].(float64)
-		status, hasStatus := m["status"].(string)
+		status, hasStatus := c.taskStatus(m)
 		if hasEnd && hasStart && hasStatus {
 			finished = append(finished, task{end, start, status})
 		}

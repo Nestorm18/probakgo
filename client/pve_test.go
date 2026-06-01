@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -243,6 +244,50 @@ func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
 		if got := task["duration"]; got != int64(0) {
 			t.Errorf("duration without per-VM log: got %v, want 0", got)
 		}
+	}
+}
+
+func TestBackupJobTasksUsesExitStatusForStoppedAggregateJob(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"upid":      "UPID:test-node:000123:ABCDEF:664BEEF0:vzdump::root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(10200),
+					"status":    "stopped",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/status") {
+			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+				"data": map[string]any{"status": "stopped", "exitstatus": "OK"},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	filesByVMID := map[int64][]backupFile{
+		100: {{ctime: 10010, size: 39_000_000, volid: "pbs:backup/ct/100"}},
+	}
+
+	tasks := newTestPVEClient(srv).backupJobTasks(map[int64]string{100: "adguard"}, filesByVMID)
+
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 reconstructed task, got %d", len(tasks))
+	}
+	if got := tasks[0]["status"]; got != "OK" {
+		t.Fatalf("status: got %v, want OK", got)
+	}
+	if bs := jobBackupStatus(tasks); !bs.OK {
+		t.Fatal("jobBackupStatus should be OK when Proxmox exitstatus is OK")
 	}
 }
 
