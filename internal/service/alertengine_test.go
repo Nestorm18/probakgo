@@ -165,6 +165,21 @@ func TestEvalPVEBackupErrors_OKTask_NoAlert(t *testing.T) {
 	}
 }
 
+func TestEvalPVEBackupErrors_ReportStatusFallbackForOldClients(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-old-client", "1.1.1.1", "", "0.0.60", "")
+	bs := &domain.BackupStatus{Status: json.RawMessage(`false`)}
+	_, _ = st.InsertPVEReport(ctx, serverID, bs)
+
+	cfg := defaultCfg()
+	alerts, _ := evalPVEBackupErrors(st, cfg)
+
+	if !hasAlert(alerts, domain.AlertTypeBackupError, "pve-old-client") {
+		t.Error("expected backup_error alert from report backup_status when no tasks exist")
+	}
+}
+
 func TestEvalPVEBackupErrors_VMOverride_Ignore(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

@@ -20,7 +20,7 @@
 
 <!-- Stat cards -->
 <div class="row g-3 mb-4">
-  <div class="col-6 col-xl-3">
+  <div class="col-6 col-xl-2">
     <div class="stat-card">
       <div class="stat-icon ok"><i class="bi bi-check-circle-fill"></i></div>
       <div>
@@ -29,7 +29,18 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-xl-3">
+  <div class="col-6 col-xl-2">
+    <a href="/alerts" class="text-decoration-none">
+      <div class="stat-card">
+        <div class="stat-icon bad"><i class="bi bi-x-octagon-fill"></i></div>
+        <div>
+          <div class="stat-value">{{.PVEBackupErrors}}</div>
+          <div class="stat-label">PVE Backup error</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-6 col-xl-2">
     <div class="stat-card">
       <div class="stat-icon bad"><i class="bi bi-exclamation-circle-fill"></i></div>
       <div>
@@ -78,6 +89,7 @@
           </div>
           <div class="d-flex align-items-center gap-2">
             {{if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
+            {{else if .HasBackupError}}<span class="status-pill bad" style="font-size:.68rem">Backup error</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>{{end}}
             {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
