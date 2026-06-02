@@ -175,6 +175,25 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 		if err != nil {
 			continue
 		}
+		if len(tasks) == 0 {
+			status := strings.TrimSpace(rep.BackupStatus)
+			if status == "" || strings.EqualFold(status, "OK") {
+				continue
+			}
+			if !resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
+				continue
+			}
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
+				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				Type:       domain.AlertTypeBackupError,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Backup fallido",
+				Message:    fmt.Sprintf("Ultimo job: %s", status),
+				DetectedAt: time.Now(),
+			})
+			continue
+		}
 		for _, t := range tasks {
 			if t.Status == "OK" {
 				continue
