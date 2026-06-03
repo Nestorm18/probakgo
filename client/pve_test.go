@@ -569,3 +569,53 @@ func TestGenerateReportStorageOfflineOnContentError(t *testing.T) {
 		t.Errorf("status: got %v, want offline", got)
 	}
 }
+
+func TestGenerateReportUsesAggregateStatusWhenBackupTasksCannotBeReconstructed(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/storage", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"storage": "PBS", "type": "pbs", "content": "backup"},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/storage", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/storage/PBS/content", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "PBS offline", http.StatusInternalServerError)
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/qemu", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/lxc", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"starttime": float64(10000),
+					"endtime":   float64(12000),
+					"status":    "OK",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	report, err := newTestPVEClient(srv).generateReport()
+	if err != nil {
+		t.Fatalf("generateReport: %v", err)
+	}
+
+	status := report["last_backup_status"].(backupStatus)
+	if !status.OK {
+		t.Fatalf("last_backup_status should be OK when aggregate vzdump task is OK")
+	}
+	if tasks, ok := report["backup_tasks"].([]map[string]any); ok && len(tasks) != 0 {
+		t.Fatalf("expected no reconstructed backup tasks, got %d", len(tasks))
+	}
+}
