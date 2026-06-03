@@ -555,6 +555,7 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 				sr["content_data"] = contents
 			}
 		} else if storageName != "local" {
+			log.Printf("WARN: could not read storage %s content: %v", storageName, err)
 			sr["status"] = "offline"
 		}
 
@@ -570,10 +571,17 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 		"public_ip":          c.si.publicIP(),
 		"client_version":     version,
 		"machine_id":         c.si.machineID(),
-		"last_backup_status": jobBackupStatus(tasks),
+		"last_backup_status": c.reportBackupStatus(tasks),
 		"storages":           result,
 		"backup_tasks":       tasks,
 	}, nil
+}
+
+func (c *pveClient) reportBackupStatus(tasks []map[string]any) backupStatus {
+	if len(tasks) > 0 {
+		return jobBackupStatus(tasks)
+	}
+	return c.lastBackupStatus()
 }
 
 // jobBackupStatus derives the overall backup status from all tasks in the job.
