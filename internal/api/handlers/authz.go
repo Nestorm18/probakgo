@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -29,8 +28,11 @@ func (h *H) requireKeyServer(w http.ResponseWriter, r *http.Request, serverName 
 		return true
 	}
 	if boundServerName != serverName {
-		errJSON(w, http.StatusForbidden, fmt.Sprintf("API key is bound to a different server: expected %q, got %q", boundServerName, serverName))
-		return false
+		if err := h.store.BindAPIKeyServerName(r.Context(), k.ID, serverName); err != nil {
+			internalErr(w, "update api key server", err)
+			return false
+		}
+		k.ServerName = serverName
 	}
 	return true
 }

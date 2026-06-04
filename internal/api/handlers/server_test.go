@@ -39,7 +39,7 @@ func TestListPVEServers_WithServer(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
-	ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	ts.store.UpsertPVEServerForAPIKey(ctx, k.ID, "pve-01", "10.0.0.1", "", "1.0", "")
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -84,7 +84,7 @@ func TestListPVEReports_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
-	serverID, _ := ts.store.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	serverID, _ := ts.store.UpsertPVEServerForAPIKey(ctx, k.ID, "pve-01", "10.0.0.1", "", "1.0", "")
 	ts.store.InsertPVEReport(ctx, serverID, nil)
 
 	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/servers/pve/%d/reports", serverID), nil)

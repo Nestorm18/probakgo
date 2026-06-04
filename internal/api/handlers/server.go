@@ -18,7 +18,7 @@ func (h *H) ListPVEServers(w http.ResponseWriter, r *http.Request) {
 	resp := make([]any, 0, len(servers))
 	k, _ := apictx.APIKey(r.Context())
 	for _, sv := range servers {
-		if k == nil || k.ServerName == "" || sv.Name != k.ServerName {
+		if k == nil || sv.APIKeyID != k.ID {
 			continue
 		}
 		resp = append(resp, h.report.BuildPVEServerResponse(r.Context(), sv))
@@ -35,7 +35,7 @@ func (h *H) ListPBSServers(w http.ResponseWriter, r *http.Request) {
 	resp := make([]any, 0, len(servers))
 	k, _ := apictx.APIKey(r.Context())
 	for _, sv := range servers {
-		if k == nil || k.ServerName == "" || sv.Name != k.ServerName {
+		if k == nil || sv.APIKeyID != k.ID {
 			continue
 		}
 		resp = append(resp, h.report.BuildPBSServerResponse(r.Context(), sv))
@@ -52,6 +52,11 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 	sv, err := h.store.GetPVEServer(r.Context(), id)
 	if err != nil {
 		errJSON(w, http.StatusNotFound, "server not found")
+		return
+	}
+	k, _ := apictx.APIKey(r.Context())
+	if sv.APIKeyID != 0 && k != nil && sv.APIKeyID != k.ID {
+		errJSON(w, http.StatusForbidden, "API key is not bound to this server")
 		return
 	}
 	if !h.requireKeyServer(w, r, sv.Name) {

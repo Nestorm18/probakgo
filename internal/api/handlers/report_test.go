@@ -85,7 +85,7 @@ func TestReportPVE_MissingMachineID(t *testing.T) {
 	}
 }
 
-func TestReportPVE_ServerNameMismatch(t *testing.T) {
+func TestReportPVE_ServerNameChangeAllowedForSameKey(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
@@ -99,8 +99,8 @@ func TestReportPVE_ServerNameMismatch(t *testing.T) {
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Errorf("want 403, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Errorf("want 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -183,6 +183,45 @@ func TestReportPVE_UnbindAllowsDifferentServer(t *testing.T) {
 	ts.handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusOK {
 		t.Errorf("after unbind: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_DuplicateHostnameSeparatedByAPIKey(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	keyA, _ := ts.store.CreateAPIKey(ctx, "pbs-a", "same-host", "")
+	keyB, _ := ts.store.CreateAPIKey(ctx, "pbs-b", "same-host", "")
+
+	body := `{"hostname":"same-host","ip_address":"10.0.0.1","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+keyA.Key)
+	req.Header.Set("X-Machine-ID", "machine-a")
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("first report: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+keyB.Key)
+	req.Header.Set("X-Machine-ID", "machine-b")
+	rr = httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("second report: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	servers, err := ts.store.ListPVEServers(ctx)
+	if err != nil {
+		t.Fatalf("ListPVEServers: %v", err)
+	}
+	if len(servers) != 2 {
+		t.Fatalf("servers: got %d, want 2", len(servers))
+	}
+	if servers[0].ID == servers[1].ID || servers[0].APIKeyID == servers[1].APIKeyID {
+		t.Fatalf("servers were not separated by API key: %+v", servers)
 	}
 }
 

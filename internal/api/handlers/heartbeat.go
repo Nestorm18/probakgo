@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"probakgo/internal/api/apictx"
 	"probakgo/internal/domain"
 )
 
@@ -31,6 +32,7 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	if !h.requireKeyServer(w, r, req.Hostname) {
 		return
 	}
+	k, _ := apictx.APIKey(r.Context())
 
 	var (
 		serverID int64
@@ -43,14 +45,14 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 				req.PublicIP = sv.PublicIP
 			}
 		}
-		serverID, err = h.store.UpsertPVEServer(r.Context(), req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
+		serverID, err = h.store.UpsertPVEServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	case "pbs":
 		if req.PublicIP == "" {
 			if sv, getErr := h.store.GetPBSServerByName(r.Context(), req.Hostname); getErr == nil {
 				req.PublicIP = sv.PublicIP
 			}
 		}
-		serverID, err = h.store.UpsertPBSServer(r.Context(), req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
+		serverID, err = h.store.UpsertPBSServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	}
 	if err != nil {
 		internalErr(w, "upsert heartbeat server", err)

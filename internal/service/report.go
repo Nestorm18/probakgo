@@ -21,9 +21,23 @@ func NewReport(st *store.Store, tz *time.Location) *ReportService {
 }
 
 func (r *ReportService) SavePVEReport(ctx context.Context, req *domain.PVEReportRequest) error {
-	serverID, err := r.store.UpsertPVEServer(ctx,
-		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+	return r.SavePVEReportForAPIKey(ctx, req, 0)
+}
+
+func (r *ReportService) SavePVEReportForAPIKey(ctx context.Context, req *domain.PVEReportRequest, apiKeyID int64) error {
+	var (
+		serverID int64
+		err      error
 	)
+	if apiKeyID > 0 {
+		serverID, err = r.store.UpsertPVEServerForAPIKey(ctx, apiKeyID,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	} else {
+		serverID, err = r.store.UpsertPVEServer(ctx,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("upsert server: %w", err)
 	}
@@ -58,9 +72,23 @@ func (r *ReportService) SavePVEReport(ctx context.Context, req *domain.PVEReport
 }
 
 func (r *ReportService) SavePBSReport(ctx context.Context, req *domain.PBSReportRequest) error {
-	serverID, err := r.store.UpsertPBSServer(ctx,
-		req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+	return r.SavePBSReportForAPIKey(ctx, req, 0)
+}
+
+func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.PBSReportRequest, apiKeyID int64) error {
+	var (
+		serverID int64
+		err      error
 	)
+	if apiKeyID > 0 {
+		serverID, err = r.store.UpsertPBSServerForAPIKey(ctx, apiKeyID,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	} else {
+		serverID, err = r.store.UpsertPBSServer(ctx,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	}
 	if err != nil {
 		return fmt.Errorf("upsert pbs server: %w", err)
 	}
@@ -157,6 +185,63 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 }
 
+func (r *ReportService) IsStaleForServerID(ctx context.Context, reportedAt time.Time, serverID int64) (bool, string) {
+	configs, err := r.store.ListVMBackupConfigsForServer(ctx, "pve", serverID)
+	if err != nil || len(configs) == 0 {
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+	}
+	return r.isStaleForConfigs(ctx, reportedAt, configs, serverID)
+}
+
+func (r *ReportService) isStaleForConfigs(ctx context.Context, reportedAt time.Time, configs []domain.VMBackupConfig, serverID int64) (bool, string) {
+	expected := make(map[time.Weekday]bool)
+	for _, c := range configs {
+		if c.IsExcluded {
+			continue
+		}
+		if c.Monday {
+			expected[time.Monday] = true
+		}
+		if c.Tuesday {
+			expected[time.Tuesday] = true
+		}
+		if c.Wednesday {
+			expected[time.Wednesday] = true
+		}
+		if c.Thursday {
+			expected[time.Thursday] = true
+		}
+		if c.Friday {
+			expected[time.Friday] = true
+		}
+		if c.Saturday {
+			expected[time.Saturday] = true
+		}
+		if c.Sunday {
+			expected[time.Sunday] = true
+		}
+	}
+	if len(expected) == 0 {
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+	}
+
+	now := r.now().In(r.tz)
+	finishHour, finishMinute := r.expectedFinishTimeByServerID(ctx, serverID)
+	for i := 1; i <= 14; i++ {
+		candidate := now.AddDate(0, 0, -i)
+		if !expected[candidate.Weekday()] {
+			continue
+		}
+		dayStart := time.Date(candidate.Year(), candidate.Month(), candidate.Day(), 0, 0, 0, 0, r.tz)
+		cutoff := dayStart.AddDate(0, 0, 1).Add(time.Duration(finishHour)*time.Hour + time.Duration(finishMinute)*time.Minute)
+		if now.Before(cutoff) {
+			continue
+		}
+		return reportedAt.Before(dayStart), "no se ha recibido reporte del ultimo dia de backup"
+	}
+	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+}
+
 func (r *ReportService) expectedFinishTime(ctx context.Context, serverName string) (int, int) {
 	const defaultHour, defaultMinute = 9, 0
 	sv, err := r.store.GetPVEServerByName(ctx, serverName)
@@ -164,6 +249,19 @@ func (r *ReportService) expectedFinishTime(ctx context.Context, serverName strin
 		return defaultHour, defaultMinute
 	}
 	cfg, err := r.store.GetPVEAlertConfig(ctx, sv.ID)
+	if err != nil || cfg.ExpectedFinishTime == nil {
+		return defaultHour, defaultMinute
+	}
+	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
+	if err != nil {
+		return defaultHour, defaultMinute
+	}
+	return t.Hour(), t.Minute()
+}
+
+func (r *ReportService) expectedFinishTimeByServerID(ctx context.Context, serverID int64) (int, int) {
+	const defaultHour, defaultMinute = 9, 0
+	cfg, err := r.store.GetPVEAlertConfig(ctx, serverID)
 	if err != nil || cfg.ExpectedFinishTime == nil {
 		return defaultHour, defaultMinute
 	}
@@ -192,7 +290,7 @@ func (r *ReportService) BuildPVEServerResponse(ctx context.Context, sv domain.PV
 	}
 	resp.LastReport = &rep.ReportedAt
 	resp.BackupStatus = rep.BackupStatus
-	if stale, reason := r.IsStaleForServer(ctx, rep.ReportedAt, sv.Name); stale {
+	if stale, reason := r.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID); stale {
 		resp.IsStale = true
 		resp.StaleReason = reason
 	} else {

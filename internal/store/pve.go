@@ -37,6 +37,34 @@ func (s *Store) UpsertPVEServer(ctx context.Context, name, ip, publicIP, clientV
 	return id, err
 }
 
+func (s *Store) UpsertPVEServerForAPIKey(ctx context.Context, apiKeyID int64, name, ip, publicIP, clientVersion, machineID string) (int64, error) {
+	if apiKeyID <= 0 {
+		return s.UpsertPVEServer(ctx, name, ip, publicIP, clientVersion, machineID)
+	}
+	debug.RecordQuery(ctx, `SELECT id FROM pve_servers WHERE api_key_id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id FROM pve_servers WHERE api_key_id = ? AND is_deleted = 0`, apiKeyID)
+	var id int64
+	if err := row.Scan(&id); err == sql.ErrNoRows {
+		debug.RecordQuery(ctx, `INSERT INTO pve_servers (name, ip, public_ip, client_version, machine_id, api_key_id) VALUES (?, ?, ?, ?, ?, ?)`)
+		res, err := s.db.ExecContext(ctx,
+			`INSERT INTO pve_servers (name, ip, public_ip, client_version, machine_id, api_key_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			name, ip, publicIP, clientVersion, machineID, apiKeyID,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("insert pve_server: %w", err)
+		}
+		return res.LastInsertId()
+	} else if err != nil {
+		return 0, err
+	}
+	debug.RecordQuery(ctx, `UPDATE pve_servers SET name=?, ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE pve_servers SET name=?, ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+		name, ip, publicIP, clientVersion, machineID, id,
+	)
+	return id, err
+}
+
 func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.BackupStatus) (int64, error) {
 	status := ""
 	var starttime, endtime, duration int64
@@ -105,8 +133,8 @@ func (s *Store) InsertPVEStorageContent(ctx context.Context, storageID int64, c 
 }
 
 func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE is_deleted = 0 ORDER BY name`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers WHERE is_deleted = 0 ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pve_servers WHERE is_deleted = 0 ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -116,7 +144,7 @@ func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) 
 	for rows.Next() {
 		var sv domain.PVEServer
 		if err := rows.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-			&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+			&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 			return nil, err
 		}
 		servers = append(servers, sv)
@@ -125,24 +153,24 @@ func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) 
 }
 
 func (s *Store) GetPVEServer(ctx context.Context, id int64) (*domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE id = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers WHERE id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pve_servers WHERE id = ? AND is_deleted = 0`, id)
 	var sv domain.PVEServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil
 }
 
 func (s *Store) GetPVEServerByName(ctx context.Context, name string) (*domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pve_servers WHERE name = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pve_servers WHERE name = ? AND is_deleted = 0`, name)
 	var sv domain.PVEServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil
