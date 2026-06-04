@@ -180,6 +180,35 @@ func (s *Store) GetLatestPBSReport(ctx context.Context, serverID int64) (*domain
 	return &r, nil
 }
 
+func (s *Store) GetLatestPBSReports(ctx context.Context) (map[int64]*domain.PBSReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports r WHERE r.id = (SELECT r2.id FROM pbs_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
+		FROM pbs_reports r
+		WHERE r.id = (
+			SELECT r2.id FROM pbs_reports r2
+			WHERE r2.server_id = r.server_id
+			ORDER BY r2.reported_at DESC, r2.id DESC
+			LIMIT 1
+		)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	reports := make(map[int64]*domain.PBSReport)
+	for rows.Next() {
+		var r domain.PBSReport
+		var isStale int
+		var staleReason sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
+		reports[r.ServerID] = &r
+	}
+	return reports, rows.Err()
+}
+
 func (s *Store) ListPBSReports(ctx context.Context, serverID int64, limit int) ([]domain.PBSReport, error) {
 	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
@@ -222,6 +251,31 @@ func (s *Store) GetPBSStoresForReport(ctx context.Context, reportID int64) ([]do
 		stores = append(stores, st)
 	}
 	return stores, rows.Err()
+}
+
+func (s *Store) GetPBSStoresForReports(ctx context.Context, reportIDs []int64) (map[int64][]domain.PBSStore, error) {
+	if len(reportIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(reportIDs)
+	debug.RecordQuery(ctx, `SELECT id, report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta FROM pbs_stores WHERE report_id IN (...) ORDER BY report_id, store`)
+	q := `SELECT id, report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta
+		FROM pbs_stores WHERE report_id IN (` + ph + `) ORDER BY report_id, store`
+	rows, err := s.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.PBSStore)
+	for rows.Next() {
+		var st domain.PBSStore
+		if err := rows.Scan(&st.ID, &st.ReportID, &st.Store, &st.Total, &st.Used, &st.Avail,
+			&st.EstimatedFullDate, &st.MountStatus, &st.HistoryStart, &st.HistoryDelta); err != nil {
+			return nil, err
+		}
+		result[st.ReportID] = append(result[st.ReportID], st)
+	}
+	return result, rows.Err()
 }
 
 func (s *Store) GetPBSGCStatus(ctx context.Context, storeID int64) (*domain.PBSGCStatus, error) {

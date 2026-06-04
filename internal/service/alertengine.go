@@ -81,19 +81,35 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 	if err != nil {
 		return cfg, err
 	}
+	pveConfigs, err := st.ListPVEAlertConfigs(ctx)
+	if err != nil {
+		return cfg, err
+	}
+	pveVMConfigs, err := st.ListPVEVMAlertConfigs(ctx)
+	if err != nil {
+		return cfg, err
+	}
 	for _, sv := range pveServers {
-		svCfg, _ := st.GetPVEAlertConfig(ctx, sv.ID)
+		svCfg := pveConfigs[sv.ID]
+		svCfg.ServerID = sv.ID
 		cfg.PVEConfigs[sv.ID] = svCfg
-		vmCfgs, _ := st.GetPVEVMAlertConfigs(ctx, sv.ID)
-		cfg.PVEVMConfigs[sv.ID] = vmCfgs
+		cfg.PVEVMConfigs[sv.ID] = pveVMConfigs[sv.ID]
 	}
 
 	pbsServers, err := st.ListPBSServers(ctx)
 	if err != nil {
 		return cfg, err
 	}
+	pbsConfigs, err := st.ListPBSAlertConfigs(ctx)
+	if err != nil {
+		return cfg, err
+	}
 	for _, sv := range pbsServers {
-		svCfg, _ := st.GetPBSAlertConfig(ctx, sv.ID)
+		svCfg, ok := pbsConfigs[sv.ID]
+		if !ok {
+			svCfg.VerifyAlert = true
+		}
+		svCfg.ServerID = sv.ID
 		cfg.PBSConfigs[sv.ID] = svCfg
 	}
 

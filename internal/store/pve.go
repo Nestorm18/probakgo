@@ -170,6 +170,37 @@ func (s *Store) GetLatestPVEReport(ctx context.Context, serverID int64) (*domain
 	return &r, nil
 }
 
+func (s *Store) GetLatestPVEReports(ctx context.Context) (map[int64]*domain.PVEReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports r WHERE r.id = (SELECT r2.id FROM pve_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
+		backup_status, backup_starttime, backup_endtime, backup_duration
+		FROM pve_reports r
+		WHERE r.id = (
+			SELECT r2.id FROM pve_reports r2
+			WHERE r2.server_id = r.server_id
+			ORDER BY r2.reported_at DESC, r2.id DESC
+			LIMIT 1
+		)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	reports := make(map[int64]*domain.PVEReport)
+	for rows.Next() {
+		var r domain.PVEReport
+		var isStale int
+		var staleReason sql.NullString
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
+		reports[r.ServerID] = &r
+	}
+	return reports, rows.Err()
+}
+
 func (s *Store) ListPVEReports(ctx context.Context, serverID int64, limit int) ([]domain.PVEReport, error) {
 	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
@@ -314,6 +345,7 @@ func (s *Store) GetPVEBackupTasksForReports(ctx context.Context, reportIDs []int
 		return nil, nil
 	}
 	ph, args := int64InArgs(reportIDs)
+	debug.RecordQuery(ctx, `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename FROM pve_backup_tasks WHERE report_id IN (...) ORDER BY report_id, vmid ASC`)
 	q := `SELECT id, report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename
 		FROM pve_backup_tasks WHERE report_id IN (` + ph + `) ORDER BY report_id, vmid ASC`
 	rows, err := s.db.QueryContext(ctx, q, args...)
