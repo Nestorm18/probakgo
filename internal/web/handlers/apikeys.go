@@ -112,7 +112,7 @@ func (h *WebH) DeleteAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	k, err := h.store.GetAPIKey(ctx, id)
 	if err == nil && k.ServerName != "" {
-		if err := h.store.HardDeleteServerData(ctx, k.ServerName); err != nil {
+		if err := h.store.HardDeleteServerDataForAPIKey(ctx, id, k.ServerName); err != nil {
 			http.Redirect(w, r, "/api-keys?flash=Error+al+borrar+servidor:+"+err.Error(), http.StatusSeeOther)
 			return
 		}
