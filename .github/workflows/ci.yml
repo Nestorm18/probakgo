@@ -52,8 +52,8 @@ jobs:
             exit 1
           fi
 
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo_linux_amd64 .
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo-client_linux_amd64 ./client/
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo_linux_amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo-client_linux_amd64 ./client/
           sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 > SHA256SUMS
 
           gh release create "v$SERVER_VER" \

@@ -128,8 +128,8 @@ go build -o probakgo-client ./client/
 Para inyectar la versión en el binario:
 
 ```bash
-go build -ldflags "-X main.version=1.0.0" -o probakgo .
-go build -ldflags "-X main.version=1.0.0" -o probakgo-client ./client/
+CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo .
+CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo-client ./client/
 ```
 
 ---

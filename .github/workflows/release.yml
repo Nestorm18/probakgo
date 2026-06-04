@@ -21,13 +21,13 @@ jobs:
 
       - name: Build server Linux amd64
         run: |
-          GOOS=linux GOARCH=amd64 go build \
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
             -o probakgo_linux_amd64 .
 
       - name: Build client Linux amd64
         run: |
-          GOOS=linux GOARCH=amd64 go build \
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
             -o probakgo-client_linux_amd64 ./client/
 
