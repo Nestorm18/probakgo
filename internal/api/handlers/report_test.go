@@ -104,6 +104,25 @@ func TestReportPVE_ServerNameMismatch(t *testing.T) {
 	}
 }
 
+func TestReportPVE_ServerNameTrimmed(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "nicolas-gestion ", "")
+
+	body := `{"hostname":"nicolas-gestion","ip_address":"10.0.0.1","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestReportPVE_MachineIDMismatch(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
@@ -130,6 +149,40 @@ func TestReportPVE_MachineIDMismatch(t *testing.T) {
 	ts.handler.ServeHTTP(rr, req)
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("second report: want 401, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_UnbindAllowsDifferentServer(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+
+	body := `{"hostname":"old-pve","ip_address":"10.0.0.1","storages":[]}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-old")
+
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("first report: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	if err := ts.store.UnbindAPIKeyServer(ctx, k.ID); err != nil {
+		t.Fatalf("unbind api key: %v", err)
+	}
+
+	body = `{"hostname":"nicolas","ip_address":"10.0.0.2","storages":[]}`
+	req = httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-new")
+
+	rr = httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Errorf("after unbind: want 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }
 

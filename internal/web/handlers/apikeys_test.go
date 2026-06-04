@@ -50,8 +50,8 @@ func withChiID(r *http.Request, id string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
-// TestCreateAPIKeyPost_EmptyName verifies that a missing name field redirects with a flash message.
-func TestCreateAPIKeyPost_EmptyName(t *testing.T) {
+// TestCreateAPIKeyPost_EmptyServerName verifies that a missing hostname redirects with a flash message.
+func TestCreateAPIKeyPost_EmptyServerName(t *testing.T) {
 	st := openHandlerDB(t)
 	h := webhandlers.New(st, nil, nil)
 
@@ -68,6 +68,24 @@ func TestCreateAPIKeyPost_EmptyName(t *testing.T) {
 	loc := rr.Header().Get("Location")
 	if !strings.Contains(loc, "flash=") {
 		t.Errorf("want flash in redirect location, got %q", loc)
+	}
+}
+
+func TestCreateAPIKeyPost_EmptyAliasUsesServerName(t *testing.T) {
+	ctx := context.Background()
+	st := openHandlerDB(t)
+	if _, err := st.CreateAPIKey(ctx, "", "pbs", ""); err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	keys, err := st.ListAPIKeys(ctx)
+	if err != nil {
+		t.Fatalf("ListAPIKeys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("keys: got %d, want 1", len(keys))
+	}
+	if keys[0].Name != "pbs" || keys[0].ServerName != "pbs" {
+		t.Errorf("key fields: got name=%q server_name=%q", keys[0].Name, keys[0].ServerName)
 	}
 }
 

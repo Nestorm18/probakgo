@@ -15,7 +15,7 @@
     <table class="table table-hover mb-0">
       <thead>
         <tr>
-          <th>Nombre</th>
+          <th>Alias / Hostname</th>
           <th>Key</th>
           <th>Machine ID</th>
           <th>Último uso</th>
@@ -102,12 +102,12 @@
         </div>
         <div class="modal-body">
           <div class="mb-3">
-            <label class="form-label">Nombre</label>
-            <input type="text" name="name" class="form-control" required placeholder="Cliente soporte1">
+            <label class="form-label">Hostname del servidor <span style="color:var(--clr-danger)">*</span></label>
+            <input type="text" name="server_name" class="form-control" required placeholder="pbs">
           </div>
           <div class="mb-3">
-            <label class="form-label">Nombre de servidor <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="text" name="server_name" class="form-control" placeholder="soporte1">
+            <label class="form-label">Alias visible <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="text" name="name" class="form-control" placeholder="pbs-anteva">
           </div>
           <div class="mb-3">
             <label class="form-label">URL Proxmox <span style="color:var(--txt-muted)">(opcional)</span></label>

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"probakgo/internal/api/apictx"
 )
@@ -12,11 +14,13 @@ func (h *H) requireKeyServer(w http.ResponseWriter, r *http.Request, serverName 
 		errJSON(w, http.StatusUnauthorized, "invalid or inactive API key")
 		return false
 	}
+	serverName = strings.TrimSpace(serverName)
+	boundServerName := strings.TrimSpace(k.ServerName)
 	if serverName == "" {
 		errJSON(w, http.StatusBadRequest, "server name is required")
 		return false
 	}
-	if k.ServerName == "" {
+	if boundServerName == "" {
 		if err := h.store.BindAPIKeyServerName(r.Context(), k.ID, serverName); err != nil {
 			internalErr(w, "bind api key server", err)
 			return false
@@ -24,8 +28,8 @@ func (h *H) requireKeyServer(w http.ResponseWriter, r *http.Request, serverName 
 		k.ServerName = serverName
 		return true
 	}
-	if k.ServerName != serverName {
-		errJSON(w, http.StatusForbidden, "API key is bound to a different server")
+	if boundServerName != serverName {
+		errJSON(w, http.StatusForbidden, fmt.Sprintf("API key is bound to a different server: expected %q, got %q", boundServerName, serverName))
 		return false
 	}
 	return true

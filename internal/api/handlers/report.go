@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"probakgo/internal/domain"
 )
@@ -13,6 +14,7 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
+	req.Hostname = strings.TrimSpace(req.Hostname)
 	if req.Hostname == "" {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
 		return
@@ -33,6 +35,7 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
+	req.Hostname = strings.TrimSpace(req.Hostname)
 	if req.Hostname == "" {
 		errJSON(w, http.StatusBadRequest, "hostname is required")
 		return
