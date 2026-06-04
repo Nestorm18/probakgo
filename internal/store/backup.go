@@ -33,6 +33,14 @@ func (s *Store) ListVMBackupConfigsForServer(ctx context.Context, serverType str
 	return scanVMConfigs(rows)
 }
 
+func (s *Store) ListVMBackupConfigsForServerOrName(ctx context.Context, serverType string, serverID int64, serverName string) ([]domain.VMBackupConfig, error) {
+	configs, err := s.ListVMBackupConfigsForServer(ctx, serverType, serverID)
+	if err != nil || len(configs) > 0 || serverName == "" {
+		return configs, err
+	}
+	return s.ListVMBackupConfigs(ctx, serverName)
+}
+
 func (s *Store) CreateVMBackupConfig(ctx context.Context, serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
 	debug.RecordQuery(ctx, `INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	res, err := s.db.ExecContext(ctx,

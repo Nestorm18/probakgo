@@ -86,6 +86,35 @@ func TestHardDeleteServerDataForAPIKey_DeletesLegacyServerWithSameHostname(t *te
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_alert_config WHERE server_id = ?`, legacyServer, 0)
 }
 
+func TestUpsertPVEServerForAPIKey_AdoptsLegacyServerWithSameMachineID(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+
+	key, err := st.CreateAPIKey(ctx, "alias", "host1", "")
+	if err != nil {
+		t.Fatalf("create key: %v", err)
+	}
+	legacyID, err := st.UpsertPVEServer(ctx, "host1", "10.0.0.1", "", "0.0.80", "machine-1")
+	if err != nil {
+		t.Fatalf("upsert legacy: %v", err)
+	}
+	gotID, err := st.UpsertPVEServerForAPIKey(ctx, key.ID, "host1", "10.0.0.2", "", "0.0.92", "machine-1")
+	if err != nil {
+		t.Fatalf("upsert for key: %v", err)
+	}
+	if gotID != legacyID {
+		t.Fatalf("got id %d, want legacy id %d", gotID, legacyID)
+	}
+	assertCount(t, st, `SELECT COUNT(*) FROM pve_servers WHERE name = ? AND is_deleted = 0`, "host1", 1)
+	sv, err := st.GetPVEServer(ctx, legacyID)
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	if sv.APIKeyID != key.ID || sv.DisplayName != "alias" || sv.IP != "10.0.0.2" {
+		t.Fatalf("server after adopt: %+v", sv)
+	}
+}
+
 func assertCount(t *testing.T, st *Store, query string, arg any, want int) {
 	t.Helper()
 	var got int

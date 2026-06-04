@@ -157,7 +157,7 @@ func evalPVEDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("disk:pve:%d:%s", sv.ID, stg.Storage),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				StoreName:  stg.Storage,
 				Type:       domain.AlertTypeDisk,
 				Severity:   alertDiskSeverity(pct),
@@ -201,7 +201,7 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				Type:       domain.AlertTypeBackupError,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Backup fallido",
@@ -224,7 +224,7 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d:%d", sv.ID, t.VMID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				VMID: t.VMID, VMName: name,
 				Type:       domain.AlertTypeBackupError,
 				Severity:   domain.AlertSeverityCritical,
@@ -279,7 +279,7 @@ func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_size:pve:%d:%d", serverID, t.VMID),
-				ServerName: sv.Name, ServerID: serverID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: serverID, ServerType: "pve",
 				VMID: t.VMID, VMName: name,
 				Type:       domain.AlertTypeBackupSize,
 				Severity:   domain.AlertSeverityWarning,
@@ -306,7 +306,7 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		if err != nil {
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pve_stale:pve:%d", sv.ID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				Type:       domain.AlertTypePVEStale,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Sin reporte",
@@ -318,7 +318,7 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		stale := rep.IsStale
 		reason := rep.StaleReason
 		if cfg.Report != nil {
-			stale, reason = cfg.Report.IsStaleForServer(ctx, rep.ReportedAt, sv.Name)
+			stale, reason = cfg.Report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 		}
 		if !stale {
 			continue
@@ -328,7 +328,7 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		}
 		alerts = append(alerts, domain.Alert{
 			ID:         fmt.Sprintf("pve_stale:pve:%d", sv.ID),
-			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 			Type:       domain.AlertTypePVEStale,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Sin reporte",
@@ -367,7 +367,7 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 		since := alertFmtAge(age)
 		alerts = append(alerts, domain.Alert{
 			ID:         fmt.Sprintf("pve_heartbeat:pve:%d", sv.ID),
-			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 			Type:       domain.AlertTypePVEHeartbeat,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Servidor offline",
@@ -392,7 +392,7 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 		if err != nil {
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 				Type:       domain.AlertTypePBSReportStale,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Sin reporte",
@@ -415,7 +415,7 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 		}
 		alerts = append(alerts, domain.Alert{
 			ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
-			ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 			Type:       domain.AlertTypePBSReportStale,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Sin reporte",
@@ -461,7 +461,7 @@ func evalPBSDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("disk:pbs:%d:%s", sv.ID, ds.Store),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 				StoreName:  ds.Store,
 				Type:       domain.AlertTypeDisk,
 				Severity:   alertDiskSeverity(pct),
@@ -520,7 +520,7 @@ func evalPBSFill(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pbs_fill:pbs:%d:%s", sv.ID, ds.Store),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 				StoreName:  ds.Store,
 				Type:       domain.AlertTypePBSFill,
 				Severity:   sev,
@@ -580,7 +580,7 @@ func evalPBSStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 				}
 				alerts = append(alerts, domain.Alert{
 					ID:         fmt.Sprintf("pbs_stale:pbs:%d:%s:%s/%s", sv.ID, ds.Store, sn.BackupType, sn.BackupID),
-					ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+					ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 					StoreName:  ds.Store,
 					Type:       domain.AlertTypePBSStale,
 					Severity:   domain.AlertSeverityWarning,
@@ -628,7 +628,7 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 				}
 				alerts = append(alerts, domain.Alert{
 					ID:         fmt.Sprintf("pbs_verify:pbs:%d:%s:%s/%s", sv.ID, ds.Store, sn.BackupType, sn.BackupID),
-					ServerName: sv.Name, ServerID: sv.ID, ServerType: "pbs",
+					ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 					StoreName:  ds.Store,
 					Type:       domain.AlertTypePBSVerify,
 					Severity:   domain.AlertSeverityWarning,
@@ -682,7 +682,7 @@ func evalPVEMissingVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 		if err != nil || len(tasks) == 0 {
 			continue
 		}
-		configs, err := st.ListVMBackupConfigs(ctx, sv.Name)
+		configs, err := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		if err != nil || len(configs) == 0 {
 			continue
 		}
@@ -702,7 +702,7 @@ func evalPVEMissingVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 			vmid, _ := strconv.ParseInt(c.VMID, 10, 64)
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pve_missing_vm:pve:%d:%s", sv.ID, c.VMID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				VMID: vmid, VMName: name,
 				Type:       domain.AlertTypePVEMissingVM,
 				Severity:   domain.AlertSeverityCritical,
@@ -731,7 +731,7 @@ func evalPVEUnknownVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 		if err != nil || len(tasks) == 0 {
 			continue
 		}
-		configs, err := st.ListVMBackupConfigs(ctx, sv.Name)
+		configs, err := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		if err != nil || len(configs) == 0 {
 			continue
 		}
@@ -750,7 +750,7 @@ func evalPVEUnknownVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 			}
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pve_unknown_vm:pve:%d:%d", sv.ID, t.VMID),
-				ServerName: sv.Name, ServerID: sv.ID, ServerType: "pve",
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				VMID: t.VMID, VMName: name,
 				Type:       domain.AlertTypePVEUnknownVM,
 				Severity:   domain.AlertSeverityWarning,

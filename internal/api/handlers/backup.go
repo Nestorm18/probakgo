@@ -21,7 +21,7 @@ func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "resolve pve server", err)
 		return
 	}
-	configs, err := h.store.ListVMBackupConfigsForServer(r.Context(), "pve", serverID)
+	configs, err := h.store.ListVMBackupConfigsForServerOrName(r.Context(), "pve", serverID, server)
 	if err != nil {
 		internalErr(w, "list vm backup configs", err)
 		return

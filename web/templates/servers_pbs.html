@@ -29,7 +29,7 @@
       <tr>
         <td>
           <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
-            {{.Server.Name}}
+            {{.Server.DisplayName}}
           </a>
           {{if .ServerURL}}
           <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1" title="Abrir interfaz Proxmox" style="color:var(--txt-muted);font-size:.8rem"><i class="bi bi-box-arrow-up-right"></i></a>
@@ -87,7 +87,7 @@
           <button class="btn btn-sm btn-outline-secondary pbs-alert-cfg-btn"
                   title="Alertas"
                   data-server-id="{{.Server.ID}}"
-                  data-server-name="{{.Server.Name}}"
+                  data-server-name="{{.Server.DisplayName}}"
                   data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}"
                   data-days-until-full="{{if .AlertConfig.DaysUntilFull}}{{deref .AlertConfig.DaysUntilFull}}{{end}}"
                   data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
