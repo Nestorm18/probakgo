@@ -81,6 +81,13 @@
             <div class="fw-semibold">Alertas</div>
             <div class="text-secondary" style="font-size:.8rem">Umbrales y avisos</div>
           </div>
+          <div class="mt-auto">
+            {{if and .Config .Config.AlertBackupErr}}
+              <span class="badge" style="background:var(--clr-ok)">Activo</span>
+            {{else}}
+              <span class="badge" style="background:var(--clr-secondary)">Backup error off</span>
+            {{end}}
+          </div>
         </div>
       </div>
     </a>
