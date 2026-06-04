@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"probakgo/internal/debug"
@@ -50,6 +51,12 @@ func (s *Store) CreateAPIKey(ctx context.Context, name, serverName, serverURL st
 		return nil, err
 	}
 	key := fmt.Sprintf("pbk-%x", raw)
+	name = strings.TrimSpace(name)
+	serverName = strings.TrimSpace(serverName)
+	serverURL = strings.TrimSpace(serverURL)
+	if name == "" {
+		name = serverName
+	}
 
 	debug.RecordQuery(ctx, `INSERT INTO api_keys (key, name, key_type, server_name, server_url) VALUES (?, ?, 'server', ?, ?)`)
 	res, err := s.db.ExecContext(ctx,
@@ -84,9 +91,9 @@ func (s *Store) BindAPIKeyServerName(ctx context.Context, id int64, serverName s
 	return err
 }
 
-func (s *Store) UnbindAPIKeyMachineID(ctx context.Context, id int64) error {
-	debug.RecordQuery(ctx, `UPDATE api_keys SET machine_id='' WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET machine_id='' WHERE id=?`, id)
+func (s *Store) UnbindAPIKeyServer(ctx context.Context, id int64) error {
+	debug.RecordQuery(ctx, `UPDATE api_keys SET machine_id='', server_name='' WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET machine_id='', server_name='' WHERE id=?`, id)
 	return err
 }
 
@@ -97,6 +104,12 @@ func (s *Store) ToggleAPIKey(ctx context.Context, id int64) error {
 }
 
 func (s *Store) UpdateAPIKey(ctx context.Context, id int64, name, serverName, serverURL string) error {
+	name = strings.TrimSpace(name)
+	serverName = strings.TrimSpace(serverName)
+	serverURL = strings.TrimSpace(serverURL)
+	if name == "" {
+		name = serverName
+	}
 	debug.RecordQuery(ctx, `UPDATE api_keys SET name=?, server_name=?, server_url=? WHERE id=?`)
 	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET name=?, server_name=?, server_url=? WHERE id=?`, name, serverName, serverURL, id)
 	return err

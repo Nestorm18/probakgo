@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -10,7 +11,7 @@ import (
 )
 
 func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
-	server := chi.URLParam(r, "server")
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	if !h.requireKeyServer(w, r, server) {
 		return
 	}
@@ -27,7 +28,7 @@ func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
-	server := chi.URLParam(r, "server")
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	if !h.requireKeyServer(w, r, server) {
 		return
 	}
@@ -49,7 +50,7 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
-	server := chi.URLParam(r, "server")
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
 	if !h.requireKeyServer(w, r, server) {
 		return
@@ -67,7 +68,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
-	server := chi.URLParam(r, "server")
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
 	if !h.requireKeyServer(w, r, server) {
 		return
@@ -80,7 +81,7 @@ func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
-	server := chi.URLParam(r, "server")
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
 	if !h.requireKeyServer(w, r, server) {
 		return

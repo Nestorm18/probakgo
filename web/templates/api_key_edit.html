@@ -14,13 +14,13 @@
           {{ .CSRFField }}
 
           <div class="mb-3">
-            <label class="form-label">Nombre <span style="color:var(--clr-danger)">*</span></label>
-            <input type="text" class="form-control" name="name" value="{{.Key.Name}}" required>
+            <label class="form-label">Hostname del servidor <span style="color:var(--clr-danger)">*</span></label>
+            <input type="text" class="form-control" name="server_name" value="{{.Key.ServerName}}" required placeholder="pbs">
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Nombre de servidor <span style="color:var(--txt-muted);font-weight:400">(opcional)</span></label>
-            <input type="text" class="form-control" name="server_name" value="{{.Key.ServerName}}" placeholder="soporte1">
+            <label class="form-label">Alias visible <span style="color:var(--txt-muted);font-weight:400">(opcional)</span></label>
+            <input type="text" class="form-control" name="name" value="{{.Key.Name}}" placeholder="pbs-example">
           </div>
           <div class="mb-3">
             <label class="form-label">URL Proxmox <span style="color:var(--txt-muted);font-weight:400">(opcional)</span></label>

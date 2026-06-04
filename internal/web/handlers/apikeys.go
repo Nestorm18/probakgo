@@ -56,11 +56,14 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	name := r.FormValue("name")
-	serverName := r.FormValue("server_name")
-	if name == "" {
-		http.Redirect(w, r, "/api-keys?flash=Nombre+requerido", http.StatusSeeOther)
+	name := strings.TrimSpace(r.FormValue("name"))
+	serverName := strings.TrimSpace(r.FormValue("server_name"))
+	if serverName == "" {
+		http.Redirect(w, r, "/api-keys?flash=Hostname+del+servidor+requerido", http.StatusSeeOther)
 		return
+	}
+	if name == "" {
+		name = serverName
 	}
 	serverURL := r.FormValue("server_url")
 	githubToken := strings.TrimSpace(r.FormValue("github_token"))
@@ -126,9 +129,12 @@ func (h *WebH) UnbindAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	k, _ := h.store.GetAPIKey(ctx, id)
-	_ = h.store.UnbindAPIKeyMachineID(ctx, id)
+	_ = h.store.UnbindAPIKeyServer(ctx, id)
 	if k != nil {
-		h.audit(r, "api_key.unbind", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"machine_id_was_set": k.MachineID != ""})
+		h.audit(r, "api_key.unbind", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{
+			"machine_id_was_set":  k.MachineID != "",
+			"server_name_was_set": k.ServerName != "",
+		})
 	}
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
@@ -196,11 +202,15 @@ func (h *WebH) EditAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := r.FormValue("name")
-	serverName := r.FormValue("server_name")
-	serverURL := r.FormValue("server_url")
-	if name == "" {
-		http.Redirect(w, r, "/api-keys/"+chi.URLParam(r, "id")+"/edit?flash=El+nombre+es+obligatorio", http.StatusSeeOther)
+	name = strings.TrimSpace(name)
+	serverName := strings.TrimSpace(r.FormValue("server_name"))
+	serverURL := strings.TrimSpace(r.FormValue("server_url"))
+	if serverName == "" {
+		http.Redirect(w, r, "/api-keys/"+chi.URLParam(r, "id")+"/edit?flash=El+hostname+del+servidor+es+obligatorio", http.StatusSeeOther)
 		return
+	}
+	if name == "" {
+		name = serverName
 	}
 	if err := h.store.UpdateAPIKey(ctx, id, name, serverName, serverURL); err != nil {
 		http.Redirect(w, r, "/api-keys/"+chi.URLParam(r, "id")+"/edit?flash="+err.Error(), http.StatusSeeOther)
