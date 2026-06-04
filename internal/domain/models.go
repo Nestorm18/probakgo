@@ -9,6 +9,7 @@ type PVEServer struct {
 	PublicIP      string    `db:"public_ip"`
 	ClientVersion string    `db:"client_version"`
 	MachineID     string    `db:"machine_id"`
+	APIKeyID      int64     `db:"api_key_id"`
 	IsDeleted     bool      `db:"is_deleted"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`
@@ -73,6 +74,7 @@ type PBSServer struct {
 	PublicIP      string    `db:"public_ip"`
 	ClientVersion string    `db:"client_version"`
 	MachineID     string    `db:"machine_id"`
+	APIKeyID      int64     `db:"api_key_id"`
 	IsDeleted     bool      `db:"is_deleted"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`

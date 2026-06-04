@@ -21,12 +21,40 @@ func (s *Store) ListVMBackupConfigs(ctx context.Context, serverName string) ([]d
 	return scanVMConfigs(rows)
 }
 
+func (s *Store) ListVMBackupConfigsForServer(ctx context.Context, serverType string, serverID int64) ([]domain.VMBackupConfig, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday, is_excluded, is_deleted, deleted_at, created_at FROM vm_backup_configs WHERE server_type = ? AND server_id = ? AND is_deleted = 0 ORDER BY vm_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday,
+		thursday, friday, saturday, sunday, is_excluded, is_deleted, deleted_at, created_at
+		FROM vm_backup_configs WHERE server_type = ? AND server_id = ? AND is_deleted = 0 ORDER BY vm_id`, serverType, serverID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVMConfigs(rows)
+}
+
 func (s *Store) CreateVMBackupConfig(ctx context.Context, serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
 	debug.RecordQuery(ctx, `INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	res, err := s.db.ExecContext(ctx,
 		`INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday,
 		 thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		serverName, req.VMID, req.VMName,
+		boolToInt(req.Monday), boolToInt(req.Tuesday), boolToInt(req.Wednesday),
+		boolToInt(req.Thursday), boolToInt(req.Friday), boolToInt(req.Saturday),
+		boolToInt(req.Sunday),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+func (s *Store) CreateVMBackupConfigForServer(ctx context.Context, serverType string, serverID int64, serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
+	debug.RecordQuery(ctx, `INSERT INTO vm_backup_configs (server_type, server_id, server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO vm_backup_configs (server_type, server_id, server_name, vm_id, vm_name, monday, tuesday, wednesday,
+		 thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		serverType, serverID, serverName, req.VMID, req.VMName,
 		boolToInt(req.Monday), boolToInt(req.Tuesday), boolToInt(req.Wednesday),
 		boolToInt(req.Thursday), boolToInt(req.Friday), boolToInt(req.Saturday),
 		boolToInt(req.Sunday),
@@ -51,6 +79,20 @@ func (s *Store) UpdateVMBackupConfig(ctx context.Context, serverName, vmID strin
 	return err
 }
 
+func (s *Store) UpdateVMBackupConfigForServer(ctx context.Context, serverType string, serverID int64, vmID string, req domain.CreateVMBackupConfigRequest) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET vm_name=?, monday=?, tuesday=?, wednesday=?, thursday=?, friday=?, saturday=?, sunday=? WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE vm_backup_configs SET vm_name=?, monday=?, tuesday=?, wednesday=?,
+		 thursday=?, friday=?, saturday=?, sunday=?
+		 WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`,
+		req.VMName,
+		boolToInt(req.Monday), boolToInt(req.Tuesday), boolToInt(req.Wednesday),
+		boolToInt(req.Thursday), boolToInt(req.Friday), boolToInt(req.Saturday),
+		boolToInt(req.Sunday), serverType, serverID, vmID,
+	)
+	return err
+}
+
 func (s *Store) ToggleVMExclude(ctx context.Context, serverName, vmID string) error {
 	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_excluded = NOT is_excluded WHERE server_name=? AND vm_id=? AND is_deleted=0`)
 	_, err := s.db.ExecContext(ctx,
@@ -60,11 +102,29 @@ func (s *Store) ToggleVMExclude(ctx context.Context, serverName, vmID string) er
 	return err
 }
 
+func (s *Store) ToggleVMExcludeForServer(ctx context.Context, serverType string, serverID int64, vmID string) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_excluded = NOT is_excluded WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE vm_backup_configs SET is_excluded = NOT is_excluded WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`,
+		serverType, serverID, vmID,
+	)
+	return err
+}
+
 func (s *Store) DeleteVMBackupConfig(ctx context.Context, serverName, vmID string) error {
 	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_name=? AND vm_id=? AND is_deleted=0`)
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_name=? AND vm_id=? AND is_deleted=0`,
 		time.Now(), serverName, vmID,
+	)
+	return err
+}
+
+func (s *Store) DeleteVMBackupConfigForServer(ctx context.Context, serverType string, serverID int64, vmID string) error {
+	debug.RecordQuery(ctx, `UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE vm_backup_configs SET is_deleted=1, deleted_at=? WHERE server_type=? AND server_id=? AND vm_id=? AND is_deleted=0`,
+		time.Now(), serverType, serverID, vmID,
 	)
 	return err
 }

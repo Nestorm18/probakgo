@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"probakgo/internal/api/apictx"
 	"probakgo/internal/domain"
 )
 
@@ -22,7 +23,8 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 	if !h.requireKeyServer(w, r, req.Hostname) {
 		return
 	}
-	if err := h.report.SavePVEReport(r.Context(), &req); err != nil {
+	k, _ := apictx.APIKey(r.Context())
+	if err := h.report.SavePVEReportForAPIKey(r.Context(), &req, k.ID); err != nil {
 		internalErr(w, "save pve report", err)
 		return
 	}
@@ -43,7 +45,8 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 	if !h.requireKeyServer(w, r, req.Hostname) {
 		return
 	}
-	if err := h.report.SavePBSReport(r.Context(), &req); err != nil {
+	k, _ := apictx.APIKey(r.Context())
+	if err := h.report.SavePBSReportForAPIKey(r.Context(), &req, k.ID); err != nil {
 		internalErr(w, "save pbs report", err)
 		return
 	}

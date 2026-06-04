@@ -41,7 +41,7 @@ func TestHeartbeatPVE_HappyPath(t *testing.T) {
 	}
 }
 
-func TestHeartbeat_ServerNameMismatch(t *testing.T) {
+func TestHeartbeat_ServerNameChangeAllowedForSameKey(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
@@ -55,7 +55,7 @@ func TestHeartbeat_ServerNameMismatch(t *testing.T) {
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("want 403, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 }

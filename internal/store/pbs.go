@@ -35,6 +35,34 @@ func (s *Store) UpsertPBSServer(ctx context.Context, name, ip, publicIP, clientV
 	return id, err
 }
 
+func (s *Store) UpsertPBSServerForAPIKey(ctx context.Context, apiKeyID int64, name, ip, publicIP, clientVersion, machineID string) (int64, error) {
+	if apiKeyID <= 0 {
+		return s.UpsertPBSServer(ctx, name, ip, publicIP, clientVersion, machineID)
+	}
+	debug.RecordQuery(ctx, `SELECT id FROM pbs_servers WHERE api_key_id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id FROM pbs_servers WHERE api_key_id = ? AND is_deleted = 0`, apiKeyID)
+	var id int64
+	if err := row.Scan(&id); err == sql.ErrNoRows {
+		debug.RecordQuery(ctx, `INSERT INTO pbs_servers (name, ip, public_ip, client_version, machine_id, api_key_id) VALUES (?, ?, ?, ?, ?, ?)`)
+		res, err := s.db.ExecContext(ctx,
+			`INSERT INTO pbs_servers (name, ip, public_ip, client_version, machine_id, api_key_id) VALUES (?, ?, ?, ?, ?, ?)`,
+			name, ip, publicIP, clientVersion, machineID, apiKeyID,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("insert pbs_server: %w", err)
+		}
+		return res.LastInsertId()
+	} else if err != nil {
+		return 0, err
+	}
+	debug.RecordQuery(ctx, `UPDATE pbs_servers SET name=?, ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE pbs_servers SET name=?, ip=?, public_ip=?, client_version=?, machine_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+		name, ip, publicIP, clientVersion, machineID, id,
+	)
+	return id, err
+}
+
 func (s *Store) InsertPBSReport(ctx context.Context, serverID int64) (int64, error) {
 	debug.RecordQuery(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`)
 	res, err := s.db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`, serverID)
@@ -122,8 +150,8 @@ func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain
 }
 
 func (s *Store) ListPBSServers(ctx context.Context) ([]domain.PBSServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pbs_servers WHERE is_deleted = 0 ORDER BY name`)
 	if err != nil {
 		return nil, err
@@ -133,7 +161,7 @@ func (s *Store) ListPBSServers(ctx context.Context) ([]domain.PBSServer, error) 
 	for rows.Next() {
 		var sv domain.PBSServer
 		if err := rows.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-			&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+			&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 			return nil, err
 		}
 		servers = append(servers, sv)
@@ -142,24 +170,24 @@ func (s *Store) ListPBSServers(ctx context.Context) ([]domain.PBSServer, error) 
 }
 
 func (s *Store) GetPBSServer(ctx context.Context, id int64) (*domain.PBSServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE id = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pbs_servers WHERE id = ? AND is_deleted = 0`, id)
 	var sv domain.PBSServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil
 }
 
 func (s *Store) GetPBSServerByName(ctx context.Context, name string) (*domain.PBSServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE name = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, is_deleted, created_at, updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pbs_servers WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, name, ip, public_ip, client_version, machine_id, COALESCE(api_key_id, 0), is_deleted, created_at, updated_at
 		FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
 	var sv domain.PBSServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil
