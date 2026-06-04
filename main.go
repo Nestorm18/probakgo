@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.91"
+var version = "0.0.92"
 
 // web/ is at the project root, same directory as this file.
 //

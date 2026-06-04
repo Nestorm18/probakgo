@@ -16,8 +16,8 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
-	serverID, serverName := h.resolvePVEBackupServer(ctx, server)
-	configs, err := h.store.ListVMBackupConfigsForServer(ctx, "pve", serverID)
+	serverID, hostname, displayName := h.resolvePVEBackupServer(ctx, server)
+	configs, err := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", serverID, hostname)
 	if err != nil {
 		slog.Error("list vm backup configs", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
@@ -26,7 +26,7 @@ func (h *WebH) BackupConfig(w http.ResponseWriter, r *http.Request) {
 	h.tmpl.Render(w, r, "backup_config.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
-		"ServerName": serverName,
+		"ServerName": displayName,
 		"ServerRef":  server,
 		"Configs":    configs,
 		"Flash":      r.URL.Query().Get("flash"),
@@ -38,11 +38,11 @@ func (h *WebH) BackupConfigVMNewPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
-	serverID, serverName := h.resolvePVEBackupServer(ctx, server)
+	serverID, hostname, displayName := h.resolvePVEBackupServer(ctx, server)
 
 	var vm *domain.VMBackupConfig
 	if copyID := r.URL.Query().Get("copy"); copyID != "" {
-		configs, _ := h.store.ListVMBackupConfigsForServer(ctx, "pve", serverID)
+		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", serverID, hostname)
 		for i, c := range configs {
 			if c.VMID == copyID {
 				clone := configs[i]
@@ -56,7 +56,7 @@ func (h *WebH) BackupConfigVMNewPage(w http.ResponseWriter, r *http.Request) {
 	h.tmpl.Render(w, r, "vm_backup_config_form.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
-		"ServerName": serverName,
+		"ServerName": displayName,
 		"ServerRef":  server,
 		"Action":     "new",
 		"VM":         vm,
@@ -67,13 +67,13 @@ func (h *WebH) BackupConfigVMNewPage(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) BackupConfigVMNewPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	server := chi.URLParam(r, "server")
-	serverID, serverName := h.resolvePVEBackupServer(ctx, server)
+	serverID, hostname, _ := h.resolvePVEBackupServer(ctx, server)
 	req := collectVMFormRequest(r)
 	if req.VMID == "" {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/new?flash=VM+ID+requerido", http.StatusSeeOther)
 		return
 	}
-	if _, err := h.store.CreateVMBackupConfigForServer(ctx, "pve", serverID, serverName, req); err != nil {
+	if _, err := h.store.CreateVMBackupConfigForServer(ctx, "pve", serverID, hostname, req); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/new?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -84,9 +84,9 @@ func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	server := chi.URLParam(r, "server")
-	serverID, serverName := h.resolvePVEBackupServer(ctx, server)
+	serverID, hostname, displayName := h.resolvePVEBackupServer(ctx, server)
 	vmid := chi.URLParam(r, "vmid")
-	configs, _ := h.store.ListVMBackupConfigsForServer(ctx, "pve", serverID)
+	configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", serverID, hostname)
 	var vm *domain.VMBackupConfig
 	for i, c := range configs {
 		if c.VMID == vmid {
@@ -97,7 +97,7 @@ func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
 	h.tmpl.Render(w, r, "vm_backup_config_form.html", map[string]any{
 		"Username":   username,
 		"Role":       role,
-		"ServerName": serverName,
+		"ServerName": displayName,
 		"ServerRef":  server,
 		"Action":     "edit",
 		"VM":         vm,
@@ -108,7 +108,7 @@ func (h *WebH) BackupConfigVMEditPage(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) BackupConfigVMEditPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	server := chi.URLParam(r, "server")
-	serverID, _ := h.resolvePVEBackupServer(ctx, server)
+	serverID, _, _ := h.resolvePVEBackupServer(ctx, server)
 	vmid := chi.URLParam(r, "vmid")
 	req := collectVMFormRequest(r)
 	req.VMID = vmid
@@ -122,7 +122,7 @@ func (h *WebH) BackupConfigVMEditPost(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) BackupConfigVMDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	server := chi.URLParam(r, "server")
-	serverID, _ := h.resolvePVEBackupServer(ctx, server)
+	serverID, _, _ := h.resolvePVEBackupServer(ctx, server)
 	vmid := chi.URLParam(r, "vmid")
 	if err := h.store.DeleteVMBackupConfigForServer(ctx, "pve", serverID, vmid); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"?flash="+err.Error(), http.StatusSeeOther)
@@ -134,7 +134,7 @@ func (h *WebH) BackupConfigVMDelete(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) BackupConfigVMToggle(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	server := chi.URLParam(r, "server")
-	serverID, _ := h.resolvePVEBackupServer(ctx, server)
+	serverID, _, _ := h.resolvePVEBackupServer(ctx, server)
 	vmid := chi.URLParam(r, "vmid")
 	if err := h.store.ToggleVMExcludeForServer(ctx, "pve", serverID, vmid); err != nil {
 		http.Redirect(w, r, "/backup-config/"+server+"?flash="+err.Error(), http.StatusSeeOther)
@@ -143,17 +143,17 @@ func (h *WebH) BackupConfigVMToggle(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/backup-config/"+server+"?flash=Estado+cambiado&ok=1", http.StatusSeeOther)
 }
 
-func (h *WebH) resolvePVEBackupServer(ctx context.Context, ref string) (int64, string) {
+func (h *WebH) resolvePVEBackupServer(ctx context.Context, ref string) (int64, string, string) {
 	if id, err := strconv.ParseInt(ref, 10, 64); err == nil && id > 0 {
 		if sv, err := h.store.GetPVEServer(ctx, id); err == nil {
-			return sv.ID, sv.Name
+			return sv.ID, sv.Name, sv.DisplayName
 		}
-		return id, ref
+		return id, ref, ref
 	}
 	if sv, err := h.store.GetPVEServerByName(ctx, ref); err == nil {
-		return sv.ID, sv.Name
+		return sv.ID, sv.Name, sv.DisplayName
 	}
-	return 0, ref
+	return 0, ref, ref
 }
 
 func collectVMFormRequest(r *http.Request) domain.CreateVMBackupConfigRequest {

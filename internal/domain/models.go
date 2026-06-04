@@ -5,6 +5,7 @@ import "time"
 type PVEServer struct {
 	ID            int64     `db:"id"`
 	Name          string    `db:"name"`
+	DisplayName   string    `db:"display_name"`
 	IP            string    `db:"ip"`
 	PublicIP      string    `db:"public_ip"`
 	ClientVersion string    `db:"client_version"`
@@ -70,6 +71,7 @@ type PVEStorageContent struct {
 type PBSServer struct {
 	ID            int64     `db:"id"`
 	Name          string    `db:"name"`
+	DisplayName   string    `db:"display_name"`
 	IP            string    `db:"ip"`
 	PublicIP      string    `db:"public_ip"`
 	ClientVersion string    `db:"client_version"`

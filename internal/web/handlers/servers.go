@@ -57,7 +57,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
 		stale := rep == nil
 		if rep != nil {
-			stale, _ = h.report.IsStaleForServer(ctx, rep.ReportedAt, sv.Name)
+			stale, _ = h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 		}
 		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
 		r2 := map[string]any{
@@ -66,7 +66,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"TaskMissing": 0,
 			"TaskUnknown": 0,
 			"AlertConfig": alertCfg,
-			"ServerURL":   serverURLs[sv.Name],
+			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 			"Heartbeat":   buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
 		}
 		if rep != nil {
@@ -75,7 +75,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 
 			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
 			if len(tasks) > 0 {
-				configs, _ := h.store.ListVMBackupConfigs(ctx, sv.Name)
+				configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 				if len(configs) > 0 {
 					jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
 					configured := make(map[string]bool, len(configs))
@@ -172,7 +172,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if len(backupTasks) > 0 {
-		configs, _ := h.store.ListVMBackupConfigs(ctx, sv.Name)
+		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		for _, c := range configs {
 			configuredVMIDs[c.VMID] = true
 		}
@@ -387,7 +387,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			"Server":      sv,
 			"IsStale":     rep == nil || rep.IsStale,
 			"AlertConfig": alertCfg,
-			"ServerURL":   serverURLs[sv.Name],
+			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -470,7 +470,7 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 	}
 	reports, _ := h.store.ListPVEReportsByDays(ctx, id, days)
 
-	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.Name, time.Now().Format("20060102"))
+	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.DisplayName, time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 
@@ -499,9 +499,21 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 func buildServerURLMap(keys []domain.APIKey, _ error) map[string]string {
 	m := make(map[string]string)
 	for _, k := range keys {
+		if k.ID > 0 && k.ServerURL != "" {
+			m["id:"+strconv.FormatInt(k.ID, 10)] = k.ServerURL
+		}
 		if k.ServerName != "" && k.ServerURL != "" {
-			m[k.ServerName] = k.ServerURL
+			m["name:"+k.ServerName] = k.ServerURL
 		}
 	}
 	return m
+}
+
+func serverURLFor(apiKeyID int64, hostname string, urls map[string]string) string {
+	if apiKeyID > 0 {
+		if u := urls["id:"+strconv.FormatInt(apiKeyID, 10)]; u != "" {
+			return u
+		}
+	}
+	return urls["name:"+hostname]
 }

@@ -269,11 +269,11 @@ func (h *WebH) alertFromSuppressionID(ctx context.Context, alertID string) domai
 	switch a.ServerType {
 	case "pve":
 		if sv, err := h.store.GetPVEServer(ctx, a.ServerID); err == nil {
-			a.ServerName = sv.Name
+			a.ServerName = sv.DisplayName
 		}
 	case "pbs":
 		if sv, err := h.store.GetPBSServer(ctx, a.ServerID); err == nil {
-			a.ServerName = sv.Name
+			a.ServerName = sv.DisplayName
 		}
 	}
 	if a.ServerName == "" {
