@@ -55,6 +55,13 @@ func (s *Store) HardDeleteServerDataForAPIKey(ctx context.Context, apiKeyID int6
 		if err := hardDeletePBS(ctx, tx, fallbackName); err != nil {
 			return err
 		}
+	} else if fallbackName != "" {
+		if err := hardDeleteLegacyPVE(ctx, tx, fallbackName); err != nil {
+			return err
+		}
+		if err := hardDeleteLegacyPBS(ctx, tx, fallbackName); err != nil {
+			return err
+		}
 	}
 
 	return tx.Commit()
@@ -84,6 +91,19 @@ func hardDeletePVEByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) (bo
 		}
 	}
 	return len(ids) > 0, nil
+}
+
+func hardDeleteLegacyPVE(ctx context.Context, tx txRunner, serverName string) error {
+	ids, err := legacyPVEServerIDsByName(ctx, tx, serverName)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := hardDeletePVEByID(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func hardDeletePVEByID(ctx context.Context, tx txRunner, id int64) error {
@@ -136,6 +156,19 @@ func hardDeletePBSByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) (bo
 	return len(ids) > 0, nil
 }
 
+func hardDeleteLegacyPBS(ctx context.Context, tx txRunner, serverName string) error {
+	ids, err := legacyPBSServerIDsByName(ctx, tx, serverName)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := hardDeletePBSByID(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func hardDeletePBSByID(ctx context.Context, tx txRunner, id int64) error {
 	steps := []string{
 		`DELETE FROM server_heartbeats WHERE server_type = 'pbs' AND server_id = ?`,
@@ -166,12 +199,20 @@ func pveServerIDsByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) ([]i
 	return serverIDs(ctx, tx, `SELECT id FROM pve_servers WHERE api_key_id = ?`, apiKeyID)
 }
 
+func legacyPVEServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
+	return serverIDs(ctx, tx, `SELECT id FROM pve_servers WHERE name = ? AND api_key_id IS NULL`, serverName)
+}
+
 func pbsServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
 	return serverIDs(ctx, tx, `SELECT id FROM pbs_servers WHERE name = ?`, serverName)
 }
 
 func pbsServerIDsByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) ([]int64, error) {
 	return serverIDs(ctx, tx, `SELECT id FROM pbs_servers WHERE api_key_id = ?`, apiKeyID)
+}
+
+func legacyPBSServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
+	return serverIDs(ctx, tx, `SELECT id FROM pbs_servers WHERE name = ? AND api_key_id IS NULL`, serverName)
 }
 
 func serverIDs(ctx context.Context, tx txRunner, query string, arg any) ([]int64, error) {
