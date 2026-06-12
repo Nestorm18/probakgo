@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -307,12 +308,18 @@ func TestEvalPBSDisk_OverThreshold(t *testing.T) {
 	_, st := openTestStore(t)
 	serverID, _ := st.UpsertPBSServer(ctx, "pbs1", "1.1.1.1", "", "1.0", "")
 	reportID, _ := st.InsertPBSReport(ctx, serverID)
-	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "datastore1", Total: 1000, Used: 900})
+	_, _ = st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{
+		Store: "datastore1", Total: 1000, Used: 900,
+		EstimatedFullDate: time.Now().Add(10 * 24 * time.Hour).Unix(),
+	})
 
 	cfg := defaultCfg()
 	alerts, _ := evalPBSDisk(st, cfg)
 	if !hasAlert(alerts, domain.AlertTypeDisk, "pbs1") {
 		t.Error("expected disk alert for pbs1")
+	}
+	if len(alerts) != 1 || !strings.Contains(alerts[0].Message, "estimacion: 9 dias") {
+		t.Fatalf("expected disk alert to include fill estimation, got %+v", alerts)
 	}
 }
 
