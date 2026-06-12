@@ -466,7 +466,7 @@ func evalPBSDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 				Type:       domain.AlertTypeDisk,
 				Severity:   alertDiskSeverity(pct),
 				Title:      "Disco casi lleno",
-				Message:    fmt.Sprintf("%d%% usado (%s / %s)", pct, alertFmtBytes(ds.Used), alertFmtBytes(ds.Total)),
+				Message:    pbsDiskMessage(pct, ds.Used, ds.Total, ds.EstimatedFullDate, time.Now()),
 				Value:      fmt.Sprintf("%d", pct),
 				Threshold:  fmt.Sprintf("%d%%", threshold),
 				DetectedAt: time.Now(),
@@ -806,3 +806,19 @@ func alertFmtAge(d time.Duration) string {
 }
 
 func alertFmtBytes(b int64) string { return domain.FormatBytes(b) }
+
+func pbsDiskMessage(pct int, used, total int64, estimatedFullDate int64, now time.Time) string {
+	msg := fmt.Sprintf("%d%% usado (%s / %s)", pct, alertFmtBytes(used), alertFmtBytes(total))
+	if estimatedFullDate == 0 {
+		return msg
+	}
+	fullTime := time.Unix(estimatedFullDate, 0)
+	if !fullTime.After(now) {
+		return msg + "; estimacion de llenado vencida"
+	}
+	daysLeft := int(fullTime.Sub(now).Hours() / 24)
+	if daysLeft < 1 {
+		return msg + "; estimacion: menos de 1 dia"
+	}
+	return fmt.Sprintf("%s; estimacion: %d dias", msg, daysLeft)
+}
