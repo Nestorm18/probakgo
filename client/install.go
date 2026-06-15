@@ -249,13 +249,18 @@ func autoConfigureBackupConfig(apiURL, apiKey, proxmoxToken, proxmoxSecret strin
 		ServerType:    "pve",
 	}
 	si := newSysInfo(cfg)
-	vms, err := newPVEClient(cfg, si).discoverPVEVMs()
+	pve := newPVEClient(cfg, si)
+	vms, err := pve.discoverPVEVMs()
 	if err != nil {
 		fmt.Printf("WARN: could not list VMs for backup config: %v\n", err)
 		return
 	}
+	schedules, err := pve.discoverPVEBackupSchedules(vms)
+	if err != nil {
+		fmt.Printf("WARN: could not read Proxmox backup jobs, using Monday-Friday defaults: %v\n", err)
+	}
 	machineID := si.machineID()
-	created, updated, skipped, err := syncBackupConfig(cfg, si.Hostname, machineID, vms)
+	created, updated, skipped, err := syncBackupConfig(cfg, si.Hostname, machineID, vms, schedules)
 	if err != nil {
 		fmt.Printf("WARN: could not sync backup config: %v\n", err)
 	} else if len(vms) == 0 {

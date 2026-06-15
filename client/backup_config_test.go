@@ -129,3 +129,97 @@ func TestSyncBackupConfigCreatesMissingAndUpdatesUnscheduledVMs(t *testing.T) {
 		t.Fatalf("created body: %+v", created[0])
 	}
 }
+
+func TestDiscoverPVEBackupSchedulesUsesClusterBackupJobs(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/cluster/backup", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"enabled":  float64(1),
+					"schedule": "mon..sat 22:15",
+					"vmid":     "400,500,600,700,800,100",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	schedules, err := newTestPVEClient(srv).discoverPVEBackupSchedules([]discoveredVM{
+		{VMID: "100", Name: "adguard"},
+		{VMID: "400", Name: "debian"},
+	})
+	if err != nil {
+		t.Fatalf("discoverPVEBackupSchedules: %v", err)
+	}
+	got := schedules["100"].Days
+	if !got.Monday || !got.Friday || !got.Saturday || got.Sunday {
+		t.Fatalf("VM 100 days: got %+v, want mon..sat", got)
+	}
+}
+
+func TestDiscoverPVEBackupSchedulesPrefersWeekdayNightJobAndAddsWeekend(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/cluster/backup", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"enabled": float64(1), "schedule": "mon..fri 12:00", "vmid": "101"},
+				map[string]any{"enabled": float64(1), "schedule": "mon..fri 22:30", "vmid": "101"},
+				map[string]any{"enabled": float64(1), "schedule": "sat 23:00", "vmid": "101"},
+				map[string]any{"enabled": float64(0), "schedule": "sun 23:00", "vmid": "101"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	schedules, err := newTestPVEClient(srv).discoverPVEBackupSchedules([]discoveredVM{{VMID: "101", Name: "web"}})
+	if err != nil {
+		t.Fatalf("discoverPVEBackupSchedules: %v", err)
+	}
+	got := schedules["101"]
+	if got.StartMin != 22*60+30 {
+		t.Fatalf("StartMin: got %d, want 1350", got.StartMin)
+	}
+	if !got.Days.Monday || !got.Days.Friday || !got.Days.Saturday || got.Days.Sunday {
+		t.Fatalf("days: got %+v, want weekdays plus saturday only", got.Days)
+	}
+}
+
+func TestSyncBackupConfigUsesDiscoveredSchedule(t *testing.T) {
+	var created []map[string]any
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/backup-config/pve/pve-01", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"server": "pve-01", "configs": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api/backup-config/pve/pve-01/vms", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode create body: %v", err)
+		}
+		created = append(created, body)
+		w.WriteHeader(http.StatusCreated)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	createdCount, updated, skipped, err := syncBackupConfig(
+		&Config{APIURL: srv.URL, APIKey: "pbk-test"},
+		"pve-01",
+		"machine-123",
+		[]discoveredVM{{VMID: "100", Name: "adguard"}},
+		map[string]pveBackupSchedule{
+			"100": {Days: backupDays{Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("syncBackupConfig: %v", err)
+	}
+	if createdCount != 1 || updated != 0 || skipped != 0 {
+		t.Fatalf("created/updated/skipped: got %d/%d/%d, want 1/0/0", createdCount, updated, skipped)
+	}
+	if len(created) != 1 || created[0]["saturday"] != true || created[0]["sunday"] == true {
+		t.Fatalf("created body: %+v", created)
+	}
+}
