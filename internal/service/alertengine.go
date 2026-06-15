@@ -61,6 +61,15 @@ func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	return all, nil
 }
 
+func CurrentAlerts(ctx context.Context, st *store.Store, rep *ReportService) ([]domain.Alert, error) {
+	cfg, err := LoadAlertConfigs(ctx, st)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Report = rep
+	return RunAll(st, cfg)
+}
+
 // LoadAlertConfigs builds AlertConfigs from the store using email_config as global fallback.
 func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error) {
 	emailCfg, err := st.GetEmailConfig(ctx)

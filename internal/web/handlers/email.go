@@ -4,8 +4,10 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -72,6 +74,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
+		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"
@@ -128,13 +131,14 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := domain.EmailConfig{
-		SMTPHost:   r.FormValue("smtp_host"),
-		SMTPPort:   port,
-		SMTPUser:   r.FormValue("smtp_user"),
-		SMTPPass:   pass,
-		Recipients: r.FormValue("recipients"),
-		IsEnabled:  r.FormValue("is_enabled") == "on",
-		SendTime:   sendTime,
+		SMTPHost:              r.FormValue("smtp_host"),
+		SMTPPort:              port,
+		SMTPUser:              r.FormValue("smtp_user"),
+		SMTPPass:              pass,
+		Recipients:            r.FormValue("recipients"),
+		IsEnabled:             r.FormValue("is_enabled") == "on",
+		SendTime:              sendTime,
+		CriticalAlertsEnabled: r.FormValue("critical_alerts_enabled") == "on",
 	}
 	if existing != nil {
 		cfg.RetentionMonths = existing.RetentionMonths
@@ -150,13 +154,14 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "settings.email_update", "settings", "email", "Email", map[string]any{
-		"smtp_host":      cfg.SMTPHost,
-		"smtp_port":      cfg.SMTPPort,
-		"smtp_user_set":  cfg.SMTPUser != "",
-		"smtp_pass_set":  cfg.SMTPPass != "",
-		"recipients_set": cfg.Recipients != "",
-		"is_enabled":     cfg.IsEnabled,
-		"send_time":      cfg.SendTime,
+		"smtp_host":               cfg.SMTPHost,
+		"smtp_port":               cfg.SMTPPort,
+		"smtp_user_set":           cfg.SMTPUser != "",
+		"smtp_pass_set":           cfg.SMTPPass != "",
+		"recipients_set":          cfg.Recipients != "",
+		"is_enabled":              cfg.IsEnabled,
+		"send_time":               cfg.SendTime,
+		"critical_alerts_enabled": cfg.CriticalAlertsEnabled,
 	})
 	http.Redirect(w, r, "/settings/email?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
@@ -208,6 +213,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
@@ -218,6 +224,29 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"retention_enabled": cfg.RetentionEnabled,
 	})
 	http.Redirect(w, r, "/settings/maintenance?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+}
+
+func (h *WebH) MaintenanceDatabaseDownload(w http.ResponseWriter, r *http.Request) {
+	tmp, err := os.CreateTemp("", "probakgo-data-*.db")
+	if err != nil {
+		http.Error(w, "error creando copia temporal", http.StatusInternalServerError)
+		return
+	}
+	tmpName := tmp.Name()
+	_ = tmp.Close()
+	defer os.Remove(tmpName)
+	_ = os.Remove(tmpName)
+
+	if err := h.store.BackupTo(r.Context(), tmpName); err != nil {
+		slog.Error("backup database", "err", err)
+		http.Error(w, "error generando copia", http.StatusInternalServerError)
+		return
+	}
+	filename := "probakgo_data_" + time.Now().Format("20060102_150405") + ".db"
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	h.audit(r, "settings.database_download", "settings", "maintenance", "Copia BD", nil)
+	http.ServeFile(w, r, tmpName)
 }
 
 func (h *WebH) AlertsSettings(w http.ResponseWriter, r *http.Request) {
@@ -287,6 +316,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"

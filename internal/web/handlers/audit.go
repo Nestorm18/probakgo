@@ -18,10 +18,17 @@ func (h *WebH) AuditLogPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	users, err := h.store.ListUsers(r.Context())
+	if err != nil {
+		slog.Error("list users for audit log", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
 	h.tmpl.Render(w, r, "audit_log.html", map[string]any{
 		"Username": username,
 		"Role":     role,
 		"Rows":     rows,
+		"Users":    users,
 	})
 }
 

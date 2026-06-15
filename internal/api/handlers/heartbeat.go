@@ -72,5 +72,6 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "save heartbeat", err)
 		return
 	}
+	h.sendImmediateCriticalAlerts()
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "server": req.Hostname, "server_type": req.ServerType})
 }

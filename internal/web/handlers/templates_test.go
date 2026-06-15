@@ -16,7 +16,7 @@ import (
 func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
-	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, func() (int, int) { return 0, 0 })
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
 	fixtures := templateFixtures(time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC))
 
 	entries, err := os.ReadDir("../../../web/templates")
@@ -54,7 +54,7 @@ func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
-	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, func() (int, int) { return 0, 0 })
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
 	req := httptest.NewRequest(http.MethodGet, "/about?flash=Mensaje+visible&ok=1", nil)
 	rr := httptest.NewRecorder()
 

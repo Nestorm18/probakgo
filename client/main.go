@@ -14,7 +14,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.94"
+var version = "0.0.99"
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -56,6 +56,9 @@ func main() {
 		case "heartbeat":
 			runHeartbeat()
 			return
+		case "doctor":
+			runDoctor()
+			return
 		case "version":
 			fmt.Printf("probakgo-client v%s\n", version)
 			return
@@ -82,6 +85,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  uninstall   Remove all installed files and revoke the Proxmox API token\n")
 		fmt.Fprintf(os.Stderr, "  update      Self-update to the latest GitHub release\n")
 		fmt.Fprintf(os.Stderr, "  heartbeat   Send a lightweight liveness heartbeat to Probakgo\n")
+		fmt.Fprintf(os.Stderr, "  doctor      Check config, connectivity, hook and heartbeat timer\n")
 		fmt.Fprintf(os.Stderr, "  version     Print version\n\n")
 		fmt.Fprintf(os.Stderr, "Flags (report mode):\n")
 		flag.PrintDefaults()

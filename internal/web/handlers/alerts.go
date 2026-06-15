@@ -57,14 +57,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 
-	cfg, err := service.LoadAlertConfigs(ctx, h.store)
-	if err != nil {
-		slog.Error("load alert configs", "err", err)
-		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
-		return
-	}
-	cfg.Report = h.report
-	allAlerts, err := service.RunAll(h.store, cfg)
+	allAlerts, err := h.runAlerts(ctx, true)
 	if err != nil {
 		slog.Error("run alerts", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
@@ -127,6 +120,8 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 
 	serverNames := uniqueServerNames(active)
 
+	events, _ := h.store.ListAlertStateEvents(ctx, 100)
+
 	h.tmpl.Render(w, r, "alerts.html", map[string]any{
 		"Username":         username,
 		"Role":             role,
@@ -138,6 +133,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 		"FilterSeverity":   filterSeverity,
 		"FilterServer":     filterServer,
 		"ServerNames":      serverNames,
+		"AlertEvents":      events,
 	})
 }
 
@@ -174,12 +170,7 @@ func (h *WebH) AlertsStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, error) {
-	cfg, err := service.LoadAlertConfigs(ctx, h.store)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	cfg.Report = h.report
-	allAlerts, err := service.RunAll(h.store, cfg)
+	allAlerts, err := h.runAlerts(ctx, true)
 	if err != nil {
 		return nil, 0, 0, err
 	}
@@ -201,6 +192,22 @@ func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, erro
 	return active, critical, warning, nil
 }
 
+func (h *WebH) runAlerts(ctx context.Context, syncState bool) ([]domain.Alert, error) {
+	cfg, err := service.LoadAlertConfigs(ctx, h.store)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Report = h.report
+	allAlerts, err := service.RunAll(h.store, cfg)
+	if err != nil {
+		return nil, err
+	}
+	if syncState {
+		_ = h.store.SyncAlertStates(ctx, allAlerts)
+	}
+	return allAlerts, nil
+}
+
 func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	alertIDs := formAlertIDs(r)
@@ -211,18 +218,47 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	until := time.Now().Add(time.Duration(days) * 24 * time.Hour)
+	current := h.alertMap(ctx)
 	for _, alertID := range alertIDs {
 		_ = h.store.UpsertAlertSuppression(ctx, alertID, until, reason)
+		alert := current[alertID]
+		if alert.ID == "" {
+			alert = h.alertFromSuppressionID(ctx, alertID)
+		}
+		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "suppressed", reason))
 	}
 	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
 }
 
 func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	current := h.alertMap(ctx)
 	for _, alertID := range formAlertIDs(r) {
 		_ = h.store.DeleteAlertSuppression(ctx, alertID)
+		alert := current[alertID]
+		if alert.ID == "" {
+			alert = h.alertFromSuppressionID(ctx, alertID)
+		}
+		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "unsuppressed", ""))
 	}
 	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
+}
+
+func (h *WebH) alertMap(ctx context.Context) map[string]domain.Alert {
+	allAlerts, _ := h.runAlerts(ctx, false)
+	out := make(map[string]domain.Alert, len(allAlerts))
+	for _, alert := range allAlerts {
+		out[alert.ID] = alert
+	}
+	return out
+}
+
+func alertStateEventFromAlert(alert domain.Alert, eventType, note string) domain.AlertStateEvent {
+	return domain.AlertStateEvent{
+		AlertID: alert.ID, EventType: eventType, Severity: alert.Severity, Title: alert.Title,
+		Message: alert.Message, ServerName: alert.ServerName, ServerType: alert.ServerType,
+		ServerID: alert.ServerID, StoreName: alert.StoreName, VMID: alert.VMID, VMName: alert.VMName, Note: note,
+	}
 }
 
 func formAlertIDs(r *http.Request) []string {

@@ -70,6 +70,14 @@
 </div>
 
 <!-- Server lists -->
+<div class="d-flex align-items-center gap-2 mb-3">
+  <div class="input-group input-group-sm filter-search" style="max-width:320px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" id="dashboardServerFilter" class="form-control form-control-sm" placeholder="Filtrar por cliente o empresa...">
+  </div>
+  <span id="dashboardFilterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
+</div>
+
 <div class="row g-4">
   <div class="col-12 col-xl-6">
     <div class="card">
@@ -79,7 +87,7 @@
       </div>
       <div style="border-radius:0 0 .75rem .75rem;overflow:hidden">
         {{range .PVERows}}
-        <a href="/servers/pve/{{.Server.ID}}" class="server-row text-decoration-none">
+        <a href="/servers/pve/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
           <div class="server-row-icon">
             <i class="bi bi-server"></i>
           </div>
@@ -109,7 +117,7 @@
       </div>
       <div style="border-radius:0 0 .75rem .75rem;overflow:hidden">
         {{range .PBSRows}}
-        <a href="/servers/pbs/{{.Server.ID}}" class="server-row text-decoration-none">
+        <a href="/servers/pbs/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
           <div class="server-row-icon">
             <i class="bi bi-archive"></i>
           </div>
@@ -132,4 +140,24 @@
     </div>
   </div>
 </div>
+{{end}}
+{{block "page_scripts" .}}
+<script>
+(function() {
+  const input = document.getElementById('dashboardServerFilter');
+  const countEl = document.getElementById('dashboardFilterCount');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase();
+    let visible = 0;
+    const rows = document.querySelectorAll('.dashboard-server-row');
+    rows.forEach(row => {
+      const match = !q || row.textContent.toLowerCase().includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    countEl.textContent = q ? `${visible} de ${rows.length}` : '';
+  });
+})();
+</script>
 {{end}}
