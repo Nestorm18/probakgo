@@ -1,0 +1,48 @@
+{{block "page_title" .}}Activar 2FA - Probakgo{{end}}
+{{block "page_heading" .}}Activar 2FA{{end}}
+{{block "page_content" .}}
+
+<div class="row">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Configurar aplicación TOTP
+      </div>
+      <div class="card-body">
+        {{if .Error}}
+        <div class="alert alert-danger d-flex align-items-center gap-2 mb-3">
+          <i class="bi bi-exclamation-triangle-fill"></i><span>{{.Error}}</span>
+        </div>
+        {{end}}
+        {{if .QRDataURI}}
+        <div class="mb-3 text-center">
+          <img src="{{.QRDataURI}}" alt="QR 2FA" width="220" height="220" style="border:1px solid var(--border);border-radius:8px;background:white;padding:8px">
+        </div>
+        {{end}}
+        <div class="mb-3">
+          <label class="form-label">Clave de configuración</label>
+          <div class="input-group">
+            <input class="form-control" value="{{.Secret}}" readonly style="font-family:'DM Mono',monospace">
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">URI otpauth</label>
+          <textarea class="form-control" readonly rows="3" style="font-family:'DM Mono',monospace;font-size:.78rem">{{.URI}}</textarea>
+        </div>
+        <form method="POST" action="/profile/2fa/confirm">
+          {{ .CSRFField }}
+          <div class="mb-3">
+            <label class="form-label">Código generado por tu app</label>
+            <input type="text" name="code" class="form-control" inputmode="numeric" autocomplete="one-time-code" required maxlength="6" pattern="[0-9]{6}">
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-shield-check me-1"></i>Activar 2FA</button>
+            <a href="/profile" class="btn btn-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{end}}

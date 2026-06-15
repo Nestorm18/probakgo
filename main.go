@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.99"
+var version = "0.0.103"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -58,6 +58,17 @@ func main() {
 			if updated {
 				restartService()
 			}
+			return
+		case "unlock2fa":
+			if len(os.Args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: probakgo unlock2fa <usuario>")
+				os.Exit(2)
+			}
+			if err := unlock2FA(os.Args[2]); err != nil {
+				fmt.Fprintln(os.Stderr, "unlock2fa:", err)
+				os.Exit(1)
+			}
+			fmt.Printf("2FA disabled for user %q.\n", os.Args[2])
 			return
 		}
 	}
@@ -276,6 +287,26 @@ func ensureDefaults(st *store.Store) error {
 		}
 		slog.Warn("⚠  default user created - CHANGE PASSWORD IMMEDIATELY",
 			"username", "probakgo", "password", pass)
+	}
+	return nil
+}
+
+func unlock2FA(username string) error {
+	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	db, err := dbpkg.Open(cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	ok, err := store.New(db).DisableUserTOTPByUsername(context.Background(), username)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("user %q not found", username)
 	}
 	return nil
 }

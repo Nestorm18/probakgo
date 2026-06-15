@@ -15,6 +15,7 @@
         <tr>
           <th>Usuario</th>
           <th>Rol</th>
+          <th>2FA</th>
           <th>Estado</th>
           <th>Creado</th>
           <th></th>
@@ -30,6 +31,10 @@
           {{if eq .Role "admin"}}<span class="status-pill warn">admin</span>
           {{else if eq .Role "editor"}}<span class="status-pill ok">editor</span>
           {{else}}<span class="status-pill muted">reader</span>{{end}}
+        </td>
+        <td>
+          {{if .TOTPEnabled}}<span class="status-pill ok">Activo</span>
+          {{else}}<span class="status-pill muted">No activo</span>{{end}}
         </td>
         <td>
           {{if .IsActive}}<span class="status-pill ok">Activo</span>
@@ -54,6 +59,12 @@
                     data-bs-target="#pwdModal" data-uid="{{.ID}}" title="Cambiar contraseña">
               <i class="bi bi-key"></i>
             </button>
+            <form method="POST" action="/users/{{.ID}}/2fa/disable" class="d-inline">
+              {{ $.CSRFField }}
+              <button class="btn btn-sm btn-outline-secondary" title="{{if .TOTPEnabled}}Desactivar 2FA{{else}}2FA no activo{{end}}" {{if not .TOTPEnabled}}disabled{{end}}>
+                <i class="bi bi-shield-x"></i>
+              </button>
+            </form>
             {{if not (and (eq .Username $.CurrentUsername) (eq .Role "admin"))}}
             <form method="POST" action="/users/{{.ID}}/toggle" class="d-inline">
               {{ $.CSRFField }}
@@ -75,7 +86,7 @@
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="5" class="text-center py-5" style="color:var(--txt-muted)">Sin usuarios registrados</td></tr>
+      <tr><td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">Sin usuarios registrados</td></tr>
       {{end}}
       </tbody>
     </table>

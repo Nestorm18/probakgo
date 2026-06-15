@@ -9,22 +9,25 @@ import (
 )
 
 func (s *Store) GetUserByUsername(ctx context.Context, username string) (*domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users WHERE username = ?`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip, totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at FROM users WHERE username = ?`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip,
+		totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at
 		FROM users WHERE username = ?`, username)
 	return scanUser(row)
 }
 
 func (s *Store) GetUser(ctx context.Context, id int64) (*domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users WHERE id = ?`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip, totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at FROM users WHERE id = ?`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip,
+		totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at
 		FROM users WHERE id = ?`, id)
 	return scanUser(row)
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
-	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip FROM users ORDER BY username`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip
+	debug.RecordQuery(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip, totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at FROM users ORDER BY username`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip,
+		totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at
 		FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
@@ -36,7 +39,12 @@ func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
 		var isActive int
 		var lastLoginAt sql.NullTime
 		var lastLoginIP sql.NullString
-		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP); err != nil {
+		var totpEnabled int
+		var totpSecret sql.NullString
+		var totpConfirmedAt sql.NullTime
+		var totpGraceStartedAt sql.NullTime
+		if err := rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP,
+			&totpEnabled, &totpSecret, &totpConfirmedAt, &totpGraceStartedAt); err != nil {
 			return nil, err
 		}
 		u.IsActive = isActive != 0
@@ -44,6 +52,14 @@ func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
 			u.LastLoginAt = &lastLoginAt.Time
 		}
 		u.LastLoginIP = lastLoginIP.String
+		u.TOTPEnabled = totpEnabled != 0
+		u.TOTPSecret = totpSecret.String
+		if totpConfirmedAt.Valid {
+			u.TOTPConfirmedAt = &totpConfirmedAt.Time
+		}
+		if totpGraceStartedAt.Valid {
+			u.TOTPGraceStartedAt = &totpGraceStartedAt.Time
+		}
 		users = append(users, u)
 	}
 	return users, rows.Err()
@@ -73,6 +89,46 @@ func (s *Store) UpdateUserUsername(ctx context.Context, id int64, username strin
 func (s *Store) UpdateUserPassword(ctx context.Context, id int64, hash string) error {
 	debug.RecordQuery(ctx, `UPDATE users SET password_hash=? WHERE id=?`)
 	_, err := s.db.ExecContext(ctx, `UPDATE users SET password_hash=? WHERE id=?`, hash, id)
+	return err
+}
+
+func (s *Store) EnableUserTOTP(ctx context.Context, id int64, secret string) error {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=1, totp_secret=?, totp_confirmed_at=CURRENT_TIMESTAMP, totp_grace_started_at=NULL WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=1, totp_secret=?, totp_confirmed_at=CURRENT_TIMESTAMP, totp_grace_started_at=NULL WHERE id=?`, secret, id)
+	return err
+}
+
+func (s *Store) DisableUserTOTP(ctx context.Context, id int64) error {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL WHERE id=?`, id)
+	return err
+}
+
+func (s *Store) DisableUserTOTPByUsername(ctx context.Context, username string) (bool, error) {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL WHERE username=?`)
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL WHERE username=?`, username)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+func (s *Store) StartUserTOTPGrace(ctx context.Context, id int64) error {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_grace_started_at = COALESCE(totp_grace_started_at, CURRENT_TIMESTAMP) WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_grace_started_at = COALESCE(totp_grace_started_at, CURRENT_TIMESTAMP) WHERE id=?`, id)
+	return err
+}
+
+func (s *Store) ClearUserTOTPGrace(ctx context.Context) error {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_grace_started_at=NULL`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_grace_started_at=NULL`)
+	return err
+}
+
+func (s *Store) SetUserActive(ctx context.Context, id int64, active bool) error {
+	debug.RecordQuery(ctx, `UPDATE users SET is_active=? WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET is_active=? WHERE id=?`, boolToInt(active), id)
 	return err
 }
 
@@ -106,7 +162,12 @@ func scanUser(row *sql.Row) (*domain.User, error) {
 	var isActive int
 	var lastLoginAt sql.NullTime
 	var lastLoginIP sql.NullString
-	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP); err != nil {
+	var totpEnabled int
+	var totpSecret sql.NullString
+	var totpConfirmedAt sql.NullTime
+	var totpGraceStartedAt sql.NullTime
+	if err := row.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &isActive, &u.CreatedAt, &lastLoginAt, &lastLoginIP,
+		&totpEnabled, &totpSecret, &totpConfirmedAt, &totpGraceStartedAt); err != nil {
 		return nil, err
 	}
 	u.IsActive = isActive != 0
@@ -114,5 +175,13 @@ func scanUser(row *sql.Row) (*domain.User, error) {
 		u.LastLoginAt = &lastLoginAt.Time
 	}
 	u.LastLoginIP = lastLoginIP.String
+	u.TOTPEnabled = totpEnabled != 0
+	u.TOTPSecret = totpSecret.String
+	if totpConfirmedAt.Valid {
+		u.TOTPConfirmedAt = &totpConfirmedAt.Time
+	}
+	if totpGraceStartedAt.Valid {
+		u.TOTPGraceStartedAt = &totpGraceStartedAt.Time
+	}
 	return &u, nil
 }

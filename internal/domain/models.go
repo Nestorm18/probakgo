@@ -180,14 +180,18 @@ type APIKey struct {
 }
 
 type User struct {
-	ID           int64      `db:"id"`
-	Username     string     `db:"username"`
-	PasswordHash string     `db:"password_hash"`
-	Role         string     `db:"role"`
-	IsActive     bool       `db:"is_active"`
-	CreatedAt    time.Time  `db:"created_at"`
-	LastLoginAt  *time.Time `db:"last_login_at"`
-	LastLoginIP  string     `db:"last_login_ip"`
+	ID                 int64      `db:"id"`
+	Username           string     `db:"username"`
+	PasswordHash       string     `db:"password_hash" json:"-"`
+	Role               string     `db:"role"`
+	IsActive           bool       `db:"is_active"`
+	CreatedAt          time.Time  `db:"created_at"`
+	LastLoginAt        *time.Time `db:"last_login_at"`
+	LastLoginIP        string     `db:"last_login_ip"`
+	TOTPEnabled        bool       `db:"totp_enabled"`
+	TOTPSecret         string     `db:"totp_secret" json:"-"`
+	TOTPConfirmedAt    *time.Time `db:"totp_confirmed_at"`
+	TOTPGraceStartedAt *time.Time `db:"totp_grace_started_at"`
 }
 
 type LoginAttempt struct {
@@ -248,6 +252,7 @@ type EmailConfig struct {
 	PublicAPIURL             string `db:"public_api_url"`
 	AlertPVEHeartbeatMinutes int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
 	CriticalAlertsEnabled    bool   `db:"critical_alerts_enabled"`
+	EnforceTOTPNonReaders    bool   `db:"enforce_totp_non_readers"`
 }
 
 // Alert represents a detected condition requiring attention.

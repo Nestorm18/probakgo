@@ -7,7 +7,7 @@
 
 ## Seguridad
 
-- [ ] 2FA/TOTP para usuarios web, especialmente si la aplicacion queda expuesta por HTTPS a internet.
+- [x] 2FA/TOTP para usuarios web, especialmente si la aplicacion queda expuesta por HTTPS a internet.
 - [x] Pagina de sesiones activas / ultimos accesos por usuario. Se puede mejorar en settings/audit-log 
 - [x] Aviso visible si `SESSION_SECURE=false` y se accede por HTTPS publico.
 

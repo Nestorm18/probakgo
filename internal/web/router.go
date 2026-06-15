@@ -52,6 +52,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 	r.Get("/login", h.LoginPage)
 	r.With(loginLimiter.Middleware).Post("/login", h.LoginPost)
+	r.Get("/login/2fa", h.Login2FAPage)
+	r.With(loginLimiter.Middleware).Post("/login/2fa", h.Login2FAPost)
 	r.Get("/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
@@ -96,12 +98,16 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Post("/users", h.CreateUserPost)
 		r.With(RequireAdmin).Post("/users/{id}/username", h.ChangeUsernamePost)
 		r.With(RequireAdmin).Post("/users/{id}/password", h.ChangePasswordPost)
+		r.With(RequireAdmin).Post("/users/{id}/2fa/disable", h.DisableUser2FAPost)
 		r.With(RequireAdmin).Post("/users/{id}/role", h.ChangeRolePost)
 		r.With(RequireAdmin).Post("/users/{id}/toggle", h.ToggleUserPost)
 		r.With(RequireAdmin).Post("/users/{id}/delete", h.DeleteUserPost)
 
 		r.Get("/profile", h.Profile)
 		r.Post("/profile", h.ProfilePost)
+		r.Post("/profile/2fa/setup", h.Profile2FASetup)
+		r.Post("/profile/2fa/confirm", h.Profile2FAConfirm)
+		r.Post("/profile/2fa/disable", h.Profile2FADisable)
 
 		// Backup config - editor + admin
 		r.With(RequireEditor).Get("/backup-config/{server}", h.BackupConfig)

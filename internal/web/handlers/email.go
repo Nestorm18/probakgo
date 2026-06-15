@@ -75,6 +75,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.EnforceTOTPNonReaders = r.FormValue("enforce_totp_non_readers") == "on"
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"
@@ -84,13 +85,18 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertBackupErr = true
 		cfg.AlertPBSStaleHours = 48
 		cfg.AlertPVEHeartbeatMinutes = 15
+		cfg.EnforceTOTPNonReaders = r.FormValue("enforce_totp_non_readers") == "on"
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/system?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	if existing != nil && existing.EnforceTOTPNonReaders && !cfg.EnforceTOTPNonReaders {
+		_ = h.store.ClearUserTOTPGrace(ctx)
+	}
 	h.audit(r, "settings.system_update", "settings", "system", "Sistema", map[string]any{
-		"public_api_url_set": cfg.PublicAPIURL != "",
+		"public_api_url_set":       cfg.PublicAPIURL != "",
+		"enforce_totp_non_readers": cfg.EnforceTOTPNonReaders,
 	})
 	http.Redirect(w, r, "/settings/system?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
@@ -148,6 +154,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/email?flash="+err.Error(), http.StatusSeeOther)
@@ -214,6 +221,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/maintenance?flash="+err.Error(), http.StatusSeeOther)
@@ -317,6 +325,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"

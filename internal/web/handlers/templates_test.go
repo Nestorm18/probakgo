@@ -69,6 +69,24 @@ func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	}
 }
 
+func TestProfile2FASetupAllowsQRDataURI(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
+	req := httptest.NewRequest(http.MethodGet, "/profile/2fa/setup", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "profile_2fa_setup.html", templateFixtures(time.Now())["profile_2fa_setup.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `src="data:image/png;base64,test"`) {
+		t.Fatalf("qr data uri was not rendered safely:\n%s", body)
+	}
+	if strings.Contains(body, "#ZgotmplZ") {
+		t.Fatalf("qr data uri was blocked by html/template:\n%s", body)
+	}
+}
+
 func templateFixtures(now time.Time) map[string]map[string]any {
 	base := func(extra map[string]any) map[string]any {
 		data := map[string]any{
@@ -137,7 +155,8 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Keys": []map[string]any{},
 		}),
 		"audit_log.html": base(map[string]any{
-			"Rows": []domain.AuditLog{},
+			"Rows":  []domain.AuditLog{},
+			"Users": []domain.User{},
 		}),
 		"backup_config.html": base(map[string]any{
 			"ServerName": "pve-1",
@@ -155,9 +174,15 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		"email_settings.html":       base(map[string]any{"Config": emailConfig}),
 		"ip_bans.html":              base(map[string]any{"Bans": []map[string]any{}, "LoginAttempts": []domain.LoginAttempt{}}),
 		"login.html":                base(map[string]any{"Error": ""}),
+		"login_2fa.html":            base(map[string]any{"Error": ""}),
 		"maintenance_settings.html": base(map[string]any{"Config": emailConfig}),
 		"profile.html": base(map[string]any{
 			"User": domain.User{ID: 1, Username: "admin", Role: "admin", IsActive: true, CreatedAt: now},
+		}),
+		"profile_2fa_setup.html": base(map[string]any{
+			"Secret":    "JBSWY3DPEHPK3PXP",
+			"URI":       "otpauth://totp/Probakgo:admin?secret=JBSWY3DPEHPK3PXP&issuer=Probakgo",
+			"QRDataURI": template.URL("data:image/png;base64,test"),
 		}),
 		"reports_pve.html": base(map[string]any{
 			"Server":       pveServer,
