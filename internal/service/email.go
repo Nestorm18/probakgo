@@ -10,6 +10,7 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"probakgo/internal/domain"
@@ -18,6 +19,13 @@ import (
 
 //go:embed email_template.html
 var emailTemplateHTML string
+
+var criticalEmailState = struct {
+	sync.Mutex
+	sentAt map[string]time.Time
+}{sentAt: make(map[string]time.Time)}
+
+const criticalEmailThrottle = time.Hour
 
 type serverRow struct {
 	Name        string
@@ -113,6 +121,94 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 	}
 
 	return sendSMTP(cfg, recipients, subject, html)
+}
+
+// SendImmediateCriticalAlerts sends an optional, throttled email for active critical alerts.
+func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	cfg, err := st.GetEmailConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get email config: %w", err)
+	}
+	if !cfg.CriticalAlertsEnabled {
+		return nil
+	}
+	if cfg.SMTPUser == "" || cfg.SMTPPass == "" {
+		return fmt.Errorf("SMTP credentials not configured")
+	}
+	recipients := parseRecipients(cfg.Recipients)
+	if len(recipients) == 0 {
+		return fmt.Errorf("no email recipients configured")
+	}
+
+	alertCfg, err := LoadAlertConfigs(ctx, st)
+	if err != nil {
+		return fmt.Errorf("load alert config: %w", err)
+	}
+	alertCfg.Report = rep
+	alerts, err := RunAll(st, alertCfg)
+	if err != nil {
+		return fmt.Errorf("run alerts: %w", err)
+	}
+	_ = st.SyncAlertStates(ctx, alerts)
+	suppressed, _ := st.GetActiveSuppressions(ctx)
+
+	now := time.Now()
+	var selected []domain.Alert
+	criticalEmailState.Lock()
+	for _, a := range alerts {
+		if a.Severity != domain.AlertSeverityCritical {
+			continue
+		}
+		if _, ok := suppressed[a.ID]; ok {
+			continue
+		}
+		if last, ok := criticalEmailState.sentAt[a.ID]; ok && now.Sub(last) < criticalEmailThrottle {
+			continue
+		}
+		selected = append(selected, a)
+	}
+	criticalEmailState.Unlock()
+	if len(selected) == 0 {
+		return nil
+	}
+
+	subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
+	if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+		return err
+	}
+
+	criticalEmailState.Lock()
+	for _, a := range selected {
+		criticalEmailState.sentAt[a.ID] = now
+	}
+	criticalEmailState.Unlock()
+	return nil
+}
+
+func renderImmediateCriticalEmail(alerts []domain.Alert, now time.Time) string {
+	var b strings.Builder
+	b.WriteString(`<div style="font-family:Arial,sans-serif;color:#111827">`)
+	b.WriteString(`<h2 style="margin:0 0 12px;color:#dc2626">Probakgo alerta critica</h2>`)
+	b.WriteString(`<p style="margin:0 0 16px;color:#4b5563">Detectado el `)
+	b.WriteString(template.HTMLEscapeString(now.Format("2006-01-02 15:04:05")))
+	b.WriteString(`.</p>`)
+	b.WriteString(`<table style="width:100%;border-collapse:collapse;font-size:14px">`)
+	b.WriteString(`<thead><tr><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Servidor</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Alerta</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Detalle</th></tr></thead><tbody>`)
+	for _, a := range alerts {
+		b.WriteString(`<tr>`)
+		b.WriteString(`<td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(template.HTMLEscapeString(a.ServerName))
+		b.WriteString(`</td><td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(template.HTMLEscapeString(a.Title))
+		b.WriteString(`</td><td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(template.HTMLEscapeString(a.Message))
+		b.WriteString(`</td></tr>`)
+	}
+	b.WriteString(`</tbody></table></div>`)
+	return b.String()
 }
 
 func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cfg *domain.EmailConfig) (emailData, error) {
@@ -384,7 +480,7 @@ func sendSMTP(cfg *domain.EmailConfig, recipients []string, subject, html string
 	if err := smtp.SendMail(addr, auth, cfg.SMTPUser, recipients, msg); err != nil {
 		return fmt.Errorf("smtp send: %w", err)
 	}
-	slog.Info("daily email sent", "recipients", len(recipients))
+	slog.Info("email sent", "recipients", len(recipients))
 	return nil
 }
 

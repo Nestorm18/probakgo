@@ -33,6 +33,9 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 	if cfg.AlertPVEHeartbeatMinutes != 15 {
 		t.Errorf("AlertPVEHeartbeatMinutes: want 15, got %d", cfg.AlertPVEHeartbeatMinutes)
 	}
+	if cfg.CriticalAlertsEnabled {
+		t.Error("CriticalAlertsEnabled: want false")
+	}
 }
 
 func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
@@ -53,6 +56,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		AlertBackupErr:           false,
 		PublicAPIURL:             "https://probakgo.example.com",
 		AlertPVEHeartbeatMinutes: 10,
+		CriticalAlertsEnabled:    true,
 	}
 
 	if err := st.UpsertEmailConfig(ctx, want); err != nil {
@@ -82,6 +86,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"AlertBackupErr", got.AlertBackupErr, want.AlertBackupErr},
 		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
 		{"AlertPVEHeartbeatMinutes", got.AlertPVEHeartbeatMinutes, want.AlertPVEHeartbeatMinutes},
+		{"CriticalAlertsEnabled", got.CriticalAlertsEnabled, want.CriticalAlertsEnabled},
 	}
 	for _, c := range checks {
 		if c.got != c.want {

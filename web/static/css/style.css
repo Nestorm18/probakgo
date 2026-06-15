@@ -453,6 +453,15 @@ code {
   background: var(--input-grp-bg); border-color: var(--input-border); color: var(--txt-muted);
   font-family: 'DM Sans', system-ui, sans-serif;
 }
+.filter-search .input-group-text {
+  border-right: 0;
+}
+.filter-search .form-control {
+  border-left: 0;
+}
+.filter-search .input-group-text i {
+  color: var(--txt-muted);
+}
 .form-check-input {
   background-color: var(--input-bg); border-color: var(--input-border);
 }

@@ -88,6 +88,12 @@
         <span>{{.Flash}}</span>
       </div>
       {{end}}
+      {{if .ShowSessionSecureWarning}}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi bi-shield-exclamation"></i>
+        <span>HTTPS detectado con <code>SESSION_SECURE=false</code>. Activa <code>SESSION_SECURE=true</code> en el servidor para proteger la cookie de sesión.</span>
+      </div>
+      {{end}}
       {{block "page_content" .}}{{end}}
     </main>
   </div>

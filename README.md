@@ -17,6 +17,8 @@ Monitoriza nodos **Proxmox VE** y **Proxmox Backup Server**, muestra el estado d
 - Historial de jobs de backup con detalle por VM y gráfico de duración
 - Seguimiento de snapshots PBS: verificación, estimación de llenado y staleness configurable
 - Informe diario por email con resumen de problemas (STARTTLS, compatible con Gmail / Office 365)
+- Heartbeat cada 5 minutos para detectar nodos PVE offline
+- Autoconfiguracion de VMs esperadas desde los jobs de backup de Proxmox (`/cluster/backup`)
 - Control de acceso por roles: `reader`, `editor`, `admin`
 - API keys con prefijo por tipo (`pbk-` clientes, `adm-` API externa)
 - Auto-actualización del servidor y del cliente vía GitHub Releases
@@ -64,7 +66,16 @@ chmod +x /tmp/probakgo-client
 
 El nodo aparece en el dashboard en segundos. Para múltiples nodos, repite el proceso creando una API key por nodo.
 
+Para diagnosticar una instalación:
+
+```bash
+/opt/probakgo/probakgo-client doctor
+```
+
+El comando revisa `.env`, API key, conexión con Probakgo, conexión con Proxmox, hook de vzdump y timer de heartbeat.
+
 Ver [INSTALLATION.md](INSTALLATION.md) para la guía completa: proxy nginx, HTTPS, múltiples nodos, TLS personalizado.
+Ver [RELEASES.md](RELEASES.md) para publicar versiones y binarios.
 
 ---
 
@@ -139,6 +150,7 @@ CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo-client ./cli
 | Documento | Descripción |
 |---|---|
 | [INSTALLATION.md](INSTALLATION.md) | Guía completa: systemd, nginx, múltiples nodos, resolución de problemas |
+| [RELEASES.md](RELEASES.md) | Checklist de versionado, binarios, publicación y rollback |
 | [docs/DEVTEST.md](docs/DEVTEST.md) | Entorno de pruebas end-to-end desde Windows |
 
 ---

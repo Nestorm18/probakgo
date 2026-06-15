@@ -28,6 +28,7 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "save pve report", err)
 		return
 	}
+	h.sendImmediateCriticalAlerts()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "server": req.Hostname})
 }
 
@@ -50,5 +51,6 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "save pbs report", err)
 		return
 	}
+	h.sendImmediateCriticalAlerts()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "server": req.Hostname})
 }

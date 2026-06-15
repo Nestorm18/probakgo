@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -51,14 +52,16 @@ type Templates struct {
 	fs          fs.FS
 	funcMap     template.FuncMap
 	version     string
+	secure      bool
 	badgeCounts func() (int, int)
 }
 
-func NewTemplates(fs fs.FS, version string, loc *time.Location, badgeCounts func() (int, int)) *Templates {
+func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int)) *Templates {
 	return &Templates{
 		fs:          fs,
 		funcMap:     makeFuncMap(loc),
 		version:     version,
+		secure:      secure,
 		badgeCounts: badgeCounts,
 	}
 }
@@ -180,6 +183,9 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		if _, has := m["FlashOK"]; !has {
 			m["FlashOK"] = r.URL.Query().Get("ok") == "1"
 		}
+		if _, has := m["ShowSessionSecureWarning"]; !has {
+			m["ShowSessionSecureWarning"] = !t.secure && requestLooksPublicHTTPS(r)
+		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
 		}
@@ -240,6 +246,28 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(buf.Bytes())
+}
+
+func requestLooksPublicHTTPS(r *http.Request) bool {
+	if r.TLS == nil && !strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
+		return false
+	}
+	host := r.Host
+	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
+		host = strings.Split(forwarded, ",")[0]
+	}
+	host = strings.TrimSpace(host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return !(ip.IsLoopback() || ip.IsPrivate() || ip.IsUnspecified())
+	}
+	return host != ""
 }
 
 func renderTemplateError(w http.ResponseWriter, r *http.Request, name, phase string, err error) {

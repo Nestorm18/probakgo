@@ -3,11 +3,15 @@
 {{block "page_content" .}}
 
 <div class="d-flex align-items-center gap-2 mb-3">
-  <div class="input-group input-group-sm" style="max-width:280px">
-    <span class="input-group-text" style="background:var(--input-grp-bg);border-color:var(--input-border)"><i class="bi bi-search" style="color:var(--txt-muted)"></i></span>
-    <input type="text" id="serverFilter" class="form-control form-control-sm" placeholder="Filtrar por nombre, IP o estado…" style="border-color:var(--input-border)">
+  <div class="input-group input-group-sm filter-search" style="max-width:280px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" id="serverFilter" class="form-control form-control-sm" placeholder="Filtrar por nombre, IP o estado…">
   </div>
   <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
+  <div class="ms-auto d-flex gap-2">
+    <a href="/servers/pbs.csv" class="btn btn-sm btn-secondary" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
+    <a href="/servers/pbs.json" class="btn btn-sm btn-secondary" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
+  </div>
 </div>
 
 <div class="card">

@@ -17,6 +17,8 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		"pve_vm_alert_config",
 		"pve_alert_config",
 		"pbs_alert_config",
+		"alert_state_events",
+		"alert_states",
 		"alert_suppressions",
 		"server_heartbeats",
 		"pve_backup_tasks",

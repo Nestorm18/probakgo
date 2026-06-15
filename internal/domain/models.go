@@ -247,6 +247,7 @@ type EmailConfig struct {
 	AlertPBSStaleHours       int    `db:"alert_pbs_stale_hours"` // 0 = disabled
 	PublicAPIURL             string `db:"public_api_url"`
 	AlertPVEHeartbeatMinutes int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
+	CriticalAlertsEnabled    bool   `db:"critical_alerts_enabled"`
 }
 
 // Alert represents a detected condition requiring attention.
@@ -265,6 +266,23 @@ type Alert struct {
 	Value      string // measured value, e.g. "87%"
 	Threshold  string // configured threshold, e.g. "85%"
 	DetectedAt time.Time
+}
+
+type AlertStateEvent struct {
+	ID         int64     `db:"id"`
+	AlertID    string    `db:"alert_id"`
+	EventType  string    `db:"event_type"`
+	Severity   string    `db:"severity"`
+	Title      string    `db:"title"`
+	Message    string    `db:"message"`
+	ServerName string    `db:"server_name"`
+	ServerType string    `db:"server_type"`
+	ServerID   int64     `db:"server_id"`
+	StoreName  string    `db:"store_name"`
+	VMID       int64     `db:"vmid"`
+	VMName     string    `db:"vm_name"`
+	Note       string    `db:"note"`
+	CreatedAt  time.Time `db:"created_at"`
 }
 
 const (

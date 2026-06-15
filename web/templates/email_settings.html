@@ -47,6 +47,14 @@
                 </label>
               </div>
             </div>
+            <div class="col-12">
+              <div class="check-toggle-wrap">
+                <input class="form-check-input m-0" type="checkbox" name="critical_alerts_enabled" id="criticalAlertsEnabled" {{if .Config.CriticalAlertsEnabled}}checked{{end}}>
+                <label class="form-check-label m-0" for="criticalAlertsEnabled" style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                  Enviar alertas críticas inmediatas
+                </label>
+              </div>
+            </div>
           </div>
           <div class="mt-4 d-flex gap-2">
             <button type="submit" class="btn btn-primary">

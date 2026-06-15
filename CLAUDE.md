@@ -120,12 +120,13 @@ go build -o probakgo-client ./client/
 - PBS: queries datastore usage; sends to `POST /report/pbs`
 - Machine ID binding via `/etc/machine-id`
 - TLS: configurable verify/skip/CA bundle via env vars
-- Subcommands: `install`, `uninstall`, `update`, `version` (report mode is default, `--vzdump-hook` flag)
+- Subcommands: `install`, `uninstall`, `update`, `heartbeat`, `doctor`, `version` (report mode is default, `--vzdump-hook` flag)
 - File mode: `--file path.json` for testing without a live Proxmox node
 
 **Self-update (2026-04):**
 - Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
-- Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00).
+- Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)`. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00) and installs `probakgo-client-heartbeat.timer`.
+- `probakgo-client doctor` checks `.env`, API key, server health, Proxmox API, machine-id, vzdump hook and heartbeat systemd timer.
 - `var version` (not `const`) required for `-ldflags "-X main.version=..."` injection at release build time.
 - `GITHUB_TOKEN` env var: if set, selfupdate uses it as a Bearer token for GitHub API requests and downloads assets via the API assets endpoint (required for private repos). Without it, uses public `browser_download_url` directly.
 - Note: GitHub API returns 404 for unauthenticated requests on private repos - selfupdate requires the repo to be public or `GITHUB_TOKEN` to be set.
@@ -204,14 +205,19 @@ The `install` subcommand:
 - Generates and installs vzdump hook script in `/etc/vzdump.conf`
 - Configures logrotate
 - Installs `/etc/cron.d/probakgo-client` for daily self-update at 01:00
+- Installs `probakgo-client-heartbeat.timer` for `probakgo-client heartbeat` every 5 minutes
+- On PVE, reads `/cluster/backup` during auto-config to infer expected VM backup days. Prefer weekday jobs and the latest time when multiple daily jobs exist; add weekend days from additional active jobs for the same VM.
 
 The `uninstall` subcommand (requires root):
 - Removes the `script:` hook line from `/etc/vzdump.conf`
 - Revokes the Proxmox API token (`pveum` on PVE, `proxmox-backup-manager` on PBS)
 - Deletes `/etc/cron.d/probakgo-client` and `/etc/logrotate.d/probakgo`
+- Disables/removes `probakgo-client-heartbeat.timer` and `.service`
 - Removes `/opt/probakgo/` and `/var/log/probakgo/`
 
 **Updates**: `probakgo-client update` or automatic via cron. No service restart needed - the client runs per-backup, not as a daemon.
+
+**Diagnostics**: `probakgo-client doctor` checks `.env`, API key, Probakgo connectivity, Proxmox connectivity, hook and heartbeat timer.
 
 ### Client configuration (`/opt/probakgo/.env`)
 

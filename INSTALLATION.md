@@ -131,14 +131,17 @@ El subcomando `install` hace automáticamente:
 5. Registra el hook vzdump en `/etc/vzdump.conf`
 6. Configura logrotate en `/etc/logrotate.d/probakgo-client`
 7. Instala cron de auto-actualización en `/etc/cron.d/probakgo-client` (01:00 diario)
+8. Instala `probakgo-client-heartbeat.timer` para enviar heartbeat cada 5 minutos
+9. En PVE, lee `/cluster/backup` para autoconfigurar las VMs esperadas segun los jobs activos
 
 ### 3. Verificar
 
 ```bash
+/opt/probakgo/probakgo-client doctor
 /opt/probakgo/probakgo-client --vzdump-hook
 ```
 
-El nodo debería aparecer en el dashboard del servidor en pocos segundos.
+El nodo deberia aparecer en el dashboard del servidor en pocos segundos. `doctor` comprueba `.env`, API key, conexion con Probakgo, conexion con Proxmox, hook de vzdump y timer de heartbeat.
 
 ### Desinstalar el cliente
 
@@ -151,7 +154,8 @@ El subcomando `uninstall` (requiere root) deshace la instalación completamente:
 1. Elimina la línea del hook en `/etc/vzdump.conf`
 2. Revoca el token API de Proxmox (`pveum` en PVE, `proxmox-backup-manager` en PBS)
 3. Elimina `/etc/cron.d/probakgo-client` y `/etc/logrotate.d/probakgo`
-4. Elimina los directorios `/opt/probakgo/` y `/var/log/probakgo/`
+4. Deshabilita y elimina `probakgo-client-heartbeat.timer` y `.service`
+5. Elimina los directorios `/opt/probakgo/` y `/var/log/probakgo/`
 
 > Si el binario ya no está en `/opt/probakgo/`, copia una versión reciente al nodo y ejecútala con `uninstall` antes de eliminarla.
 
@@ -189,6 +193,30 @@ En **Configuración → Reiniciar BD** puedes borrar todos los datos monitorizad
 ---
 
 ## Resolución de problemas
+
+### Diagnostico rapido del cliente
+
+```bash
+/opt/probakgo/probakgo-client doctor
+```
+
+Si el heartbeat manual funciona pero la web lo marca offline, revisa especificamente:
+
+```bash
+systemctl status probakgo-client-heartbeat.timer --no-pager
+systemctl list-timers --all | grep probakgo
+journalctl -u probakgo-client-heartbeat.service -n 100 --no-pager
+```
+
+Si el timer aparece activo pero sin proxima ejecucion (`Trigger: n/a`), rearmalo:
+
+```bash
+systemctl stop probakgo-client-heartbeat.timer
+systemctl reset-failed probakgo-client-heartbeat.timer probakgo-client-heartbeat.service
+systemctl daemon-reload
+systemctl start probakgo-client-heartbeat.service
+systemctl start probakgo-client-heartbeat.timer
+```
 
 ### El cliente no conecta con el servidor
 

@@ -23,7 +23,7 @@ import (
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
 func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
-	tmpl := webhandlers.NewTemplates(templateFS, version, loc, func() (int, int) {
+	tmpl := webhandlers.NewTemplates(templateFS, version, loc, secure, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st, rep)
 	})
 	h := webhandlers.New(st, tmpl, rep)
@@ -59,15 +59,24 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		r.Get("/", h.Dashboard)
 		r.Get("/alerts", h.Alerts)
+		r.Get("/alerts.csv", h.AlertsCSV)
+		r.Get("/alerts.json", h.AlertsJSON)
 		r.Get("/alerts/status.json", h.AlertsStatus)
 		r.Post("/alerts/suppress", h.AlertSuppressPost)
 		r.Post("/alerts/unsuppress", h.AlertUnsuppressPost)
 		r.Get("/servers/pve", h.PVEServers)
+		r.Get("/servers/pve.csv", h.PVEServersCSV)
+		r.Get("/servers/pve.json", h.PVEServersJSON)
 		r.Get("/servers/pve/{id}", h.PVEServerDetail)
 		r.Get("/servers/pve/{id}/reports", h.PVEServerReports)
 		r.Get("/servers/pve/{id}/reports/csv", h.PVEServerReportsCSV)
+		r.Get("/servers/pve/{id}/reports/json", h.PVEServerReportsJSON)
 		r.Get("/servers/pbs", h.PBSServers)
+		r.Get("/servers/pbs.csv", h.PBSServersCSV)
+		r.Get("/servers/pbs.json", h.PBSServersJSON)
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
+		r.Get("/servers/pbs/{id}/reports/csv", h.PBSServerReportsCSV)
+		r.Get("/servers/pbs/{id}/reports/json", h.PBSServerReportsJSON)
 		r.With(RequireEditor).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
 		r.With(RequireEditor).Post("/servers/pve/{id}/alerts/vm", h.PVEVMAlertConfigPost)
 		r.With(RequireEditor).Post("/servers/pbs/{id}/alerts", h.PBSAlertConfigPost)
@@ -112,6 +121,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)
 		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
 		r.With(RequireAdmin).Post("/settings/maintenance", h.MaintenanceSettingsPost)
+		r.With(RequireAdmin).Get("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)
 		r.With(RequireAdmin).Get("/settings/alerts", h.AlertsSettings)
 		r.With(RequireAdmin).Post("/settings/alerts", h.AlertsSettingsPost)
 		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)
