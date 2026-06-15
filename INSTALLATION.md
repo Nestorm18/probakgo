@@ -208,6 +208,16 @@ systemctl list-timers --all | grep probakgo
 journalctl -u probakgo-client-heartbeat.service -n 100 --no-pager
 ```
 
+### Desbloquear 2FA de un usuario
+
+Si un usuario pierde el acceso a su aplicacion TOTP y tienes acceso SSH a la VM del servidor:
+
+```bash
+/opt/probakgo/probakgo unlock2fa usuario
+```
+
+El comando desactiva 2FA para ese usuario usando la base de datos configurada en `.env`.
+
 Si el timer aparece activo pero sin proxima ejecucion (`Trigger: n/a`), rearmalo:
 
 ```bash

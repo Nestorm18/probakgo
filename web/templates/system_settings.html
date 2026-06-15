@@ -5,27 +5,47 @@
 {{end}}
 {{block "page_content" .}}
 
-<div class="row">
-  <div class="col-12 col-lg-7">
-    <div class="card">
-      <div class="card-header">
-        <i class="bi bi-globe2 me-2" style="color:var(--clr-accent)"></i>URL pública de Probakgo
-      </div>
-      <div class="card-body">
-        <form method="POST" action="/settings/system">
-          {{.CSRFField}}
+<form method="POST" action="/settings/system">
+  {{.CSRFField}}
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-globe2 me-2" style="color:var(--clr-accent)"></i>URL pública de Probakgo
+        </div>
+        <div class="card-body">
           <div class="mb-3">
             <label class="form-label">URL para instalación de clientes</label>
             <input type="url" name="public_api_url" class="form-control" value="{{.Config.PublicAPIURL}}" placeholder="https://probakgo.midominio.com:36748">
             <div class="form-text">Si está vacía, los comandos usan la URL con la que accedes al panel.</div>
           </div>
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-lg me-1"></i>Guardar
-          </button>
-        </form>
+        </div>
       </div>
     </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card">
+        <div class="card-header">
+          <i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Seguridad de usuarios
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="form-check form-switch">
+              <input type="checkbox" name="enforce_totp_non_readers" value="on" class="form-check-input" id="enforce_totp_non_readers" {{if .Config.EnforceTOTPNonReaders}}checked{{end}}>
+              <label class="form-check-label" for="enforce_totp_non_readers">Forzar 2FA para administradores y editores</label>
+            </div>
+            <div class="form-text">Los usuarios reader no se ven afectados. Admin y editor tienen 3 días desde el primer aviso para activar 2FA; si no lo hacen, quedan inactivos.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg me-1"></i>Guardar
+      </button>
+    </div>
   </div>
-</div>
+</form>
 
 {{end}}

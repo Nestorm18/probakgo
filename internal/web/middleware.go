@@ -2,7 +2,9 @@ package web
 
 import (
 	"net/http"
+	"time"
 
+	"probakgo/internal/domain"
 	"probakgo/internal/session"
 	"probakgo/internal/store"
 )
@@ -27,9 +29,30 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 			if user.Role != sessionRole {
 				_ = session.SetUser(w, r, username, user.Role)
 			}
+			if userNeedsTOTPEnforcement(st, r, user) {
+				_ = st.SetUserActive(r.Context(), user.ID, false)
+				session.Clear(w, r)
+				http.Redirect(w, r, "/login?flash=Usuario+desactivado:+2FA+no+se+activo+dentro+del+plazo", http.StatusSeeOther)
+				return
+			}
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func userNeedsTOTPEnforcement(st *store.Store, r *http.Request, user *domain.User) bool {
+	if user.Role == "reader" || user.TOTPEnabled {
+		return false
+	}
+	cfg, err := st.GetEmailConfig(r.Context())
+	if err != nil || cfg == nil || !cfg.EnforceTOTPNonReaders {
+		return false
+	}
+	if user.TOTPGraceStartedAt == nil {
+		_ = st.StartUserTOTPGrace(r.Context(), user.ID)
+		return false
+	}
+	return time.Since(*user.TOTPGraceStartedAt) >= 72*time.Hour
 }
 
 // RequireEditor allows admin and editor roles.

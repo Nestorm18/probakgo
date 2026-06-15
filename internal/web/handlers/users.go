@@ -119,6 +119,22 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users?flash=Contraseña+actualizada&ok=1", http.StatusSeeOther)
 }
 
+func (h *WebH) DisableUser2FAPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	u, err := h.store.GetUser(ctx, id)
+	if err != nil {
+		http.Redirect(w, r, "/users?flash=Usuario+no+encontrado", http.StatusSeeOther)
+		return
+	}
+	if err := h.store.DisableUserTOTP(ctx, id); err != nil {
+		http.Redirect(w, r, "/users?flash="+err.Error(), http.StatusSeeOther)
+		return
+	}
+	h.audit(r, "user.2fa_admin_disable", "user", strconv.FormatInt(id, 10), u.Username, nil)
+	http.Redirect(w, r, "/users?flash=2FA+desactivado+para+"+u.Username+"&ok=1", http.StatusSeeOther)
+}
+
 func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

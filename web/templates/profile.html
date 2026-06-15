@@ -45,6 +45,40 @@
       </div>
     </div>
 
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Verificación en dos pasos
+      </div>
+      <div class="card-body">
+        {{if .User.TOTPEnabled}}
+        <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+          <span class="status-pill ok">2FA activo</span>
+          {{if .User.TOTPConfirmedAt}}<span style="font-size:.78rem;color:var(--txt-muted)">desde {{formatTime .User.TOTPConfirmedAt}}</span>{{end}}
+        </div>
+        <form method="POST" action="/profile/2fa/disable">
+          {{ .CSRFField }}
+          <div class="mb-3">
+            <label class="form-label">Contraseña actual</label>
+            <input type="password" class="form-control" name="current_password" required autocomplete="current-password">
+          </div>
+          <button type="submit" class="btn btn-secondary">
+            <i class="bi bi-shield-x me-1"></i>Desactivar 2FA
+          </button>
+        </form>
+        {{else}}
+        <div class="d-flex align-items-center justify-content-between gap-3">
+          <span class="status-pill muted">2FA desactivado</span>
+          <form method="POST" action="/profile/2fa/setup" class="m-0">
+            {{ .CSRFField }}
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-shield-plus me-1"></i>Activar 2FA
+            </button>
+          </form>
+        </div>
+        {{end}}
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header">
         <i class="bi bi-lock me-2" style="color:var(--clr-accent)"></i>Cambiar contraseña
