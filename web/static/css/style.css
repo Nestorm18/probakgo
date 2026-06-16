@@ -397,6 +397,13 @@ code {
 .table-hover tbody tr:hover td { background: var(--row-hover-bg); }
 .table tbody tr { transition: background .1s; }
 
+.card-body:has(> .table),
+.card-body:has(> .table-responsive),
+.list-group-item:has(> .table),
+div[style*="overflow:hidden"]:has(> .table) {
+  min-width: 0;
+}
+
 /* ─── Status pills ───────────────────────────────────────────── */
 .status-pill {
   display: inline-flex; align-items: center; gap: .3rem;
@@ -694,4 +701,38 @@ details[open] > summary::before { transform: rotate(90deg); }
   .page-body { padding: 1rem; }
   .login-panel-left { display: none; }
   .login-panel-right { width: 100%; min-width: unset; }
+
+  .page-header {
+    padding: 0 .75rem;
+  }
+  .page-header h1 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .page-header .ms-auto {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .card-body:has(> .table),
+  .list-group-item:has(> .table),
+  .card-body.p-0,
+  div[style*="overflow:hidden"]:has(> .table) {
+    overflow-x: auto !important;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+  }
+  .card-body:has(> .table) > .table,
+  .list-group-item:has(> .table) > .table,
+  .card-body.p-0 > .table,
+  div[style*="overflow:hidden"]:has(> .table) > .table {
+    min-width: 720px;
+  }
+  .table-responsive {
+    -webkit-overflow-scrolling: touch;
+  }
 }
