@@ -22,3 +22,16 @@ func VMScheduledForDay(c VMBackupConfig, day time.Weekday) bool {
 	}
 	return false
 }
+
+func VMHasAnyScheduledDay(c VMBackupConfig) bool {
+	return c.Monday || c.Tuesday || c.Wednesday || c.Thursday || c.Friday || c.Saturday || c.Sunday
+}
+
+func HasActiveVMBackupConfigs(configs []VMBackupConfig) bool {
+	for _, c := range configs {
+		if !c.IsExcluded && VMHasAnyScheduledDay(c) {
+			return true
+		}
+	}
+	return false
+}

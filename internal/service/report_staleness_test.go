@@ -167,7 +167,7 @@ func TestIsStaleForServer_StaleAfterServerExpectedFinishTime(t *testing.T) {
 	}
 }
 
-func TestIsStaleForServer_AllConfigsExcluded_FallsBack(t *testing.T) {
+func TestIsStaleForServer_AllConfigsExcluded_NotStale(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
@@ -183,7 +183,7 @@ func TestIsStaleForServer_AllConfigsExcluded_FallsBack(t *testing.T) {
 
 	// All excluded → no expected days → falls back to IsStale (yesterday = stale)
 	stale, _ := svc.IsStaleForServer(context.Background(), time.Now().Add(-25*time.Hour), "pve-ex")
-	if !stale {
-		t.Error("want stale=true: all configs excluded, yesterday's report")
+	if stale {
+		t.Error("want stale=false: all configs are excluded")
 	}
 }

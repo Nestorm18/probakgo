@@ -54,8 +54,10 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
 	var rows []map[string]any
 	for _, sv := range servers {
+		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
 		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
-		stale := rep == nil
+		stale := rep == nil && !ignoreStale
 		if rep != nil {
 			stale, _ = h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 		}
@@ -75,7 +77,6 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 
 			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
 			if len(tasks) > 0 {
-				configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 				if len(configs) > 0 {
 					jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
 					configured := make(map[string]bool, len(configs))

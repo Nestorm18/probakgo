@@ -52,7 +52,9 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
 		rep := pveReports[sv.ID]
-		isStale := rep == nil || rep.IsStale
+		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
+		isStale := (rep == nil || rep.IsStale) && !ignoreStale
 		hasBackupError := pveBackupErrors[sv.ID]
 		if isStale {
 			pveStale++
