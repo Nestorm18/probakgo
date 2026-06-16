@@ -159,7 +159,7 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	var selected []domain.Alert
 	criticalEmailState.Lock()
 	for _, a := range alerts {
-		if a.Severity != domain.AlertSeverityCritical {
+		if !shouldSendImmediateCriticalEmail(a) {
 			continue
 		}
 		if _, ok := suppressed[a.ID]; ok {
@@ -186,6 +186,18 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	}
 	criticalEmailState.Unlock()
 	return nil
+}
+
+func shouldSendImmediateCriticalEmail(a domain.Alert) bool {
+	if a.Severity != domain.AlertSeverityCritical {
+		return false
+	}
+	switch a.Type {
+	case domain.AlertTypePBSReportStale, domain.AlertTypePBSStale:
+		return false
+	default:
+		return true
+	}
 }
 
 func renderImmediateCriticalEmail(alerts []domain.Alert, now time.Time) string {
