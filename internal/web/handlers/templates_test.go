@@ -140,6 +140,12 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"ServerNames":      []string{"pve-1"},
 			"FilterSeverity":   "",
 			"FilterServer":     "",
+			"AlertEvents":      []domain.AlertStateEvent{{EventType: "appeared", ServerName: "pve-1", Title: "Sin reporte", Message: "test", CreatedAt: now}},
+			"HistoryPage":      1,
+			"HistoryPrevPage":  0,
+			"HistoryNextPage":  2,
+			"HistoryHasPrev":   false,
+			"HistoryHasNext":   true,
 		}),
 		"alerts_settings.html": base(map[string]any{"Config": emailConfig}),
 		"api_key_created.html": base(map[string]any{
