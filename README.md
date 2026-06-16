@@ -54,6 +54,14 @@ Abre `http://localhost:36748`. El usuario inicial es **probakgo** y la contrase�
 
 El primer arranque como root instala automáticamente el servicio systemd y el cron de auto-actualización.
 
+Para diagnosticar el servidor:
+
+```bash
+/opt/probakgo/probakgo doctor
+```
+
+El comando revisa configuración, base de datos, migraciones, URL pública, `SESSION_SECURE`, administradores con 2FA, servicio systemd y cron de actualización.
+
 ### Cliente (en cada nodo Proxmox)
 
 ```bash

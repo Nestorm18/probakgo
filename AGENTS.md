@@ -137,6 +137,7 @@ go build -o probakgo-client ./client/
 
 **Self-update (2026-04):**
 - Server: `main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo", version)`. On first startup as root, writes `/etc/cron.d/probakgo` (daily at 01:00). After update calls `systemctl restart probakgo`.
+- `probakgo doctor` checks server config, DB/migrations, public URL, `SESSION_SECURE`, active admin 2FA status, systemd service and update cron.
 - Client: `client/main.go` handles `update` subcommand via `selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)` and, when run as root, ensures `probakgo-client-heartbeat.timer` is installed. `install` subcommand writes `/etc/cron.d/probakgo-client` (daily at 01:00) and installs `probakgo-client-heartbeat.timer` (every 5 minutes).
 - The client also auto-ensures the heartbeat timer on normal root executions from `/opt/probakgo/probakgo-client`; this covers clients whose first update was performed by an older binary before the post-update hook existed.
 - `probakgo-client doctor` checks `.env`, API key, server health, Proxmox API, machine-id, vzdump hook and heartbeat systemd timer.
