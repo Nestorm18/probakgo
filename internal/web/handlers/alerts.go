@@ -120,7 +120,16 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 
 	serverNames := uniqueServerNames(active)
 
-	events, _ := h.store.ListAlertStateEvents(ctx, 100)
+	const alertHistoryPageSize = 25
+	historyPage, _ := strconv.Atoi(r.URL.Query().Get("history_page"))
+	if historyPage < 1 {
+		historyPage = 1
+	}
+	events, _ := h.store.ListAlertStateEventsPage(ctx, alertHistoryPageSize+1, (historyPage-1)*alertHistoryPageSize)
+	historyHasNext := len(events) > alertHistoryPageSize
+	if historyHasNext {
+		events = events[:alertHistoryPageSize]
+	}
 
 	h.tmpl.Render(w, r, "alerts.html", map[string]any{
 		"Username":         username,
@@ -134,6 +143,11 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 		"FilterServer":     filterServer,
 		"ServerNames":      serverNames,
 		"AlertEvents":      events,
+		"HistoryPage":      historyPage,
+		"HistoryPrevPage":  historyPage - 1,
+		"HistoryNextPage":  historyPage + 1,
+		"HistoryHasPrev":   historyPage > 1,
+		"HistoryHasNext":   historyHasNext,
 	})
 }
 

@@ -113,16 +113,23 @@ func (s *Store) InsertAlertStateEvent(ctx context.Context, entry domain.AlertSta
 }
 
 func (s *Store) ListAlertStateEvents(ctx context.Context, limit int) ([]domain.AlertStateEvent, error) {
+	return s.ListAlertStateEventsPage(ctx, limit, 0)
+}
+
+func (s *Store) ListAlertStateEventsPage(ctx context.Context, limit, offset int) ([]domain.AlertStateEvent, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100
 	}
-	debug.RecordQuery(ctx, `SELECT id, alert_id, event_type, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name, note, created_at FROM alert_state_events ORDER BY created_at DESC LIMIT ?`)
+	if offset < 0 {
+		offset = 0
+	}
+	debug.RecordQuery(ctx, `SELECT id, alert_id, event_type, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name, note, created_at FROM alert_state_events ORDER BY created_at DESC LIMIT ? OFFSET ?`)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, alert_id, event_type, severity, title, message, server_name, server_type, server_id,
 		       store_name, vmid, vm_name, note, created_at
 		FROM alert_state_events
 		ORDER BY created_at DESC
-		LIMIT ?`, limit)
+		LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil, err
 	}

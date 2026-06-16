@@ -36,6 +36,9 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 	if cfg.CriticalAlertsEnabled {
 		t.Error("CriticalAlertsEnabled: want false")
 	}
+	if cfg.SensitiveActionsRequireTOTP {
+		t.Error("SensitiveActionsRequireTOTP: want false")
+	}
 }
 
 func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
@@ -43,20 +46,21 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 	st := openTestDB(t)
 
 	want := domain.EmailConfig{
-		SMTPHost:                 "smtp.example.com",
-		SMTPPort:                 465,
-		SMTPUser:                 "user@example.com",
-		SMTPPass:                 "s3cr3t",
-		Recipients:               "admin@example.com,ops@example.com",
-		IsEnabled:                true,
-		SendTime:                 "09:30",
-		RetentionMonths:          12,
-		RetentionEnabled:         false,
-		AlertDiskPct:             90,
-		AlertBackupErr:           false,
-		PublicAPIURL:             "https://probakgo.example.com",
-		AlertPVEHeartbeatMinutes: 10,
-		CriticalAlertsEnabled:    true,
+		SMTPHost:                    "smtp.example.com",
+		SMTPPort:                    465,
+		SMTPUser:                    "user@example.com",
+		SMTPPass:                    "s3cr3t",
+		Recipients:                  "admin@example.com,ops@example.com",
+		IsEnabled:                   true,
+		SendTime:                    "09:30",
+		RetentionMonths:             12,
+		RetentionEnabled:            false,
+		AlertDiskPct:                90,
+		AlertBackupErr:              false,
+		PublicAPIURL:                "https://probakgo.example.com",
+		AlertPVEHeartbeatMinutes:    10,
+		CriticalAlertsEnabled:       true,
+		SensitiveActionsRequireTOTP: true,
 	}
 
 	if err := st.UpsertEmailConfig(ctx, want); err != nil {
@@ -87,6 +91,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
 		{"AlertPVEHeartbeatMinutes", got.AlertPVEHeartbeatMinutes, want.AlertPVEHeartbeatMinutes},
 		{"CriticalAlertsEnabled", got.CriticalAlertsEnabled, want.CriticalAlertsEnabled},
+		{"SensitiveActionsRequireTOTP", got.SensitiveActionsRequireTOTP, want.SensitiveActionsRequireTOTP},
 	}
 	for _, c := range checks {
 		if c.got != c.want {

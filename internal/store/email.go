@@ -9,22 +9,22 @@ import (
 )
 
 func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error) {
-	debug.RecordQuery(ctx, `SELECT id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes, critical_alerts_enabled, enforce_totp_non_readers FROM email_config LIMIT 1`)
+	debug.RecordQuery(ctx, `SELECT id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes, critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp FROM email_config LIMIT 1`)
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, smtp_host, smtp_port, smtp_user, smtp_password, recipients,
 		       is_enabled, send_time,
 		       retention_months, retention_enabled, alert_disk_pct, alert_backup_err,
 		       alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes,
-		       critical_alerts_enabled, enforce_totp_non_readers
+		       critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp
 		FROM email_config LIMIT 1`)
 	var c domain.EmailConfig
-	var isEnabled, retEnabled, alertBackupErr, criticalAlertsEnabled, enforceTOTPNonReaders int
+	var isEnabled, retEnabled, alertBackupErr, criticalAlertsEnabled, enforceTOTPNonReaders, sensitiveActionsRequireTOTP int
 	err := row.Scan(
 		&c.ID, &c.SMTPHost, &c.SMTPPort, &c.SMTPUser, &c.SMTPPass,
 		&c.Recipients, &isEnabled, &c.SendTime,
 		&c.RetentionMonths, &retEnabled, &c.AlertDiskPct, &alertBackupErr,
 		&c.AlertPBSStaleHours, &c.PublicAPIURL, &c.AlertPVEHeartbeatMinutes,
-		&criticalAlertsEnabled, &enforceTOTPNonReaders,
+		&criticalAlertsEnabled, &enforceTOTPNonReaders, &sensitiveActionsRequireTOTP,
 	)
 	if err == sql.ErrNoRows {
 		return &domain.EmailConfig{
@@ -45,19 +45,20 @@ func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error)
 	c.AlertBackupErr = alertBackupErr != 0
 	c.CriticalAlertsEnabled = criticalAlertsEnabled != 0
 	c.EnforceTOTPNonReaders = enforceTOTPNonReaders != 0
+	c.SensitiveActionsRequireTOTP = sensitiveActionsRequireTOTP != 0
 	return &c, nil
 }
 
 func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) error {
-	debug.RecordQuery(ctx, `INSERT INTO email_config (id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes, critical_alerts_enabled, enforce_totp_non_readers) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`)
+	debug.RecordQuery(ctx, `INSERT INTO email_config (id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_backup_err, alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes, critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO email_config (
 			id, smtp_host, smtp_port, smtp_user, smtp_password, recipients,
 			is_enabled, send_time,
 			retention_months, retention_enabled, alert_disk_pct, alert_backup_err,
 			alert_pbs_stale_hours, public_api_url, alert_pve_heartbeat_minutes,
-			critical_alerts_enabled, enforce_totp_non_readers
-		) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp
+		) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			smtp_host=excluded.smtp_host,
 			smtp_port=excluded.smtp_port,
@@ -74,12 +75,13 @@ func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) err
 			public_api_url=excluded.public_api_url,
 			alert_pve_heartbeat_minutes=excluded.alert_pve_heartbeat_minutes,
 			critical_alerts_enabled=excluded.critical_alerts_enabled,
-			enforce_totp_non_readers=excluded.enforce_totp_non_readers`,
+			enforce_totp_non_readers=excluded.enforce_totp_non_readers,
+			sensitive_actions_require_totp=excluded.sensitive_actions_require_totp`,
 		c.SMTPHost, c.SMTPPort, c.SMTPUser, c.SMTPPass,
 		c.Recipients, boolToInt(c.IsEnabled), c.SendTime,
 		c.RetentionMonths, boolToInt(c.RetentionEnabled), c.AlertDiskPct, boolToInt(c.AlertBackupErr),
 		c.AlertPBSStaleHours, c.PublicAPIURL, c.AlertPVEHeartbeatMinutes,
-		boolToInt(c.CriticalAlertsEnabled), boolToInt(c.EnforceTOTPNonReaders),
+		boolToInt(c.CriticalAlertsEnabled), boolToInt(c.EnforceTOTPNonReaders), boolToInt(c.SensitiveActionsRequireTOTP),
 	)
 	return err
 }

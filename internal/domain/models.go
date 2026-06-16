@@ -236,23 +236,24 @@ type VMBackupConfig struct {
 }
 
 type EmailConfig struct {
-	ID                       int64  `db:"id"`
-	SMTPHost                 string `db:"smtp_host"`
-	SMTPPort                 int    `db:"smtp_port"`
-	SMTPUser                 string `db:"smtp_user"`
-	SMTPPass                 string `db:"smtp_password"`
-	Recipients               string `db:"recipients"`
-	IsEnabled                bool   `db:"is_enabled"`
-	SendTime                 string `db:"send_time"`
-	RetentionMonths          int    `db:"retention_months"`
-	RetentionEnabled         bool   `db:"retention_enabled"`
-	AlertDiskPct             int    `db:"alert_disk_pct"` // 0 = disabled
-	AlertBackupErr           bool   `db:"alert_backup_err"`
-	AlertPBSStaleHours       int    `db:"alert_pbs_stale_hours"` // 0 = disabled
-	PublicAPIURL             string `db:"public_api_url"`
-	AlertPVEHeartbeatMinutes int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
-	CriticalAlertsEnabled    bool   `db:"critical_alerts_enabled"`
-	EnforceTOTPNonReaders    bool   `db:"enforce_totp_non_readers"`
+	ID                          int64  `db:"id"`
+	SMTPHost                    string `db:"smtp_host"`
+	SMTPPort                    int    `db:"smtp_port"`
+	SMTPUser                    string `db:"smtp_user"`
+	SMTPPass                    string `db:"smtp_password"`
+	Recipients                  string `db:"recipients"`
+	IsEnabled                   bool   `db:"is_enabled"`
+	SendTime                    string `db:"send_time"`
+	RetentionMonths             int    `db:"retention_months"`
+	RetentionEnabled            bool   `db:"retention_enabled"`
+	AlertDiskPct                int    `db:"alert_disk_pct"` // 0 = disabled
+	AlertBackupErr              bool   `db:"alert_backup_err"`
+	AlertPBSStaleHours          int    `db:"alert_pbs_stale_hours"` // 0 = disabled
+	PublicAPIURL                string `db:"public_api_url"`
+	AlertPVEHeartbeatMinutes    int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
+	CriticalAlertsEnabled       bool   `db:"critical_alerts_enabled"`
+	EnforceTOTPNonReaders       bool   `db:"enforce_totp_non_readers"`
+	SensitiveActionsRequireTOTP bool   `db:"sensitive_actions_require_totp"`
 }
 
 // Alert represents a detected condition requiring attention.
