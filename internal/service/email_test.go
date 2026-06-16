@@ -26,6 +26,47 @@ func TestParseRecipients_Empty(t *testing.T) {
 	}
 }
 
+func TestShouldSendImmediateCriticalEmail_ExcludesPBSStale(t *testing.T) {
+	cases := []struct {
+		name  string
+		alert domain.Alert
+		want  bool
+	}{
+		{
+			name:  "pbs report stale",
+			alert: domain.Alert{Type: domain.AlertTypePBSReportStale, Severity: domain.AlertSeverityCritical},
+			want:  false,
+		},
+		{
+			name:  "pbs snapshot stale",
+			alert: domain.Alert{Type: domain.AlertTypePBSStale, Severity: domain.AlertSeverityCritical},
+			want:  false,
+		},
+		{
+			name:  "pbs fill",
+			alert: domain.Alert{Type: domain.AlertTypePBSFill, Severity: domain.AlertSeverityCritical},
+			want:  true,
+		},
+		{
+			name:  "pbs verify",
+			alert: domain.Alert{Type: domain.AlertTypePBSVerify, Severity: domain.AlertSeverityCritical},
+			want:  true,
+		},
+		{
+			name:  "warning",
+			alert: domain.Alert{Type: domain.AlertTypeDisk, Severity: domain.AlertSeverityWarning},
+			want:  false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldSendImmediateCriticalEmail(tc.alert); got != tc.want {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestNextRunTime_Future(t *testing.T) {
 	// 23:59 is in the future for all but 1 minute per day
 	next := nextRunTime("23:59", time.UTC)
