@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.107"
+var version = "0.0.108"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -57,6 +57,11 @@ func main() {
 			}
 			if updated {
 				restartService()
+			}
+			return
+		case "doctor":
+			if err := runServerDoctor(); err != nil {
+				os.Exit(1)
 			}
 			return
 		case "unlock2fa":

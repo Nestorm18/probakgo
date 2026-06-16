@@ -94,6 +94,12 @@
         <span>HTTPS detectado con <code>SESSION_SECURE=false</code>. Activa <code>SESSION_SECURE=true</code> en el servidor para proteger la cookie de sesión.</span>
       </div>
       {{end}}
+      {{if .ShowPublicHTTPWarning}}
+      <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+        <span>HTTP detectado desde un host público. Usa HTTPS o accede solo por NetBird/VPN; si es un DNS interno de NetBird, revisa que el puerto no esté abierto en el router.</span>
+      </div>
+      {{end}}
       {{block "page_content" .}}{{end}}
     </main>
   </div>

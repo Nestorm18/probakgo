@@ -40,6 +40,14 @@ systemctl restart probakgo
 journalctl -u probakgo -f
 ```
 
+### Diagnosticar el servidor
+
+```bash
+/opt/probakgo/probakgo doctor
+```
+
+El comando comprueba configuración, acceso a la base de datos, migraciones, URL pública, `SESSION_SECURE`, administradores con 2FA, servicio systemd y cron de actualización. Devuelve error solo si detecta fallos críticos; las configuraciones revisables aparecen como `WARN`.
+
 ### Configuración opcional (`.env`)
 
 El binario crea `.env` automáticamente con la `SESSION_KEY`. Puedes añadir variables adicionales:
