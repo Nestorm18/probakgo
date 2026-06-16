@@ -155,6 +155,37 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	}
 }
 
+func TestBuildEmailData_NoReportAllVMsExcluded_NoPVEIssue(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-excluded", "10.0.0.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-excluded", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true, Tuesday: true,
+	}); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+	if err := st.ToggleVMExcludeForServer(ctx, "pve", serverID, "100"); err != nil {
+		t.Fatalf("toggle exclude: %v", err)
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertBackupErr = false
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.PVEIssues) != 0 {
+		t.Fatalf("want no PVE issue when all configured VMs are excluded, got %d", len(data.PVEIssues))
+	}
+	if data.TotalIssues != 0 {
+		t.Fatalf("want TotalIssues=0, got %d", data.TotalIssues)
+	}
+}
+
 func TestBuildEmailData_StaleReportDoesNotShowOldTasksOK(t *testing.T) {
 	ctx := context.Background()
 	db, st := openTestStore(t)

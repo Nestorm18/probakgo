@@ -31,3 +31,18 @@ func TestVMScheduledForDay(t *testing.T) {
 		})
 	}
 }
+
+func TestHasActiveVMBackupConfigs(t *testing.T) {
+	if HasActiveVMBackupConfigs(nil) {
+		t.Fatal("nil configs should not be active")
+	}
+	if HasActiveVMBackupConfigs([]VMBackupConfig{{VMID: "100", Monday: true, IsExcluded: true}}) {
+		t.Fatal("excluded config should not be active")
+	}
+	if HasActiveVMBackupConfigs([]VMBackupConfig{{VMID: "100"}}) {
+		t.Fatal("config without scheduled days should not be active")
+	}
+	if !HasActiveVMBackupConfigs([]VMBackupConfig{{VMID: "100", Monday: true}}) {
+		t.Fatal("non-excluded config with a scheduled day should be active")
+	}
+}

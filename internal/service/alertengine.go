@@ -311,6 +311,10 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	}
 	var alerts []domain.Alert
 	for _, sv := range servers {
+		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
+			continue
+		}
 		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil {
 			alerts = append(alerts, domain.Alert{

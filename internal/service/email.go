@@ -237,6 +237,10 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	var pveIssues, pveOk []serverRow
 	for _, sv := range pveServers {
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
+		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
+			continue
+		}
 		r, err := st.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil {
 			row.StaleReason = "no se han recibido reportes"
@@ -245,7 +249,6 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 
 		tasks, _ := st.GetPVEBackupTasksForReport(ctx, r.ID)
-		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		isStale := false
 		staleReason := ""
 		if stale, reason := rep.IsStaleForServerID(ctx, r.ReportedAt, sv.ID); stale {

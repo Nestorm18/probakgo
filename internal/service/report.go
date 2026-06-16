@@ -163,7 +163,7 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 		}
 	}
 	if len(expected) == 0 {
-		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+		return false, "sin backups activos configurados"
 	}
 
 	now := r.now().In(r.tz)
@@ -222,7 +222,7 @@ func (r *ReportService) isStaleForConfigs(ctx context.Context, reportedAt time.T
 		}
 	}
 	if len(expected) == 0 {
-		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+		return false, "sin backups activos configurados"
 	}
 
 	now := r.now().In(r.tz)

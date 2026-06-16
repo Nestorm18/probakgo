@@ -303,6 +303,27 @@ func TestEvalPVEStale_NoReport(t *testing.T) {
 
 // ── evalPBSDisk ───────────────────────────────────────────────────────────────
 
+func TestEvalPVEStale_NoReportAllVMsExcluded_NoAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-excluded", "1.1.1.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-excluded", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true, Tuesday: true,
+	}); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+	if err := st.ToggleVMExcludeForServer(ctx, "pve", serverID, "100"); err != nil {
+		t.Fatalf("toggle exclude: %v", err)
+	}
+
+	cfg := defaultCfg()
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, _ := evalPVEStale(st, cfg)
+	if hasAlert(alerts, domain.AlertTypePVEStale, "pve-excluded") {
+		t.Error("unexpected pve_stale alert when all configured VMs are excluded")
+	}
+}
+
 func TestEvalPBSDisk_OverThreshold(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
