@@ -476,6 +476,30 @@ div[style*="overflow:hidden"]:has(> .table) {
   background-color: var(--clr-accent); border-color: var(--clr-accent);
 }
 
+.alert-config-stack {
+  display: grid;
+  gap: .75rem;
+}
+.alert-config-field {
+  padding: .85rem .95rem;
+  border: 1px solid var(--card-border);
+  border-radius: .5rem;
+  background: color-mix(in srgb, var(--body-bg) 70%, var(--card-bg));
+}
+.alert-config-field .form-label {
+  display: block;
+  margin-bottom: .4rem;
+  font-size: .82rem;
+}
+.alert-config-field .form-text {
+  margin-top: .35rem;
+  font-size: .72rem;
+}
+.alert-config-field .form-check-label {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--txt-secondary);
+}
 /* ─── Buttons ────────────────────────────────────────────────── */
 .btn {
   border-radius: .4rem; font-size: .8rem; font-weight: 500;
