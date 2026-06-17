@@ -99,6 +99,7 @@
             {{if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
             {{else if .HasBackupError}}<span class="status-pill bad" style="font-size:.68rem">Backup error</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>{{end}}
+            {{if .Swap.Enabled}}<span class="status-pill bad" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
             {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
           <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>
@@ -129,6 +130,7 @@
             {{if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>
             <span class="status-pill {{.FillClass}}" style="font-size:.68rem">{{.FillLabel}}</span>{{end}}
+            {{if .Swap.Enabled}}<span class="status-pill bad" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
             {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
           <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>

@@ -356,6 +356,8 @@ func alertTitleFromID(alertID string) string {
 		return "VM sin backup"
 	case domain.AlertTypePVEUnknownVM:
 		return "VM no configurada"
+	case domain.AlertTypeSwap:
+		return "Swap activa"
 	default:
 		return "Alerta suprimida"
 	}

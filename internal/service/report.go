@@ -42,7 +42,9 @@ func (r *ReportService) SavePVEReportForAPIKey(ctx context.Context, req *domain.
 		return fmt.Errorf("upsert server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPVEReport(ctx, serverID, req.LastBackupStatus)
+	reportID, err := r.store.InsertPVEReportWithSwap(ctx, serverID, req.LastBackupStatus, domain.HostSwap{
+		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
+	})
 	if err != nil {
 		return fmt.Errorf("insert report: %w", err)
 	}
@@ -93,7 +95,9 @@ func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.
 		return fmt.Errorf("upsert pbs server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPBSReport(ctx, serverID)
+	reportID, err := r.store.InsertPBSReportWithSwap(ctx, serverID, domain.HostSwap{
+		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
+	})
 	if err != nil {
 		return fmt.Errorf("insert pbs report: %w", err)
 	}

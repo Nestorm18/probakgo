@@ -78,6 +78,10 @@ func (s *Store) UpsertPVEServerForAPIKey(ctx context.Context, apiKeyID int64, na
 }
 
 func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.BackupStatus) (int64, error) {
+	return s.InsertPVEReportWithSwap(ctx, serverID, bs, domain.HostSwap{})
+}
+
+func (s *Store) InsertPVEReportWithSwap(ctx context.Context, serverID int64, bs *domain.BackupStatus, swap domain.HostSwap) (int64, error) {
 	status := ""
 	var starttime, endtime, duration int64
 	if bs != nil {
@@ -86,11 +90,15 @@ func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.
 		endtime = bs.EndTime
 		duration = bs.Duration
 	}
-	debug.RecordQuery(ctx, `INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration) VALUES (?, ?, ?, ?, ?)`)
+	swapEnabled := 0
+	if swap.Enabled {
+		swapEnabled = 1
+	}
+	debug.RecordQuery(ctx, `INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration)
-		 VALUES (?, ?, ?, ?, ?)`,
-		serverID, status, starttime, endtime, duration,
+		`INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		serverID, status, starttime, endtime, duration, swap.Total, swap.Used, swapEnabled,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert pve_report: %w", err)
@@ -203,26 +211,29 @@ type PVEReportRow struct {
 }
 
 func (s *Store) GetLatestPVEReport(ctx context.Context, serverID int64) (*domain.PVEReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
 	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
-		backup_status, backup_starttime, backup_endtime, backup_duration
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PVEReport
 	var isStale int
 	var staleReason sql.NullString
+	var swapEnabled int
 	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
-		&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
+		&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+		&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 		return nil, err
 	}
 	r.IsStale = isStale != 0
 	r.StaleReason = staleReason.String
+	r.SwapEnabled = swapEnabled != 0
 	return &r, nil
 }
 
 func (s *Store) GetLatestPVEReports(ctx context.Context) (map[int64]*domain.PVEReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports r WHERE r.id = (SELECT r2.id FROM pve_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports r WHERE r.id = (SELECT r2.id FROM pve_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
-		backup_status, backup_starttime, backup_endtime, backup_duration
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports r
 		WHERE r.id = (
 			SELECT r2.id FROM pve_reports r2
@@ -239,21 +250,24 @@ func (s *Store) GetLatestPVEReports(ctx context.Context) (map[int64]*domain.PVER
 		var r domain.PVEReport
 		var isStale int
 		var staleReason sql.NullString
+		var swapEnabled int
 		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
-			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
 		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
 		reports[r.ServerID] = &r
 	}
 	return reports, rows.Err()
 }
 
 func (s *Store) ListPVEReports(ctx context.Context, serverID int64, limit int) ([]domain.PVEReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
-		backup_status, backup_starttime, backup_endtime, backup_duration
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`, serverID, limit)
 	if err != nil {
 		return nil, err
@@ -264,12 +278,15 @@ func (s *Store) ListPVEReports(ctx context.Context, serverID int64, limit int) (
 		var r domain.PVEReport
 		var isStale int
 		var staleReason sql.NullString
+		var swapEnabled int
 		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
-			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
 		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
@@ -319,9 +336,9 @@ func (s *Store) GetPVEStorageContent(ctx context.Context, storageID int64) ([]do
 
 func (s *Store) ListPVEReportsByDays(ctx context.Context, serverID int64, days int) ([]domain.PVEReport, error) {
 	threshold := time.Now().AddDate(0, 0, -days)
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
-		backup_status, backup_starttime, backup_endtime, backup_duration
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`,
 		serverID, threshold)
 	if err != nil {
@@ -333,12 +350,15 @@ func (s *Store) ListPVEReportsByDays(ctx context.Context, serverID int64, days i
 		var r domain.PVEReport
 		var isStale int
 		var staleReason sql.NullString
+		var swapEnabled int
 		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
-			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration); err != nil {
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
 		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()

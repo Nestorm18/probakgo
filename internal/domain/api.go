@@ -13,6 +13,9 @@ type PVEReportRequest struct {
 	PublicIP         string              `json:"public_ip"`
 	ClientVersion    string              `json:"client_version"`
 	MachineID        string              `json:"machine_id"`
+	SwapTotal        int64               `json:"swap_total"`
+	SwapUsed         int64               `json:"swap_used"`
+	SwapEnabled      bool                `json:"swap_enabled"`
 	LastBackupStatus *BackupStatus       `json:"last_backup_status"`
 	Storages         []StoragePayload    `json:"storages"`
 	BackupTasks      []BackupTaskPayload `json:"backup_tasks"`
@@ -100,6 +103,9 @@ type PBSReportRequest struct {
 	PublicIP       string         `json:"public_ip"`
 	ClientVersion  string         `json:"client_version"`
 	MachineID      string         `json:"machine_id"`
+	SwapTotal      int64          `json:"swap_total"`
+	SwapUsed       int64          `json:"swap_used"`
+	SwapEnabled    bool           `json:"swap_enabled"`
 	PBSInformation PBSInformation `json:"pbs_information"`
 }
 

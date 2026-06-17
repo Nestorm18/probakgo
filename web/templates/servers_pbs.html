@@ -22,9 +22,10 @@
           <th data-sort="0" style="cursor:pointer;user-select:none">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th data-sort="1" style="cursor:pointer;user-select:none">Dirección <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th>Cliente</th>
-          <th data-sort="3" style="cursor:pointer;user-select:none">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th>Swap</th>
+          <th data-sort="4" style="cursor:pointer;user-select:none">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th>Datastores</th>
-          <th data-sort="5" style="cursor:pointer;user-select:none">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="6" style="cursor:pointer;user-select:none">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
           <th></th>
         </tr>
       </thead>
@@ -47,6 +48,7 @@
           <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
         </td>
         <td><code>{{.Server.ClientVersion}}</code></td>
+        <td>{{if .Swap.Enabled}}<span class="status-pill bad" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
@@ -86,7 +88,7 @@
         </td>
       </tr>
       {{else}}
-      <tr class="empty-state-row"><td colspan="7">
+      <tr class="empty-state-row"><td colspan="8">
         <div class="p-4">
           <div class="text-center mb-3" style="color:var(--txt-muted)"><i class="bi bi-archive" style="font-size:2rem"></i></div>
           <p class="text-center fw-semibold mb-3" style="color:var(--txt-primary)">Sin servidores PBS registrados</p>

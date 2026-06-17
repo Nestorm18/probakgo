@@ -22,3 +22,23 @@ func TestServerTypeFromContent(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSwapInfo(t *testing.T) {
+	info := parseSwapInfo("MemTotal: 1024 kB\nSwapTotal: 2097152 kB\nSwapFree: 1572864 kB\n")
+	if !info.Enabled {
+		t.Fatal("expected swap enabled")
+	}
+	if info.Total != 2097152*1024 {
+		t.Fatalf("total = %d, want %d", info.Total, int64(2097152*1024))
+	}
+	if info.Used != 524288*1024 {
+		t.Fatalf("used = %d, want %d", info.Used, int64(524288*1024))
+	}
+}
+
+func TestParseSwapInfoDisabled(t *testing.T) {
+	info := parseSwapInfo("MemTotal: 1024 kB\nSwapTotal: 0 kB\nSwapFree: 0 kB\n")
+	if info.Enabled || info.Total != 0 || info.Used != 0 {
+		t.Fatalf("unexpected swap info: %+v", info)
+	}
+}

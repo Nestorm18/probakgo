@@ -564,6 +564,7 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 
 	names := c.vmNames()
 	tasks := c.backupJobTasks(names, filesByVMID)
+	swap := c.si.swapInfo()
 
 	return map[string]any{
 		"hostname":           c.si.Hostname,
@@ -571,6 +572,9 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 		"public_ip":          c.si.publicIP(),
 		"client_version":     version,
 		"machine_id":         c.si.machineID(),
+		"swap_total":         swap.Total,
+		"swap_used":          swap.Used,
+		"swap_enabled":       swap.Enabled,
 		"last_backup_status": c.reportBackupStatus(tasks),
 		"storages":           result,
 		"backup_tasks":       tasks,

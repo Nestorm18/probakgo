@@ -74,6 +74,7 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("datastore-usage: %w", err)
 	}
+	swap := c.si.swapInfo()
 	if list, ok := data["data"].([]any); ok {
 		for _, item := range list {
 			ds, ok := item.(map[string]any)
@@ -143,6 +144,9 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 		"public_ip":       c.si.publicIP(),
 		"client_version":  version,
 		"machine_id":      c.si.machineID(),
+		"swap_total":      swap.Total,
+		"swap_used":       swap.Used,
+		"swap_enabled":    swap.Enabled,
 		"pbs_information": data,
 	}, nil
 }

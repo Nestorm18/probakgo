@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -13,6 +14,12 @@ import (
 type SysInfo struct {
 	Hostname string
 	cfg      *Config
+}
+
+type SwapInfo struct {
+	Total   int64 `json:"swap_total"`
+	Used    int64 `json:"swap_used"`
+	Enabled bool  `json:"swap_enabled"`
 }
 
 func newSysInfo(cfg *Config) *SysInfo {
@@ -61,6 +68,46 @@ func (si *SysInfo) machineID() string {
 	}
 	log.Println("WARN: could not read machine-id")
 	return ""
+}
+
+func (si *SysInfo) swapInfo() SwapInfo {
+	data, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return SwapInfo{}
+	}
+	return parseSwapInfo(string(data))
+}
+
+func parseSwapInfo(meminfo string) SwapInfo {
+	var totalKB, freeKB int64
+	for _, line := range strings.Split(meminfo, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		value, err := strconv.ParseInt(fields[1], 10, 64)
+		if err != nil {
+			continue
+		}
+		switch strings.TrimSuffix(fields[0], ":") {
+		case "SwapTotal":
+			totalKB = value
+		case "SwapFree":
+			freeKB = value
+		}
+	}
+	if totalKB <= 0 {
+		return SwapInfo{}
+	}
+	usedKB := totalKB - freeKB
+	if usedKB < 0 {
+		usedKB = 0
+	}
+	return SwapInfo{
+		Total:   totalKB * 1024,
+		Used:    usedKB * 1024,
+		Enabled: true,
+	}
 }
 
 func serverTypeFromContent(content string) string {
