@@ -393,7 +393,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
 			stores, _ := h.store.GetPBSStoresForReport(ctx, rep.ID)
-			r2["Stores"] = stores
+			r2["Stores"] = pbsStoreDisplays(stores)
 		}
 		rows = append(rows, r2)
 	}

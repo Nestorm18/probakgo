@@ -42,7 +42,6 @@ var evaluators = []AlertEvaluator{
 	evalPBSReportStale,
 	evalPBSDisk,
 	evalPBSFill,
-	evalPBSStale,
 	evalPBSVerify,
 }
 
@@ -549,64 +548,9 @@ func evalPBSFill(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 func evalPBSStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var alerts []domain.Alert
-	now := time.Now()
-	for _, sv := range servers {
-		svCfg := cfg.PBSConfigs[sv.ID]
-		staleHours := cfg.GlobalStaleHours
-		if svCfg.StaleHours != nil {
-			staleHours = *svCfg.StaleHours
-		}
-		if staleHours == 0 {
-			continue
-		}
-		cutoff := now.Unix() - int64(staleHours)*3600
-
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
-			continue
-		}
-		stores, err := st.GetPBSStoresForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, ds := range stores {
-			snaps, err := st.GetPBSSnapshotsForStore(ctx, ds.ID)
-			if err != nil {
-				continue
-			}
-			for _, sn := range snaps {
-				if sn.LastBackup == 0 || sn.LastBackup >= cutoff {
-					continue
-				}
-				h := int(now.Sub(time.Unix(sn.LastBackup, 0)).Hours())
-				var since string
-				if h >= 48 {
-					since = fmt.Sprintf("%dd", h/24)
-				} else {
-					since = fmt.Sprintf("%dh", h)
-				}
-				alerts = append(alerts, domain.Alert{
-					ID:         fmt.Sprintf("pbs_stale:pbs:%d:%s:%s/%s", sv.ID, ds.Store, sn.BackupType, sn.BackupID),
-					ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
-					StoreName:  ds.Store,
-					Type:       domain.AlertTypePBSStale,
-					Severity:   domain.AlertSeverityWarning,
-					Title:      "Snapshot sin actualizar",
-					Message:    fmt.Sprintf("%s/%s sin backup desde hace %s", sn.BackupType, sn.BackupID, since),
-					Value:      since,
-					Threshold:  fmt.Sprintf("%dh", staleHours),
-					DetectedAt: now,
-				})
-			}
-		}
-	}
-	return alerts, nil
+	// PBS can intentionally keep old VM/CT snapshots for long-term safety.
+	// Staleness is therefore tracked at the server-report level, not per group.
+	return nil, nil
 }
 
 func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {

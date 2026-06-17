@@ -401,7 +401,7 @@ func TestEvalPBSFill_BeyondThreshold_NoAlert(t *testing.T) {
 
 // ── evalPBSStale ──────────────────────────────────────────────────────────────
 
-func TestEvalPBSStale_OldSnapshot(t *testing.T) {
+func TestEvalPBSStale_OldSnapshot_NoAlert(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
 	serverID, _ := st.UpsertPBSServer(ctx, "pbs-stale", "1.1.1.1", "", "1.0", "")
@@ -414,8 +414,8 @@ func TestEvalPBSStale_OldSnapshot(t *testing.T) {
 
 	cfg := defaultCfg() // GlobalStaleHours=48
 	alerts, _ := evalPBSStale(st, cfg)
-	if !hasAlert(alerts, domain.AlertTypePBSStale, "pbs-stale") {
-		t.Error("expected pbs_stale alert for 72h-old snapshot with 48h threshold")
+	if hasAlert(alerts, domain.AlertTypePBSStale, "pbs-stale") {
+		t.Error("unexpected pbs_stale alert for intentionally old PBS snapshot")
 	}
 }
 

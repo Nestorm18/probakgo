@@ -39,7 +39,7 @@
           <div class="mb-3">
             <div class="form-check form-switch">
               <input type="checkbox" name="sensitive_actions_require_totp" value="on" class="form-check-input" id="sensitive_actions_require_totp" {{if .Config.SensitiveActionsRequireTOTP}}checked{{end}}>
-              <label class="form-check-label" for="sensitive_actions_require_totp">Exigir 2FA en operaciones delicadas</label>
+              <label class="form-check-label" for="sensitive_actions_require_totp">Forzar 2FA en operaciones delicadas</label>
             </div>
             <div class="form-text">Bloquea cambios de usuarios, API keys, configuración, backup-config, supresiones de alertas y actualizaciones si el usuario no tiene 2FA activo.</div>
           </div>

@@ -339,7 +339,7 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 		{"100", "adguard", false},
 		{"300", "wireguard", false},
 		{"301", "wireguard-externos", false},
-		{"1000", "pbs-example", true},
+		{"1000", "pbs-empresa", true},
 	} {
 		_, err := st.CreateVMBackupConfig(ctx, "soporte2", domain.CreateVMBackupConfigRequest{
 			VMID:      vm.id,
