@@ -294,10 +294,17 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		alertDisk = 0
 	}
 	pbsStaleStr := r.FormValue("alert_pbs_stale_hours")
-	pbsStaleHours, err := strconv.Atoi(pbsStaleStr)
-	if pbsStaleStr != "" && err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+horas+PBS+no+valido", http.StatusSeeOther)
-		return
+	pbsStaleHours := 0
+	if existing != nil {
+		pbsStaleHours = existing.AlertPBSStaleHours
+	}
+	if pbsStaleStr != "" {
+		n, err := strconv.Atoi(pbsStaleStr)
+		if err != nil {
+			http.Redirect(w, r, "/settings/alerts?flash=Valor+de+horas+PBS+no+valido", http.StatusSeeOther)
+			return
+		}
+		pbsStaleHours = n
 	}
 	if pbsStaleHours < 0 {
 		pbsStaleHours = 0
@@ -345,7 +352,6 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	h.audit(r, "settings.alerts_update", "settings", "alerts", "Alertas globales", map[string]any{
 		"alert_disk_pct":              cfg.AlertDiskPct,
 		"alert_backup_err":            cfg.AlertBackupErr,
-		"alert_pbs_stale_hours":       cfg.AlertPBSStaleHours,
 		"alert_pve_heartbeat_minutes": cfg.AlertPVEHeartbeatMinutes,
 	})
 	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)

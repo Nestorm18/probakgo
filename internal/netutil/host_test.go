@@ -16,7 +16,7 @@ func TestHostLooksPublic(t *testing.T) {
 		{"100.127.255.254", false},
 		{"100.128.0.1", true},
 		{"probakgo", false},
-		{"probakgo.anteva.info", true},
+		{"probakgo.empresa.info", true},
 		{"8.8.8.8", true},
 	}
 	for _, tt := range tests {

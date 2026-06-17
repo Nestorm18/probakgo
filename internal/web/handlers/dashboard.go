@@ -198,35 +198,111 @@ func pbsFillBadge(stores []domain.PBSStore) (label, class string) {
 	}
 	now := time.Now()
 	var nearest *time.Time
+	maxPct := 0
 	for _, store := range stores {
+		if store.Total > 0 {
+			pct := int(float64(store.Used) / float64(store.Total) * 100)
+			if pct > maxPct {
+				maxPct = pct
+			}
+		}
 		if store.EstimatedFullDate == 0 {
 			continue
 		}
 		fullAt := time.Unix(store.EstimatedFullDate, 0)
+		if !fullAt.After(now) {
+			continue
+		}
 		if nearest == nil || fullAt.Before(*nearest) {
 			nearest = &fullAt
 		}
 	}
 	if nearest == nil {
+		switch {
+		case maxPct > 95:
+			return fmt.Sprintf("%d%% · Sin riesgo", maxPct), "ok"
+		case maxPct > 85:
+			return fmt.Sprintf("%d%% · Sin riesgo", maxPct), "ok"
+		}
 		return "Llenado OK", "ok"
 	}
-	if !nearest.After(now) {
-		return "Lleno", "bad"
+	days := pbsDaysUntil(*nearest, now)
+	return fmt.Sprintf("Lleno en %dd", days), pbsFillClass(days)
+}
+
+type pbsStoreDisplay struct {
+	StoreName  string
+	Used       int64
+	Total      int64
+	BadgeLabel string
+	BadgeClass string
+	BadgeTitle string
+	NoFillRisk bool
+}
+
+func pbsStoreDisplays(stores []domain.PBSStore) []pbsStoreDisplay {
+	now := time.Now()
+	rows := make([]pbsStoreDisplay, 0, len(stores))
+	for _, store := range stores {
+		row := pbsStoreDisplay{
+			StoreName: store.Store,
+			Used:      store.Used,
+			Total:     store.Total,
+		}
+		if store.EstimatedFullDate > 0 {
+			fullAt := time.Unix(store.EstimatedFullDate, 0)
+			if fullAt.After(now) {
+				days := pbsDaysUntil(fullAt, now)
+				row.BadgeLabel = fmt.Sprintf("Lleno en %dd", days)
+				row.BadgeClass = pbsFillClass(days)
+				if days <= 14 {
+					row.BadgeTitle = "Se llena en menos de 14 días"
+				} else {
+					row.BadgeTitle = fmt.Sprintf("Se llena en %d días", days)
+				}
+				rows = append(rows, row)
+				continue
+			}
+		}
+		if store.Total > 0 {
+			pct := int(float64(store.Used) / float64(store.Total) * 100)
+			switch {
+			case pct > 95:
+				row.BadgeLabel = fmt.Sprintf("%d%%", pct)
+				row.BadgeClass = "ok"
+				row.BadgeTitle = fmt.Sprintf("Disco al %d%%", pct)
+				row.NoFillRisk = true
+			case pct > 85:
+				row.BadgeLabel = fmt.Sprintf("%d%%", pct)
+				row.BadgeClass = "ok"
+				row.BadgeTitle = fmt.Sprintf("Disco al %d%%", pct)
+				row.NoFillRisk = true
+			}
+		}
+		rows = append(rows, row)
 	}
-	until := nearest.Sub(now)
+	return rows
+}
+
+func pbsDaysUntil(fullAt, now time.Time) int {
+	until := fullAt.Sub(now)
 	days := int(until.Hours() / 24)
 	if until%(24*time.Hour) != 0 {
 		days++
 	}
 	if days < 1 {
-		days = 1
+		return 1
 	}
+	return days
+}
+
+func pbsFillClass(days int) string {
 	switch {
 	case days <= 14:
-		return fmt.Sprintf("Lleno en %dd", days), "bad"
+		return "bad"
 	case days <= 30:
-		return fmt.Sprintf("Lleno en %dd", days), "warn"
+		return "warn"
 	default:
-		return fmt.Sprintf("Lleno en %dd", days), "ok"
+		return "ok"
 	}
 }
