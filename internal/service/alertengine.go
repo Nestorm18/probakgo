@@ -39,6 +39,7 @@ var evaluators = []AlertEvaluator{
 	evalPVEUnknownVM,
 	evalPVEStale,
 	evalPVEHeartbeat,
+	evalHostSwap,
 	evalPBSReportStale,
 	evalPBSDisk,
 	evalPBSFill,
@@ -386,6 +387,57 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 			Message:    fmt.Sprintf("No se recibe señal del servidor desde hace %s", since),
 			Value:      since,
 			Threshold:  fmt.Sprintf("%d min", cfg.GlobalPVEHeartbeatMinutes),
+			DetectedAt: now,
+		})
+	}
+	return alerts, nil
+}
+
+func evalHostSwap(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	var alerts []domain.Alert
+	now := time.Now()
+
+	pveServers, err := st.ListPVEServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, sv := range pveServers {
+		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
+		if err != nil || !rep.SwapEnabled {
+			continue
+		}
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("swap:pve:%d", sv.ID),
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
+			Type:       domain.AlertTypeSwap,
+			Severity:   domain.AlertSeverityWarning,
+			Title:      "Swap activa",
+			Message:    hostSwapMessage(rep.SwapUsed, rep.SwapTotal),
+			Value:      alertFmtBytes(rep.SwapUsed),
+			Threshold:  "swap desactivada",
+			DetectedAt: now,
+		})
+	}
+
+	pbsServers, err := st.ListPBSServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, sv := range pbsServers {
+		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
+		if err != nil || !rep.SwapEnabled {
+			continue
+		}
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("swap:pbs:%d", sv.ID),
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
+			Type:       domain.AlertTypeSwap,
+			Severity:   domain.AlertSeverityWarning,
+			Title:      "Swap activa",
+			Message:    hostSwapMessage(rep.SwapUsed, rep.SwapTotal),
+			Value:      alertFmtBytes(rep.SwapUsed),
+			Threshold:  "swap desactivada",
 			DetectedAt: now,
 		})
 	}
@@ -763,6 +815,16 @@ func alertFmtAge(d time.Duration) string {
 }
 
 func alertFmtBytes(b int64) string { return domain.FormatBytes(b) }
+
+func hostSwapMessage(used, total int64) string {
+	if total <= 0 {
+		return "El host tiene swap activa"
+	}
+	if used > 0 {
+		return fmt.Sprintf("Swap activa: %s usados de %s", alertFmtBytes(used), alertFmtBytes(total))
+	}
+	return fmt.Sprintf("Swap activa: %s configurados, sin uso actual", alertFmtBytes(total))
+}
 
 func pbsDiskMessage(pct int, used, total int64, estimatedFullDate int64, now time.Time) string {
 	msg := fmt.Sprintf("%d%% usado (%s / %s)", pct, alertFmtBytes(used), alertFmtBytes(total))

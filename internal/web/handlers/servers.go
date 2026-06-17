@@ -36,6 +36,47 @@ type heartbeatView struct {
 	Threshold int
 }
 
+type swapView struct {
+	Enabled  bool
+	Label    string
+	CSSClass string
+	Title    string
+	Used     int64
+	Total    int64
+}
+
+func buildSwapView(enabled bool, used, total int64) swapView {
+	if !enabled {
+		return swapView{Label: "Sin swap", CSSClass: "ok"}
+	}
+	view := swapView{
+		Enabled:  true,
+		Label:    "swap",
+		CSSClass: "bad",
+		Title:    fmt.Sprintf("Swap activa: %s usados de %s", domain.FormatBytes(used), domain.FormatBytes(total)),
+		Used:     used,
+		Total:    total,
+	}
+	if used <= 0 {
+		view.Title = fmt.Sprintf("Swap activa: %s configurados, sin uso actual", domain.FormatBytes(total))
+	}
+	return view
+}
+
+func latestPVESwapView(reports []domain.PVEReport) swapView {
+	if len(reports) == 0 {
+		return buildSwapView(false, 0, 0)
+	}
+	return buildSwapView(reports[0].SwapEnabled, reports[0].SwapUsed, reports[0].SwapTotal)
+}
+
+func latestPBSSwapView(reports []domain.PBSReport) swapView {
+	if len(reports) == 0 {
+		return buildSwapView(false, 0, 0)
+	}
+	return buildSwapView(reports[0].SwapEnabled, reports[0].SwapUsed, reports[0].SwapTotal)
+}
+
 func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
@@ -70,10 +111,12 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"AlertConfig": alertCfg,
 			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 			"Heartbeat":   buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
+			"Swap":        buildSwapView(false, 0, 0),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
 			r2["BackupStatus"] = rep.BackupStatus
+			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
 
 			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
 			if len(tasks) > 0 {
@@ -254,6 +297,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"BackupRows":      backupRows,
 		"BackupJobStart":  backupJobStart,
 		"Heartbeat":       buildHeartbeatViewPtr(hb, heartbeatThreshold),
+		"Swap":            latestPVESwapView(reports),
 		"MissingVMs":      missingVMs,
 		"ConfiguredVMIDs": configuredVMIDs,
 		"JobHistory":      jobHistory,
@@ -389,9 +433,11 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			"IsStale":     rep == nil || rep.IsStale,
 			"AlertConfig": alertCfg,
 			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"Swap":        buildSwapView(false, 0, 0),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
+			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
 			stores, _ := h.store.GetPBSStoresForReport(ctx, rep.ID)
 			r2["Stores"] = pbsStoreDisplays(stores)
 		}
@@ -445,6 +491,7 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Server":      sv,
 		"Reports":     reports,
 		"Stores":      storeDetails,
+		"Swap":        latestPBSSwapView(reports),
 		"AlertConfig": alertCfg,
 		"Flash":       r.URL.Query().Get("flash"),
 		"FlashOK":     r.URL.Query().Get("ok") == "1",

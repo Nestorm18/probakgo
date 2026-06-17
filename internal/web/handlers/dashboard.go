@@ -63,9 +63,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		} else {
 			pveOK++
 		}
-		row := map[string]any{"Server": sv, "IsStale": isStale, "HasBackupError": hasBackupError}
+		row := map[string]any{"Server": sv, "IsStale": isStale, "HasBackupError": hasBackupError, "Swap": buildSwapView(false, 0, 0)}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
+			row["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
 		}
 		pveRows = append(pveRows, row)
 	}
@@ -104,9 +105,11 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"IsStale":   isStale,
 			"FillLabel": fillLabel,
 			"FillClass": fillClass,
+			"Swap":      buildSwapView(false, 0, 0),
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
+			row["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
 		}
 		pbsRows = append(pbsRows, row)
 	}

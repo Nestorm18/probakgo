@@ -76,8 +76,17 @@ func (s *Store) UpsertPBSServerForAPIKey(ctx context.Context, apiKeyID int64, na
 }
 
 func (s *Store) InsertPBSReport(ctx context.Context, serverID int64) (int64, error) {
-	debug.RecordQuery(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`)
-	res, err := s.db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id) VALUES (?)`, serverID)
+	return s.InsertPBSReportWithSwap(ctx, serverID, domain.HostSwap{})
+}
+
+func (s *Store) InsertPBSReportWithSwap(ctx context.Context, serverID int64, swap domain.HostSwap) (int64, error) {
+	swapEnabled := 0
+	if swap.Enabled {
+		swapEnabled = 1
+	}
+	debug.RecordQuery(ctx, `INSERT INTO pbs_reports (server_id, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?)`,
+		serverID, swap.Total, swap.Used, swapEnabled)
 	if err != nil {
 		return 0, fmt.Errorf("insert pbs_report: %w", err)
 	}
@@ -215,23 +224,26 @@ func (s *Store) GetPBSServerByName(ctx context.Context, name string) (*domain.PB
 }
 
 func (s *Store) GetLatestPBSReport(ctx context.Context, serverID int64) (*domain.PBSReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
-	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`)
+	row := s.db.QueryRowContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled
 		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT 1`, serverID)
 	var r domain.PBSReport
 	var isStale int
 	var staleReason sql.NullString
-	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
+	var swapEnabled int
+	if err := row.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+		&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 		return nil, err
 	}
 	r.IsStale = isStale != 0
 	r.StaleReason = staleReason.String
+	r.SwapEnabled = swapEnabled != 0
 	return &r, nil
 }
 
 func (s *Store) GetLatestPBSReports(ctx context.Context) (map[int64]*domain.PBSReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports r WHERE r.id = (SELECT r2.id FROM pbs_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled FROM pbs_reports r WHERE r.id = (SELECT r2.id FROM pbs_reports r2 WHERE r2.server_id = r.server_id ORDER BY r2.reported_at DESC, r2.id DESC LIMIT 1)`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled
 		FROM pbs_reports r
 		WHERE r.id = (
 			SELECT r2.id FROM pbs_reports r2
@@ -248,19 +260,22 @@ func (s *Store) GetLatestPBSReports(ctx context.Context) (map[int64]*domain.PBSR
 		var r domain.PBSReport
 		var isStale int
 		var staleReason sql.NullString
-		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
+		var swapEnabled int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
 		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
 		reports[r.ServerID] = &r
 	}
 	return reports, rows.Err()
 }
 
 func (s *Store) ListPBSReports(ctx context.Context, serverID int64, limit int) ([]domain.PBSReport, error) {
-	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
-	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled
 		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ?`, serverID, limit)
 	if err != nil {
 		return nil, err
@@ -271,11 +286,14 @@ func (s *Store) ListPBSReports(ctx context.Context, serverID int64, limit int) (
 		var r domain.PBSReport
 		var isStale int
 		var staleReason sql.NullString
-		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason); err != nil {
+		var swapEnabled int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
 			return nil, err
 		}
 		r.IsStale = isStale != 0
 		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()

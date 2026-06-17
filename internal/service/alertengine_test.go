@@ -134,6 +134,40 @@ func TestEvalPVEHeartbeat_NoAlertBeforeFirstHeartbeat(t *testing.T) {
 	}
 }
 
+func TestEvalHostSwap_PVEEnabled(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-swap", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPVEReportWithSwap(ctx, serverID, nil, domain.HostSwap{
+		Total:   2 * 1000 * 1000 * 1000,
+		Used:    128 * 1000 * 1000,
+		Enabled: true,
+	})
+
+	alerts, err := evalHostSwap(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypeSwap, "pve-swap") {
+		t.Fatal("expected swap alert")
+	}
+}
+
+func TestEvalHostSwap_Disabled(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-noswap", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPVEReportWithSwap(ctx, serverID, nil, domain.HostSwap{})
+
+	alerts, err := evalHostSwap(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeSwap, "pve-noswap") {
+		t.Fatal("did not expect swap alert")
+	}
+}
+
 // ── evalPVEBackupErrors ───────────────────────────────────────────────────────
 
 func TestEvalPVEBackupErrors_ErrorTask(t *testing.T) {

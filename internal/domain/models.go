@@ -26,6 +26,9 @@ type PVEReport struct {
 	BackupStarttime int64     `db:"backup_starttime"`
 	BackupEndtime   int64     `db:"backup_endtime"`
 	BackupDuration  int64     `db:"backup_duration"`
+	SwapTotal       int64     `db:"swap_total"`
+	SwapUsed        int64     `db:"swap_used"`
+	SwapEnabled     bool      `db:"swap_enabled"`
 }
 
 type PVEStorage struct {
@@ -88,6 +91,15 @@ type PBSReport struct {
 	ReportedAt  time.Time `db:"reported_at"`
 	IsStale     bool      `db:"is_stale"`
 	StaleReason string    `db:"stale_reason"`
+	SwapTotal   int64     `db:"swap_total"`
+	SwapUsed    int64     `db:"swap_used"`
+	SwapEnabled bool      `db:"swap_enabled"`
+}
+
+type HostSwap struct {
+	Total   int64
+	Used    int64
+	Enabled bool
 }
 
 type PBSStore struct {
@@ -303,6 +315,7 @@ const (
 	AlertTypePBSReportStale = "pbs_report_stale"
 	AlertTypePVEMissingVM   = "pve_missing_vm"
 	AlertTypePVEUnknownVM   = "pve_unknown_vm"
+	AlertTypeSwap           = "swap"
 )
 
 const (
