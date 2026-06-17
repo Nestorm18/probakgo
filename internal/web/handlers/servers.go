@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -45,6 +46,13 @@ type swapView struct {
 	Total    int64
 }
 
+type alertOverrideView struct {
+	Has   bool
+	Count int
+	Label string
+	Title string
+}
+
 func buildSwapView(enabled bool, used, total int64) swapView {
 	if !enabled {
 		return swapView{Label: "Sin swap", CSSClass: "ok"}
@@ -61,6 +69,61 @@ func buildSwapView(enabled bool, used, total int64) swapView {
 		view.Title = fmt.Sprintf("Swap activa: %s configurados, sin uso actual", domain.FormatBytes(total))
 	}
 	return view
+}
+
+func buildPVEAlertOverrideView(cfg domain.PVEAlertConfig) alertOverrideView {
+	var parts []string
+	if cfg.DiskPct != nil {
+		parts = append(parts, fmt.Sprintf("Disco %d%%", *cfg.DiskPct))
+	}
+	if cfg.StaleHours != nil {
+		if *cfg.StaleHours == 0 {
+			parts = append(parts, "Sin reporte desactivado")
+		} else {
+			parts = append(parts, fmt.Sprintf("Sin reporte %dh", *cfg.StaleHours))
+		}
+	}
+	if cfg.BackupErr != nil {
+		if *cfg.BackupErr == 0 {
+			parts = append(parts, "Backup fallido desactivado")
+		} else {
+			parts = append(parts, "Backup fallido activado")
+		}
+	}
+	if cfg.ExpectedFinishTime != nil && *cfg.ExpectedFinishTime != "" {
+		parts = append(parts, "Hora limite "+*cfg.ExpectedFinishTime)
+	}
+	return buildAlertOverrideView(parts)
+}
+
+func buildPBSAlertOverrideView(cfg domain.PBSAlertConfig) alertOverrideView {
+	var parts []string
+	if cfg.DiskPct != nil {
+		parts = append(parts, fmt.Sprintf("Disco %d%%", *cfg.DiskPct))
+	}
+	if cfg.DaysUntilFull != nil {
+		parts = append(parts, fmt.Sprintf("Llenado %dd", *cfg.DaysUntilFull))
+	}
+	if !cfg.VerifyAlert {
+		parts = append(parts, "Verificacion desactivada")
+	}
+	return buildAlertOverrideView(parts)
+}
+
+func buildAlertOverrideView(parts []string) alertOverrideView {
+	if len(parts) == 0 {
+		return alertOverrideView{}
+	}
+	label := parts[0]
+	if len(parts) > 1 {
+		label = fmt.Sprintf("%d ajustes", len(parts))
+	}
+	return alertOverrideView{
+		Has:   true,
+		Count: len(parts),
+		Label: label,
+		Title: "Alertas personalizadas: " + strings.Join(parts, " | "),
+	}
 }
 
 func latestPVESwapView(reports []domain.PVEReport) swapView {
@@ -104,14 +167,15 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		}
 		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
 		r2 := map[string]any{
-			"Server":      sv,
-			"IsStale":     stale,
-			"TaskMissing": 0,
-			"TaskUnknown": 0,
-			"AlertConfig": alertCfg,
-			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
-			"Heartbeat":   buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
-			"Swap":        buildSwapView(false, 0, 0),
+			"Server":         sv,
+			"IsStale":        stale,
+			"TaskMissing":    0,
+			"TaskUnknown":    0,
+			"AlertConfig":    alertCfg,
+			"AlertOverrides": buildPVEAlertOverrideView(alertCfg),
+			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"Heartbeat":      buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
+			"Swap":           buildSwapView(false, 0, 0),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -429,11 +493,12 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		rep, _ := h.store.GetLatestPBSReport(ctx, sv.ID)
 		alertCfg, _ := h.store.GetPBSAlertConfig(ctx, sv.ID)
 		r2 := map[string]any{
-			"Server":      sv,
-			"IsStale":     rep == nil || rep.IsStale,
-			"AlertConfig": alertCfg,
-			"ServerURL":   serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
-			"Swap":        buildSwapView(false, 0, 0),
+			"Server":         sv,
+			"IsStale":        rep == nil || rep.IsStale,
+			"AlertConfig":    alertCfg,
+			"AlertOverrides": buildPBSAlertOverrideView(alertCfg),
+			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"Swap":           buildSwapView(false, 0, 0),
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
