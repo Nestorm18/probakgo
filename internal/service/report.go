@@ -122,6 +122,36 @@ func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.
 	return nil
 }
 
+func (r *ReportService) SaveWindowsReportForAPIKey(ctx context.Context, req *domain.WindowsReportRequest, apiKeyID int64) error {
+	var (
+		serverID int64
+		err      error
+	)
+	if apiKeyID > 0 {
+		serverID, err = r.store.UpsertWindowsServerForAPIKey(ctx, apiKeyID,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	} else {
+		serverID, err = r.store.UpsertWindowsServer(ctx,
+			req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("upsert windows server: %w", err)
+	}
+
+	reportID, err := r.store.InsertWindowsReport(ctx, serverID)
+	if err != nil {
+		return fmt.Errorf("insert windows report: %w", err)
+	}
+	for _, disk := range req.Disks {
+		if err := r.store.InsertWindowsDisk(ctx, reportID, disk); err != nil {
+			return fmt.Errorf("insert windows disk %s: %w", disk.Name, err)
+		}
+	}
+	return nil
+}
+
 // IsStale returns true when the report was not received today (in the configured timezone).
 func (r *ReportService) IsStale(reportedAt time.Time) bool {
 	now := r.now().In(r.tz)

@@ -32,6 +32,8 @@ var templateActive = map[string]string{
 	"vm_backup_config_form.html": "pve",
 	"servers_pbs.html":           "pbs",
 	"server_pbs_detail.html":     "pbs",
+	"servers_windows.html":       "windows",
+	"server_windows_detail.html": "windows",
 	"api_keys.html":              "keys",
 	"api_key_created.html":       "keys",
 	"users.html":                 "users",

@@ -1,0 +1,134 @@
+{{block "page_title" .}}Windows - Probakgo{{end}}
+{{block "page_heading" .}}Windows{{end}}
+{{block "page_content" .}}
+
+<div class="d-flex align-items-center gap-2 mb-3">
+  <div class="input-group input-group-sm filter-search" style="max-width:280px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" id="serverFilter" class="form-control form-control-sm" placeholder="Filtrar por nombre, IP o estado...">
+  </div>
+  <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
+</div>
+
+<div class="card">
+  <div class="card-body p-0" style="overflow-x:auto;border-radius:.75rem">
+    <table class="table table-hover mb-0" style="min-width:920px">
+      <thead>
+        <tr>
+          <th data-sort="0" style="cursor:pointer;user-select:none">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="1" style="cursor:pointer;user-select:none">Direccion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th>Cliente</th>
+          <th data-sort="3" style="cursor:pointer;user-select:none">Conexion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="4" style="cursor:pointer;user-select:none">Ultimo reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th>Discos</th>
+          <th data-sort="6" style="cursor:pointer;user-select:none">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody class="server-tbody">
+      {{range .Rows}}
+      <tr>
+        <td>
+          <a href="/servers/windows/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
+            {{.Server.DisplayName}}
+          </a>
+          {{if .ServerURL}}
+          <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1" title="Abrir servidor" style="color:var(--txt-muted);font-size:.8rem"><i class="bi bi-box-arrow-up-right"></i></a>
+          {{end}}
+          {{if .Server.MachineID}}
+          <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
+          {{end}}
+        </td>
+        <td>
+          <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
+          <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
+        </td>
+        <td><code>{{.Server.ClientVersion}}</code></td>
+        <td>
+          {{if .Heartbeat.Online}}<span class="status-pill ok" title="{{.Heartbeat.Label}}">Online</span>
+          {{else if .Heartbeat.Seen}}<span class="status-pill bad" title="{{.Heartbeat.Label}}">Offline</span>
+          {{else}}<span class="status-pill warn">Sin heartbeat</span>{{end}}
+        </td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">
+          {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}
+        </td>
+        <td style="font-size:.82rem">
+          {{range .Disks}}
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <span style="font-family:'DM Mono',monospace;color:var(--txt-primary);font-weight:500">{{.Name}}</span>
+            {{if .Label}}<span style="color:var(--txt-muted)">{{.Label}}</span>{{end}}
+            <span style="color:var(--txt-muted)">{{formatBytes .Used}} / {{formatBytes .Total}}</span>
+            <span class="status-pill {{.BadgeClass}}" title="{{.Title}}">{{.BadgeLabel}}</span>
+          </div>
+          {{else}}
+          <span style="color:var(--txt-muted)">-</span>
+          {{end}}
+        </td>
+        <td>
+          {{if .HasDiskAlert}}<span class="status-pill bad">{{.DiskSummary}}</span>
+          {{else}}<span class="status-pill ok">{{.DiskSummary}}</span>{{end}}
+        </td>
+        <td class="text-end" style="white-space:nowrap">
+          <a href="/servers/windows/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary" title="Ver detalle"><i class="bi bi-eye"></i></a>
+        </td>
+      </tr>
+      {{else}}
+      <tr class="empty-state-row"><td colspan="8">
+        <div class="p-4">
+          <div class="text-center mb-3" style="color:var(--txt-muted)"><i class="bi bi-windows" style="font-size:2rem"></i></div>
+          <p class="text-center fw-semibold mb-3" style="color:var(--txt-primary)">Sin servidores Windows registrados</p>
+          <p class="text-center mb-3" style="font-size:.83rem;color:var(--txt-muted)">El servidor se registra automaticamente cuando el cliente Windows envia su primer reporte.</p>
+          <div class="text-center"><a href="/api-keys" class="btn btn-sm btn-primary"><i class="bi bi-key me-1"></i>Crear API Key</a></div>
+        </div>
+      </td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{block "page_scripts" .}}
+<script>
+(function() {
+  const input = document.getElementById('serverFilter');
+  const tbody = document.querySelector('.server-tbody');
+  const countEl = document.getElementById('filterCount');
+  if (!input || !tbody) return;
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase();
+    let visible = 0;
+    tbody.querySelectorAll('tr:not(.empty-state-row)').forEach(row => {
+      const match = !q || row.textContent.toLowerCase().includes(q);
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    const total = tbody.querySelectorAll('tr:not(.empty-state-row)').length;
+    countEl.textContent = q ? `${visible} de ${total}` : '';
+  });
+})();
+
+(function() {
+  const tbody = document.querySelector('.server-tbody');
+  if (!tbody) return;
+  let sortCol = -1, sortAsc = true;
+  document.querySelectorAll('th[data-sort]').forEach(th => {
+    th.addEventListener('click', () => {
+      const col = parseInt(th.dataset.sort);
+      sortAsc = sortCol === col ? !sortAsc : true;
+      sortCol = col;
+      const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state-row)'));
+      rows.sort((a, b) => {
+        const av = a.cells[col]?.textContent.trim() || '';
+        const bv = b.cells[col]?.textContent.trim() || '';
+        return sortAsc ? av.localeCompare(bv, 'es') : bv.localeCompare(av, 'es');
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      document.querySelectorAll('th[data-sort] .sort-icon').forEach(i => { i.className = 'bi sort-icon'; });
+      th.querySelector('.sort-icon').className = `bi bi-caret-${sortAsc ? 'up' : 'down'}-fill sort-icon`;
+    });
+  });
+})();
+</script>
+{{end}}
+
+{{end}}

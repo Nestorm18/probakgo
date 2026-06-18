@@ -31,8 +31,14 @@ jobs:
             -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
             -o probakgo-client_linux_amd64 ./client/
 
+      - name: Build Windows client amd64
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
+            -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
+            -o probakgo-windows-client_windows_amd64.exe ./client-windows/
+
       - name: Create checksums
-        run: sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 > SHA256SUMS
+        run: sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 probakgo-windows-client_windows_amd64.exe > SHA256SUMS
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -41,4 +47,5 @@ jobs:
           files: |
             probakgo_linux_amd64
             probakgo-client_linux_amd64
+            probakgo-windows-client_windows_amd64.exe
             SHA256SUMS

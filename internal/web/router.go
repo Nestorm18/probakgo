@@ -47,6 +47,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	r.Get("/download/client/linux-amd64", h.DownloadClientLinuxAMD64)
+	r.Get("/download/client/windows-amd64", h.DownloadClientWindowsAMD64)
 
 	loginLimiter := ratelimit.New(10, time.Minute)
 	sensitive := RequireTOTPForSensitiveAction(st)
@@ -80,6 +81,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/servers/pbs/{id}", h.PBSServerDetail)
 		r.Get("/servers/pbs/{id}/reports/csv", h.PBSServerReportsCSV)
 		r.Get("/servers/pbs/{id}/reports/json", h.PBSServerReportsJSON)
+		r.Get("/servers/windows", h.WindowsServers)
+		r.Get("/servers/windows/{id}", h.WindowsServerDetail)
 		r.With(RequireEditor, sensitive).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
 		r.With(RequireEditor, sensitive).Post("/servers/pve/{id}/alerts/vm", h.PVEVMAlertConfigPost)
 		r.With(RequireEditor, sensitive).Post("/servers/pbs/{id}/alerts", h.PBSAlertConfigPost)

@@ -228,7 +228,7 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 	days, _ := strconv.Atoi(r.FormValue("days"))
 	reason := r.FormValue("reason")
 	if len(alertIDs) == 0 || days <= 0 {
-		http.Redirect(w, r, "/alerts", http.StatusSeeOther)
+		http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
 		return
 	}
 	until := time.Now().Add(time.Duration(days) * 24 * time.Hour)
@@ -241,7 +241,7 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "suppressed", reason))
 	}
-	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
+	http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
 }
 
 func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
@@ -255,7 +255,15 @@ func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "unsuppressed", ""))
 	}
-	http.Redirect(w, r, "/alerts", http.StatusSeeOther)
+	http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
+}
+
+func alertRedirectBack(r *http.Request) string {
+	back := strings.TrimSpace(r.FormValue("back"))
+	if back == "" || !strings.HasPrefix(back, "/") || strings.HasPrefix(back, "//") || strings.Contains(back, "\n") || strings.Contains(back, "\r") {
+		return "/alerts"
+	}
+	return back
 }
 
 func (h *WebH) alertMap(ctx context.Context) map[string]domain.Alert {
@@ -325,6 +333,10 @@ func (h *WebH) alertFromSuppressionID(ctx context.Context, alertID string) domai
 		if sv, err := h.store.GetPBSServer(ctx, a.ServerID); err == nil {
 			a.ServerName = sv.DisplayName
 		}
+	case "windows":
+		if sv, err := h.store.GetWindowsServer(ctx, a.ServerID); err == nil {
+			a.ServerName = sv.DisplayName
+		}
 	}
 	if a.ServerName == "" {
 		a.ServerName = a.ServerType + " " + strconv.FormatInt(a.ServerID, 10)
@@ -358,6 +370,10 @@ func alertTitleFromID(alertID string) string {
 		return "VM no configurada"
 	case domain.AlertTypeSwap:
 		return "Swap activa"
+	case domain.AlertTypeWindowsHeartbeat:
+		return "Servidor offline"
+	case domain.AlertTypeWindowsDiskHealth:
+		return "Salud de disco"
 	default:
 		return "Alerta suprimida"
 	}

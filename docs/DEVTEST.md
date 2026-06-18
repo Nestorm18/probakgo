@@ -28,6 +28,12 @@ go build -o probakgo .
 # Cliente
 go build -o probakgo-client ./client/
 
+# Cliente Windows
+$env:GOOS = "windows"
+$env:GOARCH = "amd64"
+$env:CGO_ENABLED = "0"
+go build -o probakgo-windows-client.exe ./client-windows/
+
 # Restaurar entorno tras compilar
 Remove-Item Env:GOOS
 Remove-Item Env:GOARCH
@@ -43,6 +49,8 @@ scp probakgo root@192.168.10.222:/tmp/probakgo
 # Cliente → nodo Proxmox
 scp probakgo-client root@192.168.10.230:/tmp/probakgo-client
 ```
+
+El cliente Windows se prueba directamente en una maquina Windows con PowerShell como administrador.
 
 En la VM Debian, crear el directorio, mover y dar permisos:
 
@@ -101,6 +109,8 @@ En la web UI:
 3. **Nombre:** identifica el nodo, ej. `pve-lab`
 4. Copiar la clave generada - **sólo se muestra una vez**
 
+La pantalla de key creada muestra pestanas para **Linux / Proxmox** y **Windows**. Usa la pestana que corresponda al tipo de cliente.
+
 ---
 
 ### Token GitHub para repo privado
@@ -143,6 +153,30 @@ El subcomando `install` hace automáticamente:
 5. Registra el hook vzdump en `/etc/vzdump.conf`
 6. Configura logrotate
 7. Instala cron de auto-update en `/etc/cron.d/probakgo-client`
+
+---
+
+## 4b. Cliente Windows
+
+En una maquina Windows, abre PowerShell como administrador:
+
+```powershell
+.\probakgo-windows-client.exe install --api-url http://<ip-vm-servidor>:36748 --api-key pbk-<clave-creada-arriba>
+```
+
+Verifica tarea y logs:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
+schtasks /Query /TN "Probakgo Windows Report"
+Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
+```
+
+Para forzar un envio manual:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe
+```
 
 ---
 

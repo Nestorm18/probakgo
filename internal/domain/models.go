@@ -164,6 +164,40 @@ type PVEBackupTask struct {
 	Filename  string `db:"filename"`
 }
 
+type WindowsServer struct {
+	ID            int64     `db:"id"`
+	Name          string    `db:"name"`
+	DisplayName   string    `db:"display_name"`
+	IP            string    `db:"ip"`
+	PublicIP      string    `db:"public_ip"`
+	ClientVersion string    `db:"client_version"`
+	MachineID     string    `db:"machine_id"`
+	APIKeyID      int64     `db:"api_key_id"`
+	IsDeleted     bool      `db:"is_deleted"`
+	CreatedAt     time.Time `db:"created_at"`
+	UpdatedAt     time.Time `db:"updated_at"`
+}
+
+type WindowsReport struct {
+	ID         int64     `db:"id"`
+	ServerID   int64     `db:"server_id"`
+	ReportedAt time.Time `db:"reported_at"`
+	IsStale    bool      `db:"is_stale"`
+}
+
+type WindowsDisk struct {
+	ID         int64  `db:"id"`
+	ReportID   int64  `db:"report_id"`
+	Name       string `db:"name"`
+	Label      string `db:"label"`
+	FileSystem string `db:"file_system"`
+	DriveType  string `db:"drive_type"`
+	Total      int64  `db:"total"`
+	Used       int64  `db:"used"`
+	Free       int64  `db:"free"`
+	Health     string `db:"health"`
+}
+
 type ServerHeartbeat struct {
 	ID            int64     `db:"id"`
 	ServerType    string    `db:"server_type"`
@@ -273,7 +307,7 @@ type Alert struct {
 	ID         string // dedup key: "type:serverType:serverID:store:vmid"
 	ServerName string
 	ServerID   int64
-	ServerType string // "pve" | "pbs"
+	ServerType string // "pve" | "pbs" | "windows"
 	StoreName  string // empty if server-level
 	VMID       int64  // 0 if not applicable
 	VMName     string
@@ -304,18 +338,20 @@ type AlertStateEvent struct {
 }
 
 const (
-	AlertTypeDisk           = "disk"
-	AlertTypeBackupError    = "backup_error"
-	AlertTypeBackupSize     = "backup_size"
-	AlertTypePBSFill        = "pbs_fill"
-	AlertTypePBSStale       = "pbs_stale"
-	AlertTypePBSVerify      = "pbs_verify"
-	AlertTypePVEStale       = "pve_stale"
-	AlertTypePVEHeartbeat   = "pve_heartbeat"
-	AlertTypePBSReportStale = "pbs_report_stale"
-	AlertTypePVEMissingVM   = "pve_missing_vm"
-	AlertTypePVEUnknownVM   = "pve_unknown_vm"
-	AlertTypeSwap           = "swap"
+	AlertTypeDisk              = "disk"
+	AlertTypeBackupError       = "backup_error"
+	AlertTypeBackupSize        = "backup_size"
+	AlertTypePBSFill           = "pbs_fill"
+	AlertTypePBSStale          = "pbs_stale"
+	AlertTypePBSVerify         = "pbs_verify"
+	AlertTypePVEStale          = "pve_stale"
+	AlertTypePVEHeartbeat      = "pve_heartbeat"
+	AlertTypePBSReportStale    = "pbs_report_stale"
+	AlertTypePVEMissingVM      = "pve_missing_vm"
+	AlertTypePVEUnknownVM      = "pve_unknown_vm"
+	AlertTypeSwap              = "swap"
+	AlertTypeWindowsHeartbeat  = "windows_heartbeat"
+	AlertTypeWindowsDiskHealth = "windows_disk_health"
 )
 
 const (

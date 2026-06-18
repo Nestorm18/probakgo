@@ -25,8 +25,9 @@ jobs:
         run: |
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
-          if [ "$SERVER_VER" != "$CLIENT_VER" ]; then
-            echo "ERROR: server version ($SERVER_VER) != client version ($CLIENT_VER) - keep them in sync"
+          WINDOWS_CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client-windows/main.go)
+          if [ "$SERVER_VER" != "$CLIENT_VER" ] || [ "$SERVER_VER" != "$WINDOWS_CLIENT_VER" ]; then
+            echo "ERROR: server version ($SERVER_VER), client version ($CLIENT_VER), windows client version ($WINDOWS_CLIENT_VER) - keep them in sync"
             exit 1
           fi
           echo "Version sync OK: $SERVER_VER"
@@ -48,17 +49,19 @@ jobs:
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "")
           if [ -n "$LATEST_TAG" ] && [ "$SERVER_VER" = "$LATEST_TAG" ]; then
-            echo "ERROR: version $SERVER_VER already released - bump var version in main.go and client/main.go before pushing to master"
+            echo "ERROR: version $SERVER_VER already released - bump var version in main.go, client/main.go and client-windows/main.go before pushing to master"
             exit 1
           fi
 
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo_linux_amd64 .
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo-client_linux_amd64 ./client/
-          sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 > SHA256SUMS
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo-windows-client_windows_amd64.exe ./client-windows/
+          sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 probakgo-windows-client_windows_amd64.exe > SHA256SUMS
 
           gh release create "v$SERVER_VER" \
             --generate-notes \
             probakgo_linux_amd64 \
             probakgo-client_linux_amd64 \
+            probakgo-windows-client_windows_amd64.exe \
             SHA256SUMS
           echo "Released v$SERVER_VER"

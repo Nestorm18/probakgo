@@ -563,6 +563,242 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, role, _ := session.GetUser(r)
+	servers, err := h.store.ListWindowsServers(ctx)
+	if err != nil {
+		slog.Error("list windows servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	emailCfg, _ := h.store.GetEmailConfig(ctx)
+	diskThreshold := 90
+	heartbeatThreshold := 15
+	if emailCfg != nil {
+		diskThreshold = emailCfg.AlertDiskPct
+		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	reports, _ := h.store.GetLatestWindowsReports(ctx)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, rep := range reports {
+		reportIDs = append(reportIDs, rep.ID)
+	}
+	disksByReport, _ := h.store.GetWindowsDisksForReports(ctx, reportIDs)
+	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
+	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+
+	var rows []map[string]any
+	for _, sv := range servers {
+		rep := reports[sv.ID]
+		disks := []domain.WindowsDisk(nil)
+		if rep != nil {
+			disks = disksByReport[rep.ID]
+		}
+		rows = append(rows, map[string]any{
+			"Server":       sv,
+			"LastReport":   windowsReportTime(rep),
+			"Disks":        windowsDiskDisplays(disks, diskThreshold),
+			"DiskSummary":  windowsDiskSummary(disks, diskThreshold),
+			"Heartbeat":    buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
+			"ServerURL":    serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"HasDiskAlert": windowsHasDiskAlert(disks, diskThreshold),
+		})
+	}
+	h.tmpl.Render(w, r, "servers_windows.html", map[string]any{
+		"Username": username,
+		"Role":     role,
+		"Rows":     rows,
+		"Flash":    r.URL.Query().Get("flash"),
+		"FlashOK":  r.URL.Query().Get("ok") == "1",
+	})
+}
+
+func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, role, _ := session.GetUser(r)
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	sv, err := h.store.GetWindowsServer(ctx, id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	reports, _ := h.store.ListWindowsReports(ctx, id, 14)
+	emailCfg, _ := h.store.GetEmailConfig(ctx)
+	diskThreshold := 90
+	heartbeatThreshold := 15
+	if emailCfg != nil {
+		diskThreshold = emailCfg.AlertDiskPct
+		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	var disks []domain.WindowsDisk
+	if len(reports) > 0 {
+		disks, _ = h.store.GetWindowsDisksForReport(ctx, reports[0].ID)
+	}
+	hb, _ := h.store.GetServerHeartbeat(ctx, "windows", id)
+	heartbeat := domain.ServerHeartbeat{}
+	if hb != nil {
+		heartbeat = *hb
+	}
+	diskRows := windowsDiskDisplays(disks, diskThreshold)
+	backURL := fmt.Sprintf("/servers/windows/%d", sv.ID)
+	suppressions, _ := h.store.GetActiveSuppressions(ctx)
+	alertControls := windowsAlertControls(sv.ID, diskRows, suppressions)
+	h.tmpl.Render(w, r, "server_windows_detail.html", map[string]any{
+		"Username":      username,
+		"Role":          role,
+		"Server":        sv,
+		"Reports":       reports,
+		"Disks":         diskRows,
+		"DiskThreshold": diskThreshold,
+		"Heartbeat":     buildHeartbeatView(heartbeat, heartbeatThreshold),
+		"AlertControls": alertControls,
+		"AllAlertIDs":   windowsAlertControlIDs(alertControls),
+		"BackURL":       backURL,
+	})
+}
+
+type windowsDiskDisplay struct {
+	domain.WindowsDisk
+	UsedPct    int
+	BadgeClass string
+	BadgeLabel string
+	Title      string
+}
+
+type windowsAlertControl struct {
+	ID         string
+	Title      string
+	Detail     string
+	Suppressed bool
+	Until      time.Time
+}
+
+func windowsReportTime(rep *domain.WindowsReport) *time.Time {
+	if rep == nil {
+		return nil
+	}
+	return &rep.ReportedAt
+}
+
+func windowsDiskDisplays(disks []domain.WindowsDisk, threshold int) []windowsDiskDisplay {
+	rows := make([]windowsDiskDisplay, 0, len(disks))
+	for _, disk := range disks {
+		if !isWindowsLogicalDisk(disk) {
+			continue
+		}
+		pct := 0
+		if disk.Total > 0 {
+			pct = int(float64(disk.Used) / float64(disk.Total) * 100)
+		}
+		row := windowsDiskDisplay{
+			WindowsDisk: disk,
+			UsedPct:     pct,
+			BadgeClass:  "ok",
+			BadgeLabel:  fmt.Sprintf("%d%%", pct),
+			Title:       fmt.Sprintf("%s usado de %s", domain.FormatBytes(disk.Used), domain.FormatBytes(disk.Total)),
+		}
+		if threshold > 0 && pct >= threshold {
+			row.BadgeClass = "bad"
+		} else if pct >= 85 {
+			row.BadgeClass = "warn"
+		}
+		if !windowsDiskHealthOK(disk.Health) {
+			row.BadgeClass = "bad"
+			row.BadgeLabel = disk.Health
+			row.Title = "Estado del disco: " + disk.Health
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+func windowsDiskSummary(disks []domain.WindowsDisk, threshold int) string {
+	disks = windowsLogicalDisks(disks)
+	if len(disks) == 0 {
+		return "Sin discos"
+	}
+	if windowsHasDiskAlert(disks, threshold) {
+		return "Revisar discos"
+	}
+	return "Discos OK"
+}
+
+func windowsHasDiskAlert(disks []domain.WindowsDisk, threshold int) bool {
+	for _, disk := range disks {
+		if !isWindowsLogicalDisk(disk) {
+			continue
+		}
+		if !windowsDiskHealthOK(disk.Health) {
+			return true
+		}
+		if threshold > 0 && disk.Total > 0 && int(float64(disk.Used)/float64(disk.Total)*100) >= threshold {
+			return true
+		}
+	}
+	return false
+}
+
+func windowsDiskHealthOK(health string) bool {
+	health = strings.TrimSpace(strings.ToLower(health))
+	return health == "" || health == "ok" || health == "healthy" || health == "normal"
+}
+
+func windowsLogicalDisks(disks []domain.WindowsDisk) []domain.WindowsDisk {
+	out := make([]domain.WindowsDisk, 0, len(disks))
+	for _, disk := range disks {
+		if isWindowsLogicalDisk(disk) {
+			out = append(out, disk)
+		}
+	}
+	return out
+}
+
+func isWindowsLogicalDisk(disk domain.WindowsDisk) bool {
+	name := strings.TrimSpace(disk.Name)
+	driveType := strings.TrimSpace(strings.ToLower(disk.DriveType))
+	if driveType != "" && driveType != "fixed" {
+		return false
+	}
+	return len(name) == 2 && name[1] == ':' && ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'))
+}
+
+func windowsAlertControls(serverID int64, disks []windowsDiskDisplay, suppressions map[string]time.Time) []windowsAlertControl {
+	rows := []windowsAlertControl{
+		windowsAlertControlFromID(fmt.Sprintf("windows_heartbeat:windows:%d", serverID), "Conexión", "Servidor Windows sin heartbeat", suppressions),
+	}
+	for _, disk := range disks {
+		rows = append(rows,
+			windowsAlertControlFromID(fmt.Sprintf("disk:windows:%d:%s", serverID, disk.Name), "Disco lleno "+disk.Name, "Uso de disco por encima del umbral global", suppressions),
+			windowsAlertControlFromID(fmt.Sprintf("windows_disk_health:windows:%d:%s", serverID, disk.Name), "Salud "+disk.Name, "Estado SMART/salud de la unidad", suppressions),
+		)
+	}
+	return rows
+}
+
+func windowsAlertControlFromID(id, title, detail string, suppressions map[string]time.Time) windowsAlertControl {
+	until, suppressed := suppressions[id]
+	return windowsAlertControl{
+		ID:         id,
+		Title:      title,
+		Detail:     detail,
+		Suppressed: suppressed,
+		Until:      until,
+	}
+}
+
+func windowsAlertControlIDs(rows []windowsAlertControl) string {
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	return strings.Join(ids, ",")
+}
+
 func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

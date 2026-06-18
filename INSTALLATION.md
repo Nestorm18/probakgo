@@ -268,3 +268,34 @@ systemctl restart probakgo
 cat /var/log/probakgo-client.log
 /opt/probakgo/probakgo-client --debug --debug-api-calls --vzdump-hook
 ```
+
+---
+
+## Cliente Windows
+
+El cliente Windows monitoriza discos y heartbeat. Usa API key `pbk-`, se instala en `C:\ProgramData\Probakgo` y se ejecuta con la tarea programada `Probakgo Windows Report` cada 5 minutos.
+
+En la pantalla **API Keys -> Nueva API Key**, despues de crear la key, usa la pestana **Windows**.
+
+Instalacion desde PowerShell como administrador:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-windows-client_windows_amd64.exe" -OutFile "$env:TEMP\probakgo-windows-client.exe"
+& "$env:TEMP\probakgo-windows-client.exe" install --api-url http://<ip-servidor>:36748 --api-key pbk-<tu-clave>
+```
+
+El instalador copia el binario, escribe `.env`, crea la tarea programada y deja logs persistentes. El archivo activo es `C:\ProgramData\Probakgo\probakgo-windows-client.log`; al cambiar de dia se archiva como `probakgo-windows-client-YYYY-MM-DD.log` y se conservan solo los ultimos 7 dias.
+
+Diagnostico:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
+schtasks /Query /TN "Probakgo Windows Report"
+Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 100
+```
+
+Si no aparece en la web, ejecuta manualmente:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe
+```

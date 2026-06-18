@@ -1,12 +1,21 @@
 # TODO - Probakgo
 
-## V2 - Windows Server / sistemas no Proxmox
+## V2 - Windows Server
 
-- Agente para Windows Server o similar usando la misma filosofia que el cliente actual: instalador simple, `.env`, API key, heartbeat y auto-update.
-- Objetivo principal: monitorizar estado de discos fisicos/logicos, salud SMART si esta disponible y espacio libre.
-- Monitorizar hostname, IP publica/local, version del agente y ultimo heartbeat.
+- Hecho: agente Windows separado en `client-windows/` con instalador simple, `.env`, API key, heartbeat/report cada 5 minutos y logs locales.
+- Hecho: monitorizar estado de discos fisicos/logicos, salud SMART si esta disponible y espacio libre.
+- Hecho: monitorizar hostname, IP publica/local, version del agente y ultimo heartbeat.
+- Hecho: vista web propia para Windows con columnas centradas en discos.
+- Hecho: alertas basicas de heartbeat, disco y SMART.
+- Hecho: comando `doctor` y logs rotados a diario en `C:\ProgramData\Probakgo` conservando 7 dias.
+- Pendiente: auto-update especifico del cliente Windows.
+- Pendiente: comprobar si conviene instalarlo como servicio ademas de tarea programada.
 - RAM y CPU quedan fuera del alcance inicial; Proxmox ya cubre ese diagnostico cuando hay algo raro.
-- Enviar alertas si no hay heartbeat, si un disco falla, si SMART avisa o si un volumen se queda sin espacio.
-- Vista web separada o unificada por tipo de cliente para distinguir PVE, PBS y Windows/servidor generico.
-- Instalacion como servicio de Windows, con logs locales y comando `doctor` equivalente para diagnostico.
-- Disenar primero el modelo de datos para que tambien sirva a otros servidores no Proxmox en el futuro.
+- Pendiente: alerta de volumen no detectado desde el ultimo reporte.
+- Pendiente: ampliar `doctor` para comprobar conectividad real con Probakgo/API key y permisos WMI/PowerShell.
+
+## V2 - Servidores genericos no Proxmox
+
+- Disenar primero el modelo de datos para que Windows no quede como caso cerrado y pueda servir a otros servidores en el futuro.
+- Mantener el alcance pequeno: heartbeat, identidad del host, discos y alertas basicas.
+- Evitar monitorizar CPU/RAM/procesos salvo que aparezca una necesidad real.

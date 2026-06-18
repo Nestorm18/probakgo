@@ -107,6 +107,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 
 	pveServer := domain.PVEServer{ID: 1, Name: "pve-1", IP: "10.0.0.1", PublicIP: "203.0.113.10", ClientVersion: "test"}
 	pbsServer := domain.PBSServer{ID: 2, Name: "pbs-1", IP: "10.0.0.2", PublicIP: "203.0.113.11", ClientVersion: "test"}
+	windowsServer := domain.WindowsServer{ID: 3, Name: "win-1", DisplayName: "win-1", IP: "10.0.0.3", PublicIP: "203.0.113.12", ClientVersion: "test"}
 	emailConfig := domain.EmailConfig{
 		SMTPHost:                 "smtp.example.test",
 		SMTPPort:                 587,
@@ -169,13 +170,17 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Configs":    []domain.VMBackupConfig{},
 		}),
 		"dashboard.html": base(map[string]any{
-			"PVEOk":           1,
-			"PVEBackupErrors": 0,
-			"PVEStale":        0,
-			"PBSOk":           1,
-			"PBSStale":        0,
-			"PVERows":         []map[string]any{},
-			"PBSRows":         []map[string]any{},
+			"PVEOk":             1,
+			"PVEBackupErrors":   0,
+			"PVEStale":          0,
+			"PBSOk":             1,
+			"PBSStale":          0,
+			"WindowsOK":         1,
+			"WindowsDiskAlerts": 0,
+			"WindowsOffline":    0,
+			"PVERows":           []map[string]any{},
+			"PBSRows":           []map[string]any{},
+			"WindowsRows":       []map[string]any{},
 		}),
 		"email_settings.html":       base(map[string]any{"Config": emailConfig}),
 		"ip_bans.html":              base(map[string]any{"Bans": []map[string]any{}, "LoginAttempts": []domain.LoginAttempt{}}),
@@ -217,10 +222,29 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"JobHistory":      []map[string]any{},
 			"Reports":         []domain.PVEReport{},
 		}),
+		"server_windows_detail.html": base(map[string]any{
+			"Server":    windowsServer,
+			"Role":      "admin",
+			"Heartbeat": heartbeatView{Seen: true, Online: true, Label: "Online", CSSClass: "ok", LastSeen: now},
+			"Disks": []windowsDiskDisplay{{
+				WindowsDisk: domain.WindowsDisk{Name: "C:", Label: "System", FileSystem: "NTFS", Total: 1000, Used: 500, Free: 500},
+				UsedPct:     50,
+				BadgeClass:  "ok",
+				BadgeLabel:  "50%",
+				Title:       "test",
+			}},
+			"Reports":       []domain.WindowsReport{{ID: 1, ServerID: 3, ReportedAt: now}},
+			"AlertControls": []windowsAlertControl{{ID: "windows_heartbeat:windows:3", Title: "Conexión", Detail: "Servidor Windows sin heartbeat"}},
+			"AllAlertIDs":   "windows_heartbeat:windows:3",
+			"BackURL":       "/servers/windows/3",
+		}),
 		"servers_pbs.html": base(map[string]any{
 			"Rows": []map[string]any{},
 		}),
 		"servers_pve.html": base(map[string]any{
+			"Rows": []map[string]any{},
+		}),
+		"servers_windows.html": base(map[string]any{
 			"Rows": []map[string]any{},
 		}),
 		"settings_hub.html": base(map[string]any{

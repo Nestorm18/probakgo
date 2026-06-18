@@ -27,6 +27,9 @@ func (s *Store) HardDeleteServerData(ctx context.Context, serverName string) err
 	if err := hardDeletePBS(ctx, tx, serverName); err != nil {
 		return err
 	}
+	if err := hardDeleteWindows(ctx, tx, serverName); err != nil {
+		return err
+	}
 
 	return tx.Commit()
 }
@@ -48,11 +51,18 @@ func (s *Store) HardDeleteServerDataForAPIKey(ctx context.Context, apiKeyID int6
 	if err != nil {
 		return err
 	}
-	if !deletedPVE && !deletedPBS && fallbackName != "" {
+	deletedWindows, err := hardDeleteWindowsByAPIKey(ctx, tx, apiKeyID)
+	if err != nil {
+		return err
+	}
+	if !deletedPVE && !deletedPBS && !deletedWindows && fallbackName != "" {
 		if err := hardDeletePVE(ctx, tx, fallbackName); err != nil {
 			return err
 		}
 		if err := hardDeletePBS(ctx, tx, fallbackName); err != nil {
+			return err
+		}
+		if err := hardDeleteWindows(ctx, tx, fallbackName); err != nil {
 			return err
 		}
 	} else if fallbackName != "" {
@@ -60,6 +70,9 @@ func (s *Store) HardDeleteServerDataForAPIKey(ctx context.Context, apiKeyID int6
 			return err
 		}
 		if err := hardDeleteLegacyPBS(ctx, tx, fallbackName); err != nil {
+			return err
+		}
+		if err := hardDeleteLegacyWindows(ctx, tx, fallbackName); err != nil {
 			return err
 		}
 	}
@@ -213,6 +226,75 @@ func pbsServerIDsByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) ([]i
 
 func legacyPBSServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
 	return serverIDs(ctx, tx, `SELECT id FROM pbs_servers WHERE name = ? AND api_key_id IS NULL`, serverName)
+}
+
+func hardDeleteWindows(ctx context.Context, tx txRunner, serverName string) error {
+	ids, err := windowsServerIDsByName(ctx, tx, serverName)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := hardDeleteWindowsByID(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func hardDeleteWindowsByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) (bool, error) {
+	ids, err := windowsServerIDsByAPIKey(ctx, tx, apiKeyID)
+	if err != nil {
+		return false, err
+	}
+	for _, id := range ids {
+		if err := hardDeleteWindowsByID(ctx, tx, id); err != nil {
+			return false, err
+		}
+	}
+	return len(ids) > 0, nil
+}
+
+func hardDeleteLegacyWindows(ctx context.Context, tx txRunner, serverName string) error {
+	ids, err := legacyWindowsServerIDsByName(ctx, tx, serverName)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if err := hardDeleteWindowsByID(ctx, tx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func hardDeleteWindowsByID(ctx context.Context, tx txRunner, id int64) error {
+	steps := []string{
+		`DELETE FROM server_heartbeats WHERE server_type = 'windows' AND server_id = ?`,
+		`DELETE FROM windows_disks WHERE report_id IN (SELECT id FROM windows_reports WHERE server_id = ?)`,
+		`DELETE FROM windows_reports WHERE server_id = ?`,
+		`DELETE FROM windows_servers WHERE id = ?`,
+	}
+	for _, stmt := range steps {
+		if _, err := tx.ExecContext(ctx, stmt, id); err != nil {
+			return fmt.Errorf("windows delete %q: %w", stmt, err)
+		}
+	}
+	if err := deleteAlertSuppressionsForServer(ctx, tx, "windows", id); err != nil {
+		return err
+	}
+	return nil
+}
+
+func windowsServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
+	return serverIDs(ctx, tx, `SELECT id FROM windows_servers WHERE name = ?`, serverName)
+}
+
+func windowsServerIDsByAPIKey(ctx context.Context, tx txRunner, apiKeyID int64) ([]int64, error) {
+	return serverIDs(ctx, tx, `SELECT id FROM windows_servers WHERE api_key_id = ?`, apiKeyID)
+}
+
+func legacyWindowsServerIDsByName(ctx context.Context, tx txRunner, serverName string) ([]int64, error) {
+	return serverIDs(ctx, tx, `SELECT id FROM windows_servers WHERE name = ? AND api_key_id IS NULL`, serverName)
 }
 
 func serverIDs(ctx context.Context, tx txRunner, query string, arg any) ([]int64, error) {

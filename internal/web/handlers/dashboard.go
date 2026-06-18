@@ -29,6 +29,12 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	windowsServers, err := h.store.ListWindowsServers(ctx)
+	if err != nil {
+		slog.Error("list windows servers", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
 
 	pveReports, err := h.store.GetLatestPVEReports(ctx)
 	if err != nil {
@@ -114,19 +120,76 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		pbsRows = append(pbsRows, row)
 	}
 
+	emailCfg, _ := h.store.GetEmailConfig(ctx)
+	diskThreshold := 90
+	heartbeatThreshold := 15
+	if emailCfg != nil {
+		diskThreshold = emailCfg.AlertDiskPct
+		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	windowsReports, err := h.store.GetLatestWindowsReports(ctx)
+	if err != nil {
+		slog.Error("list latest windows reports", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	windowsReportIDs := make([]int64, 0, len(windowsReports))
+	for _, rep := range windowsReports {
+		windowsReportIDs = append(windowsReportIDs, rep.ID)
+	}
+	windowsDisks, err := h.store.GetWindowsDisksForReports(ctx, windowsReportIDs)
+	if err != nil {
+		slog.Error("list windows disks", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	windowsHeartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
+	var windowsOK, windowsOffline, windowsDiskAlerts int
+	var windowsRows []map[string]any
+	for _, sv := range windowsServers {
+		rep := windowsReports[sv.ID]
+		disks := []domain.WindowsDisk(nil)
+		if rep != nil {
+			disks = windowsDisks[rep.ID]
+		}
+		heartbeat := buildHeartbeatView(windowsHeartbeats[sv.ID], heartbeatThreshold)
+		diskAlert := windowsHasDiskAlert(disks, diskThreshold)
+		if !heartbeat.Online {
+			windowsOffline++
+		} else if diskAlert {
+			windowsDiskAlerts++
+		} else {
+			windowsOK++
+		}
+		row := map[string]any{
+			"Server":       sv,
+			"Heartbeat":    heartbeat,
+			"HasDiskAlert": diskAlert,
+			"DiskSummary":  windowsDiskSummary(disks, diskThreshold),
+		}
+		if rep != nil {
+			row["LastReport"] = rep.ReportedAt
+		}
+		windowsRows = append(windowsRows, row)
+	}
+
 	alertCritical, alertWarning := service.ActiveAlertCounts(ctx, h.store, h.report)
 	h.tmpl.Render(w, r, "dashboard.html", map[string]any{
-		"Username":        username,
-		"Role":            role,
-		"AlertCritical":   alertCritical,
-		"AlertWarning":    alertWarning,
-		"PVERows":         pveRows,
-		"PBSRows":         pbsRows,
-		"PVEOk":           pveOK,
-		"PVEStale":        pveStale,
-		"PVEBackupErrors": len(pveBackupErrors),
-		"PBSOk":           pbsOK,
-		"PBSStale":        pbsStale,
+		"Username":          username,
+		"Role":              role,
+		"AlertCritical":     alertCritical,
+		"AlertWarning":      alertWarning,
+		"PVERows":           pveRows,
+		"PBSRows":           pbsRows,
+		"WindowsRows":       windowsRows,
+		"PVEOk":             pveOK,
+		"PVEStale":          pveStale,
+		"PVEBackupErrors":   len(pveBackupErrors),
+		"PBSOk":             pbsOK,
+		"PBSStale":          pbsStale,
+		"WindowsOK":         windowsOK,
+		"WindowsOffline":    windowsOffline,
+		"WindowsDiskAlerts": windowsDiskAlerts,
 	})
 }
 
