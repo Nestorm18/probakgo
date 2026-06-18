@@ -47,6 +47,7 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireServerKey).Post("/heartbeat", h.Heartbeat)
 	r.With(s.requireServerKey).Post("/report/pve", h.ReportPVE)
 	r.With(s.requireServerKey).Post("/report/pbs", h.ReportPBS)
+	r.With(s.requireServerKey).Post("/report/windows", h.ReportWindows)
 
 	r.With(s.requireServerKey).Get("/auth/verify", h.VerifyKey)
 	r.With(s.requireServerKey).Get("/servers/pve", h.ListPVEServers)

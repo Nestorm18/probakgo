@@ -22,13 +22,21 @@ type githubLatestRelease struct {
 }
 
 func (h *WebH) DownloadClientLinuxAMD64(w http.ResponseWriter, r *http.Request) {
+	h.downloadReleaseAsset(w, r, "probakgo-client_linux_amd64", "probakgo-client")
+}
+
+func (h *WebH) DownloadClientWindowsAMD64(w http.ResponseWriter, r *http.Request) {
+	h.downloadReleaseAsset(w, r, "probakgo-windows-client_windows_amd64.exe", "probakgo-windows-client.exe")
+}
+
+func (h *WebH) downloadReleaseAsset(w http.ResponseWriter, r *http.Request, assetName, filename string) {
 	token := githubDownloadToken(r)
 	if token == "" {
 		http.Error(w, "GitHub token requerido", http.StatusUnauthorized)
 		return
 	}
 
-	assetID, err := latestAssetID(r, token, "probakgo-client_linux_amd64")
+	assetID, err := latestAssetID(r, token, assetName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
@@ -55,7 +63,7 @@ func (h *WebH) DownloadClientLinuxAMD64(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="probakgo-client"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 	_, _ = io.Copy(w, resp.Body)
 }
 

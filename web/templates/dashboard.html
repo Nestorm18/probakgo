@@ -19,9 +19,9 @@
 {{end}}
 
 <!-- Stat cards -->
-<div class="row g-3 mb-4">
-  <div class="col-6 col-xl-2">
-    <div class="stat-card">
+<div class="row g-3 mb-4 dashboard-stat-grid">
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
       <div class="stat-icon ok"><i class="bi bi-check-circle-fill"></i></div>
       <div>
         <div class="stat-value">{{.PVEOk}}</div>
@@ -29,10 +29,10 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-xl-2">
-    <a href="/alerts" class="text-decoration-none">
-      <div class="stat-card">
-        <div class="stat-icon bad"><i class="bi bi-x-octagon-fill"></i></div>
+  <div class="col-6 col-md-3">
+    <a href="/alerts" class="text-decoration-none d-block h-100">
+      <div class="stat-card h-100">
+        <div class="stat-icon {{if gt .PVEBackupErrors 0}}bad{{else}}ok{{end}}"><i class="bi bi-x-octagon-fill"></i></div>
         <div>
           <div class="stat-value">{{.PVEBackupErrors}}</div>
           <div class="stat-label">PVE Backup error</div>
@@ -40,17 +40,17 @@
       </div>
     </a>
   </div>
-  <div class="col-6 col-xl-2">
-    <div class="stat-card">
-      <div class="stat-icon bad"><i class="bi bi-exclamation-circle-fill"></i></div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon {{if gt .PVEStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-circle-fill"></i></div>
       <div>
         <div class="stat-value">{{.PVEStale}}</div>
         <div class="stat-label">PVE Sin reporte</div>
       </div>
     </div>
   </div>
-  <div class="col-6 col-xl-3">
-    <div class="stat-card">
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
       <div class="stat-icon ok"><i class="bi bi-archive-fill"></i></div>
       <div>
         <div class="stat-value">{{.PBSOk}}</div>
@@ -58,12 +58,39 @@
       </div>
     </div>
   </div>
-  <div class="col-6 col-xl-3">
-    <div class="stat-card">
-      <div class="stat-icon bad"><i class="bi bi-exclamation-triangle-fill"></i></div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon {{if gt .PBSStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-triangle-fill"></i></div>
       <div>
         <div class="stat-value">{{.PBSStale}}</div>
         <div class="stat-label">PBS Sin reporte</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon ok"><i class="bi bi-windows"></i></div>
+      <div>
+        <div class="stat-value">{{.WindowsOK}}</div>
+        <div class="stat-label">Windows OK</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon {{if gt .WindowsDiskAlerts 0}}bad{{else}}ok{{end}}"><i class="bi bi-hdd-fill"></i></div>
+      <div>
+        <div class="stat-value">{{.WindowsDiskAlerts}}</div>
+        <div class="stat-label">Windows Disco</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="stat-card h-100">
+      <div class="stat-icon {{if gt .WindowsOffline 0}}bad{{else}}ok{{end}}"><i class="bi bi-wifi-off"></i></div>
+      <div>
+        <div class="stat-value">{{.WindowsOffline}}</div>
+        <div class="stat-label">Windows Offline</div>
       </div>
     </div>
   </div>
@@ -131,6 +158,38 @@
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>
             <span class="status-pill {{.FillClass}}" style="font-size:.68rem">{{.FillLabel}}</span>{{end}}
             {{if .Swap.Enabled}}<span class="status-pill bad" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
+            {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
+          </div>
+          <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>
+        </a>
+        {{else}}
+        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-windows me-2" style="color:var(--clr-accent)"></i>Windows</span>
+        <a href="/servers/windows" class="btn btn-sm btn-secondary">Ver todos</a>
+      </div>
+      <div style="border-radius:0 0 .75rem .75rem;overflow:hidden">
+        {{range .WindowsRows}}
+        <a href="/servers/windows/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
+          <div class="server-row-icon">
+            <i class="bi bi-windows"></i>
+          </div>
+          <div class="flex-grow-1 min-w-0">
+            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Server.DisplayName}}</div>
+            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            {{if .Heartbeat.Online}}<span class="status-pill ok" style="font-size:.68rem">Online</span>
+            {{else if .Heartbeat.Seen}}<span class="status-pill bad" style="font-size:.68rem">Offline</span>
+            {{else}}<span class="status-pill warn" style="font-size:.68rem">Sin heartbeat</span>{{end}}
+            {{if .HasDiskAlert}}<span class="status-pill bad" style="font-size:.68rem">{{.DiskSummary}}</span>
+            {{else}}<span class="status-pill ok" style="font-size:.68rem">{{.DiskSummary}}</span>{{end}}
             {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
           <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>

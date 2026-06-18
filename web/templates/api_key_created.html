@@ -13,7 +13,7 @@
         <i class="bi bi-exclamation-triangle-fill fs-5 mt-1" style="color:var(--clr-warn);flex-shrink:0"></i>
         <div>
           <div class="fw-semibold mb-1" style="color:var(--txt-primary)">Copia esta key ahora</div>
-          <div style="font-size:.83rem;color:var(--txt-secondary)">No se volverá a mostrar. Si la pierdes, tendrás que crear una nueva.</div>
+          <div style="font-size:.83rem;color:var(--txt-secondary)">No se volvera a mostrar. Si la pierdes, tendras que crear una nueva.</div>
         </div>
       </div>
     </div>
@@ -32,55 +32,119 @@
           </button>
         </div>
 
-        <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.75rem">Instalar cliente en el nodo Proxmox</div>
+        <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.75rem">Instalar cliente</div>
 
-        <div class="d-flex flex-column gap-3">
+        <ul class="nav nav-tabs mb-3" id="installTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="linux-tab" data-bs-toggle="tab" data-bs-target="#linux-install" type="button" role="tab" aria-controls="linux-install" aria-selected="true">
+              <i class="bi bi-terminal me-1"></i>Linux / Proxmox
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="windows-tab" data-bs-toggle="tab" data-bs-target="#windows-install" type="button" role="tab" aria-controls="windows-install" aria-selected="false">
+              <i class="bi bi-windows me-1"></i>Windows
+            </button>
+          </li>
+        </ul>
 
-          <div>
-            <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">1</span>
-              Descargar el cliente
-            </div>
-            <div style="position:relative">
-              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">{{if .GitHubToken}}wget --header "X-GitHub-Token: {{.GitHubToken}}" {{.APIURL}}/download/client/linux-amd64 -O /tmp/probakgo-client{{else}}wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 -O /tmp/probakgo-client{{end}}</pre>
-              <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
-                <i class="bi bi-clipboard" style="font-size:.85rem"></i>
-              </button>
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="linux-install" role="tabpanel" aria-labelledby="linux-tab" tabindex="0">
+            <div class="d-flex flex-column gap-3">
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">1</span>
+                  Descargar el cliente
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">{{if .GitHubToken}}wget --header "X-GitHub-Token: {{.GitHubToken}}" {{.APIURL}}/download/client/linux-amd64 -O /tmp/probakgo-client{{else}}wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 -O /tmp/probakgo-client{{end}}</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">2</span>
+                  Dar permisos de ejecucion
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">3</span>
+                  Instalar
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}{{if .GitHubToken}} --github-token {{.GitHubToken}}{{end}}</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
 
-          <div>
-            <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">2</span>
-              Dar permisos de ejecución
-            </div>
-            <div style="position:relative">
-              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client</pre>
-              <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
-                <i class="bi bi-clipboard" style="font-size:.85rem"></i>
-              </button>
+          <div class="tab-pane fade" id="windows-install" role="tabpanel" aria-labelledby="windows-tab" tabindex="0">
+            <div class="d-flex flex-column gap-3">
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">1</span>
+                  Descargar el cliente desde PowerShell como administrador
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">{{if .GitHubToken}}$headers = @{ 'X-GitHub-Token' = '{{.GitHubToken}}' }
+Invoke-WebRequest -Headers $headers -Uri "{{.APIURL}}/download/client/windows-amd64" -OutFile "$env:TEMP\probakgo-windows-client.exe"{{else}}Invoke-WebRequest -Uri "https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-windows-client_windows_amd64.exe" -OutFile "$env:TEMP\probakgo-windows-client.exe"{{end}}</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">2</span>
+                  Instalar
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">& "$env:TEMP\probakgo-windows-client.exe" install --api-url {{.APIURL}} --api-key {{.Key}}</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
+                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">3</span>
+                  Verificar y revisar logs
+                </div>
+                <div style="position:relative">
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
+Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80</pre>
+                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
+                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
+                  </button>
+                </div>
+              </div>
+
             </div>
           </div>
-
-          <div>
-            <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">3</span>
-              Instalar
-            </div>
-            <div style="position:relative">
-              <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}{{if .GitHubToken}} --github-token {{.GitHubToken}}{{end}}</pre>
-              <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
-                <i class="bi bi-clipboard" style="font-size:.85rem"></i>
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
 
     <a href="/api-keys" class="btn btn-primary w-100">
-      <i class="bi bi-check-lg me-1"></i>Ya la guardé, continuar
+      <i class="bi bi-check-lg me-1"></i>Ya la guarde, continuar
     </a>
 
   </div>

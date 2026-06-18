@@ -44,6 +44,12 @@ function Set-BuildEnv {
     $env:CGO_ENABLED = "0"
 }
 
+function Set-WindowsBuildEnv {
+    $env:GOOS        = "windows"
+    $env:GOARCH      = "amd64"
+    $env:CGO_ENABLED = "0"
+}
+
 function Clear-BuildEnv {
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 }
@@ -270,10 +276,23 @@ function Fetch-DB {
     }
 }
 
+function Build-WindowsClient {
+    Write-Host "`n=== Building Windows client ===" -ForegroundColor Cyan
+    Set-WindowsBuildEnv
+    go build -o probakgo-windows-client.exe ./client-windows/
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Windows client created: .\probakgo-windows-client.exe" -ForegroundColor Green
+    } else {
+        Write-Error "Windows client build failed"
+    }
+    Clear-BuildEnv
+}
+
 if ($All -or $Server)  { Deploy-Server }
 if ($All -or $Clients) { Deploy-Clients }
 if ($Update)           { Update-All }
 if ($Db)               { Fetch-DB }
+Build-WindowsClient
 
 Remove-Item $tmpPassFile -ErrorAction SilentlyContinue
 Write-Host "`nDone." -ForegroundColor Green

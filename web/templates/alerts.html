@@ -63,8 +63,10 @@
         <span style="font-weight:700;font-size:.88rem;color:var(--txt-primary)">{{.ServerName}}</span>
         {{if eq .ServerType "pve"}}
           <span class="badge compact-badge pve">PVE</span>
-        {{else}}
+        {{else if eq .ServerType "pbs"}}
           <span class="badge compact-badge pbs">PBS</span>
+        {{else}}
+          <span class="badge compact-badge windows">Windows</span>
         {{end}}
       </div>
       <div class="d-flex align-items-center gap-1">
@@ -110,8 +112,10 @@
       <div class="d-flex gap-2 align-items-center" style="flex-shrink:0">
         {{if eq .ServerType "pve"}}
           <span class="badge compact-badge pve">PVE</span>
-        {{else}}
+        {{else if eq .ServerType "pbs"}}
           <span class="badge compact-badge pbs">PBS</span>
+        {{else}}
+          <span class="badge compact-badge windows">Windows</span>
         {{end}}
         {{if $.Role}}{{if canEdit $.Role}}
         <button class="btn btn-sm btn-outline-secondary suppress-open-btn"
@@ -153,8 +157,10 @@
           <span style="font-weight:700;font-size:.88rem;color:var(--txt-primary)">{{.ServerName}}</span>
           {{if eq .ServerType "pve"}}
             <span class="badge compact-badge pve">PVE</span>
-          {{else}}
+          {{else if eq .ServerType "pbs"}}
             <span class="badge compact-badge pbs">PBS</span>
+          {{else}}
+            <span class="badge compact-badge windows">Windows</span>
           {{end}}
           <span class="badge compact-badge pbs">{{len .Rows}} suprimida{{if gt (len .Rows) 1}}s{{end}}</span>
         </div>

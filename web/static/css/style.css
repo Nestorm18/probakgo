@@ -328,6 +328,7 @@ code {
   box-shadow: var(--card-shadow);
   display: flex; align-items: center; gap: 1rem;
   position: relative; overflow: hidden;
+  min-height: 92px;
 }
 .stat-card::before {
   content: ""; position: absolute; top: 0; left: 0; right: 0;
@@ -354,7 +355,7 @@ code {
   color: var(--txt-primary); letter-spacing: -.03em;
   font-variant-numeric: tabular-nums;
 }
-.stat-label { font-size: .73rem; color: var(--txt-muted); margin-top: .2rem; font-weight: 500; }
+.stat-label { font-size: .73rem; color: var(--txt-muted); margin-top: .2rem; font-weight: 500; line-height: 1.15; }
 
 /* ─── Server rows ────────────────────────────────────────────── */
 .server-row {
@@ -437,6 +438,7 @@ div[style*="overflow:hidden"]:has(> .table) {
 }
 .compact-badge.pve { background: var(--clr-accent); }
 .compact-badge.pbs { background: var(--pill-muted-txt); }
+.compact-badge.windows { background: #0a66c2; }
 .compact-badge.critical { background: var(--clr-danger); }
 .compact-badge.warning { background: var(--clr-warn); }
 

@@ -161,6 +161,28 @@ type GCStatusPayload struct {
 	UPID           string `json:"upid"`
 }
 
+// --- Windows report payload (sent by windows client) ---
+
+type WindowsReportRequest struct {
+	Hostname      string               `json:"hostname"`
+	IPAddress     string               `json:"ip_address"`
+	PublicIP      string               `json:"public_ip"`
+	ClientVersion string               `json:"client_version"`
+	MachineID     string               `json:"machine_id"`
+	Disks         []WindowsDiskPayload `json:"disks"`
+}
+
+type WindowsDiskPayload struct {
+	Name       string `json:"name"`
+	Label      string `json:"label"`
+	FileSystem string `json:"file_system"`
+	DriveType  string `json:"drive_type"`
+	Total      int64  `json:"total"`
+	Used       int64  `json:"used"`
+	Free       int64  `json:"free"`
+	Health     string `json:"health"`
+}
+
 // --- API responses ---
 
 type PVEServerResponse struct {

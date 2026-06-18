@@ -84,6 +84,19 @@ func TestFormAlertIDs(t *testing.T) {
 	}
 }
 
+func TestAlertRedirectBack(t *testing.T) {
+	req := httptest.NewRequest("POST", "/alerts/suppress", strings.NewReader("back=/servers/windows/10"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if got := alertRedirectBack(req); got != "/servers/windows/10" {
+		t.Fatalf("got %q", got)
+	}
+	req = httptest.NewRequest("POST", "/alerts/suppress", strings.NewReader("back=https://example.com"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if got := alertRedirectBack(req); got != "/alerts" {
+		t.Fatalf("external redirect should fallback, got %q", got)
+	}
+}
+
 func TestAlertsStatusIncludesHeartbeatAlert(t *testing.T) {
 	st := openAlertsHandlerDB(t)
 	ctx := context.Background()

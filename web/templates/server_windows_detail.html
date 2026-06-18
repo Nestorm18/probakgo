@@ -1,0 +1,192 @@
+{{block "page_title" .}}{{.Server.DisplayName}} - Probakgo{{end}}
+{{block "page_heading" .}}{{.Server.DisplayName}}{{end}}
+{{block "page_actions" .}}
+<a href="/servers/windows" class="btn btn-sm btn-secondary me-1"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+{{end}}
+{{block "page_content" .}}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">IP Local</div>
+      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">{{.Server.IP}}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">IP Publica</div>
+      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">
+        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">Version cliente</div>
+      <div class="info-tile-value"><code>{{if .Server.ClientVersion}}{{.Server.ClientVersion}}{{else}}-{{end}}</code></div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">Conexion</div>
+      <div class="info-tile-value" style="font-size:.82rem">
+        {{if .Heartbeat.Online}}<span class="status-pill ok" title="{{.Heartbeat.Label}}">Online</span>
+        {{else if .Heartbeat.Seen}}<span class="status-pill bad" title="{{.Heartbeat.Label}}">Offline</span>
+        {{else}}<span class="status-pill warn">Sin heartbeat</span>{{end}}
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="info-tile h-100">
+      <div class="info-tile-label">Machine ID</div>
+      <div class="info-tile-value" style="font-size:.82rem">
+        {{if .Server.MachineID}}
+          <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i><code>{{.Server.MachineID}}</code>
+        {{else}}<span style="color:var(--txt-muted)">Sin vincular</span>{{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{if .Role}}{{if canEdit .Role}}
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+    <span><i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas Windows</span>
+    <form method="post" action="/alerts/suppress" class="d-flex align-items-center gap-2 flex-wrap m-0">
+      {{.CSRFField}}
+      <input type="hidden" name="alert_id" value="{{.AllAlertIDs}}">
+      <input type="hidden" name="back" value="{{.BackURL}}">
+      <input type="hidden" name="reason" value="Silenciado desde Windows">
+      <select name="days" class="form-select form-select-sm" style="width:auto">
+        <option value="1">1 día</option>
+        <option value="3" selected>3 días</option>
+        <option value="7">7 días</option>
+        <option value="30">30 días</option>
+      </select>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-bell-slash me-1"></i>Silenciar todas
+      </button>
+    </form>
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>Alerta</th>
+          <th>Detalle</th>
+          <th>Estado</th>
+          <th class="text-end">Accion</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .AlertControls}}
+      <tr>
+        <td style="font-weight:600;color:var(--txt-primary)">{{.Title}}</td>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Detail}}</td>
+        <td>
+          {{if .Suppressed}}
+            <span class="status-pill muted" title="{{formatTime .Until}}">Silenciada</span>
+            <div style="font-size:.72rem;color:var(--txt-muted);margin-top:.2rem">hasta {{formatTime .Until}}</div>
+          {{else}}
+            <span class="status-pill ok">Activa</span>
+          {{end}}
+        </td>
+        <td class="text-end" style="white-space:nowrap">
+          {{if .Suppressed}}
+          <form method="post" action="/alerts/unsuppress" class="m-0">
+            {{$.CSRFField}}
+            <input type="hidden" name="alert_id" value="{{.ID}}">
+            <input type="hidden" name="back" value="{{$.BackURL}}">
+            <button type="submit" class="btn btn-sm btn-secondary">
+              <i class="bi bi-bell me-1"></i>Reactivar
+            </button>
+          </form>
+          {{else}}
+          <form method="post" action="/alerts/suppress" class="d-inline-flex gap-2 align-items-center m-0">
+            {{$.CSRFField}}
+            <input type="hidden" name="alert_id" value="{{.ID}}">
+            <input type="hidden" name="back" value="{{$.BackURL}}">
+            <input type="hidden" name="reason" value="Silenciado desde Windows">
+            <select name="days" class="form-select form-select-sm" style="width:auto">
+              <option value="1">1 día</option>
+              <option value="3" selected>3 días</option>
+              <option value="7">7 días</option>
+              <option value="30">30 días</option>
+            </select>
+            <button type="submit" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-bell-slash me-1"></i>Silenciar
+            </button>
+          </form>
+          {{end}}
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}{{end}}
+
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Discos (ultimo reporte)
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>Unidad</th>
+          <th>Etiqueta</th>
+          <th>Sistema</th>
+          <th>Usado</th>
+          <th>Libre</th>
+          <th>Total</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Disks}}
+      <tr>
+        <td style="font-family:'DM Mono',monospace;color:var(--txt-primary);font-weight:500">{{.Name}}</td>
+        <td>{{if .Label}}{{.Label}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td style="color:var(--txt-muted)">{{.FileSystem}}</td>
+        <td>{{formatBytes .Used}}</td>
+        <td>{{formatBytes .Free}}</td>
+        <td>{{formatBytes .Total}}</td>
+        <td><span class="status-pill {{.BadgeClass}}" title="{{.Title}}">{{.BadgeLabel}}</span></td>
+      </tr>
+      {{else}}
+      <tr><td colspan="7" class="text-center p-4" style="color:var(--txt-muted)">Sin discos en el ultimo reporte</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0" style="min-width:520px">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Reports}}
+      <tr>
+        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+        <td>{{if .IsStale}}<span class="status-pill bad">Sin reporte</span>{{else}}<span class="status-pill ok">Recibido</span>{{end}}</td>
+      </tr>
+      {{else}}
+      <tr><td colspan="2" class="text-center p-4" style="color:var(--txt-muted)">Sin reportes</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{end}}

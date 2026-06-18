@@ -44,6 +44,9 @@ var evaluators = []AlertEvaluator{
 	evalPBSDisk,
 	evalPBSFill,
 	evalPBSVerify,
+	evalWindowsDisk,
+	evalWindowsHeartbeat,
+	evalWindowsDiskHealth,
 }
 
 // RunAll executes all registered evaluators. Individual errors are logged but do not
@@ -650,6 +653,151 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		}
 	}
 	return alerts, nil
+}
+
+func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	if cfg.GlobalDiskPct <= 0 {
+		return nil, nil
+	}
+	servers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		rep, err := st.GetLatestWindowsReport(ctx, sv.ID)
+		if err != nil {
+			continue
+		}
+		disks, err := st.GetWindowsDisksForReport(ctx, rep.ID)
+		if err != nil {
+			continue
+		}
+		for _, disk := range disks {
+			if !isWindowsLogicalAlertDisk(disk) {
+				continue
+			}
+			if disk.Total <= 0 {
+				continue
+			}
+			pct := int(float64(disk.Used) / float64(disk.Total) * 100)
+			if pct < cfg.GlobalDiskPct {
+				continue
+			}
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("disk:windows:%d:%s", sv.ID, disk.Name),
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "windows",
+				StoreName:  disk.Name,
+				Type:       domain.AlertTypeDisk,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Disco casi lleno",
+				Message:    fmt.Sprintf("%s al %d%% (%s libre)", disk.Name, pct, alertFmtBytes(disk.Free)),
+				Value:      fmt.Sprintf("%d%%", pct),
+				Threshold:  fmt.Sprintf("%d%%", cfg.GlobalDiskPct),
+				DetectedAt: time.Now(),
+			})
+		}
+	}
+	return alerts, nil
+}
+
+func evalWindowsHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	if cfg.GlobalPVEHeartbeatMinutes <= 0 {
+		return nil, nil
+	}
+	ctx := context.Background()
+	servers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	heartbeats, err := st.ListServerHeartbeatsByType(ctx, "windows")
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	threshold := time.Duration(cfg.GlobalPVEHeartbeatMinutes) * time.Minute
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		lastSeen := time.Time{}
+		if hb, ok := heartbeats[sv.ID]; ok {
+			lastSeen = hb.LastSeenAt
+		}
+		if lastSeen.IsZero() {
+			if rep, err := st.GetLatestWindowsReport(ctx, sv.ID); err == nil {
+				lastSeen = rep.ReportedAt
+			}
+		}
+		if lastSeen.IsZero() {
+			continue
+		}
+		age := now.Sub(lastSeen)
+		if age <= threshold {
+			continue
+		}
+		since := alertFmtAge(age)
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("windows_heartbeat:windows:%d", sv.ID),
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "windows",
+			Type:       domain.AlertTypeWindowsHeartbeat,
+			Severity:   domain.AlertSeverityCritical,
+			Title:      "Servidor offline",
+			Message:    fmt.Sprintf("No se recibe senal del servidor Windows desde hace %s", since),
+			Value:      since,
+			Threshold:  fmt.Sprintf("%d min", cfg.GlobalPVEHeartbeatMinutes),
+			DetectedAt: now,
+		})
+	}
+	return alerts, nil
+}
+
+func evalWindowsDiskHealth(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	servers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		rep, err := st.GetLatestWindowsReport(ctx, sv.ID)
+		if err != nil {
+			continue
+		}
+		disks, err := st.GetWindowsDisksForReport(ctx, rep.ID)
+		if err != nil {
+			continue
+		}
+		for _, disk := range disks {
+			if !isWindowsLogicalAlertDisk(disk) {
+				continue
+			}
+			health := strings.TrimSpace(strings.ToLower(disk.Health))
+			if health == "" || health == "ok" || health == "healthy" || health == "normal" {
+				continue
+			}
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("windows_disk_health:windows:%d:%s", sv.ID, disk.Name),
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "windows",
+				StoreName:  disk.Name,
+				Type:       domain.AlertTypeWindowsDiskHealth,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Salud de disco",
+				Message:    fmt.Sprintf("%s informa estado %s", disk.Name, disk.Health),
+				Value:      disk.Health,
+				DetectedAt: time.Now(),
+			})
+		}
+	}
+	return alerts, nil
+}
+
+func isWindowsLogicalAlertDisk(disk domain.WindowsDisk) bool {
+	name := strings.TrimSpace(disk.Name)
+	driveType := strings.TrimSpace(strings.ToLower(disk.DriveType))
+	if driveType != "" && driveType != "fixed" {
+		return false
+	}
+	return len(name) == 2 && name[1] == ':' && ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'))
 }
 
 // ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.

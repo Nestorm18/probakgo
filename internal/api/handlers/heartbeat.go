@@ -25,8 +25,8 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	if req.ServerType == "" {
 		req.ServerType = "pve"
 	}
-	if req.ServerType != "pve" && req.ServerType != "pbs" {
-		errJSON(w, http.StatusBadRequest, "server_type must be pve or pbs")
+	if req.ServerType != "pve" && req.ServerType != "pbs" && req.ServerType != "windows" {
+		errJSON(w, http.StatusBadRequest, "server_type must be pve, pbs or windows")
 		return
 	}
 	if !h.requireKeyServer(w, r, req.Hostname) {
@@ -53,6 +53,13 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		serverID, err = h.store.UpsertPBSServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
+	case "windows":
+		if req.PublicIP == "" {
+			if sv, getErr := h.store.GetWindowsServerByName(r.Context(), req.Hostname); getErr == nil {
+				req.PublicIP = sv.PublicIP
+			}
+		}
+		serverID, err = h.store.UpsertWindowsServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	}
 	if err != nil {
 		internalErr(w, "upsert heartbeat server", err)

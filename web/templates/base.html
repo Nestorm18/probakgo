@@ -32,6 +32,7 @@
         <li><a class="nav-link {{if eq .Active "alerts-view"}}active{{end}}" href="/alerts" id="alertsNavLink"><i class="bi bi-bell"></i>Alertas<span id="alertCriticalBadge" class="badge ms-auto" style="background:var(--clr-danger);font-size:.65rem;{{if .AlertCritical}}{{else}}display:none{{end}}">{{.AlertCritical}}</span><span id="alertWarningBadge" class="badge {{if .AlertCritical}}ms-1{{else}}ms-auto{{end}}" style="background:var(--clr-warn);font-size:.65rem;{{if .AlertWarning}}{{else}}display:none{{end}}">{{.AlertWarning}}</span></a></li>
         <li><a class="nav-link {{if eq .Active "pve"}}active{{end}}" href="/servers/pve"><i class="bi bi-server"></i>Proxmox VE</a></li>
         <li><a class="nav-link {{if eq .Active "pbs"}}active{{end}}" href="/servers/pbs"><i class="bi bi-archive"></i>Proxmox BS</a></li>
+        <li><a class="nav-link {{if eq .Active "windows"}}active{{end}}" href="/servers/windows"><i class="bi bi-windows"></i>Windows</a></li>
       </ul>
 
       <div class="sidebar-label">Gestión</div>
