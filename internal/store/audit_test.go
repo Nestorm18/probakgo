@@ -50,3 +50,42 @@ func TestAuditLogInsertAndListNewestFirst(t *testing.T) {
 		t.Fatalf("metadata: got %q", rows[1].Metadata)
 	}
 }
+
+func TestAuditLogListPage(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	for _, action := range []string{"first", "second", "third"} {
+		if err := st.InsertAuditLog(ctx, domain.AuditLog{
+			ActorUsername: "admin",
+			ActorRole:     "admin",
+			Action:        action,
+			TargetType:    "system",
+			Metadata:      `{}`,
+		}); err != nil {
+			t.Fatalf("insert audit log %q: %v", action, err)
+		}
+	}
+
+	page1, err := st.ListAuditLogsPage(ctx, 2, 0)
+	if err != nil {
+		t.Fatalf("list first page: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Fatalf("first page rows: got %d, want 2", len(page1))
+	}
+	if page1[0].Action != "third" || page1[1].Action != "second" {
+		t.Fatalf("first page actions: got %q, %q", page1[0].Action, page1[1].Action)
+	}
+
+	page2, err := st.ListAuditLogsPage(ctx, 2, 2)
+	if err != nil {
+		t.Fatalf("list second page: %v", err)
+	}
+	if len(page2) != 1 {
+		t.Fatalf("second page rows: got %d, want 1", len(page2))
+	}
+	if page2[0].Action != "first" {
+		t.Fatalf("second page action: got %q, want first", page2[0].Action)
+	}
+}

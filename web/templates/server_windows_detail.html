@@ -48,6 +48,42 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Discos (ultimo reporte)
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
+    <table class="table table-hover mb-0" style="min-width:760px">
+      <thead>
+        <tr>
+          <th>Unidad</th>
+          <th>Etiqueta</th>
+          <th>Sistema</th>
+          <th>Usado</th>
+          <th>Libre</th>
+          <th>Total</th>
+          <th>Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+      {{range .Disks}}
+      <tr>
+        <td style="font-family:'DM Mono',monospace;color:var(--txt-primary);font-weight:500">{{.Name}}</td>
+        <td>{{if .Label}}{{.Label}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td style="color:var(--txt-muted)">{{.FileSystem}}</td>
+        <td>{{formatBytes .Used}}</td>
+        <td>{{formatBytes .Free}}</td>
+        <td>{{formatBytes .Total}}</td>
+        <td><span class="status-pill {{.BadgeClass}}" title="{{.Title}}">{{.BadgeLabel}}</span></td>
+      </tr>
+      {{else}}
+      <tr><td colspan="7" class="text-center p-4" style="color:var(--txt-muted)">Sin discos en el ultimo reporte</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {{if .Role}}{{if canEdit .Role}}
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -58,10 +94,10 @@
       <input type="hidden" name="back" value="{{.BackURL}}">
       <input type="hidden" name="reason" value="Silenciado desde Windows">
       <select name="days" class="form-select form-select-sm" style="width:auto">
-        <option value="1">1 día</option>
-        <option value="3" selected>3 días</option>
-        <option value="7">7 días</option>
-        <option value="30">30 días</option>
+        <option value="1">1 dia</option>
+        <option value="3" selected>3 dias</option>
+        <option value="7">7 dias</option>
+        <option value="30">30 dias</option>
       </select>
       <button type="submit" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-bell-slash me-1"></i>Silenciar todas
@@ -108,10 +144,10 @@
             <input type="hidden" name="back" value="{{$.BackURL}}">
             <input type="hidden" name="reason" value="Silenciado desde Windows">
             <select name="days" class="form-select form-select-sm" style="width:auto">
-              <option value="1">1 día</option>
-              <option value="3" selected>3 días</option>
-              <option value="7">7 días</option>
-              <option value="30">30 días</option>
+              <option value="1">1 dia</option>
+              <option value="3" selected>3 dias</option>
+              <option value="7">7 dias</option>
+              <option value="30">30 dias</option>
             </select>
             <button type="submit" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-bell-slash me-1"></i>Silenciar
@@ -126,42 +162,6 @@
   </div>
 </div>
 {{end}}{{end}}
-
-<div class="card mb-4">
-  <div class="card-header">
-    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Discos (ultimo reporte)
-  </div>
-  <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
-    <table class="table table-hover mb-0" style="min-width:760px">
-      <thead>
-        <tr>
-          <th>Unidad</th>
-          <th>Etiqueta</th>
-          <th>Sistema</th>
-          <th>Usado</th>
-          <th>Libre</th>
-          <th>Total</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-      {{range .Disks}}
-      <tr>
-        <td style="font-family:'DM Mono',monospace;color:var(--txt-primary);font-weight:500">{{.Name}}</td>
-        <td>{{if .Label}}{{.Label}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
-        <td style="color:var(--txt-muted)">{{.FileSystem}}</td>
-        <td>{{formatBytes .Used}}</td>
-        <td>{{formatBytes .Free}}</td>
-        <td>{{formatBytes .Total}}</td>
-        <td><span class="status-pill {{.BadgeClass}}" title="{{.Title}}">{{.BadgeLabel}}</span></td>
-      </tr>
-      {{else}}
-      <tr><td colspan="7" class="text-center p-4" style="color:var(--txt-muted)">Sin discos en el ultimo reporte</td></tr>
-      {{end}}
-      </tbody>
-    </table>
-  </div>
-</div>
 
 <div class="card">
   <div class="card-header">

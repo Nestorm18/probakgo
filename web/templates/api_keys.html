@@ -9,10 +9,24 @@
 {{end}}
 {{block "page_content" .}}
 
+<div class="d-flex align-items-center gap-2 mb-3">
+  <form method="GET" action="/api-keys" class="input-group input-group-sm filter-search" style="max-width:360px">
+    <span class="input-group-text"><i class="bi bi-search"></i></span>
+    <input type="text" name="q" id="serverFilter" class="form-control form-control-sm"
+           value="{{.SearchQuery}}" placeholder="Filtrar por alias, hostname, key o estado...">
+    <button class="btn btn-sm btn-secondary" type="submit">Buscar</button>
+  </form>
+  {{if .SearchQuery}}
+  <a href="/api-keys" class="btn btn-sm btn-secondary">Limpiar</a>
+  {{end}}
+  <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)">
+    {{if .SearchQuery}}{{len .Keys}} resultado{{if ne (len .Keys) 1}}s{{end}}{{end}}
+  </span>
+</div>
 
 <div class="card">
-  <div class="card-body p-0" style="overflow:hidden;border-radius:.75rem">
-    <table class="table table-hover mb-0">
+  <div class="card-body p-0" style="overflow-x:auto">
+    <table class="table table-hover mb-0" style="min-width:900px">
       <thead>
         <tr>
           <th>Alias / Hostname</th>
@@ -86,6 +100,24 @@
       {{end}}
       </tbody>
     </table>
+  </div>
+  <div class="card-footer d-flex justify-content-between align-items-center gap-2">
+    {{$q := .SearchQueryEscaped}}
+    {{if .KeysHasPrev}}
+    <a class="btn btn-sm btn-secondary" href="/api-keys?page={{.KeysPrevPage}}{{if .SearchQuery}}&q={{$q}}{{end}}">
+      <i class="bi bi-chevron-left me-1"></i>Anterior
+    </a>
+    {{else}}
+    <button class="btn btn-sm btn-secondary" disabled><i class="bi bi-chevron-left me-1"></i>Anterior</button>
+    {{end}}
+    <span style="font-size:.78rem;color:var(--txt-muted)">Página {{.KeysPage}} · 25 keys por página</span>
+    {{if .KeysHasNext}}
+    <a class="btn btn-sm btn-secondary" href="/api-keys?page={{.KeysNextPage}}{{if .SearchQuery}}&q={{$q}}{{end}}">
+      Siguiente<i class="bi bi-chevron-right ms-1"></i>
+    </a>
+    {{else}}
+    <button class="btn btn-sm btn-secondary" disabled>Siguiente<i class="bi bi-chevron-right ms-1"></i></button>
+    {{end}}
   </div>
 </div>
 

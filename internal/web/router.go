@@ -86,6 +86,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireEditor, sensitive).Post("/servers/pve/{id}/alerts", h.PVEAlertConfigPost)
 		r.With(RequireEditor, sensitive).Post("/servers/pve/{id}/alerts/vm", h.PVEVMAlertConfigPost)
 		r.With(RequireEditor, sensitive).Post("/servers/pbs/{id}/alerts", h.PBSAlertConfigPost)
+		r.With(RequireEditor, sensitive).Post("/servers/windows/{id}/alerts", h.WindowsAlertConfigPost)
 
 		// API keys - list visible to all, writes admin-only, reveal admin-only
 		r.Get("/api-keys", h.APIKeys)

@@ -265,7 +265,64 @@ func (s *Store) UpsertPBSAlertConfig(ctx context.Context, cfg domain.PBSAlertCon
 	return err
 }
 
-// nullInt converts *int to a SQL-compatible value (nil → NULL, &v → v).
+func (s *Store) GetWindowsAlertConfig(ctx context.Context, serverID int64) (domain.WindowsAlertConfig, error) {
+	debug.RecordQuery(ctx, `SELECT disk_pct FROM windows_alert_config WHERE server_id = ?`)
+	row := s.db.QueryRowContext(ctx,
+		`SELECT disk_pct FROM windows_alert_config WHERE server_id = ?`,
+		serverID,
+	)
+	var cfg domain.WindowsAlertConfig
+	cfg.ServerID = serverID
+	var diskPct sql.NullInt64
+	if err := row.Scan(&diskPct); err == sql.ErrNoRows {
+		return cfg, nil
+	} else if err != nil {
+		return cfg, err
+	}
+	if diskPct.Valid {
+		v := int(diskPct.Int64)
+		cfg.DiskPct = &v
+	}
+	return cfg, nil
+}
+
+func (s *Store) ListWindowsAlertConfigs(ctx context.Context) (map[int64]domain.WindowsAlertConfig, error) {
+	debug.RecordQuery(ctx, `SELECT server_id, disk_pct FROM windows_alert_config`)
+	rows, err := s.db.QueryContext(ctx, `SELECT server_id, disk_pct FROM windows_alert_config`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	configs := make(map[int64]domain.WindowsAlertConfig)
+	for rows.Next() {
+		var cfg domain.WindowsAlertConfig
+		var diskPct sql.NullInt64
+		if err := rows.Scan(&cfg.ServerID, &diskPct); err != nil {
+			return nil, err
+		}
+		if diskPct.Valid {
+			v := int(diskPct.Int64)
+			cfg.DiskPct = &v
+		}
+		configs[cfg.ServerID] = cfg
+	}
+	return configs, rows.Err()
+}
+
+func (s *Store) UpsertWindowsAlertConfig(ctx context.Context, cfg domain.WindowsAlertConfig) error {
+	debug.RecordQuery(ctx, `INSERT INTO windows_alert_config (server_id, disk_pct, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO windows_alert_config (server_id, disk_pct, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(server_id) DO UPDATE SET
+			disk_pct=excluded.disk_pct,
+			updated_at=excluded.updated_at`,
+		cfg.ServerID, nullInt(cfg.DiskPct),
+	)
+	return err
+}
+
+// nullInt converts *int to a SQL-compatible value (nil -> NULL, &v -> v).
 func nullInt(p *int) any {
 	if p == nil {
 		return nil

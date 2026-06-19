@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -14,14 +15,25 @@ import (
 	"probakgo/internal/session"
 )
 
+const apiKeysPageSize = 25
+
 func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
-	keys, err := h.store.ListAPIKeys(ctx)
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	keys, err := h.store.ListAPIKeysPage(ctx, apiKeysPageSize+1, (page-1)*apiKeysPageSize, query)
 	if err != nil {
 		slog.Error("list api keys", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
+	}
+	hasNext := len(keys) > apiKeysPageSize
+	if hasNext {
+		keys = keys[:apiKeysPageSize]
 	}
 	type keyRow struct {
 		ID         int64
@@ -47,10 +59,17 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	h.tmpl.Render(w, r, "api_keys.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Keys":     rows,
-		"Flash":    r.URL.Query().Get("flash"),
+		"Username":           username,
+		"Role":               role,
+		"Keys":               rows,
+		"Flash":              r.URL.Query().Get("flash"),
+		"SearchQuery":        query,
+		"SearchQueryEscaped": url.QueryEscape(query),
+		"KeysPage":           page,
+		"KeysPrevPage":       page - 1,
+		"KeysNextPage":       page + 1,
+		"KeysHasPrev":        page > 1,
+		"KeysHasNext":        hasNext,
 	})
 }
 

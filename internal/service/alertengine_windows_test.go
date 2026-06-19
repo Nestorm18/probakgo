@@ -44,6 +44,49 @@ func TestEvalWindowsDisk_IgnoresPhysicalDiskRows(t *testing.T) {
 	}
 }
 
+func TestEvalWindowsDisk_UsesServerOverride(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertWindowsServer(ctx, "win-override", "1.1.1.1", "", "1.0", "machine-win")
+	reportID, _ := st.InsertWindowsReport(ctx, serverID)
+	_ = st.InsertWindowsDisk(ctx, reportID, domain.WindowsDiskPayload{
+		Name: "C:", Total: 1000, Used: 900, Free: 100,
+	})
+
+	threshold := 95
+	cfg := defaultCfg()
+	cfg.WindowsConfigs[serverID] = domain.WindowsAlertConfig{ServerID: serverID, DiskPct: &threshold}
+	alerts, err := evalWindowsDisk(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeDisk, "win-override") {
+		t.Error("did not expect windows disk alert below server override")
+	}
+}
+
+func TestEvalWindowsDisk_ServerOverrideCanEnableWhenGlobalDisabled(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertWindowsServer(ctx, "win-enabled", "1.1.1.1", "", "1.0", "machine-win")
+	reportID, _ := st.InsertWindowsReport(ctx, serverID)
+	_ = st.InsertWindowsDisk(ctx, reportID, domain.WindowsDiskPayload{
+		Name: "C:", Total: 1000, Used: 900, Free: 100,
+	})
+
+	threshold := 80
+	cfg := defaultCfg()
+	cfg.GlobalWindowsDiskPct = 0
+	cfg.WindowsConfigs[serverID] = domain.WindowsAlertConfig{ServerID: serverID, DiskPct: &threshold}
+	alerts, err := evalWindowsDisk(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypeDisk, "win-enabled") {
+		t.Error("expected windows disk alert from server override")
+	}
+}
+
 func TestEvalWindowsHeartbeat_Offline(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

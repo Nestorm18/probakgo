@@ -270,6 +270,7 @@ func hardDeleteLegacyWindows(ctx context.Context, tx txRunner, serverName string
 func hardDeleteWindowsByID(ctx context.Context, tx txRunner, id int64) error {
 	steps := []string{
 		`DELETE FROM server_heartbeats WHERE server_type = 'windows' AND server_id = ?`,
+		`DELETE FROM windows_alert_config WHERE server_id = ?`,
 		`DELETE FROM windows_disks WHERE report_id IN (SELECT id FROM windows_reports WHERE server_id = ?)`,
 		`DELETE FROM windows_reports WHERE server_id = ?`,
 		`DELETE FROM windows_servers WHERE id = ?`,

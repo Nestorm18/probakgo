@@ -71,6 +71,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.AlertDiskPct = existing.AlertDiskPct
+		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
@@ -83,6 +84,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = 3
 		cfg.RetentionEnabled = true
 		cfg.AlertDiskPct = 85
+		cfg.AlertWindowsDiskPct = 90
 		cfg.AlertBackupErr = true
 		cfg.AlertPBSStaleHours = 48
 		cfg.AlertPVEHeartbeatMinutes = 15
@@ -153,6 +155,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.AlertDiskPct = existing.AlertDiskPct
+		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
@@ -220,6 +223,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.IsEnabled = existing.IsEnabled
 		cfg.SendTime = existing.SendTime
 		cfg.AlertDiskPct = existing.AlertDiskPct
+		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
@@ -293,6 +297,15 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	if alertDisk < 0 || alertDisk > 99 {
 		alertDisk = 0
 	}
+	windowsDiskStr := r.FormValue("alert_windows_disk_pct")
+	windowsDisk, err := strconv.Atoi(windowsDiskStr)
+	if windowsDiskStr != "" && err != nil {
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+Windows+no+valido", http.StatusSeeOther)
+		return
+	}
+	if windowsDisk < 0 || windowsDisk > 99 {
+		windowsDisk = 0
+	}
 	pbsStaleStr := r.FormValue("alert_pbs_stale_hours")
 	pbsStaleHours := 0
 	if existing != nil {
@@ -321,6 +334,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 
 	cfg := domain.EmailConfig{
 		AlertDiskPct:             alertDisk,
+		AlertWindowsDiskPct:      windowsDisk,
 		AlertBackupErr:           r.FormValue("alert_backup_err") == "on",
 		AlertPBSStaleHours:       pbsStaleHours,
 		AlertPVEHeartbeatMinutes: pveHeartbeatMinutes,
@@ -344,6 +358,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.SendTime = "08:00"
 		cfg.RetentionMonths = 3
 		cfg.RetentionEnabled = true
+		cfg.AlertWindowsDiskPct = 90
 	}
 	if err := h.store.UpsertEmailConfig(ctx, cfg); err != nil {
 		http.Redirect(w, r, "/settings/alerts?flash="+err.Error(), http.StatusSeeOther)
@@ -351,6 +366,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit(r, "settings.alerts_update", "settings", "alerts", "Alertas globales", map[string]any{
 		"alert_disk_pct":              cfg.AlertDiskPct,
+		"alert_windows_disk_pct":      cfg.AlertWindowsDiskPct,
 		"alert_backup_err":            cfg.AlertBackupErr,
 		"alert_pve_heartbeat_minutes": cfg.AlertPVEHeartbeatMinutes,
 	})

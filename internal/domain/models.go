@@ -292,7 +292,8 @@ type EmailConfig struct {
 	SendTime                    string `db:"send_time"`
 	RetentionMonths             int    `db:"retention_months"`
 	RetentionEnabled            bool   `db:"retention_enabled"`
-	AlertDiskPct                int    `db:"alert_disk_pct"` // 0 = disabled
+	AlertDiskPct                int    `db:"alert_disk_pct"`         // 0 = disabled
+	AlertWindowsDiskPct         int    `db:"alert_windows_disk_pct"` // 0 = disabled
 	AlertBackupErr              bool   `db:"alert_backup_err"`
 	AlertPBSStaleHours          int    `db:"alert_pbs_stale_hours"` // 0 = disabled
 	PublicAPIURL                string `db:"public_api_url"`
@@ -387,4 +388,11 @@ type PBSAlertConfig struct {
 	DaysUntilFull *int // nil = disabled; alert if disk fills in < N days
 	StaleHours    *int // nil = use global; 0 = disabled
 	VerifyAlert   bool
+}
+
+// WindowsAlertConfig holds per-server Windows alert thresholds.
+// nil fields inherit from Windows-specific global email_config values.
+type WindowsAlertConfig struct {
+	ServerID int64
+	DiskPct  *int // nil = use global Windows disk threshold
 }
