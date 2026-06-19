@@ -19,16 +19,18 @@ func (h *WebH) About(w http.ResponseWriter, r *http.Request) {
 
 	pveServers, _ := h.store.ListPVEServers(ctx)
 	pbsServers, _ := h.store.ListPBSServers(ctx)
+	windowsServers, _ := h.store.ListWindowsServers(ctx)
 	dbSize := h.store.DBSize(ctx)
 
 	h.tmpl.Render(w, r, "about.html", map[string]any{
-		"Username":  username,
-		"Role":      role,
-		"PVECount":  len(pveServers),
-		"PBSCount":  len(pbsServers),
-		"DBSize":    dbSize,
-		"Uptime":    uptimeStr(time.Since(h.startTime)),
-		"StartTime": h.startTime,
+		"Username":     username,
+		"Role":         role,
+		"PVECount":     len(pveServers),
+		"PBSCount":     len(pbsServers),
+		"WindowsCount": len(windowsServers),
+		"DBSize":       dbSize,
+		"Uptime":       uptimeStr(time.Since(h.startTime)),
+		"StartTime":    h.startTime,
 	})
 }
 

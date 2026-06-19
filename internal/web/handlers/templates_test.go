@@ -126,11 +126,12 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 
 	return map[string]map[string]any{
 		"about.html": base(map[string]any{
-			"Uptime":    "1h",
-			"StartTime": now,
-			"DBSize":    int64(1024),
-			"PVECount":  1,
-			"PBSCount":  1,
+			"Uptime":       "1h",
+			"StartTime":    now,
+			"DBSize":       int64(1024),
+			"PVECount":     1,
+			"PBSCount":     1,
+			"WindowsCount": 1,
 		}),
 		"alerts.html": base(map[string]any{
 			"AlertGroups": []alertGroup{},
