@@ -159,3 +159,33 @@ func TestPBSAlertConfig_RoundTrip(t *testing.T) {
 		t.Error("VerifyAlert: got true, want false")
 	}
 }
+
+func TestWindowsAlertConfig_RoundTrip(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertWindowsServer(ctx, "win1", "1.2.3.4", "", "1.0", "")
+
+	want := domain.WindowsAlertConfig{
+		ServerID: serverID,
+		DiskPct:  intPtr(92),
+	}
+	if err := st.UpsertWindowsAlertConfig(ctx, want); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	got, err := st.GetWindowsAlertConfig(ctx, serverID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.DiskPct == nil || *got.DiskPct != 92 {
+		t.Errorf("DiskPct: got %v, want 92", got.DiskPct)
+	}
+
+	list, err := st.ListWindowsAlertConfigs(ctx)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if list[serverID].DiskPct == nil || *list[serverID].DiskPct != 92 {
+		t.Errorf("list DiskPct: got %+v", list[serverID].DiskPct)
+	}
+}

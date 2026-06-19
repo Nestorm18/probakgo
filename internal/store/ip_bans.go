@@ -67,15 +67,22 @@ func (s *Store) InsertLoginAttempt(ctx context.Context, username, ip, userAgent,
 }
 
 func (s *Store) ListLoginAttempts(ctx context.Context, limit int) ([]domain.LoginAttempt, error) {
+	return s.ListLoginAttemptsPage(ctx, limit, 0)
+}
+
+func (s *Store) ListLoginAttemptsPage(ctx context.Context, limit, offset int) ([]domain.LoginAttempt, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	debug.RecordQuery(ctx, `SELECT id, username, ip, user_agent, result, reason, attempted_at FROM login_attempts ORDER BY attempted_at DESC LIMIT ?`)
+	if offset < 0 {
+		offset = 0
+	}
+	debug.RecordQuery(ctx, `SELECT id, username, ip, user_agent, result, reason, attempted_at FROM login_attempts ORDER BY attempted_at DESC, id DESC LIMIT ? OFFSET ?`)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, username, ip, user_agent, result, reason, attempted_at
 		FROM login_attempts
-		ORDER BY attempted_at DESC
-		LIMIT ?`, limit)
+		ORDER BY attempted_at DESC, id DESC
+		LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return nil, err
 	}

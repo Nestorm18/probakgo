@@ -16,14 +16,16 @@ import (
 // Global values from email_config act as fallback when a server has no per-server config.
 type AlertConfigs struct {
 	GlobalDiskPct             int
+	GlobalWindowsDiskPct      int
 	GlobalStaleHours          int
 	GlobalBackupErr           bool
 	GlobalPVEHeartbeatMinutes int
 	Report                    *ReportService
 
-	PVEConfigs   map[int64]domain.PVEAlertConfig
-	PVEVMConfigs map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
-	PBSConfigs   map[int64]domain.PBSAlertConfig
+	PVEConfigs     map[int64]domain.PVEAlertConfig
+	PVEVMConfigs   map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
+	PBSConfigs     map[int64]domain.PBSAlertConfig
+	WindowsConfigs map[int64]domain.WindowsAlertConfig
 }
 
 // AlertEvaluator is the function signature every alert type must implement.
@@ -81,12 +83,14 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 	}
 	cfg := AlertConfigs{
 		GlobalDiskPct:             emailCfg.AlertDiskPct,
+		GlobalWindowsDiskPct:      emailCfg.AlertWindowsDiskPct,
 		GlobalBackupErr:           emailCfg.AlertBackupErr,
 		GlobalStaleHours:          emailCfg.AlertPBSStaleHours,
 		GlobalPVEHeartbeatMinutes: emailCfg.AlertPVEHeartbeatMinutes,
 		PVEConfigs:                make(map[int64]domain.PVEAlertConfig),
 		PVEVMConfigs:              make(map[int64][]domain.PVEVMAlertConfig),
 		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
+		WindowsConfigs:            make(map[int64]domain.WindowsAlertConfig),
 	}
 
 	pveServers, err := st.ListPVEServers(ctx)
@@ -123,6 +127,20 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 		}
 		svCfg.ServerID = sv.ID
 		cfg.PBSConfigs[sv.ID] = svCfg
+	}
+
+	windowsServers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return cfg, err
+	}
+	windowsConfigs, err := st.ListWindowsAlertConfigs(ctx)
+	if err != nil {
+		return cfg, err
+	}
+	for _, sv := range windowsServers {
+		svCfg := windowsConfigs[sv.ID]
+		svCfg.ServerID = sv.ID
+		cfg.WindowsConfigs[sv.ID] = svCfg
 	}
 
 	return cfg, nil
@@ -657,15 +675,19 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 
 func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	ctx := context.Background()
-	if cfg.GlobalDiskPct <= 0 {
-		return nil, nil
-	}
 	servers, err := st.ListWindowsServers(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
 	for _, sv := range servers {
+		threshold := cfg.GlobalWindowsDiskPct
+		if svCfg, ok := cfg.WindowsConfigs[sv.ID]; ok && svCfg.DiskPct != nil {
+			threshold = *svCfg.DiskPct
+		}
+		if threshold <= 0 {
+			continue
+		}
 		rep, err := st.GetLatestWindowsReport(ctx, sv.ID)
 		if err != nil {
 			continue
@@ -682,7 +704,7 @@ func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) 
 				continue
 			}
 			pct := int(float64(disk.Used) / float64(disk.Total) * 100)
-			if pct < cfg.GlobalDiskPct {
+			if pct < threshold {
 				continue
 			}
 			alerts = append(alerts, domain.Alert{
@@ -694,7 +716,7 @@ func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) 
 				Title:      "Disco casi lleno",
 				Message:    fmt.Sprintf("%s al %d%% (%s libre)", disk.Name, pct, alertFmtBytes(disk.Free)),
 				Value:      fmt.Sprintf("%d%%", pct),
-				Threshold:  fmt.Sprintf("%d%%", cfg.GlobalDiskPct),
+				Threshold:  fmt.Sprintf("%d%%", threshold),
 				DetectedAt: time.Now(),
 			})
 		}

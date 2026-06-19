@@ -27,6 +27,9 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 	if cfg.AlertDiskPct != 85 {
 		t.Errorf("AlertDiskPct: want 85, got %d", cfg.AlertDiskPct)
 	}
+	if cfg.AlertWindowsDiskPct != 90 {
+		t.Errorf("AlertWindowsDiskPct: want 90, got %d", cfg.AlertWindowsDiskPct)
+	}
 	if !cfg.AlertBackupErr {
 		t.Error("AlertBackupErr: want true")
 	}
@@ -56,6 +59,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		RetentionMonths:             12,
 		RetentionEnabled:            false,
 		AlertDiskPct:                90,
+		AlertWindowsDiskPct:         92,
 		AlertBackupErr:              false,
 		PublicAPIURL:                "https://probakgo.example.com",
 		AlertPVEHeartbeatMinutes:    10,
@@ -87,6 +91,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"RetentionMonths", got.RetentionMonths, want.RetentionMonths},
 		{"RetentionEnabled", got.RetentionEnabled, want.RetentionEnabled},
 		{"AlertDiskPct", got.AlertDiskPct, want.AlertDiskPct},
+		{"AlertWindowsDiskPct", got.AlertWindowsDiskPct, want.AlertWindowsDiskPct},
 		{"AlertBackupErr", got.AlertBackupErr, want.AlertBackupErr},
 		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
 		{"AlertPVEHeartbeatMinutes", got.AlertPVEHeartbeatMinutes, want.AlertPVEHeartbeatMinutes},

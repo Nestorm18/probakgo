@@ -61,6 +61,39 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
 }
 
+func (h *WebH) WindowsAlertConfigPost(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	cfg := domain.WindowsAlertConfig{ServerID: id}
+	if v := r.FormValue("disk_pct"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 || n > 99 {
+			http.Redirect(w, r, "/servers/windows?flash=Porcentaje+de+disco+Windows+no+valido", http.StatusSeeOther)
+			return
+		}
+		cfg.DiskPct = &n
+	}
+
+	if err := h.store.UpsertWindowsAlertConfig(ctx, cfg); err != nil {
+		slog.Error("upsert windows alert config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	h.audit(r, "alert_config.windows_update", "windows_server", strconv.FormatInt(id, 10), "", map[string]any{
+		"disk_pct": cfg.DiskPct,
+	})
+	if r.FormValue("back") == "list" {
+		http.Redirect(w, r, "/servers/windows?flash=Configuracion+de+alertas+guardada&ok=1", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, "/servers/windows/"+strconv.FormatInt(id, 10)+"?flash=Configuracion+de+alertas+guardada&ok=1", http.StatusSeeOther)
+}
+
 func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)

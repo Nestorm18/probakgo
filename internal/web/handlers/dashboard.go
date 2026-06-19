@@ -124,9 +124,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	diskThreshold := 90
 	heartbeatThreshold := 15
 	if emailCfg != nil {
-		diskThreshold = emailCfg.AlertDiskPct
+		diskThreshold = emailCfg.AlertWindowsDiskPct
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
 	}
+	windowsAlertConfigs, _ := h.store.ListWindowsAlertConfigs(ctx)
 	windowsReports, err := h.store.GetLatestWindowsReports(ctx)
 	if err != nil {
 		slog.Error("list latest windows reports", "err", err)
@@ -153,7 +154,11 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			disks = windowsDisks[rep.ID]
 		}
 		heartbeat := buildHeartbeatView(windowsHeartbeats[sv.ID], heartbeatThreshold)
-		diskAlert := windowsHasDiskAlert(disks, diskThreshold)
+		serverDiskThreshold := diskThreshold
+		if alertCfg, ok := windowsAlertConfigs[sv.ID]; ok && alertCfg.DiskPct != nil {
+			serverDiskThreshold = *alertCfg.DiskPct
+		}
+		diskAlert := windowsHasDiskAlert(disks, serverDiskThreshold)
 		if !heartbeat.Online {
 			windowsOffline++
 		} else if diskAlert {
@@ -165,7 +170,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"Server":       sv,
 			"Heartbeat":    heartbeat,
 			"HasDiskAlert": diskAlert,
-			"DiskSummary":  windowsDiskSummary(disks, diskThreshold),
+			"DiskSummary":  windowsDiskSummary(disks, serverDiskThreshold),
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt

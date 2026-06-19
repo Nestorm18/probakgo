@@ -70,6 +70,16 @@
         </td>
         <td class="text-end" style="white-space:nowrap">
           <a href="/servers/windows/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary" title="Ver detalle"><i class="bi bi-eye"></i></a>
+          {{if $.Role}}{{if canEdit $.Role}}
+          <button class="btn btn-sm btn-outline-secondary windows-alert-cfg-btn position-relative"
+                  title="{{if .AlertOverrides.Has}}{{.AlertOverrides.Title}}{{else}}Alertas{{end}}"
+                  data-server-id="{{.Server.ID}}"
+                  data-server-name="{{.Server.DisplayName}}"
+                  data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}">
+            <i class="bi bi-bell"></i>
+            {{if .AlertOverrides.Has}}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill" style="background:var(--clr-accent);font-size:.58rem;line-height:1;padding:.18rem .32rem">{{.AlertOverrides.Count}}</span>{{end}}
+          </button>
+          {{end}}{{end}}
         </td>
       </tr>
       {{else}}
@@ -84,6 +94,38 @@
       {{end}}
       </tbody>
     </table>
+  </div>
+</div>
+
+<!-- Alert config modal (Windows) -->
+<div class="modal fade" id="windowsAlertCfgModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-md">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold">
+          <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas - <span id="windowsAlertCfgName"></span>
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="windowsAlertCfgForm" method="post">
+        {{.CSRFField}}
+        <input type="hidden" name="back" value="list">
+        <div class="modal-body">
+          <div class="alert-config-stack">
+            <div class="alert-config-field">
+              <label class="form-label">Disco lleno (%)</label>
+              <input type="number" id="windowsAlertDiskPct" name="disk_pct" class="form-control form-control-sm"
+                     min="0" max="99" placeholder="Global Windows (heredado)">
+              <div class="form-text">Vacio = umbral global Windows - 0 = desactivado para este servidor</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -128,6 +170,16 @@
     });
   });
 })();
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.windows-alert-cfg-btn');
+  if (!btn) return;
+  const d = btn.dataset;
+  document.getElementById('windowsAlertCfgName').textContent = d.serverName;
+  document.getElementById('windowsAlertCfgForm').action = '/servers/windows/' + d.serverId + '/alerts';
+  document.getElementById('windowsAlertDiskPct').value = d.diskPct || '';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('windowsAlertCfgModal')).show();
+});
 </script>
 {{end}}
 

@@ -15,13 +15,22 @@
           {{ .CSRFField }}
           <div class="row g-3">
             <div class="col-md-5">
-              <label class="form-label">Alerta de disco</label>
+              <label class="form-label">Alerta de disco PVE/PBS</label>
               <div class="input-group">
                 <input type="number" class="form-control" name="alert_disk_pct"
                        value="{{.Config.AlertDiskPct}}" min="0" max="99" style="max-width:100px">
                 <span class="input-group-text">%</span>
               </div>
-              <div class="form-text">Alerta cuando el almacenamiento supere este porcentaje. 0 para desactivar.</div>
+              <div class="form-text">Alerta cuando el almacenamiento PVE/PBS supere este porcentaje. 0 para desactivar.</div>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Alerta de disco Windows</label>
+              <div class="input-group">
+                <input type="number" class="form-control" name="alert_windows_disk_pct"
+                       value="{{.Config.AlertWindowsDiskPct}}" min="0" max="99" style="max-width:100px">
+                <span class="input-group-text">%</span>
+              </div>
+              <div class="form-text">Umbral global heredado por servidores Windows. 0 para desactivar.</div>
             </div>
             <div class="col-md-7 pt-md-3">
               <div class="check-toggle-wrap">

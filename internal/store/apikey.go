@@ -27,9 +27,36 @@ func (s *Store) GetAPIKey(ctx context.Context, id int64) (*domain.APIKey, error)
 }
 
 func (s *Store) ListAPIKeys(ctx context.Context) ([]domain.APIKey, error) {
+	return s.ListAPIKeysPage(ctx, 0, 0, "")
+}
+
+func (s *Store) ListAPIKeysPage(ctx context.Context, limit, offset int, query string) ([]domain.APIKey, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	query = strings.TrimSpace(query)
+	where := ""
+	args := []any{}
+	if query != "" {
+		like := "%" + strings.ToLower(query) + "%"
+		where = ` WHERE lower(name) LIKE ? OR lower(server_name) LIKE ? OR lower(machine_id) LIKE ? OR lower(server_url) LIKE ? OR lower(key) LIKE ?`
+		args = append(args, like, like, like, like, like)
+		switch strings.ToLower(query) {
+		case "activa", "activo", "active":
+			where += ` OR is_active = 1`
+		case "inactiva", "inactivo", "inactive":
+			where += ` OR is_active = 0`
+		}
+	}
+	limitSQL := ""
+	if limit > 0 {
+		limitSQL = ` LIMIT ? OFFSET ?`
+		args = append(args, limit, offset)
+	}
+
 	debug.RecordQuery(ctx, `SELECT id, key, name, key_type, is_active, machine_id, last_used, server_name, server_url, created_at FROM api_keys ORDER BY created_at DESC`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, key, name, key_type, is_active, machine_id, last_used, server_name, server_url, created_at
-		FROM api_keys ORDER BY created_at DESC`)
+		FROM api_keys`+where+` ORDER BY created_at DESC, id DESC`+limitSQL, args...)
 	if err != nil {
 		return nil, err
 	}

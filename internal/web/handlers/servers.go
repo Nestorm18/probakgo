@@ -110,6 +110,14 @@ func buildPBSAlertOverrideView(cfg domain.PBSAlertConfig) alertOverrideView {
 	return buildAlertOverrideView(parts)
 }
 
+func buildWindowsAlertOverrideView(cfg domain.WindowsAlertConfig) alertOverrideView {
+	var parts []string
+	if cfg.DiskPct != nil {
+		parts = append(parts, fmt.Sprintf("Disco %d%%", *cfg.DiskPct))
+	}
+	return buildAlertOverrideView(parts)
+}
+
 func buildAlertOverrideView(parts []string) alertOverrideView {
 	if len(parts) == 0 {
 		return alertOverrideView{}
@@ -576,9 +584,10 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 	diskThreshold := 90
 	heartbeatThreshold := 15
 	if emailCfg != nil {
-		diskThreshold = emailCfg.AlertDiskPct
+		diskThreshold = emailCfg.AlertWindowsDiskPct
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
 	}
+	alertConfigs, _ := h.store.ListWindowsAlertConfigs(ctx)
 	reports, _ := h.store.GetLatestWindowsReports(ctx)
 	reportIDs := make([]int64, 0, len(reports))
 	for _, rep := range reports {
@@ -595,14 +604,22 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			disks = disksByReport[rep.ID]
 		}
+		alertCfg := alertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
+		serverDiskThreshold := diskThreshold
+		if alertCfg.DiskPct != nil {
+			serverDiskThreshold = *alertCfg.DiskPct
+		}
 		rows = append(rows, map[string]any{
-			"Server":       sv,
-			"LastReport":   windowsReportTime(rep),
-			"Disks":        windowsDiskDisplays(disks, diskThreshold),
-			"DiskSummary":  windowsDiskSummary(disks, diskThreshold),
-			"Heartbeat":    buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
-			"ServerURL":    serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
-			"HasDiskAlert": windowsHasDiskAlert(disks, diskThreshold),
+			"Server":         sv,
+			"LastReport":     windowsReportTime(rep),
+			"Disks":          windowsDiskDisplays(disks, serverDiskThreshold),
+			"DiskSummary":    windowsDiskSummary(disks, serverDiskThreshold),
+			"Heartbeat":      buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
+			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"HasDiskAlert":   windowsHasDiskAlert(disks, serverDiskThreshold),
+			"AlertConfig":    alertCfg,
+			"AlertOverrides": buildWindowsAlertOverrideView(alertCfg),
 		})
 	}
 	h.tmpl.Render(w, r, "servers_windows.html", map[string]any{
@@ -632,8 +649,12 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 	diskThreshold := 90
 	heartbeatThreshold := 15
 	if emailCfg != nil {
-		diskThreshold = emailCfg.AlertDiskPct
+		diskThreshold = emailCfg.AlertWindowsDiskPct
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+	}
+	alertCfg, _ := h.store.GetWindowsAlertConfig(ctx, id)
+	if alertCfg.DiskPct != nil {
+		diskThreshold = *alertCfg.DiskPct
 	}
 	var disks []domain.WindowsDisk
 	if len(reports) > 0 {
@@ -655,6 +676,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Reports":       reports,
 		"Disks":         diskRows,
 		"DiskThreshold": diskThreshold,
+		"AlertConfig":   alertCfg,
 		"Heartbeat":     buildHeartbeatView(heartbeat, heartbeatThreshold),
 		"AlertControls": alertControls,
 		"AllAlertIDs":   windowsAlertControlIDs(alertControls),
