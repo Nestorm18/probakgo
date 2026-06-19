@@ -1,57 +1,59 @@
-﻿{{block "page_title" .}}Alertas - Probakgo{{end}}
-{{block "page_heading" .}}Alertas Automáticas{{end}}
+{{block "page_title" .}}Alertas - Probakgo{{end}}
+{{block "page_heading" .}}Alertas Automaticas{{end}}
 {{block "page_content" .}}
 
 <div class="row">
-  <div class="col-lg-7">
-
-
+  <div class="col-lg-7 col-xl-6">
     <div class="card">
       <div class="card-header">
-        <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas automáticas
+        <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas automaticas
       </div>
       <div class="card-body">
         <form method="POST" action="/settings/alerts">
           {{ .CSRFField }}
-          <div class="row g-3">
-            <div class="col-md-5">
+          <div class="alert-config-stack">
+            <div class="alert-config-field">
               <label class="form-label">Alerta de disco PVE/PBS</label>
-              <div class="input-group">
+              <div class="input-group" style="max-width:140px">
                 <input type="number" class="form-control" name="alert_disk_pct"
-                       value="{{.Config.AlertDiskPct}}" min="0" max="99" style="max-width:100px">
+                       value="{{.Config.AlertDiskPct}}" min="0" max="99">
                 <span class="input-group-text">%</span>
               </div>
               <div class="form-text">Alerta cuando el almacenamiento PVE/PBS supere este porcentaje. 0 para desactivar.</div>
             </div>
-            <div class="col-md-5">
+
+            <div class="alert-config-field">
               <label class="form-label">Alerta de disco Windows</label>
-              <div class="input-group">
+              <div class="input-group" style="max-width:140px">
                 <input type="number" class="form-control" name="alert_windows_disk_pct"
-                       value="{{.Config.AlertWindowsDiskPct}}" min="0" max="99" style="max-width:100px">
+                       value="{{.Config.AlertWindowsDiskPct}}" min="0" max="99">
                 <span class="input-group-text">%</span>
               </div>
               <div class="form-text">Umbral global heredado por servidores Windows. 0 para desactivar.</div>
             </div>
-            <div class="col-md-7 pt-md-3">
+
+            <div class="alert-config-field">
               <div class="check-toggle-wrap">
                 <input class="form-check-input m-0" type="checkbox" name="alert_backup_err"
                        id="alertBackup" {{if .Config.AlertBackupErr}}checked{{end}}>
                 <label class="form-check-label m-0" for="alertBackup"
                        style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
-                  Alerta cuando el último backup falle
+                  Alerta cuando el ultimo backup falle
                 </label>
               </div>
             </div>
-            <div class="col-md-5">
-              <label class="form-label">Conexión PVE</label>
-              <div class="input-group">
+
+            <div class="alert-config-field">
+              <label class="form-label">Conexion PVE</label>
+              <div class="input-group" style="max-width:150px">
                 <input type="number" class="form-control" name="alert_pve_heartbeat_minutes"
-                       value="{{.Config.AlertPVEHeartbeatMinutes}}" min="0" style="max-width:100px">
+                       value="{{.Config.AlertPVEHeartbeatMinutes}}" min="0">
                 <span class="input-group-text">min</span>
               </div>
-              <div class="form-text">Alerta si un PVE deja de dar señales durante este tiempo. 0 para desactivar.</div>
+              <div class="form-text">Alerta si un PVE deja de dar senales durante este tiempo. 0 para desactivar.</div>
             </div>
           </div>
+
           <div class="mt-4">
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-floppy me-1"></i>Guardar
@@ -60,7 +62,6 @@
         </form>
       </div>
     </div>
-
   </div>
 </div>
 

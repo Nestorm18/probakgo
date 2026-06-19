@@ -38,7 +38,7 @@
       </div>
       <div class="card-body">
         <div class="row g-3">
-          <div class="col-6">
+          <div class="col-12 col-md-4">
             <div class="stat-card">
               <div class="stat-icon ok"><i class="bi bi-server"></i></div>
               <div>
@@ -47,12 +47,21 @@
               </div>
             </div>
           </div>
-          <div class="col-6">
+          <div class="col-12 col-md-4">
             <div class="stat-card">
               <div class="stat-icon ok"><i class="bi bi-archive"></i></div>
               <div>
                 <div class="stat-value">{{.PBSCount}}</div>
                 <div class="stat-label">Proxmox BS</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div class="stat-card">
+              <div class="stat-icon ok"><i class="bi bi-windows"></i></div>
+              <div>
+                <div class="stat-value">{{.WindowsCount}}</div>
+                <div class="stat-label">Windows</div>
               </div>
             </div>
           </div>
