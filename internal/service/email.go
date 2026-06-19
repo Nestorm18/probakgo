@@ -74,12 +74,15 @@ type emailData struct {
 	SummaryIssues []summaryIssueRow
 	TotalPVE      int
 	TotalPBS      int
+	TotalWindows  int
 	TotalIssues   int
 	TotalOK       int
 	PVEIssues     []serverRow
 	PBSIssues     []serverRow
+	WindowsIssues []serverRow
 	PVEOk         []serverRow
 	PBSOk         []serverRow
+	WindowsOk     []serverRow
 	DiskAlerts    []diskAlertRow
 	BackupErrors  []serverRow
 }
@@ -233,6 +236,10 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	if err != nil {
 		return emailData{}, err
 	}
+	windowsServers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return emailData{}, err
+	}
 
 	var pveIssues, pveOk []serverRow
 	for _, sv := range pveServers {
@@ -331,6 +338,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	// Alerts: disk usage and backup errors via unified alert engine
 	var diskAlerts []diskAlertRow
 	var backupErrors []serverRow
+	windowsAlertReasons := make(map[int64][]string)
 	if alertCfg, err := LoadAlertConfigs(ctx, st); err == nil {
 		alertCfg.Report = rep
 		if alerts, err := RunAll(st, alertCfg); err == nil {
@@ -353,14 +361,56 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 						Name:        a.ServerName,
 						StaleReason: a.Message,
 					})
+				case domain.AlertTypeWindowsHeartbeat, domain.AlertTypeWindowsDiskHealth:
+					windowsAlertReasons[a.ServerID] = append(windowsAlertReasons[a.ServerID], a.Message)
 				}
 			}
 		}
 	}
 
-	totalIssues := len(pveIssues) + len(pbsIssues)
+	var windowsIssues, windowsOk []serverRow
+	for _, sv := range windowsServers {
+		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
+		r, err := st.GetLatestWindowsReport(ctx, sv.ID)
+		if err != nil {
+			row.StaleReason = "no se han recibido reportes"
+			windowsIssues = append(windowsIssues, row)
+			continue
+		}
+		if disks, err := st.GetWindowsDisksForReport(ctx, r.ID); err == nil {
+			for _, disk := range disks {
+				if !isWindowsLogicalAlertDisk(disk) {
+					continue
+				}
+				usedPct := 0
+				if disk.Total > 0 {
+					usedPct = int(disk.Used * 100 / disk.Total)
+				}
+				row.Datastores = append(row.Datastores, datastoreRow{
+					Name:        disk.Name,
+					Used:        emailFmtBytes(disk.Used),
+					Total:       emailFmtBytes(disk.Total),
+					UsedPct:     usedPct,
+					MountStatus: emailWindowsDiskStatus(disk),
+				})
+			}
+		}
+		if r.IsStale {
+			row.StaleReason = "reporte Windows marcado como obsoleto"
+			windowsIssues = append(windowsIssues, row)
+			continue
+		}
+		if reasons := windowsAlertReasons[sv.ID]; len(reasons) > 0 {
+			row.StaleReason = strings.Join(reasons, "; ")
+			windowsIssues = append(windowsIssues, row)
+		} else {
+			windowsOk = append(windowsOk, row)
+		}
+	}
+
+	totalIssues := len(pveIssues) + len(pbsIssues) + len(windowsIssues)
 	backupProblems := totalIssues + len(backupErrors)
-	totalOK := len(pveOk) + len(pbsOk)
+	totalOK := len(pveOk) + len(pbsOk) + len(windowsOk)
 	headerColor := "#28a745"
 	statusText := "Todos los servidores operativos"
 	if backupProblems > 0 {
@@ -368,7 +418,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		statusText = fmt.Sprintf("%d problema(s) de backup detectado(s)", backupProblems)
 	}
 
-	summaryIssues := buildSummaryIssues(pveIssues, pbsIssues, backupErrors)
+	summaryIssues := buildSummaryIssues(pveIssues, pbsIssues, windowsIssues, backupErrors)
 
 	return emailData{
 		ReportDate:    time.Now().In(rep.tz).Format("2006-01-02"),
@@ -378,12 +428,15 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		SummaryIssues: summaryIssues,
 		TotalPVE:      len(pveServers),
 		TotalPBS:      len(pbsServers),
+		TotalWindows:  len(windowsServers),
 		TotalIssues:   backupProblems,
 		TotalOK:       totalOK,
 		PVEIssues:     pveIssues,
 		PBSIssues:     pbsIssues,
+		WindowsIssues: windowsIssues,
 		PVEOk:         pveOk,
 		PBSOk:         pbsOk,
+		WindowsOk:     windowsOk,
 		DiskAlerts:    diskAlerts,
 		BackupErrors:  backupErrors,
 	}, nil
@@ -454,7 +507,7 @@ func missingVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask
 	return rows, activeMissing
 }
 
-func buildSummaryIssues(pveIssues, pbsIssues, backupErrors []serverRow) []summaryIssueRow {
+func buildSummaryIssues(pveIssues, pbsIssues, windowsIssues, backupErrors []serverRow) []summaryIssueRow {
 	var rows []summaryIssueRow
 	add := func(kind string, items []serverRow) {
 		for _, item := range items {
@@ -471,6 +524,7 @@ func buildSummaryIssues(pveIssues, pbsIssues, backupErrors []serverRow) []summar
 	}
 	add("PVE", pveIssues)
 	add("PBS", pbsIssues)
+	add("Windows", windowsIssues)
 	add("Backup", backupErrors)
 	return rows
 }
@@ -560,6 +614,14 @@ func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportServic
 }
 
 func emailFmtBytes(b int64) string { return domain.FormatBytes(b) }
+
+func emailWindowsDiskStatus(disk domain.WindowsDisk) string {
+	health := strings.TrimSpace(disk.Health)
+	if health == "" {
+		return "OK"
+	}
+	return health
+}
 
 func emailFmtDuration(secs int64) string {
 	if secs <= 0 {
