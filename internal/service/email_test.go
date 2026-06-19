@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -271,6 +272,95 @@ func TestBuildEmailData_DiskAlertsDoNotCountAsBackupProblems(t *testing.T) {
 	}
 	if data.StatusText != "Todos los servidores operativos" {
 		t.Errorf("unexpected status text: %q", data.StatusText)
+	}
+}
+
+func TestBuildEmailData_IncludesWindowsOK(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertWindowsServer(ctx, "win-ok", "10.0.0.20", "", "1.0", "machine-win")
+	reportID, _ := st.InsertWindowsReport(ctx, serverID)
+	if err := st.InsertWindowsDisk(ctx, reportID, domain.WindowsDiskPayload{
+		Name:      "C:",
+		DriveType: "Fixed",
+		Total:     1000,
+		Used:      500,
+		Free:      500,
+		Health:    "OK",
+	}); err != nil {
+		t.Fatalf("InsertWindowsDisk: %v", err)
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertWindowsDiskPct = 90
+	cfg.AlertBackupErr = false
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if data.TotalWindows != 1 {
+		t.Fatalf("want TotalWindows=1, got %d", data.TotalWindows)
+	}
+	if len(data.WindowsOk) != 1 {
+		t.Fatalf("want 1 Windows OK row, got %d", len(data.WindowsOk))
+	}
+	if data.TotalOK != 1 {
+		t.Fatalf("want TotalOK=1, got %d", data.TotalOK)
+	}
+	html, err := renderEmailTemplate(data)
+	if err != nil {
+		t.Fatalf("renderEmailTemplate: %v", err)
+	}
+	if !strings.Contains(html, "Servidores Windows Operativos") || !strings.Contains(html, "win-ok") || !strings.Contains(html, "C:") {
+		t.Fatalf("rendered email does not include Windows details")
+	}
+}
+
+func TestBuildEmailData_IncludesWindowsIssue(t *testing.T) {
+	ctx := context.Background()
+	db, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertWindowsServer(ctx, "win-offline", "10.0.0.21", "", "1.0", "machine-win-offline")
+	reportID, _ := st.InsertWindowsReport(ctx, serverID)
+	if err := st.InsertWindowsDisk(ctx, reportID, domain.WindowsDiskPayload{
+		Name:      "C:",
+		DriveType: "Fixed",
+		Total:     1000,
+		Used:      500,
+		Free:      500,
+		Health:    "OK",
+	}); err != nil {
+		t.Fatalf("InsertWindowsDisk: %v", err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	db.Exec("UPDATE windows_reports SET reported_at = ? WHERE id = ?", old, reportID)
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertWindowsDiskPct = 0
+	cfg.AlertBackupErr = false
+	cfg.AlertPVEHeartbeatMinutes = 15
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.WindowsIssues) != 1 {
+		t.Fatalf("want 1 Windows issue, got %d", len(data.WindowsIssues))
+	}
+	if data.WindowsIssues[0].Name != "win-offline" {
+		t.Fatalf("want win-offline issue, got %q", data.WindowsIssues[0].Name)
+	}
+	if data.TotalIssues != 1 {
+		t.Fatalf("want TotalIssues=1, got %d", data.TotalIssues)
+	}
+	if len(data.SummaryIssues) != 1 || data.SummaryIssues[0].Kind != "Windows" {
+		t.Fatalf("want Windows summary issue, got %+v", data.SummaryIssues)
 	}
 }
 

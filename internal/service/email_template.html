@@ -42,13 +42,17 @@
                                         {{end}}
                                         <table role="presentation" width="100%" cellpadding="10" cellspacing="0">
                                             <tr>
-                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
                                                     <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPVE}}</p>
                                                     <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PVE</p>
                                                 </td>
-                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
                                                     <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPBS}}</p>
                                                     <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PBS</p>
+                                                </td>
+                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
+                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalWindows}}</p>
+                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores Windows</p>
                                                 </td>
                                             </tr>
                                             <tr>
@@ -149,6 +153,29 @@
                             {{end}}
                             {{end}}
 
+                            {{if .WindowsIssues}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores Windows con Problemas</h2>
+                            {{range .WindowsIssues}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #dc3545; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #0d6efd; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">WINDOWS</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 15px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #f8d7da; border: 1px solid #f5c2c7; border-radius: 4px; margin-top: 15px;">
+                                            <tr><td><h4 style="margin: 0; font-size: 16px; color: #842029;">{{.StaleReason}}</h4></td></tr>
+                                        </table>
+                                        {{template "wintable" .}}
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+
                             {{if .PVEOk}}
                             <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PVE Operativos</h2>
                             {{range .PVEOk}}
@@ -183,6 +210,26 @@
                                         </table>
                                         <p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
                                         {{template "dstable" .}}
+                                    </td>
+                                </tr>
+                            </table>
+                            {{end}}
+                            {{end}}
+
+                            {{if .WindowsOk}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores Windows Operativos</h2>
+                            {{range .WindowsOk}}
+                            <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
+                                <tr>
+                                    <td>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td style="text-align: right;"><span style="background-color: #0d6efd; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">WINDOWS</span></td>
+                                            </tr>
+                                        </table>
+                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        {{template "wintable" .}}
                                     </td>
                                 </tr>
                             </table>
@@ -256,6 +303,32 @@
             {{else if ge .UsedPct 75}}<span style="color: #fd7e14; font-weight: 600;">{{.UsedPct}}%</span>
             {{else}}<span style="color: #28a745;">{{.UsedPct}}%</span>{{end}}
         </td>
+    </tr>
+    {{end}}
+</table>
+{{end}}
+{{end}}
+{{define "wintable"}}
+{{if .Datastores}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #dee2e6; border-radius: 4px; overflow: hidden; font-size: 13px; margin-top: 12px;">
+    <tr style="background-color: #f8f9fa;">
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Disco</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Usado</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Total</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Uso %</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Salud</td>
+    </tr>
+    {{range .Datastores}}
+    <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 8px 12px; font-weight: 500; color: #333;">{{.Name}}</td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{.Used}}</td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{.Total}}</td>
+        <td style="padding: 8px 12px;">
+            {{if ge .UsedPct 90}}<span style="color: #dc3545; font-weight: 600;">{{.UsedPct}}%</span>
+            {{else if ge .UsedPct 75}}<span style="color: #fd7e14; font-weight: 600;">{{.UsedPct}}%</span>
+            {{else}}<span style="color: #28a745;">{{.UsedPct}}%</span>{{end}}
+        </td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{.MountStatus}}</td>
     </tr>
     {{end}}
 </table>
