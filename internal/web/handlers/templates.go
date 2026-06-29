@@ -53,20 +53,22 @@ var templateActive = map[string]string{
 }
 
 type Templates struct {
-	fs          fs.FS
-	funcMap     template.FuncMap
-	version     string
-	secure      bool
-	badgeCounts func() (int, int)
+	fs                   fs.FS
+	funcMap              template.FuncMap
+	version              string
+	secure               bool
+	badgeCounts          func() (int, int)
+	sensitiveTOTPEnabled func() bool
 }
 
-func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int)) *Templates {
+func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int), sensitiveTOTPEnabled func() bool) *Templates {
 	return &Templates{
-		fs:          fs,
-		funcMap:     makeFuncMap(loc),
-		version:     version,
-		secure:      secure,
-		badgeCounts: badgeCounts,
+		fs:                   fs,
+		funcMap:              makeFuncMap(loc),
+		version:              version,
+		secure:               secure,
+		badgeCounts:          badgeCounts,
+		sensitiveTOTPEnabled: sensitiveTOTPEnabled,
 	}
 }
 
@@ -192,6 +194,9 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		}
 		if _, has := m["ShowPublicHTTPWarning"]; !has {
 			m["ShowPublicHTTPWarning"] = requestLooksPublicHTTP(r)
+		}
+		if _, has := m["SensitiveActionsRequireTOTP"]; !has && t.sensitiveTOTPEnabled != nil {
+			m["SensitiveActionsRequireTOTP"] = t.sensitiveTOTPEnabled()
 		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]

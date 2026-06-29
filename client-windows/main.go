@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var version = "0.0.133"
+var version = "0.0.135"
 
 func main() {
 	closeLog := setupLogging()

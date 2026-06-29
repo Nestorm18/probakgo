@@ -245,6 +245,37 @@ func TestListPVEReports_LimitAndOrder(t *testing.T) {
 	}
 }
 
+func TestListPVEReportsPageAndCount(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+
+	id1, _ := st.InsertPVEReport(ctx, serverID, nil)
+	id2, _ := st.InsertPVEReport(ctx, serverID, nil)
+	id3, _ := st.InsertPVEReport(ctx, serverID, nil)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-72*time.Hour), id1)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-48*time.Hour), id2)
+
+	count, err := st.CountPVEReports(ctx, serverID)
+	if err != nil {
+		t.Fatalf("CountPVEReports: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("want 3 reports, got %d", count)
+	}
+
+	reports, err := st.ListPVEReportsPage(ctx, serverID, 2, 1)
+	if err != nil {
+		t.Fatalf("ListPVEReportsPage: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("want 2 reports, got %d", len(reports))
+	}
+	if reports[0].ID != id2 || reports[1].ID != id1 || id3 == reports[0].ID {
+		t.Fatalf("unexpected page order: got [%d,%d], newest id=%d", reports[0].ID, reports[1].ID, id3)
+	}
+}
+
 func TestListPVEReportsByDays_Filter(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)
@@ -268,6 +299,34 @@ func TestListPVEReportsByDays_Filter(t *testing.T) {
 	}
 	if len(all) != 2 {
 		t.Errorf("days=7: want 2 reports, got %d", len(all))
+	}
+}
+
+func TestListPVEReportsByDaysPageAndCount(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+
+	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	recentID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	newestID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().AddDate(0, 0, -35), oldID)
+	st.db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-48*time.Hour), recentID)
+
+	count, err := st.CountPVEReportsByDays(ctx, serverID, 30)
+	if err != nil {
+		t.Fatalf("CountPVEReportsByDays: %v", err)
+	}
+	if count != 2 {
+		t.Fatalf("want 2 reports in 30 days, got %d", count)
+	}
+
+	reports, err := st.ListPVEReportsByDaysPage(ctx, serverID, 30, 1, 1)
+	if err != nil {
+		t.Fatalf("ListPVEReportsByDaysPage: %v", err)
+	}
+	if len(reports) != 1 || reports[0].ID != recentID || reports[0].ID == newestID {
+		t.Fatalf("unexpected paged reports: got %+v, newest id=%d recent id=%d", reports, newestID, recentID)
 	}
 }
 

@@ -2,6 +2,7 @@ package session
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/sessions"
 )
@@ -121,6 +122,39 @@ func ClearPendingTOTPSetup(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	delete(sess.Values, "pending_totp_secret")
+	return sess.Save(r, w)
+}
+
+func SensitiveTOTPFresh(r *http.Request, now time.Time) bool {
+	if store == nil {
+		return false
+	}
+	sess, err := getSession(r)
+	if err != nil {
+		return false
+	}
+	var unix int64
+	switch v := sess.Values["sensitive_totp_until"].(type) {
+	case int64:
+		unix = v
+	case int:
+		unix = int64(v)
+	case float64:
+		unix = int64(v)
+	case time.Time:
+		unix = v.Unix()
+	default:
+		return false
+	}
+	return time.Unix(unix, 0).After(now)
+}
+
+func SetSensitiveTOTPFresh(w http.ResponseWriter, r *http.Request, until time.Time) error {
+	sess, err := getSession(r)
+	if err != nil {
+		return err
+	}
+	sess.Values["sensitive_totp_until"] = until.Unix()
 	return sess.Save(r, w)
 }
 

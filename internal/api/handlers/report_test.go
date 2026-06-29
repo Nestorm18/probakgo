@@ -85,7 +85,7 @@ func TestReportPVE_MissingMachineID(t *testing.T) {
 	}
 }
 
-func TestReportPVE_ServerNameChangeAllowedForSameKey(t *testing.T) {
+func TestReportPVE_BoundServerNameMismatchRejected(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
@@ -99,8 +99,11 @@ func TestReportPVE_ServerNameChangeAllowedForSameKey(t *testing.T) {
 	rr := httptest.NewRecorder()
 	ts.handler.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
-		t.Errorf("want 200, got %d: %s", rr.Code, rr.Body.String())
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("want 403, got %d: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), `expected \"pve-01\", got \"pve-02\"`) {
+		t.Fatalf("response should explain server mismatch, got: %s", rr.Body.String())
 	}
 }
 

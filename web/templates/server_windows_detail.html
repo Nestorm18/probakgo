@@ -84,6 +84,19 @@
   </div>
 </div>
 
+<div class="card mb-4">
+  <div class="card-header">
+    <i class="bi bi-graph-up me-2" style="color:var(--clr-accent)"></i>Uso de espacio en el tiempo
+  </div>
+  <div class="card-body">
+    {{if .DiskChartData}}
+    <div style="height:260px"><canvas id="windowsDiskChart"></canvas></div>
+    {{else}}
+    <div class="text-center py-4" style="color:var(--txt-muted);font-size:.85rem">Sin historial suficiente para mostrar grafico</div>
+    {{end}}
+  </div>
+</div>
+
 {{if .Role}}{{if canEdit .Role}}
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
@@ -166,6 +179,7 @@
 <div class="card">
   <div class="card-header">
     <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
+    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
   </div>
   <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0" style="min-width:520px">
@@ -187,6 +201,70 @@
       </tbody>
     </table>
   </div>
+  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div style="font-size:.78rem;color:var(--txt-muted)">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    <nav aria-label="Paginación historial Windows">
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/windows/{{.Server.ID}}?page={{.Pagination.PrevPage}}">Anterior</a></li>
+        {{range .Pagination.Pages}}
+        <li class="page-item {{if eq . $.Pagination.Page}}active{{end}}"><a class="page-link" href="/servers/windows/{{$.Server.ID}}?page={{.}}">{{.}}</a></li>
+        {{end}}
+        <li class="page-item {{if not .Pagination.HasNext}}disabled{{end}}"><a class="page-link" href="/servers/windows/{{.Server.ID}}?page={{.Pagination.NextPage}}">Siguiente</a></li>
+      </ul>
+    </nav>
+  </div>
 </div>
 
+{{end}}
+{{block "page_scripts" .}}
+{{if .DiskChartData}}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  const raw = [{{range $i, $p := .DiskChartData}}{{if $i}},{{end}}{"label":"{{$p.Label}}","disk":"{{$p.Disk}}","usedPct":{{$p.UsedPct}},"used":{{$p.Used}},"total":{{$p.Total}}}{{end}}];
+  if (!raw.length) return;
+  const labels = Array.from(new Set(raw.map(p => p.label)));
+  const disks = Array.from(new Set(raw.map(p => p.disk))).sort();
+  const colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
+  const datasets = disks.map((disk, i) => ({
+    label: disk,
+    data: labels.map(label => {
+      const point = raw.find(p => p.label === label && p.disk === disk);
+      return point ? point.usedPct : null;
+    }),
+    borderColor: colors[i % colors.length],
+    backgroundColor: colors[i % colors.length],
+    tension: .25,
+    spanGaps: true,
+    pointRadius: 2,
+    pointHoverRadius: 4
+  }));
+  const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+  const gridColor = isDark ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)";
+  const textColor = isDark ? "#94a3b8" : "#64748b";
+  new Chart(document.getElementById("windowsDiskChart"), {
+    type: "line",
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        y: {
+          min: 0,
+          max: 100,
+          ticks: { color: textColor, callback: v => v + "%" },
+          grid: { color: gridColor }
+        },
+        x: { ticks: { color: textColor, maxRotation: 0, autoSkip: true }, grid: { display: false } }
+      },
+      plugins: {
+        legend: { labels: { color: textColor, usePointStyle: true, boxWidth: 8 } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ": " + ctx.parsed.y + "% usado" } }
+      }
+    }
+  });
+})();
+</script>
+{{end}}
 {{end}}

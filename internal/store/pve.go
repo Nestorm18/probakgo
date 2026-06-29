@@ -292,6 +292,41 @@ func (s *Store) ListPVEReports(ctx context.Context, serverID int64, limit int) (
 	return reports, rows.Err()
 }
 
+func (s *Store) ListPVEReportsPage(ctx context.Context, serverID int64, limit, offset int) ([]domain.PVEReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
+		FROM pve_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`, serverID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.PVEReport
+	for rows.Next() {
+		var r domain.PVEReport
+		var isStale int
+		var staleReason sql.NullString
+		var swapEnabled int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
+func (s *Store) CountPVEReports(ctx context.Context, serverID int64) (int, error) {
+	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ?`)
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ?`, serverID).Scan(&count)
+	return count, err
+}
+
 func (s *Store) GetPVEStoragesForReport(ctx context.Context, reportID int64) ([]domain.PVEStorage, error) {
 	debug.RecordQuery(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups FROM pve_storages WHERE report_id = ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups
@@ -362,6 +397,44 @@ func (s *Store) ListPVEReportsByDays(ctx context.Context, serverID int64, days i
 		reports = append(reports, r)
 	}
 	return reports, rows.Err()
+}
+
+func (s *Store) ListPVEReportsByDaysPage(ctx context.Context, serverID int64, days, limit, offset int) ([]domain.PVEReport, error) {
+	threshold := time.Now().AddDate(0, 0, -days)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
+		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
+		FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`,
+		serverID, threshold, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.PVEReport
+	for rows.Next() {
+		var r domain.PVEReport
+		var isStale int
+		var staleReason sql.NullString
+		var swapEnabled int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.BackupStatus, &r.BackupStarttime, &r.BackupEndtime, &r.BackupDuration,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
+func (s *Store) CountPVEReportsByDays(ctx context.Context, serverID int64, days int) (int, error) {
+	threshold := time.Now().AddDate(0, 0, -days)
+	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ? AND reported_at >= ?`)
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ? AND reported_at >= ?`, serverID, threshold).Scan(&count)
+	return count, err
 }
 
 func (s *Store) GetPVEStorageInfo(ctx context.Context, storageID int64) (*domain.PVEStorageInfo, error) {

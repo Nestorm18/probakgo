@@ -25,6 +25,9 @@ import (
 func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS, version, loc, secure, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st, rep)
+	}, func() bool {
+		cfg, err := st.GetEmailConfig(context.Background())
+		return err == nil && cfg != nil && cfg.SensitiveActionsRequireTOTP
 	})
 	h := webhandlers.New(st, tmpl, rep)
 

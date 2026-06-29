@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"probakgo/internal/debug"
 	"probakgo/internal/domain"
@@ -207,6 +208,34 @@ func (s *Store) ListWindowsReports(ctx context.Context, serverID int64, limit in
 	return reports, rows.Err()
 }
 
+func (s *Store) ListWindowsReportsPage(ctx context.Context, serverID int64, limit, offset int) ([]domain.WindowsReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale FROM windows_reports WHERE server_id = ? ORDER BY reported_at DESC, id DESC LIMIT ? OFFSET ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale
+		FROM windows_reports WHERE server_id = ? ORDER BY reported_at DESC, id DESC LIMIT ? OFFSET ?`, serverID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.WindowsReport
+	for rows.Next() {
+		var r domain.WindowsReport
+		var isStale int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
+func (s *Store) CountWindowsReports(ctx context.Context, serverID int64) (int, error) {
+	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM windows_reports WHERE server_id = ?`)
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM windows_reports WHERE server_id = ?`, serverID).Scan(&count)
+	return count, err
+}
+
 func (s *Store) GetWindowsDisksForReport(ctx context.Context, reportID int64) ([]domain.WindowsDisk, error) {
 	debug.RecordQuery(ctx, `SELECT id, report_id, name, label, file_system, drive_type, total, used, free, health FROM windows_disks WHERE report_id = ? ORDER BY name`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, name, label, file_system, drive_type, total, used, free, health
@@ -248,4 +277,25 @@ func (s *Store) GetWindowsDisksForReports(ctx context.Context, reportIDs []int64
 		result[d.ReportID] = append(result[d.ReportID], d)
 	}
 	return result, rows.Err()
+}
+
+// DeleteOldWindowsReports removes Windows reports and their disk rows older than cutoff.
+// Returns the number of reports deleted.
+func (s *Store) DeleteOldWindowsReports(ctx context.Context, cutoff time.Time) (int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM windows_disks WHERE report_id IN (
+		SELECT id FROM windows_reports WHERE reported_at < ?)`, cutoff); err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM windows_reports WHERE reported_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, tx.Commit()
 }
