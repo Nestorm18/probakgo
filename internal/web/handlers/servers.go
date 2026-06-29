@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"context"
 	"encoding/csv"
 	"fmt"
 	"log/slog"
@@ -51,6 +52,75 @@ type alertOverrideView struct {
 	Count int
 	Label string
 	Title string
+}
+
+const reportHistoryPageSize = 14
+
+type paginationView struct {
+	Page       int
+	TotalPages int
+	TotalItems int
+	PageSize   int
+	HasPrev    bool
+	HasNext    bool
+	PrevPage   int
+	NextPage   int
+	Pages      []int
+	Query      string
+}
+
+func buildPagination(page, totalItems, pageSize int, query string) paginationView {
+	if pageSize <= 0 {
+		pageSize = reportHistoryPageSize
+	}
+	totalPages := (totalItems + pageSize - 1) / pageSize
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	if page < 1 {
+		page = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	start := page - 2
+	if start < 1 {
+		start = 1
+	}
+	end := start + 4
+	if end > totalPages {
+		end = totalPages
+	}
+	if end-start < 4 {
+		start = end - 4
+		if start < 1 {
+			start = 1
+		}
+	}
+	pages := make([]int, 0, end-start+1)
+	for i := start; i <= end; i++ {
+		pages = append(pages, i)
+	}
+	return paginationView{
+		Page:       page,
+		TotalPages: totalPages,
+		TotalItems: totalItems,
+		PageSize:   pageSize,
+		HasPrev:    page > 1,
+		HasNext:    page < totalPages,
+		PrevPage:   page - 1,
+		NextPage:   page + 1,
+		Pages:      pages,
+		Query:      query,
+	}
+}
+
+func reportPageFromRequest(r *http.Request) int {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		return 1
+	}
+	return page
 }
 
 func buildSwapView(enabled bool, used, total int64) swapView {
@@ -242,12 +312,16 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	reports, _ := h.store.ListPVEReports(ctx, id, 14)
+	latestReports, _ := h.store.ListPVEReports(ctx, id, 14)
+	page := reportPageFromRequest(r)
+	totalReports, _ := h.store.CountPVEReports(ctx, id)
+	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
+	reports, _ := h.store.ListPVEReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
 
 	var storages []map[string]any
 	var latestReportID int64
-	if len(reports) > 0 {
-		latestReportID = reports[0].ID
+	if len(latestReports) > 0 {
+		latestReportID = latestReports[0].ID
 		sts, _ := h.store.GetPVEStoragesForReport(ctx, latestReportID)
 		storageIDs := make([]int64, len(sts))
 		for i, st := range sts {
@@ -327,13 +401,13 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 
 	// Job history: up to 6 previous reports with tasks (reports[0] is already the latest)
 	var historyIDs []int64
-	for i := 1; i < len(reports); i++ {
-		historyIDs = append(historyIDs, reports[i].ID)
+	for i := 1; i < len(latestReports); i++ {
+		historyIDs = append(historyIDs, latestReports[i].ID)
 	}
 	historyTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, historyIDs)
 	var jobHistory []map[string]any
-	for i := 1; i < len(reports) && len(jobHistory) < 6; i++ {
-		tasks := historyTasks[reports[i].ID]
+	for i := 1; i < len(latestReports) && len(jobHistory) < 6; i++ {
+		tasks := historyTasks[latestReports[i].ID]
 		if len(tasks) == 0 {
 			continue
 		}
@@ -345,7 +419,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		jobHistory = append(jobHistory, map[string]any{
-			"Report": reports[i],
+			"Report": latestReports[i],
 			"Tasks":  tasks,
 			"AllOK":  allOK,
 		})
@@ -364,12 +438,13 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Role":            role,
 		"Server":          sv,
 		"Reports":         reports,
+		"Pagination":      pagination,
 		"Storages":        storages,
 		"BackupTasks":     backupTasks,
 		"BackupRows":      backupRows,
 		"BackupJobStart":  backupJobStart,
 		"Heartbeat":       buildHeartbeatViewPtr(hb, heartbeatThreshold),
-		"Swap":            latestPVESwapView(reports),
+		"Swap":            latestPVESwapView(latestReports),
 		"MissingVMs":      missingVMs,
 		"ConfiguredVMIDs": configuredVMIDs,
 		"JobHistory":      jobHistory,
@@ -421,14 +496,17 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	days := 7
+	days := 30
 	if d := r.URL.Query().Get("days"); d != "" {
 		if n, err2 := strconv.Atoi(d); err2 == nil && n >= 1 && n <= 365 {
 			days = n
 		}
 	}
 
-	reports, _ := h.store.ListPVEReportsByDays(ctx, id, days)
+	page := reportPageFromRequest(r)
+	totalReports, _ := h.store.CountPVEReportsByDays(ctx, id, days)
+	pagination := buildPagination(page, totalReports, reportHistoryPageSize, fmt.Sprintf("days=%d", days))
+	reports, _ := h.store.ListPVEReportsByDaysPage(ctx, id, days, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
 
 	var storages []map[string]any
 	var totalBackups int
@@ -480,6 +558,7 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 		"Server":       sv,
 		"Reports":      reports,
 		"Days":         days,
+		"Pagination":   pagination,
 		"Storages":     storages,
 		"TotalBackups": totalBackups,
 		"ChartData":    chartData,
@@ -538,11 +617,15 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	reports, _ := h.store.ListPBSReports(ctx, id, 14)
+	latestReports, _ := h.store.ListPBSReports(ctx, id, 14)
+	page := reportPageFromRequest(r)
+	totalReports, _ := h.store.CountPBSReports(ctx, id)
+	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
+	reports, _ := h.store.ListPBSReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
 
 	var storeDetails []map[string]any
-	if len(reports) > 0 {
-		stores, _ := h.store.GetPBSStoresForReport(ctx, reports[0].ID)
+	if len(latestReports) > 0 {
+		stores, _ := h.store.GetPBSStoresForReport(ctx, latestReports[0].ID)
 		for _, st := range stores {
 			gc, _ := h.store.GetPBSGCStatus(ctx, st.ID)
 			history, _ := h.store.GetPBSHistory(ctx, st.ID)
@@ -563,8 +646,9 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Role":        role,
 		"Server":      sv,
 		"Reports":     reports,
+		"Pagination":  pagination,
 		"Stores":      storeDetails,
-		"Swap":        latestPBSSwapView(reports),
+		"Swap":        latestPBSSwapView(latestReports),
 		"AlertConfig": alertCfg,
 		"Flash":       r.URL.Query().Get("flash"),
 		"FlashOK":     r.URL.Query().Get("ok") == "1",
@@ -644,7 +728,13 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	reports, _ := h.store.ListWindowsReports(ctx, id, 14)
+	page := reportPageFromRequest(r)
+	totalReports, _ := h.store.CountWindowsReports(ctx, id)
+	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
+	reports, _ := h.store.ListWindowsReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
+	latestReport, _ := h.store.GetLatestWindowsReport(ctx, id)
+	chartReports, _ := h.store.ListWindowsReports(ctx, id, 30)
+	diskChartData := h.windowsDiskChartData(ctx, chartReports)
 	emailCfg, _ := h.store.GetEmailConfig(ctx)
 	diskThreshold := 90
 	heartbeatThreshold := 15
@@ -657,8 +747,8 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		diskThreshold = *alertCfg.DiskPct
 	}
 	var disks []domain.WindowsDisk
-	if len(reports) > 0 {
-		disks, _ = h.store.GetWindowsDisksForReport(ctx, reports[0].ID)
+	if latestReport != nil {
+		disks, _ = h.store.GetWindowsDisksForReport(ctx, latestReport.ID)
 	}
 	hb, _ := h.store.GetServerHeartbeat(ctx, "windows", id)
 	heartbeat := domain.ServerHeartbeat{}
@@ -674,6 +764,8 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Role":          role,
 		"Server":        sv,
 		"Reports":       reports,
+		"Pagination":    pagination,
+		"DiskChartData": diskChartData,
 		"Disks":         diskRows,
 		"DiskThreshold": diskThreshold,
 		"AlertConfig":   alertCfg,
@@ -698,6 +790,42 @@ type windowsAlertControl struct {
 	Detail     string
 	Suppressed bool
 	Until      time.Time
+}
+
+type windowsDiskChartPoint struct {
+	Label   string
+	Disk    string
+	UsedPct int
+	Used    int64
+	Total   int64
+}
+
+func (h *WebH) windowsDiskChartData(ctx context.Context, reports []domain.WindowsReport) []windowsDiskChartPoint {
+	if len(reports) == 0 {
+		return nil
+	}
+	reportIDs := make([]int64, 0, len(reports))
+	for _, rep := range reports {
+		reportIDs = append(reportIDs, rep.ID)
+	}
+	disksByReport, _ := h.store.GetWindowsDisksForReports(ctx, reportIDs)
+	points := make([]windowsDiskChartPoint, 0, len(reports))
+	for i := len(reports) - 1; i >= 0; i-- {
+		rep := reports[i]
+		for _, disk := range disksByReport[rep.ID] {
+			if !isWindowsLogicalDisk(disk) || disk.Total <= 0 {
+				continue
+			}
+			points = append(points, windowsDiskChartPoint{
+				Label:   rep.ReportedAt.Format("02/01 15:04"),
+				Disk:    disk.Name,
+				UsedPct: int(float64(disk.Used) / float64(disk.Total) * 100),
+				Used:    disk.Used,
+				Total:   disk.Total,
+			})
+		}
+	}
+	return points
 }
 
 func windowsReportTime(rep *domain.WindowsReport) *time.Time {

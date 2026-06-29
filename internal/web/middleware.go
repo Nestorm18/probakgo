@@ -9,6 +9,7 @@ import (
 	"probakgo/internal/domain"
 	"probakgo/internal/session"
 	"probakgo/internal/store"
+	"probakgo/internal/totp"
 )
 
 // RequireLogin checks the session cookie and verifies the user is still active in DB.
@@ -61,17 +62,34 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 				http.Redirect(w, r, "/login?flash=Tu+sesion+ha+sido+invalidada", http.StatusSeeOther)
 				return
 			}
-			if user.TOTPEnabled {
+			if !user.TOTPEnabled {
+				if wantsJSON(r) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusForbidden)
+					_ = json.NewEncoder(w).Encode(map[string]string{"error": "Esta operacion requiere 2FA activo"})
+					return
+				}
+				http.Redirect(w, r, "/profile?flash=Esta+operacion+requiere+2FA+activo", http.StatusSeeOther)
+				return
+			}
+			now := time.Now()
+			if session.SensitiveTOTPFresh(r, now) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			code := strings.TrimSpace(r.FormValue("totp_code"))
+			if code != "" && totp.Validate(code, user.TOTPSecret, now) {
+				_ = session.SetSensitiveTOTPFresh(w, r, now.Add(5*time.Minute))
 				next.ServeHTTP(w, r)
 				return
 			}
 			if wantsJSON(r) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusForbidden)
-				_ = json.NewEncoder(w).Encode(map[string]string{"error": "Esta operacion requiere 2FA activo"})
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "Esta operacion requiere un codigo 2FA valido"})
 				return
 			}
-			http.Redirect(w, r, "/profile?flash=Esta+operacion+requiere+2FA+activo", http.StatusSeeOther)
+			http.Redirect(w, r, r.URL.Path+"?flash=Codigo+2FA+requerido+para+esta+operacion", http.StatusSeeOther)
 		})
 	}
 }

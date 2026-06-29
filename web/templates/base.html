@@ -171,9 +171,55 @@
     bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
   });
   document.getElementById('confirmOk').addEventListener('click', () => {
-    if (_confirmPendingForm) { _confirmPendingForm.submit(); _confirmPendingForm = null; }
+    if (_confirmPendingForm) {
+      if (_confirmPendingForm.requestSubmit) _confirmPendingForm.requestSubmit();
+      else _confirmPendingForm.submit();
+      _confirmPendingForm = null;
+    }
     bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
   });
+
+  {{if .SensitiveActionsRequireTOTP}}
+  function promptSensitiveTOTP() {
+    const code = window.prompt('Codigo 2FA para confirmar esta operacion delicada:');
+    return code ? code.trim() : '';
+  }
+
+  document.addEventListener('submit', e => {
+    const form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if ((form.method || '').toLowerCase() !== 'post') return;
+    const action = form.getAttribute('action') || window.location.pathname;
+    if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
+    if (form.querySelector('input[name="totp_code"]')?.value) return;
+    const code = promptSensitiveTOTP();
+    if (!code) {
+      e.preventDefault();
+      return;
+    }
+    let input = form.querySelector('input[name="totp_code"]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'totp_code';
+      form.appendChild(input);
+    }
+    input.value = code.trim();
+  }, true);
+
+  document.addEventListener('click', e => {
+    const link = e.target.closest('a[data-sensitive-totp-link]');
+    if (!link) return;
+    const code = promptSensitiveTOTP();
+    if (!code) {
+      e.preventDefault();
+      return;
+    }
+    const url = new URL(link.href, window.location.origin);
+    url.searchParams.set('totp_code', code);
+    link.href = url.toString();
+  }, true);
+  {{end}}
 
   // Alert polling + browser notifications.
   (function () {

@@ -16,7 +16,7 @@ import (
 func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
-	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() bool { return false })
 	fixtures := templateFixtures(time.Date(2026, 5, 17, 10, 0, 0, 0, time.UTC))
 
 	entries, err := os.ReadDir("../../../web/templates")
@@ -54,7 +54,7 @@ func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
-	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() bool { return false })
 	req := httptest.NewRequest(http.MethodGet, "/about?flash=Mensaje+visible&ok=1", nil)
 	rr := httptest.NewRecorder()
 
@@ -72,7 +72,7 @@ func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 func TestProfile2FASetupAllowsQRDataURI(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
-	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 })
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() bool { return false })
 	req := httptest.NewRequest(http.MethodGet, "/profile/2fa/setup", nil)
 	rr := httptest.NewRecorder()
 
@@ -108,6 +108,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 	pveServer := domain.PVEServer{ID: 1, Name: "pve-1", IP: "10.0.0.1", PublicIP: "203.0.113.10", ClientVersion: "test"}
 	pbsServer := domain.PBSServer{ID: 2, Name: "pbs-1", IP: "10.0.0.2", PublicIP: "203.0.113.11", ClientVersion: "test"}
 	windowsServer := domain.WindowsServer{ID: 3, Name: "win-1", DisplayName: "win-1", IP: "10.0.0.3", PublicIP: "203.0.113.12", ClientVersion: "test"}
+	pagination := paginationView{Page: 1, TotalPages: 1, TotalItems: 0, PageSize: reportHistoryPageSize, Pages: []int{1}}
 	emailConfig := domain.EmailConfig{
 		SMTPHost:                 "smtp.example.test",
 		SMTPPort:                 587,
@@ -224,17 +225,19 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		}),
 		"reports_pve.html": base(map[string]any{
 			"Server":       pveServer,
-			"Days":         7,
+			"Days":         30,
 			"Reports":      []domain.PVEReport{},
+			"Pagination":   pagination,
 			"Storages":     []map[string]any{},
 			"TotalBackups": 0,
 			"ChartData":    []map[string]any{},
 		}),
 		"reset_settings.html": base(map[string]any{}),
 		"server_pbs_detail.html": base(map[string]any{
-			"Server":  pbsServer,
-			"Stores":  []map[string]any{},
-			"Reports": []domain.PBSReport{},
+			"Server":     pbsServer,
+			"Stores":     []map[string]any{},
+			"Reports":    []domain.PBSReport{},
+			"Pagination": pagination,
 		}),
 		"server_pve_detail.html": base(map[string]any{
 			"Server":          pveServer,
@@ -248,6 +251,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Storages":        []map[string]any{},
 			"JobHistory":      []map[string]any{},
 			"Reports":         []domain.PVEReport{},
+			"Pagination":      pagination,
 		}),
 		"server_windows_detail.html": base(map[string]any{
 			"Server":    windowsServer,
@@ -261,6 +265,8 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 				Title:       "test",
 			}},
 			"Reports":       []domain.WindowsReport{{ID: 1, ServerID: 3, ReportedAt: now}},
+			"Pagination":    pagination,
+			"DiskChartData": []windowsDiskChartPoint{{Label: "17/05 10:00", Disk: "C:", UsedPct: 50, Used: 500, Total: 1000}},
 			"AlertConfig":   domain.WindowsAlertConfig{ServerID: 3},
 			"AlertControls": []windowsAlertControl{{ID: "windows_heartbeat:windows:3", Title: "Conexión", Detail: "Servidor Windows sin heartbeat"}},
 			"AllAlertIDs":   "windows_heartbeat:windows:3",

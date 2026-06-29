@@ -192,6 +192,37 @@ func TestListPBSReports_LimitAndOrder(t *testing.T) {
 	}
 }
 
+func TestListPBSReportsPageAndCount(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-node", "10.0.1.1", "", "1.0", "")
+
+	id1, _ := st.InsertPBSReport(ctx, serverID)
+	id2, _ := st.InsertPBSReport(ctx, serverID)
+	id3, _ := st.InsertPBSReport(ctx, serverID)
+	st.db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-72*time.Hour), id1)
+	st.db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-48*time.Hour), id2)
+
+	count, err := st.CountPBSReports(ctx, serverID)
+	if err != nil {
+		t.Fatalf("CountPBSReports: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("want 3 reports, got %d", count)
+	}
+
+	reports, err := st.ListPBSReportsPage(ctx, serverID, 2, 1)
+	if err != nil {
+		t.Fatalf("ListPBSReportsPage: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("want 2 reports, got %d", len(reports))
+	}
+	if reports[0].ID != id2 || reports[1].ID != id1 || reports[0].ID == id3 {
+		t.Fatalf("unexpected page order: got [%d,%d], newest id=%d", reports[0].ID, reports[1].ID, id3)
+	}
+}
+
 func TestDeletePBSServer_SoftDelete(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)

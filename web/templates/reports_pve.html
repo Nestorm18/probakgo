@@ -17,7 +17,7 @@
         <option value="3"   {{if eq .Days 3}}selected{{end}}>Últimos 3 días</option>
         <option value="7"   {{if eq .Days 7}}selected{{end}}>Últimos 7 días</option>
         <option value="14"  {{if eq .Days 14}}selected{{end}}>Últimos 14 días</option>
-        <option value="31"  {{if eq .Days 31}}selected{{end}}>Últimos 31 días</option>
+        <option value="30"  {{if eq .Days 30}}selected{{end}}>Ultimos 30 dias</option>
         <option value="60"  {{if eq .Days 60}}selected{{end}}>Últimos 60 días</option>
         <option value="90"  {{if eq .Days 90}}selected{{end}}>Últimos 90 días</option>
         <option value="180" {{if eq .Days 180}}selected{{end}}>Últimos 180 días</option>
@@ -161,7 +161,7 @@
 <div class="card">
   <div class="card-header">
     <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
-    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">{{len .Reports}} reportes en los últimos {{.Days}} días</span>
+    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Pagina {{.Pagination.Page}} de {{.Pagination.TotalPages}} - {{.Pagination.TotalItems}} reportes en los ultimos {{.Days}} dias</span>
   </div>
   <div class="card-body">
     {{if .ChartData}}
@@ -196,6 +196,20 @@
         </tbody>
       </table>
     </div>
+  </div>
+  <div class="card-footer d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div style="font-size:.78rem;color:var(--txt-muted)">Pagina {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    {{if gt .Pagination.TotalPages 1}}
+    <nav aria-label="Paginacion de reportes">
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/pve/{{.Server.ID}}/reports?days={{.Days}}&page={{.Pagination.PrevPage}}">Anterior</a></li>
+        {{range .Pagination.Pages}}
+        <li class="page-item {{if eq . $.Pagination.Page}}active{{end}}"><a class="page-link" href="/servers/pve/{{$.Server.ID}}/reports?days={{$.Days}}&page={{.}}">{{.}}</a></li>
+        {{end}}
+        <li class="page-item {{if not .Pagination.HasNext}}disabled{{end}}"><a class="page-link" href="/servers/pve/{{.Server.ID}}/reports?days={{.Days}}&page={{.Pagination.NextPage}}">Siguiente</a></li>
+      </ul>
+    </nav>
+    {{end}}
   </div>
 </div>
 

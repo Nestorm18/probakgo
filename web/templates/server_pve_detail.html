@@ -250,6 +250,7 @@
 <div class="card">
   <div class="card-header">
     <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
+    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -279,6 +280,18 @@
       {{end}}
       </tbody>
     </table>
+  </div>
+  <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div style="font-size:.78rem;color:var(--txt-muted)">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    <nav aria-label="Paginación historial PVE">
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/pve/{{.Server.ID}}?page={{.Pagination.PrevPage}}">Anterior</a></li>
+        {{range .Pagination.Pages}}
+        <li class="page-item {{if eq . $.Pagination.Page}}active{{end}}"><a class="page-link" href="/servers/pve/{{$.Server.ID}}?page={{.}}">{{.}}</a></li>
+        {{end}}
+        <li class="page-item {{if not .Pagination.HasNext}}disabled{{end}}"><a class="page-link" href="/servers/pve/{{.Server.ID}}?page={{.Pagination.NextPage}}">Siguiente</a></li>
+      </ul>
+    </nav>
   </div>
 </div>
 

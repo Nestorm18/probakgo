@@ -299,6 +299,39 @@ func (s *Store) ListPBSReports(ctx context.Context, serverID int64, limit int) (
 	return reports, rows.Err()
 }
 
+func (s *Store) ListPBSReportsPage(ctx context.Context, serverID int64, limit, offset int) ([]domain.PBSReport, error) {
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason, swap_total, swap_used, swap_enabled
+		FROM pbs_reports WHERE server_id = ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`, serverID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.PBSReport
+	for rows.Next() {
+		var r domain.PBSReport
+		var isStale int
+		var staleReason sql.NullString
+		var swapEnabled int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale, &staleReason,
+			&r.SwapTotal, &r.SwapUsed, &swapEnabled); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		r.StaleReason = staleReason.String
+		r.SwapEnabled = swapEnabled != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
+func (s *Store) CountPBSReports(ctx context.Context, serverID int64) (int, error) {
+	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM pbs_reports WHERE server_id = ?`)
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pbs_reports WHERE server_id = ?`, serverID).Scan(&count)
+	return count, err
+}
+
 func (s *Store) GetPBSStoresForReport(ctx context.Context, reportID int64) ([]domain.PBSStore, error) {
 	debug.RecordQuery(ctx, `SELECT id, report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta FROM pbs_stores WHERE report_id = ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, store, total, used, avail,
