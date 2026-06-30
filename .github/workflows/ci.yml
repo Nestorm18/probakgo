@@ -52,6 +52,10 @@ jobs:
             echo "ERROR: version $SERVER_VER already released - bump var version in main.go, client/main.go and client-windows/main.go before pushing to master"
             exit 1
           fi
+          if gh release view "v$SERVER_VER" >/dev/null 2>&1; then
+            echo "ERROR: GitHub release v$SERVER_VER already exists - bump var version in main.go, client/main.go and client-windows/main.go before pushing to master"
+            exit 1
+          fi
 
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo_linux_amd64 .
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.version=$SERVER_VER" -o probakgo-client_linux_amd64 ./client/
