@@ -8,11 +8,11 @@
 - Hecho: vista web propia para Windows con columnas centradas en discos.
 - Hecho: alertas basicas de heartbeat, disco y SMART.
 - Hecho: comando `doctor` y logs rotados a diario en `C:\ProgramData\Probakgo` conservando 7 dias.
-- Pendiente: auto-update especifico del cliente Windows.
+- Hecho: auto-update especifico del cliente Windows con asset `.exe` de GitHub Releases.
 - Pendiente: comprobar si conviene instalarlo como servicio ademas de tarea programada.
 - RAM y CPU quedan fuera del alcance inicial; Proxmox ya cubre ese diagnostico cuando hay algo raro.
-- Pendiente: alerta de volumen no detectado desde el ultimo reporte.
-- Pendiente: ampliar `doctor` para comprobar conectividad real con Probakgo/API key y permisos WMI/PowerShell.
+- Hecho: alerta de volumen no detectado desde el ultimo reporte.
+- Hecho: `doctor` comprueba conectividad real con Probakgo/API key, MachineGuid, discos via WMI/PowerShell y tarea programada.
 
 ## V2 - Servidores genericos no Proxmox
 

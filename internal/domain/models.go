@@ -353,6 +353,7 @@ const (
 	AlertTypeSwap              = "swap"
 	AlertTypeWindowsHeartbeat  = "windows_heartbeat"
 	AlertTypeWindowsDiskHealth = "windows_disk_health"
+	AlertTypeWindowsVolumeGone = "windows_volume_missing"
 )
 
 const (

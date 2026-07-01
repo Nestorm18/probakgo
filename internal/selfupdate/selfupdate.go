@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -86,7 +87,7 @@ func latestRelease(repo, binaryName string) (tag string, binID, sha256ID int64, 
 	if err != nil {
 		return "", 0, 0, "", "", err
 	}
-	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
+	assetName := releaseAssetName(binaryName)
 	for _, a := range rel.Assets {
 		switch a.Name {
 		case assetName:
@@ -256,6 +257,10 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 		}
 	}
 
+	if runtime.GOOS == "windows" {
+		return replaceWindowsExecutable(executable, tmpPath)
+	}
+
 	// Atomic replace - on Linux the kernel keeps the old inode open, so this is safe
 	if err := os.Rename(tmpPath, executable); err != nil {
 		os.Remove(tmpPath)
@@ -292,7 +297,7 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 	if err != nil {
 		return fmt.Errorf("read checksums: %w", err)
 	}
-	assetName := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
+	assetName := releaseAssetName(binaryName)
 	for _, line := range strings.Split(string(body), "\n") {
 		parts := strings.Fields(line)
 		if len(parts) == 2 && parts[1] == assetName {
@@ -303,4 +308,32 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 		}
 	}
 	return fmt.Errorf("checksum not found in SHA256SUMS for %s", assetName)
+}
+
+func releaseAssetName(binaryName string) string {
+	name := fmt.Sprintf("%s_%s_%s", binaryName, runtime.GOOS, runtime.GOARCH)
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	return name
+}
+
+func replaceWindowsExecutable(executable, tmpPath string) error {
+	scriptPath := tmpPath + ".cmd"
+	script := fmt.Sprintf(`@echo off
+ping 127.0.0.1 -n 3 > nul
+move /Y "%s" "%s" > nul
+del "%%~f0" > nul 2>&1
+`, tmpPath, executable)
+	if err := os.WriteFile(scriptPath, []byte(script), 0600); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("create replacement script: %w", err)
+	}
+	cmd := exec.Command("cmd", "/C", "start", "", "/B", scriptPath)
+	if err := cmd.Start(); err != nil {
+		os.Remove(tmpPath)
+		os.Remove(scriptPath)
+		return fmt.Errorf("start replacement script: %w", err)
+	}
+	return nil
 }

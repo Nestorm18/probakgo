@@ -87,3 +87,32 @@ func TestListWindowsReportsPageAndCount(t *testing.T) {
 		t.Fatalf("reports: got %d, want 2", len(reports))
 	}
 }
+
+func TestListWindowsReportsByDays(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+
+	serverID, err := st.UpsertWindowsServer(ctx, "win-days", "1.1.1.1", "", "1.0", "machine-win")
+	if err != nil {
+		t.Fatalf("UpsertWindowsServer: %v", err)
+	}
+	oldID, err := st.InsertWindowsReport(ctx, serverID)
+	if err != nil {
+		t.Fatalf("InsertWindowsReport old: %v", err)
+	}
+	newID, err := st.InsertWindowsReport(ctx, serverID)
+	if err != nil {
+		t.Fatalf("InsertWindowsReport new: %v", err)
+	}
+	if _, err := st.db.Exec(`UPDATE windows_reports SET reported_at = ? WHERE id = ?`, time.Now().AddDate(0, 0, -40), oldID); err != nil {
+		t.Fatalf("set old report time: %v", err)
+	}
+
+	reports, err := st.ListWindowsReportsByDays(ctx, serverID, 30)
+	if err != nil {
+		t.Fatalf("ListWindowsReportsByDays: %v", err)
+	}
+	if len(reports) != 1 || reports[0].ID != newID {
+		t.Fatalf("reports: got %+v, want only report %d", reports, newID)
+	}
+}

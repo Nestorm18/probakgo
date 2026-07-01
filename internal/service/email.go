@@ -361,7 +361,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 						Name:        a.ServerName,
 						StaleReason: a.Message,
 					})
-				case domain.AlertTypeWindowsHeartbeat, domain.AlertTypeWindowsDiskHealth:
+				case domain.AlertTypeWindowsHeartbeat, domain.AlertTypeWindowsDiskHealth, domain.AlertTypeWindowsVolumeGone:
 					windowsAlertReasons[a.ServerID] = append(windowsAlertReasons[a.ServerID], a.Message)
 				}
 			}

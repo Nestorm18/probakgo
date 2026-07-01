@@ -51,6 +51,17 @@ func installWindowsClient(cfg Config) error {
 	return nil
 }
 
+func checkScheduledTask() error {
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("only available on windows")
+	}
+	cmd := exec.Command("schtasks.exe", "/Query", "/TN", "Probakgo Windows Report")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("query Probakgo Windows Report: %w: %s", err, string(out))
+	}
+	return nil
+}
+
 func copyFile(src, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {

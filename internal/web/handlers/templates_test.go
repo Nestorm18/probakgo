@@ -267,6 +267,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Reports":       []domain.WindowsReport{{ID: 1, ServerID: 3, ReportedAt: now}},
 			"Pagination":    pagination,
 			"DiskChartData": []windowsDiskChartPoint{{Label: "17/05 10:00", Disk: "C:", UsedPct: 50, Used: 500, Total: 1000}},
+			"DiskChartDays": 30,
 			"AlertConfig":   domain.WindowsAlertConfig{ServerID: 3},
 			"AlertControls": []windowsAlertControl{{ID: "windows_heartbeat:windows:3", Title: "Conexión", Detail: "Servidor Windows sin heartbeat"}},
 			"AllAlertIDs":   "windows_heartbeat:windows:3",

@@ -208,6 +208,28 @@ func (s *Store) ListWindowsReports(ctx context.Context, serverID int64, limit in
 	return reports, rows.Err()
 }
 
+func (s *Store) ListWindowsReportsByDays(ctx context.Context, serverID int64, days int) ([]domain.WindowsReport, error) {
+	threshold := time.Now().AddDate(0, 0, -days)
+	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale FROM windows_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC, id DESC`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale
+		FROM windows_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC, id DESC`, serverID, threshold)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reports []domain.WindowsReport
+	for rows.Next() {
+		var r domain.WindowsReport
+		var isStale int
+		if err := rows.Scan(&r.ID, &r.ServerID, &r.ReportedAt, &isStale); err != nil {
+			return nil, err
+		}
+		r.IsStale = isStale != 0
+		reports = append(reports, r)
+	}
+	return reports, rows.Err()
+}
+
 func (s *Store) ListWindowsReportsPage(ctx context.Context, serverID int64, limit, offset int) ([]domain.WindowsReport, error) {
 	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale FROM windows_reports WHERE server_id = ? ORDER BY reported_at DESC, id DESC LIMIT ? OFFSET ?`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale

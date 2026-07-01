@@ -1,6 +1,9 @@
 package selfupdate
 
-import "testing"
+import (
+	"runtime"
+	"testing"
+)
 
 func TestCompareVersions(t *testing.T) {
 	tests := []struct {
@@ -39,5 +42,16 @@ func TestIsNewer(t *testing.T) {
 	newer, ok = IsNewer("v0.0.58", "0.0.58")
 	if !ok || newer {
 		t.Fatalf("IsNewer same = %v, %v; want false, true", newer, ok)
+	}
+}
+
+func TestReleaseAssetName(t *testing.T) {
+	got := releaseAssetName("probakgo-windows-client")
+	want := "probakgo-windows-client_" + runtime.GOOS + "_" + runtime.GOARCH
+	if runtime.GOOS == "windows" {
+		want += ".exe"
+	}
+	if got != want {
+		t.Fatalf("releaseAssetName = %q, want %q", got, want)
 	}
 }

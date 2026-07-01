@@ -55,6 +55,7 @@ var templateActive = map[string]string{
 type Templates struct {
 	fs                   fs.FS
 	funcMap              template.FuncMap
+	loc                  *time.Location
 	version              string
 	secure               bool
 	badgeCounts          func() (int, int)
@@ -62,9 +63,13 @@ type Templates struct {
 }
 
 func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int), sensitiveTOTPEnabled func() bool) *Templates {
+	if loc == nil {
+		loc = time.Local
+	}
 	return &Templates{
 		fs:                   fs,
 		funcMap:              makeFuncMap(loc),
+		loc:                  loc,
 		version:              version,
 		secure:               secure,
 		badgeCounts:          badgeCounts,

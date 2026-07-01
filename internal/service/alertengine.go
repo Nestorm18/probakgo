@@ -49,6 +49,7 @@ var evaluators = []AlertEvaluator{
 	evalWindowsDisk,
 	evalWindowsHeartbeat,
 	evalWindowsDiskHealth,
+	evalWindowsMissingVolume,
 }
 
 // RunAll executes all registered evaluators. Individual errors are logged but do not
@@ -806,6 +807,57 @@ func evalWindowsDiskHealth(st *store.Store, _ AlertConfigs) ([]domain.Alert, err
 				Title:      "Salud de disco",
 				Message:    fmt.Sprintf("%s informa estado %s", disk.Name, disk.Health),
 				Value:      disk.Health,
+				DetectedAt: time.Now(),
+			})
+		}
+	}
+	return alerts, nil
+}
+
+func evalWindowsMissingVolume(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	servers, err := st.ListWindowsServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		reports, err := st.ListWindowsReports(ctx, sv.ID, 2)
+		if err != nil || len(reports) < 2 {
+			continue
+		}
+		current, err := st.GetWindowsDisksForReport(ctx, reports[0].ID)
+		if err != nil {
+			continue
+		}
+		previous, err := st.GetWindowsDisksForReport(ctx, reports[1].ID)
+		if err != nil {
+			continue
+		}
+		currentNames := make(map[string]bool, len(current))
+		for _, disk := range current {
+			if !isWindowsLogicalAlertDisk(disk) {
+				continue
+			}
+			currentNames[strings.ToUpper(strings.TrimSpace(disk.Name))] = true
+		}
+		for _, disk := range previous {
+			if !isWindowsLogicalAlertDisk(disk) {
+				continue
+			}
+			name := strings.ToUpper(strings.TrimSpace(disk.Name))
+			if currentNames[name] {
+				continue
+			}
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("windows_volume_missing:windows:%d:%s", sv.ID, name),
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "windows",
+				StoreName:  name,
+				Type:       domain.AlertTypeWindowsVolumeGone,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Volumen no detectado",
+				Message:    fmt.Sprintf("%s aparecia en el reporte anterior y no aparece en el ultimo reporte", name),
+				Value:      name,
 				DetectedAt: time.Now(),
 			})
 		}

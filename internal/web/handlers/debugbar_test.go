@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"probakgo/internal/session"
 )
@@ -62,6 +63,30 @@ func TestDebugBarMiddlewareSkipsUnauthenticatedHTML(t *testing.T) {
 
 	if strings.Contains(rr.Body.String(), `id="pbk-dbg"`) {
 		t.Fatal("debug bar was injected for unauthenticated request")
+	}
+}
+
+func TestDebugBarDurationWarningStartsAt200ms(t *testing.T) {
+	okHTML := debugBarHTML(debugBarParams{
+		elapsed: 199 * time.Millisecond,
+		status:  http.StatusOK,
+		method:  http.MethodGet,
+		path:    "/",
+		ct:      "text/html",
+	})
+	if !strings.Contains(okHTML, `<div><span class="pk">duration </span><span class="pv" style="color:#16a34a">199ms</span></div>`) {
+		t.Fatal("expected 199ms to stay green")
+	}
+
+	warnHTML := debugBarHTML(debugBarParams{
+		elapsed: 200 * time.Millisecond,
+		status:  http.StatusOK,
+		method:  http.MethodGet,
+		path:    "/",
+		ct:      "text/html",
+	})
+	if !strings.Contains(warnHTML, `<div><span class="pk">duration </span><span class="pv" style="color:#d97706">200ms</span></div>`) {
+		t.Fatal("expected 200ms to be warning color")
 	}
 }
 

@@ -134,7 +134,7 @@ func debugBarHTML(p debugBarParams) string {
 	}
 	var dColor string
 	switch {
-	case elapsedMs < 100:
+	case elapsedMs < 200:
 		dColor = "#16a34a"
 	case elapsedMs < 500:
 		dColor = "#d97706"

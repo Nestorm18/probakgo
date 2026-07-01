@@ -15,6 +15,7 @@ Probakgo monitoriza **Proxmox VE**, **Proxmox Backup Server** y servidores **Win
 - Historial de jobs PVE con detalle por VM.
 - PBS con datastores, verificacion, estimacion de llenado y estado de montaje.
 - Windows con discos, SMART basico, heartbeat y estado por servidor.
+- Alertas Windows por heartbeat, disco lleno, salud de disco y volumen desaparecido.
 - Informe diario por email.
 - Auto-update del servidor y de los clientes via GitHub Releases.
 - Control de acceso por roles: `reader`, `editor`, `admin`.
@@ -85,6 +86,12 @@ Diagnostico:
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
 Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
+```
+
+Actualizar cliente Windows:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe update
 ```
 
 ## Configuracion

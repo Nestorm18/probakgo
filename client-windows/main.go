@@ -8,9 +8,11 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.136"
+var version = "0.0.139"
 
 func main() {
 	closeLog := setupLogging()
@@ -29,6 +31,11 @@ func main() {
 		case "heartbeat":
 			if err := runHeartbeat(); err != nil {
 				log.Fatalf("heartbeat failed: %v", err)
+			}
+			return
+		case "update":
+			if err := runUpdate(); err != nil {
+				log.Fatalf("update failed: %v", err)
 			}
 			return
 		case "doctor":
@@ -75,6 +82,11 @@ func runHeartbeat() error {
 	return postJSON(cfg, "/api/heartbeat", req)
 }
 
+func runUpdate() error {
+	_, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-windows-client", version)
+	return err
+}
+
 func runDoctor() error {
 	cfg, err := loadConfig("")
 	if err != nil {
@@ -89,17 +101,32 @@ func runDoctor() error {
 	if strings.TrimSpace(cfg.APIKey) == "" {
 		return fmt.Errorf("API_KEY is empty")
 	}
-	if _, err := machineID(context.Background()); err != nil {
+	ctx := context.Background()
+	mid, err := machineID(ctx)
+	if err != nil {
 		return fmt.Errorf("machine id: %w", err)
 	}
-	disks, err := collectDisks(context.Background())
+	disks, err := collectDisks(ctx)
 	if err != nil {
-		return fmt.Errorf("collect disks: %w", err)
+		return fmt.Errorf("collect disks via PowerShell/WMI: %w", err)
+	}
+	hb, err := buildHeartbeatRequest(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("build heartbeat: %w", err)
+	}
+	if err := postJSON(cfg, "/api/heartbeat", hb); err != nil {
+		return fmt.Errorf("Probakgo/API key check failed: %w", err)
 	}
 	fmt.Println("Configuration OK.")
+	fmt.Println("Probakgo API: OK.")
+	fmt.Printf("Machine ID: %s\n", mid)
 	fmt.Printf("Disks detected: %d\n", len(disks))
+	if err := checkScheduledTask(); err != nil {
+		fmt.Printf("Scheduled task: WARN: %v\n", err)
+	} else {
+		fmt.Println("Scheduled task: OK.")
+	}
 	fmt.Println("Log:", logPath())
-	fmt.Println("Scheduled task: schtasks /Query /TN \"Probakgo Windows Report\"")
 	return nil
 }
 

@@ -145,6 +145,19 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	windowsHeartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
+	windowsMissingVolumeAlerts := map[int64]bool{}
+	if activeAlerts, err := service.CurrentAlerts(ctx, h.store, h.report); err == nil {
+		suppressed, _ := h.store.GetActiveSuppressions(ctx)
+		for _, alert := range activeAlerts {
+			if alert.ServerType != "windows" || alert.Type != domain.AlertTypeWindowsVolumeGone {
+				continue
+			}
+			if _, ok := suppressed[alert.ID]; ok {
+				continue
+			}
+			windowsMissingVolumeAlerts[alert.ServerID] = true
+		}
+	}
 	var windowsOK, windowsOffline, windowsDiskAlerts int
 	var windowsRows []map[string]any
 	for _, sv := range windowsServers {
@@ -159,18 +172,23 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			serverDiskThreshold = *alertCfg.DiskPct
 		}
 		diskAlert := windowsHasDiskAlert(disks, serverDiskThreshold)
+		missingVolumeAlert := windowsMissingVolumeAlerts[sv.ID]
 		if !heartbeat.Online {
 			windowsOffline++
-		} else if diskAlert {
+		} else if diskAlert || missingVolumeAlert {
 			windowsDiskAlerts++
 		} else {
 			windowsOK++
 		}
+		diskSummary := windowsDiskSummary(disks, serverDiskThreshold)
+		if missingVolumeAlert {
+			diskSummary = "Volumen no detectado"
+		}
 		row := map[string]any{
 			"Server":       sv,
 			"Heartbeat":    heartbeat,
-			"HasDiskAlert": diskAlert,
-			"DiskSummary":  windowsDiskSummary(disks, serverDiskThreshold),
+			"HasDiskAlert": diskAlert || missingVolumeAlert,
+			"DiskSummary":  diskSummary,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt

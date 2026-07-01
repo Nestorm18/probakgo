@@ -273,7 +273,7 @@ cat /var/log/probakgo-client.log
 
 ## Cliente Windows
 
-El cliente Windows monitoriza discos y heartbeat. Usa API key `pbk-`, se instala en `C:\ProgramData\Probakgo` y se ejecuta con la tarea programada `Probakgo Windows Report` cada 5 minutos.
+El cliente Windows monitoriza discos, heartbeat y volumenes desaparecidos. Usa API key `pbk-`, se instala en `C:\ProgramData\Probakgo` y se ejecuta con la tarea programada `Probakgo Windows Report` cada 5 minutos.
 
 En la pantalla **API Keys -> Nueva API Key**, despues de crear la key, usa la pestana **Windows**.
 
@@ -290,8 +290,15 @@ Diagnostico:
 
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
-schtasks /Query /TN "Probakgo Windows Report"
 Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 100
+```
+
+`doctor` comprueba `.env`, MachineGuid, lectura WMI/PowerShell de discos, API key contra Probakgo y tarea programada.
+
+Actualizar:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe update
 ```
 
 Si no aparece en la web, ejecuta manualmente:

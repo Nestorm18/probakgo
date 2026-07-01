@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"probakgo/internal/domain"
+	"probakgo/internal/service"
 	"probakgo/internal/session"
 )
 
@@ -55,6 +56,7 @@ type alertOverrideView struct {
 }
 
 const reportHistoryPageSize = 14
+const windowsDiskChartDays = 30
 
 type paginationView struct {
 	Page       int
@@ -733,7 +735,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
 	reports, _ := h.store.ListWindowsReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
 	latestReport, _ := h.store.GetLatestWindowsReport(ctx, id)
-	chartReports, _ := h.store.ListWindowsReports(ctx, id, 30)
+	chartReports, _ := h.store.ListWindowsReportsByDays(ctx, id, windowsDiskChartDays)
 	diskChartData := h.windowsDiskChartData(ctx, chartReports)
 	emailCfg, _ := h.store.GetEmailConfig(ctx)
 	diskThreshold := 90
@@ -759,6 +761,9 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 	backURL := fmt.Sprintf("/servers/windows/%d", sv.ID)
 	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 	alertControls := windowsAlertControls(sv.ID, diskRows, suppressions)
+	if activeAlerts, err := service.CurrentAlerts(ctx, h.store, h.report); err == nil {
+		alertControls = append(alertControls, windowsMissingVolumeAlertControls(sv.ID, activeAlerts, suppressions)...)
+	}
 	h.tmpl.Render(w, r, "server_windows_detail.html", map[string]any{
 		"Username":      username,
 		"Role":          role,
@@ -766,6 +771,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Reports":       reports,
 		"Pagination":    pagination,
 		"DiskChartData": diskChartData,
+		"DiskChartDays": windowsDiskChartDays,
 		"Disks":         diskRows,
 		"DiskThreshold": diskThreshold,
 		"AlertConfig":   alertCfg,
@@ -809,6 +815,10 @@ func (h *WebH) windowsDiskChartData(ctx context.Context, reports []domain.Window
 		reportIDs = append(reportIDs, rep.ID)
 	}
 	disksByReport, _ := h.store.GetWindowsDisksForReports(ctx, reportIDs)
+	loc := time.Local
+	if h.tmpl != nil && h.tmpl.loc != nil {
+		loc = h.tmpl.loc
+	}
 	points := make([]windowsDiskChartPoint, 0, len(reports))
 	for i := len(reports) - 1; i >= 0; i-- {
 		rep := reports[i]
@@ -817,7 +827,7 @@ func (h *WebH) windowsDiskChartData(ctx context.Context, reports []domain.Window
 				continue
 			}
 			points = append(points, windowsDiskChartPoint{
-				Label:   rep.ReportedAt.Format("02/01 15:04"),
+				Label:   rep.ReportedAt.In(loc).Format("02/01 15:04"),
 				Disk:    disk.Name,
 				UsedPct: int(float64(disk.Used) / float64(disk.Total) * 100),
 				Used:    disk.Used,
@@ -926,6 +936,21 @@ func windowsAlertControls(serverID int64, disks []windowsDiskDisplay, suppressio
 			windowsAlertControlFromID(fmt.Sprintf("disk:windows:%d:%s", serverID, disk.Name), "Disco lleno "+disk.Name, "Uso de disco por encima del umbral global", suppressions),
 			windowsAlertControlFromID(fmt.Sprintf("windows_disk_health:windows:%d:%s", serverID, disk.Name), "Salud "+disk.Name, "Estado SMART/salud de la unidad", suppressions),
 		)
+	}
+	return rows
+}
+
+func windowsMissingVolumeAlertControls(serverID int64, alerts []domain.Alert, suppressions map[string]time.Time) []windowsAlertControl {
+	rows := []windowsAlertControl{}
+	for _, alert := range alerts {
+		if alert.ServerID != serverID || alert.ServerType != "windows" || alert.Type != domain.AlertTypeWindowsVolumeGone {
+			continue
+		}
+		title := "Volumen no detectado"
+		if alert.StoreName != "" {
+			title += " " + alert.StoreName
+		}
+		rows = append(rows, windowsAlertControlFromID(alert.ID, title, alert.Message, suppressions))
 	}
 	return rows
 }
