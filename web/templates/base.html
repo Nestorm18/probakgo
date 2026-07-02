@@ -135,6 +135,21 @@
   </div>
 </div>
 
+<!-- Probakgo dialog (custom confirm/prompt, no native JS dialogs) -->
+<div class="pbk-dialog-backdrop" id="pbkDialog" hidden>
+  <div class="pbk-dialog" role="dialog" aria-modal="true" aria-labelledby="pbkDialogTitle" aria-describedby="pbkDialogMessage">
+    <button type="button" class="pbk-dialog-close" id="pbkDialogClose" aria-label="Cerrar"><i class="bi bi-x-lg"></i></button>
+    <div class="pbk-dialog-icon" id="pbkDialogIcon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div class="pbk-dialog-title" id="pbkDialogTitle">Confirmar accion</div>
+    <div class="pbk-dialog-message" id="pbkDialogMessage"></div>
+    <input class="form-control pbk-dialog-input" id="pbkDialogInput" autocomplete="one-time-code" inputmode="numeric" hidden>
+    <div class="pbk-dialog-actions">
+      <button type="button" class="btn btn-sm btn-secondary" id="pbkDialogCancel">Cancelar</button>
+      <button type="button" class="btn btn-sm btn-danger" id="pbkDialogOk">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   // Sidebar toggle
@@ -159,42 +174,104 @@
     applyTheme(next);
   });
 
-  // Generic confirm dialog - triggered by buttons with data-confirm="message" data-form="formId"
-  let _confirmPendingForm = null;
-  document.addEventListener('click', e => {
+  const pbkDialog = (() => {
+    const root = document.getElementById('pbkDialog');
+    const title = document.getElementById('pbkDialogTitle');
+    const message = document.getElementById('pbkDialogMessage');
+    const icon = document.getElementById('pbkDialogIcon');
+    const input = document.getElementById('pbkDialogInput');
+    const ok = document.getElementById('pbkDialogOk');
+    const cancel = document.getElementById('pbkDialogCancel');
+    const close = document.getElementById('pbkDialogClose');
+    let resolver = null;
+    let lastFocus = null;
+
+    function finish(value) {
+      if (!resolver) return;
+      const done = resolver;
+      resolver = null;
+      root.classList.remove('show');
+      root.setAttribute('hidden', '');
+      document.removeEventListener('keydown', onKey);
+      if (lastFocus && typeof lastFocus.focus === 'function') lastFocus.focus();
+      done(value);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') finish(null);
+    }
+    function open(opts) {
+      if (resolver) finish(null);
+      lastFocus = document.activeElement;
+      title.textContent = opts.title || 'Confirmar accion';
+      message.textContent = opts.message || '';
+      ok.textContent = opts.okText || 'Aceptar';
+      ok.className = 'btn btn-sm ' + (opts.okClass || 'btn-primary');
+      icon.className = 'pbk-dialog-icon ' + (opts.variant || 'warn');
+      icon.innerHTML = opts.icon || '<i class="bi bi-exclamation-triangle-fill"></i>';
+      input.hidden = !opts.input;
+      input.value = '';
+      input.placeholder = opts.placeholder || '';
+      input.type = opts.inputType || 'text';
+      root.removeAttribute('hidden');
+      requestAnimationFrame(() => root.classList.add('show'));
+      document.addEventListener('keydown', onKey);
+      setTimeout(() => (opts.input ? input : ok).focus(), 40);
+      return new Promise(resolve => { resolver = resolve; });
+    }
+    ok.addEventListener('click', () => finish(input.hidden ? true : input.value.trim()));
+    cancel.addEventListener('click', () => finish(null));
+    close.addEventListener('click', () => finish(null));
+    root.addEventListener('click', e => { if (e.target === root) finish(null); });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') finish(input.value.trim());
+    });
+    return {
+      danger: opts => open(Object.assign({ okText: 'Eliminar', okClass: 'btn-danger', variant: 'danger' }, opts)),
+      code: opts => open(Object.assign({ input: true, inputType: 'text', okText: 'Confirmar', okClass: 'btn-primary', variant: 'secure', icon: '<i class="bi bi-shield-lock-fill"></i>' }, opts))
+    };
+  })();
+  window.pbkDialog = pbkDialog;
+
+  // Generic confirm dialog - triggered by buttons with data-confirm="message" and optional data-form="formId"
+  document.addEventListener('click', async e => {
     const btn = e.target.closest('[data-confirm]');
     if (!btn) return;
     e.preventDefault();
-    document.getElementById('confirmMsg').textContent = btn.dataset.confirm;
-    document.getElementById('confirmOk').textContent = btn.dataset.confirmOk || 'Eliminar';
-    _confirmPendingForm = document.getElementById(btn.dataset.form);
-    bootstrap.Modal.getOrCreateInstance(document.getElementById('confirmModal')).show();
-  });
-  document.getElementById('confirmOk').addEventListener('click', () => {
-    if (_confirmPendingForm) {
-      if (_confirmPendingForm.requestSubmit) _confirmPendingForm.requestSubmit();
-      else _confirmPendingForm.submit();
-      _confirmPendingForm = null;
+    e.stopImmediatePropagation();
+    const ok = await pbkDialog.danger({
+      title: btn.dataset.confirmTitle || 'Confirmar accion',
+      message: btn.dataset.confirm,
+      okText: btn.dataset.confirmOk || 'Eliminar'
+    });
+    if (!ok) return;
+    const form = btn.dataset.form ? document.getElementById(btn.dataset.form) : btn.form;
+    if (form) {
+      if (form.requestSubmit) form.requestSubmit();
+      else form.submit();
     }
-    bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
-  });
+  }, true);
 
   {{if .SensitiveActionsRequireTOTP}}
-  function promptSensitiveTOTP() {
-    const code = window.prompt('Codigo 2FA para confirmar esta operacion delicada:');
-    return code ? code.trim() : '';
-  }
+  const sensitiveBypass = new WeakSet();
 
-  document.addEventListener('submit', e => {
+  document.addEventListener('submit', async e => {
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
     if ((form.method || '').toLowerCase() !== 'post') return;
     const action = form.getAttribute('action') || window.location.pathname;
     if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
     if (form.querySelector('input[name="totp_code"]')?.value) return;
-    const code = promptSensitiveTOTP();
+    if (sensitiveBypass.has(form)) {
+      sensitiveBypass.delete(form);
+      return;
+    }
+    e.preventDefault();
+    const code = await pbkDialog.code({
+      title: 'Confirmacion 2FA',
+      message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
+      placeholder: 'Codigo 2FA'
+    });
     if (!code) {
-      e.preventDefault();
       return;
     }
     let input = form.querySelector('input[name="totp_code"]');
@@ -205,19 +282,26 @@
       form.appendChild(input);
     }
     input.value = code.trim();
+    sensitiveBypass.add(form);
+    if (form.requestSubmit) form.requestSubmit();
+    else form.submit();
   }, true);
 
-  document.addEventListener('click', e => {
+  document.addEventListener('click', async e => {
     const link = e.target.closest('a[data-sensitive-totp-link]');
     if (!link) return;
-    const code = promptSensitiveTOTP();
+    e.preventDefault();
+    const code = await pbkDialog.code({
+      title: 'Confirmacion 2FA',
+      message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
+      placeholder: 'Codigo 2FA'
+    });
     if (!code) {
-      e.preventDefault();
       return;
     }
     const url = new URL(link.href, window.location.origin);
     url.searchParams.set('totp_code', code);
-    link.href = url.toString();
+    window.location.assign(url.toString());
   }, true);
   {{end}}
 

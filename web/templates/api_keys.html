@@ -245,16 +245,16 @@
   document.getElementById('revealCopyBtn')?.addEventListener('click', () => {
     const input = document.getElementById('revealKeyValue');
     const btn = document.getElementById('revealCopyBtn');
-    const confirm = () => {
+    const showCopied = () => {
       btn.innerHTML = '<i class="bi bi-check"></i>';
       setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 1500);
     };
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(input.value).then(confirm).catch(() => {
-        input.select(); document.execCommand('copy'); confirm();
+      navigator.clipboard.writeText(input.value).then(showCopied).catch(() => {
+        input.select(); document.execCommand('copy'); showCopied();
       });
     } else {
-      input.select(); document.execCommand('copy'); confirm();
+      input.select(); document.execCommand('copy'); showCopied();
     }
   });
 })();

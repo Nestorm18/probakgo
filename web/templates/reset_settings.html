@@ -5,19 +5,18 @@
 <div class="row">
   <div class="col-lg-6">
 
-
     <div class="card border-danger mb-4">
       <div class="card-header text-danger">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>Acción destructiva e irreversible
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>Accion destructiva e irreversible
       </div>
       <div class="card-body">
-        <p class="mb-1">Esta acción eliminará <strong>todos los datos operativos</strong>:</p>
+        <p class="mb-1">Esta accion eliminara <strong>todos los datos operativos</strong>:</p>
         <ul class="mb-2" style="font-size:.875rem">
           <li>Todos los servidores PVE y PBS registrados</li>
-          <li>Todos los reportes y datos de backup históricos</li>
+          <li>Todos los reportes y datos de backup historicos</li>
           <li>Todas las claves API</li>
-          <li>Configuración de alertas y supresiones</li>
-          <li>Configuración de email</li>
+          <li>Configuracion de alertas y supresiones</li>
+          <li>Configuracion de email</li>
           <li>IPs baneadas</li>
         </ul>
         <p class="mb-0 text-secondary" style="font-size:.875rem">Los usuarios <strong>no se eliminan</strong>.</p>
@@ -32,15 +31,17 @@
         <form method="POST" action="/settings/reset">
           {{ .CSRFField }}
           <div class="mb-3">
-            <label class="form-label">Contraseña actual</label>
+            <label class="form-label">Contrasena actual</label>
             <input type="password" class="form-control" name="password" required autocomplete="current-password">
           </div>
           <div class="mb-4">
-            <label class="form-label">Confirmar contraseña</label>
+            <label class="form-label">Confirmar contrasena</label>
             <input type="password" class="form-control" name="password_confirm" required autocomplete="current-password">
           </div>
           <button type="submit" class="btn btn-danger"
-                  onclick="return confirm('¿Seguro? Esta acción no se puede deshacer.')">
+                  data-confirm="Esta accion no se puede deshacer."
+                  data-confirm-title="Reiniciar base de datos"
+                  data-confirm-ok="Reiniciar">
             <i class="bi bi-trash3 me-1"></i>Reiniciar base de datos
           </button>
           <a href="/settings" class="btn btn-secondary ms-2">Cancelar</a>

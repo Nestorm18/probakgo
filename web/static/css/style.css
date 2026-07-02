@@ -612,6 +612,93 @@ div[style*="overflow:hidden"]:has(> .table) {
 .modal-title  { font-size: .9rem; font-weight: 600; color: var(--txt-primary); }
 .btn-close    { filter: var(--btn-close-filter, none); }
 
+.pbk-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, .42);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity .14s ease;
+}
+.pbk-dialog-backdrop.show { opacity: 1; }
+.pbk-dialog {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 1.35rem;
+  border: 1px solid var(--card-border);
+  border-radius: .875rem;
+  background: var(--card-bg);
+  color: var(--txt-primary);
+  box-shadow: 0 24px 60px rgba(0,0,0,.22);
+  transform: translateY(8px) scale(.98);
+  transition: transform .14s ease;
+}
+.pbk-dialog-backdrop.show .pbk-dialog { transform: translateY(0) scale(1); }
+.pbk-dialog-close {
+  position: absolute;
+  top: .65rem;
+  right: .65rem;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--txt-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pbk-dialog-close:hover {
+  background: var(--btn-sec-bg);
+  color: var(--txt-primary);
+}
+.pbk-dialog-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: .85rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  background: var(--pill-warn-bg);
+  color: var(--pill-warn-txt);
+  border: 1px solid var(--pill-warn-bd);
+}
+.pbk-dialog-icon.danger {
+  background: var(--pill-bad-bg);
+  color: var(--pill-bad-txt);
+  border-color: var(--pill-bad-bd);
+}
+.pbk-dialog-icon.secure {
+  background: var(--pill-info-bg);
+  color: var(--pill-info-txt);
+  border-color: var(--pill-info-bd);
+}
+.pbk-dialog-title {
+  padding-right: 2rem;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--txt-primary);
+}
+.pbk-dialog-message {
+  margin-top: .45rem;
+  color: var(--txt-secondary);
+  font-size: .88rem;
+  line-height: 1.45;
+}
+.pbk-dialog-input { margin-top: 1rem; }
+.pbk-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  margin-top: 1.15rem;
+}
+
 /* ─── Alerts ─────────────────────────────────────────────────── */
 .alert {
   border-radius: .5rem; font-size: .82rem; border-width: 1px; padding: .75rem 1rem;
