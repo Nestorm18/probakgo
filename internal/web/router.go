@@ -66,6 +66,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		r.Get("/", h.Dashboard)
 		r.Get("/alerts", h.Alerts)
+		r.Get("/alerts/detail", h.AlertDetail)
 		r.Get("/alerts.csv", h.AlertsCSV)
 		r.Get("/alerts.json", h.AlertsJSON)
 		r.Get("/alerts/status.json", h.AlertsStatus)

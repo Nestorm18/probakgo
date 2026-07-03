@@ -25,6 +25,7 @@ var standaloneTemplates = map[string]bool{
 // templateActive maps template name → sidebar active key
 var templateActive = map[string]string{
 	"alerts.html":                "alerts-view",
+	"alert_detail.html":          "alerts-view",
 	"dashboard.html":             "dashboard",
 	"servers_pve.html":           "pve",
 	"server_pve_detail.html":     "pve",

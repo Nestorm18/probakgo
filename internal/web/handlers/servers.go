@@ -55,6 +55,24 @@ type alertOverrideView struct {
 	Title string
 }
 
+type serverHealthView struct {
+	HasAlerts bool
+	Total     int
+	Critical  int
+	Warning   int
+	Label     string
+	CSSClass  string
+	Title     string
+}
+
+type serverListHealthSummary struct {
+	Total      int
+	OK         int
+	WithAlerts int
+	Critical   int
+	Warning    int
+}
+
 const reportHistoryPageSize = 14
 const windowsDiskChartDays = 30
 
@@ -206,6 +224,79 @@ func buildAlertOverrideView(parts []string) alertOverrideView {
 	}
 }
 
+func alertCountsByServer(alerts []domain.Alert, serverType string) map[int64]serverHealthView {
+	counts := make(map[int64]serverHealthView)
+	for _, alert := range alerts {
+		if alert.ServerType != serverType {
+			continue
+		}
+		health := counts[alert.ServerID]
+		health.HasAlerts = true
+		health.Total++
+		if alert.Severity == domain.AlertSeverityCritical {
+			health.Critical++
+		} else {
+			health.Warning++
+		}
+		counts[alert.ServerID] = health
+	}
+	return counts
+}
+
+func buildServerHealth(count serverHealthView) serverHealthView {
+	if count.Total <= 0 {
+		return serverHealthView{
+			Label:    "Sin avisos",
+			CSSClass: "ok",
+			Title:    "No hay alertas activas para este servidor",
+		}
+	}
+	count.HasAlerts = true
+	if count.Critical > 0 {
+		count.Label = fmt.Sprintf("%d crit.", count.Critical)
+		if count.Warning > 0 {
+			count.Label = fmt.Sprintf("%d crit. / %d av.", count.Critical, count.Warning)
+		}
+		count.CSSClass = "bad"
+	} else {
+		count.Label = fmt.Sprintf("%d aviso", count.Warning)
+		if count.Warning != 1 {
+			count.Label = fmt.Sprintf("%d avisos", count.Warning)
+		}
+		count.CSSClass = "warn"
+	}
+	count.Title = fmt.Sprintf("%d alerta(s) activa(s): %d critica(s), %d aviso(s)", count.Total, count.Critical, count.Warning)
+	return count
+}
+
+func addServerHealthSummary(summary *serverListHealthSummary, health serverHealthView) {
+	summary.Total++
+	if health.HasAlerts {
+		summary.WithAlerts++
+		summary.Critical += health.Critical
+		summary.Warning += health.Warning
+		return
+	}
+	summary.OK++
+}
+
+func (h *WebH) visibleAlertsForServerLists(ctx context.Context) []domain.Alert {
+	alerts, err := service.CurrentAlerts(ctx, h.store, h.report)
+	if err != nil {
+		slog.Warn("load server list health alerts", "err", err)
+		return nil
+	}
+	suppressions, _ := h.store.GetActiveSuppressions(ctx)
+	active := make([]domain.Alert, 0, len(alerts))
+	for _, alert := range alerts {
+		if _, ok := suppressions[alert.ID]; ok {
+			continue
+		}
+		active = append(active, alert)
+	}
+	return active
+}
+
 func latestPVESwapView(reports []domain.PVEReport) swapView {
 	if len(reports) == 0 {
 		return buildSwapView(false, 0, 0)
@@ -236,6 +327,9 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
+	activeAlerts := h.visibleAlertsForServerLists(ctx)
+	alertCounts := alertCountsByServer(activeAlerts, "pve")
+	healthSummary := serverListHealthSummary{}
 	var rows []map[string]any
 	for _, sv := range servers {
 		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
@@ -246,6 +340,8 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			stale, _ = h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 		}
 		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
+		health := buildServerHealth(alertCounts[sv.ID])
+		addServerHealthSummary(&healthSummary, health)
 		r2 := map[string]any{
 			"Server":         sv,
 			"IsStale":        stale,
@@ -256,6 +352,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 			"Heartbeat":      buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
 			"Swap":           buildSwapView(false, 0, 0),
+			"Health":         health,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -293,11 +390,12 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, r2)
 	}
 	h.tmpl.Render(w, r, "servers_pve.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Rows":     rows,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"Username":      username,
+		"Role":          role,
+		"Rows":          rows,
+		"HealthSummary": healthSummary,
+		"Flash":         r.URL.Query().Get("flash"),
+		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -577,10 +675,15 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	activeAlerts := h.visibleAlertsForServerLists(ctx)
+	alertCounts := alertCountsByServer(activeAlerts, "pbs")
+	healthSummary := serverListHealthSummary{}
 	var rows []map[string]any
 	for _, sv := range servers {
 		rep, _ := h.store.GetLatestPBSReport(ctx, sv.ID)
 		alertCfg, _ := h.store.GetPBSAlertConfig(ctx, sv.ID)
+		health := buildServerHealth(alertCounts[sv.ID])
+		addServerHealthSummary(&healthSummary, health)
 		r2 := map[string]any{
 			"Server":         sv,
 			"IsStale":        rep == nil || rep.IsStale,
@@ -588,6 +691,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			"AlertOverrides": buildPBSAlertOverrideView(alertCfg),
 			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 			"Swap":           buildSwapView(false, 0, 0),
+			"Health":         health,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -598,11 +702,12 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, r2)
 	}
 	h.tmpl.Render(w, r, "servers_pbs.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Rows":     rows,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"Username":      username,
+		"Role":          role,
+		"Rows":          rows,
+		"HealthSummary": healthSummary,
+		"Flash":         r.URL.Query().Get("flash"),
+		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -682,6 +787,9 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 	disksByReport, _ := h.store.GetWindowsDisksForReports(ctx, reportIDs)
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	activeAlerts := h.visibleAlertsForServerLists(ctx)
+	alertCounts := alertCountsByServer(activeAlerts, "windows")
+	healthSummary := serverListHealthSummary{}
 
 	var rows []map[string]any
 	for _, sv := range servers {
@@ -696,6 +804,8 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 		if alertCfg.DiskPct != nil {
 			serverDiskThreshold = *alertCfg.DiskPct
 		}
+		health := buildServerHealth(alertCounts[sv.ID])
+		addServerHealthSummary(&healthSummary, health)
 		rows = append(rows, map[string]any{
 			"Server":         sv,
 			"LastReport":     windowsReportTime(rep),
@@ -706,14 +816,16 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 			"HasDiskAlert":   windowsHasDiskAlert(disks, serverDiskThreshold),
 			"AlertConfig":    alertCfg,
 			"AlertOverrides": buildWindowsAlertOverrideView(alertCfg),
+			"Health":         health,
 		})
 	}
 	h.tmpl.Render(w, r, "servers_windows.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Rows":     rows,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"Username":      username,
+		"Role":          role,
+		"Rows":          rows,
+		"HealthSummary": healthSummary,
+		"Flash":         r.URL.Query().Get("flash"),
+		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
 }
 

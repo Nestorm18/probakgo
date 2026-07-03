@@ -2,10 +2,33 @@
 {{block "page_heading" .}}Proxmox Backup Server{{end}}
 {{block "page_content" .}}
 
-<div class="d-flex align-items-center gap-2 mb-3">
+<div class="server-health-strip mb-3">
+  <div class="server-health-item">
+    <span>Total</span>
+    <strong>{{.HealthSummary.Total}}</strong>
+  </div>
+  <div class="server-health-item ok">
+    <span>Sin avisos</span>
+    <strong>{{.HealthSummary.OK}}</strong>
+  </div>
+  <div class="server-health-item bad">
+    <span>Con avisos</span>
+    <strong>{{.HealthSummary.WithAlerts}}</strong>
+  </div>
+  <div class="server-health-item warn">
+    <span>Crit./Avisos</span>
+    <strong>{{.HealthSummary.Critical}}/{{.HealthSummary.Warning}}</strong>
+  </div>
+</div>
+
+<div class="server-list-toolbar d-flex align-items-center gap-2 mb-3">
   <div class="input-group input-group-sm filter-search" style="max-width:280px">
     <span class="input-group-text"><i class="bi bi-search"></i></span>
     <input type="text" id="serverFilter" class="form-control form-control-sm" placeholder="Filtrar por nombre, IP o estado…">
+  </div>
+  <div class="btn-group btn-group-sm server-health-toggle" role="group" aria-label="Filtro de avisos">
+    <button type="button" class="btn btn-secondary active" data-health-filter="all">Todos</button>
+    <button type="button" class="btn btn-secondary" data-health-filter="alerts">Con avisos</button>
   </div>
   <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
   <div class="ms-auto d-flex gap-2">
@@ -31,11 +54,12 @@
       </thead>
       <tbody class="server-tbody">
       {{range .Rows}}
-      <tr>
+      <tr data-has-alerts="{{if .Health.HasAlerts}}1{{else}}0{{end}}">
         <td>
           <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
             {{.Server.DisplayName}}
           </a>
+          <span class="status-pill {{.Health.CSSClass}} ms-1" title="{{.Health.Title}}">{{.Health.Label}}</span>
           {{if .ServerURL}}
           <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1" title="Abrir interfaz Proxmox" style="color:var(--txt-muted);font-size:.8rem"><i class="bi bi-box-arrow-up-right"></i></a>
           {{end}}
@@ -160,17 +184,29 @@
   const input = document.getElementById('serverFilter');
   const tbody = document.querySelector('.server-tbody');
   const countEl = document.getElementById('filterCount');
+  const toggleButtons = document.querySelectorAll('[data-health-filter]');
   if (!input || !tbody) return;
-  input.addEventListener('input', () => {
+  let healthFilter = 'all';
+  const applyFilters = () => {
     const q = input.value.toLowerCase();
     let visible = 0;
     tbody.querySelectorAll('tr:not(.empty-state-row)').forEach(row => {
-      const match = !q || row.textContent.toLowerCase().includes(q);
+      const textMatch = !q || row.textContent.toLowerCase().includes(q);
+      const alertMatch = healthFilter !== 'alerts' || row.dataset.hasAlerts === '1';
+      const match = textMatch && alertMatch;
       row.style.display = match ? '' : 'none';
       if (match) visible++;
     });
     const total = tbody.querySelectorAll('tr:not(.empty-state-row)').length;
-    countEl.textContent = q ? `${visible} de ${total}` : '';
+    countEl.textContent = (q || healthFilter !== 'all') ? `${visible} de ${total}` : '';
+  };
+  input.addEventListener('input', applyFilters);
+  toggleButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      healthFilter = btn.dataset.healthFilter || 'all';
+      toggleButtons.forEach(b => b.classList.toggle('active', b === btn));
+      applyFilters();
+    });
   });
 })();
 

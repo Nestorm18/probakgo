@@ -1,0 +1,198 @@
+{{block "page_title" .}}Detalle de alerta - Probakgo{{end}}
+{{block "page_heading" .}}Detalle de alerta{{end}}
+{{block "page_content" .}}
+
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+  <a href="/alerts" class="btn btn-sm btn-secondary"><i class="bi bi-chevron-left me-1"></i>Alertas</a>
+  {{if .ServerDetailURL}}
+  <a href="{{.ServerDetailURL}}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-server me-1"></i>Servidor</a>
+  {{end}}
+  <span class="status-pill {{.StatusClass}} ms-auto">{{.StatusLabel}}</span>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-xl-8">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+        {{if eq .Alert.Severity "critical"}}
+          <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
+          <span class="status-pill bad">Critica</span>
+        {{else}}
+          <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
+          <span class="status-pill warn">Advertencia</span>
+        {{end}}
+        <span>{{.Alert.Title}}</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:1rem;font-weight:650;color:var(--txt-primary);line-height:1.35">{{.Alert.Message}}</div>
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+          {{if eq .Alert.ServerType "pve"}}
+            <span class="badge compact-badge pve">PVE</span>
+          {{else if eq .Alert.ServerType "pbs"}}
+            <span class="badge compact-badge pbs">PBS</span>
+          {{else if eq .Alert.ServerType "windows"}}
+            <span class="badge compact-badge windows">Windows</span>
+          {{end}}
+          {{if .Alert.StoreName}}<span class="status-pill info"><i class="bi bi-hdd me-1"></i>{{.Alert.StoreName}}</span>{{end}}
+          {{if .Alert.VMName}}<span class="status-pill info"><i class="bi bi-pc me-1"></i>{{.Alert.VMName}}</span>{{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-info-circle me-2" style="color:var(--clr-accent)"></i>Datos</div>
+      <div class="card-body">
+        <div class="alert-detail-kv">
+          <span>Servidor</span>
+          <strong>{{.Alert.ServerName}}</strong>
+        </div>
+        <div class="alert-detail-kv">
+          <span>ID</span>
+          <code style="word-break:break-all">{{.AlertID}}</code>
+        </div>
+        {{if .Alert.Value}}
+        <div class="alert-detail-kv">
+          <span>Valor</span>
+          <strong>{{.Alert.Value}}</strong>
+        </div>
+        {{end}}
+        {{if .Alert.Threshold}}
+        <div class="alert-detail-kv">
+          <span>Umbral</span>
+          <strong>{{.Alert.Threshold}}</strong>
+        </div>
+        {{end}}
+        {{if .IsSuppressed}}
+        <div class="alert-detail-kv">
+          <span>Suprimida hasta</span>
+          <strong>{{formatTime .Suppression.Until}}</strong>
+        </div>
+        {{if .Suppression.Reason}}
+        <div class="alert-detail-kv">
+          <span>Motivo</span>
+          <strong>{{.Suppression.Reason}}</strong>
+        </div>
+        {{end}}
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{if .Role}}{{if canEdit .Role}}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-bell-slash me-2" style="color:var(--clr-accent)"></i>Acciones</div>
+  <div class="card-body d-flex gap-2 flex-wrap">
+    {{if .IsSuppressed}}
+    <form method="post" action="/alerts/unsuppress" class="m-0">
+      {{$.CSRFField}}
+      <input type="hidden" name="alert_id" value="{{.AlertID}}">
+      <input type="hidden" name="back" value="/alerts/detail?alert_id={{.AlertID | urlquery}}">
+      <button type="submit" class="btn btn-sm btn-secondary"><i class="bi bi-bell me-1"></i>Reactivar</button>
+    </form>
+    {{else}}
+    <button class="btn btn-sm btn-warning suppress-open-btn"
+            data-alert-id="{{.AlertID}}"
+            data-alert-title="{{.Alert.Title}}"
+            data-server-name="{{.Alert.ServerName}}">
+      <i class="bi bi-bell-slash me-1"></i>Suprimir temporalmente
+    </button>
+    {{end}}
+  </div>
+</div>
+{{end}}{{end}}
+
+<div class="card">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-clock-history" style="color:var(--clr-accent)"></i>
+    <span>Historial de esta alerta</span>
+    <span class="status-pill muted ms-auto">{{len .Events}} evento{{if ne (len .Events) 1}}s{{end}}</span>
+  </div>
+  <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
+    {{if .Events}}
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Evento</th>
+          <th>Detalle</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Events}}
+        <tr>
+          <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .CreatedAt}}</td>
+          <td>
+            {{if eq .EventType "appeared"}}<span class="status-pill bad">Aparece</span>
+            {{else if eq .EventType "resolved"}}<span class="status-pill ok">Resuelta</span>
+            {{else if eq .EventType "suppressed"}}<span class="status-pill muted">Suprimida</span>
+            {{else if eq .EventType "unsuppressed"}}<span class="status-pill warn">Reactivada</span>
+            {{else}}<span class="status-pill muted">{{.EventType}}</span>{{end}}
+          </td>
+          <td style="font-size:.82rem;color:var(--txt-secondary)">
+            {{if .Note}}<strong style="color:var(--txt-primary)">{{.Note}}</strong> &middot; {{end}}{{.Message}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+    {{else}}
+    <div class="p-4 text-center" style="color:var(--txt-muted)">Aun no hay eventos historicos para esta alerta.</div>
+    {{end}}
+  </div>
+</div>
+
+<div class="modal fade" id="suppressModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-1">
+        <h6 class="modal-title fw-semibold"><i class="bi bi-bell-slash me-2"></i>Suprimir alerta</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="/alerts/suppress">
+        {{.CSRFField}}
+        <input type="hidden" id="suppressAlertId" name="alert_id">
+        <input type="hidden" name="back" value="/alerts/detail?alert_id={{.AlertID | urlquery}}">
+        <div class="modal-body pt-1">
+          <p id="suppressAlertDesc" class="mb-3" style="font-size:.85rem;color:var(--txt-secondary)"></p>
+          <div class="mb-3">
+            <label class="form-label" style="font-size:.82rem">Suprimir durante</label>
+            <select name="days" class="form-select form-select-sm">
+              <option value="1">1 dia</option>
+              <option value="3" selected>3 dias</option>
+              <option value="7">7 dias</option>
+              <option value="14">14 dias</option>
+              <option value="30">1 mes</option>
+              <option value="90">3 meses</option>
+              <option value="180">6 meses</option>
+              <option value="365">1 ano</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:.82rem">Motivo <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <input type="text" name="reason" class="form-control form-control-sm" placeholder="Mantenimiento programado...">
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-sm btn-warning">Suprimir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{{end}}
+{{block "page_scripts" .}}
+<script>
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.suppress-open-btn');
+  if (!btn) return;
+  const d = btn.dataset;
+  document.getElementById('suppressAlertId').value = d.alertId;
+  document.getElementById('suppressAlertDesc').textContent = d.alertTitle + ' - ' + d.serverName;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('suppressModal')).show();
+});
+</script>
+{{end}}

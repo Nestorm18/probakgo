@@ -254,6 +254,27 @@
   {{if .SensitiveActionsRequireTOTP}}
   const sensitiveBypass = new WeakSet();
 
+  async function releaseModalFocusForDialog(source) {
+    if (!window.bootstrap) return () => {};
+    const modalEl = source?.closest?.('.modal.show') || document.querySelector('.modal.show');
+    if (!modalEl) return () => {};
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    if (!modal) return () => {};
+    await new Promise(resolve => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        modalEl.removeEventListener('hidden.bs.modal', finish);
+        resolve();
+      };
+      modalEl.addEventListener('hidden.bs.modal', finish, { once: true });
+      modal.hide();
+      setTimeout(finish, 350);
+    });
+    return () => modal.show();
+  }
+
   document.addEventListener('submit', async e => {
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
@@ -266,12 +287,14 @@
       return;
     }
     e.preventDefault();
+    const restoreModal = await releaseModalFocusForDialog(form);
     const code = await pbkDialog.code({
       title: 'Confirmacion 2FA',
       message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
       placeholder: 'Codigo 2FA'
     });
     if (!code) {
+      restoreModal();
       return;
     }
     let input = form.querySelector('input[name="totp_code"]');

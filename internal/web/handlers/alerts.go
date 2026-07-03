@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -181,6 +182,100 @@ func (h *WebH) AlertsStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+func (h *WebH) AlertDetail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	username, role, _ := session.GetUser(r)
+	alertID := strings.TrimSpace(r.URL.Query().Get("alert_id"))
+	if alertID == "" {
+		http.Redirect(w, r, "/alerts", http.StatusSeeOther)
+		return
+	}
+
+	allAlerts, err := h.runAlerts(ctx, false)
+	if err != nil {
+		slog.Error("run alerts detail", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	alertByID := make(map[string]domain.Alert, len(allAlerts))
+	for _, alert := range allAlerts {
+		alertByID[alert.ID] = alert
+	}
+
+	alert := alertByID[alertID]
+	isPresent := alert.ID != ""
+	if !isPresent {
+		if info, err := h.store.GetAlertStateEventInfo(ctx, alertID); err == nil {
+			alert = alertFromEventInfo(info)
+		}
+	}
+	if alert.ID == "" {
+		alert = h.alertFromSuppressionID(ctx, alertID)
+	}
+
+	suppression, err := h.store.GetAlertSuppression(ctx, alertID)
+	isSuppressed := err == nil && suppression.Active
+	if err != nil && err != sql.ErrNoRows {
+		slog.Warn("load alert suppression detail", "err", err)
+	}
+
+	events, _ := h.store.ListAlertStateEventsForAlert(ctx, alertID, 100)
+	if !isPresent && !isSuppressed && len(events) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+
+	statusLabel := "Resuelta"
+	statusClass := "ok"
+	if isSuppressed {
+		statusLabel = "Suprimida"
+		statusClass = "muted"
+	} else if isPresent {
+		statusLabel = "Activa"
+		statusClass = "bad"
+		if alert.Severity == domain.AlertSeverityWarning {
+			statusClass = "warn"
+		}
+	}
+
+	h.tmpl.Render(w, r, "alert_detail.html", map[string]any{
+		"Username":        username,
+		"Role":            role,
+		"Alert":           alert,
+		"AlertID":         alertID,
+		"IsPresent":       isPresent,
+		"IsSuppressed":    isSuppressed,
+		"Suppression":     suppression,
+		"Events":          events,
+		"StatusLabel":     statusLabel,
+		"StatusClass":     statusClass,
+		"ServerDetailURL": alertServerDetailURL(alert),
+	})
+}
+
+func alertFromEventInfo(ev domain.AlertStateEvent) domain.Alert {
+	return domain.Alert{
+		ID:         ev.AlertID,
+		ServerName: ev.ServerName,
+		ServerID:   ev.ServerID,
+		ServerType: ev.ServerType,
+		StoreName:  ev.StoreName,
+		VMID:       ev.VMID,
+		VMName:     ev.VMName,
+		Type:       strings.Split(ev.AlertID, ":")[0],
+		Severity:   ev.Severity,
+		Title:      ev.Title,
+		Message:    ev.Message,
+	}
+}
+
+func alertServerDetailURL(alert domain.Alert) string {
+	if alert.ServerType == "" || alert.ServerID <= 0 {
+		return ""
+	}
+	return "/servers/" + alert.ServerType + "/" + strconv.FormatInt(alert.ServerID, 10)
 }
 
 func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, error) {
@@ -374,6 +469,8 @@ func alertTitleFromID(alertID string) string {
 		return "Servidor offline"
 	case domain.AlertTypeWindowsDiskHealth:
 		return "Salud de disco"
+	case domain.AlertTypeWindowsVolumeGone:
+		return "Volumen no detectado"
 	default:
 		return "Alerta suprimida"
 	}

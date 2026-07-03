@@ -151,6 +151,25 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"HistoryHasPrev":   false,
 			"HistoryHasNext":   true,
 		}),
+		"alert_detail.html": base(map[string]any{
+			"Alert": domain.Alert{
+				ID:         "disk:pve:1:local",
+				ServerName: "pve-1",
+				ServerType: "pve",
+				ServerID:   1,
+				StoreName:  "local",
+				Severity:   domain.AlertSeverityWarning,
+				Title:      "Disco casi lleno",
+				Message:    "90% usado",
+				Value:      "90%",
+				Threshold:  "85%",
+			},
+			"AlertID":         "disk:pve:1:local",
+			"StatusLabel":     "Activa",
+			"StatusClass":     "warn",
+			"ServerDetailURL": "/servers/pve/1",
+			"Events":          []domain.AlertStateEvent{{AlertID: "disk:pve:1:local", EventType: "appeared", Message: "90% usado", CreatedAt: now}},
+		}),
 		"alerts_settings.html": base(map[string]any{"Config": emailConfig}),
 		"api_key_created.html": base(map[string]any{
 			"Name":        "cliente-pve",
@@ -274,13 +293,16 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"BackURL":       "/servers/windows/3",
 		}),
 		"servers_pbs.html": base(map[string]any{
-			"Rows": []map[string]any{},
+			"Rows":          []map[string]any{},
+			"HealthSummary": serverListHealthSummary{},
 		}),
 		"servers_pve.html": base(map[string]any{
-			"Rows": []map[string]any{},
+			"Rows":          []map[string]any{},
+			"HealthSummary": serverListHealthSummary{},
 		}),
 		"servers_windows.html": base(map[string]any{
-			"Rows": []map[string]any{},
+			"Rows":          []map[string]any{},
+			"HealthSummary": serverListHealthSummary{},
 		}),
 		"settings_hub.html": base(map[string]any{
 			"Config":   emailConfig,

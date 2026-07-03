@@ -161,6 +161,35 @@ func (s *Store) GetAlertStateEventInfo(ctx context.Context, alertID string) (dom
 	return ev, nil
 }
 
+func (s *Store) ListAlertStateEventsForAlert(ctx context.Context, alertID string, limit int) ([]domain.AlertStateEvent, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	debug.RecordQuery(ctx, `SELECT id, alert_id, event_type, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name, note, created_at FROM alert_state_events WHERE alert_id = ? ORDER BY created_at DESC LIMIT ?`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, alert_id, event_type, severity, title, message, server_name, server_type, server_id,
+		       store_name, vmid, vm_name, note, created_at
+		FROM alert_state_events
+		WHERE alert_id = ?
+		ORDER BY created_at DESC
+		LIMIT ?`, alertID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []domain.AlertStateEvent
+	for rows.Next() {
+		var ev domain.AlertStateEvent
+		if err := rows.Scan(&ev.ID, &ev.AlertID, &ev.EventType, &ev.Severity, &ev.Title, &ev.Message,
+			&ev.ServerName, &ev.ServerType, &ev.ServerID, &ev.StoreName, &ev.VMID, &ev.VMName, &ev.Note, &ev.CreatedAt); err != nil {
+			return nil, err
+		}
+		events = append(events, ev)
+	}
+	return events, rows.Err()
+}
+
 func insertAlertState(ctx context.Context, tx *sql.Tx, alert domain.Alert, now time.Time) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO alert_states (

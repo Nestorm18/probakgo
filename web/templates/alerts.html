@@ -92,7 +92,7 @@
           <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
         {{end}}
       </div>
-      <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="flex-grow-1 min-w-0 text-decoration-none" style="cursor:pointer" title="Ver servidor">
+      <a href="/alerts/detail?alert_id={{.ID | urlquery}}" class="flex-grow-1 min-w-0 text-decoration-none" style="cursor:pointer" title="Ver detalle de alerta">
         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
           <span style="font-weight:600;font-size:.88rem;color:var(--txt-primary)">{{.Title}}</span>
           {{if eq .Severity "critical"}}
@@ -117,6 +117,7 @@
         {{else}}
           <span class="badge compact-badge windows">Windows</span>
         {{end}}
+        <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="btn btn-sm btn-outline-secondary" title="Ver servidor"><i class="bi bi-server"></i></a>
         {{if $.Role}}{{if canEdit $.Role}}
         <button class="btn btn-sm btn-outline-secondary suppress-open-btn"
                 title="Suprimir temporalmente"
@@ -177,7 +178,7 @@
       {{range .Rows}}
       <div class="alert-row d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
         <div class="flex-grow-1 min-w-0">
-          <div style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</div>
+          <a href="/alerts/detail?alert_id={{.Alert.ID | urlquery}}" class="text-decoration-none" style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</a>
           <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);margin-top:.25rem">
             <i class="bi bi-server me-1"></i>{{.Alert.ServerName}}
@@ -229,7 +230,7 @@
           {{else}}<span class="status-pill muted">{{.EventType}}</span>{{end}}
         </td>
         <td style="font-size:.82rem">{{.ServerName}}</td>
-        <td style="font-size:.82rem">{{.Title}}</td>
+        <td style="font-size:.82rem"><a href="/alerts/detail?alert_id={{.AlertID | urlquery}}" class="text-decoration-none">{{.Title}}</a></td>
         <td class="text-truncate" style="max-width:480px;font-size:.78rem;color:var(--txt-muted)" title="{{if .Note}}{{.Note}} · {{end}}{{.Message}}">
           {{if .Note}}{{.Note}} · {{end}}{{.Message}}
         </td>
