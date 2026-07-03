@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -126,29 +127,29 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	if historyPage < 1 {
 		historyPage = 1
 	}
-	events, _ := h.store.ListAlertStateEventsPage(ctx, alertHistoryPageSize+1, (historyPage-1)*alertHistoryPageSize)
-	historyHasNext := len(events) > alertHistoryPageSize
-	if historyHasNext {
-		events = events[:alertHistoryPageSize]
-	}
+	totalEvents, _ := h.store.CountAlertStateEvents(ctx)
+	historyQuery := "severity=" + url.QueryEscape(filterSeverity) + "&server=" + url.QueryEscape(filterServer)
+	historyPagination := buildPagination(historyPage, totalEvents, alertHistoryPageSize, historyQuery)
+	events, _ := h.store.ListAlertStateEventsPage(ctx, alertHistoryPageSize, (historyPagination.Page-1)*alertHistoryPageSize)
 
 	h.tmpl.Render(w, r, "alerts.html", map[string]any{
-		"Username":         username,
-		"Role":             role,
-		"AlertGroups":      groupAlertsByServer(filtered),
-		"Suppressed":       suppressedRows,
-		"SuppressedGroups": groupSuppressedByServer(suppressedRows),
-		"AlertCritical":    critical,
-		"AlertWarning":     warning,
-		"FilterSeverity":   filterSeverity,
-		"FilterServer":     filterServer,
-		"ServerNames":      serverNames,
-		"AlertEvents":      events,
-		"HistoryPage":      historyPage,
-		"HistoryPrevPage":  historyPage - 1,
-		"HistoryNextPage":  historyPage + 1,
-		"HistoryHasPrev":   historyPage > 1,
-		"HistoryHasNext":   historyHasNext,
+		"Username":          username,
+		"Role":              role,
+		"AlertGroups":       groupAlertsByServer(filtered),
+		"Suppressed":        suppressedRows,
+		"SuppressedGroups":  groupSuppressedByServer(suppressedRows),
+		"AlertCritical":     critical,
+		"AlertWarning":      warning,
+		"FilterSeverity":    filterSeverity,
+		"FilterServer":      filterServer,
+		"ServerNames":       serverNames,
+		"AlertEvents":       events,
+		"HistoryPage":       historyPagination.Page,
+		"HistoryPrevPage":   historyPagination.PrevPage,
+		"HistoryNextPage":   historyPagination.NextPage,
+		"HistoryHasPrev":    historyPagination.HasPrev,
+		"HistoryHasNext":    historyPagination.HasNext,
+		"HistoryPagination": historyPagination,
 	})
 }
 

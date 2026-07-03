@@ -474,6 +474,13 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 	}
 	var alerts []domain.Alert
 	for _, sv := range servers {
+		staleHours := cfg.GlobalStaleHours
+		if svCfg, ok := cfg.PBSConfigs[sv.ID]; ok && svCfg.StaleHours != nil {
+			staleHours = *svCfg.StaleHours
+		}
+		if staleHours == 0 {
+			continue
+		}
 		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil {
 			alerts = append(alerts, domain.Alert{
@@ -487,17 +494,9 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 			})
 			continue
 		}
-		stale := rep.IsStale
-		reason := rep.StaleReason
-		if cfg.Report != nil && cfg.Report.IsStale(rep.ReportedAt) {
-			stale = true
-			reason = "No se ha recibido el reporte de hoy"
-		}
-		if !stale {
+		age := time.Since(rep.ReportedAt)
+		if age <= time.Duration(staleHours)*time.Hour {
 			continue
-		}
-		if reason == "" {
-			reason = "sin reporte reciente"
 		}
 		alerts = append(alerts, domain.Alert{
 			ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
@@ -505,7 +504,9 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 			Type:       domain.AlertTypePBSReportStale,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Sin reporte",
-			Message:    reason,
+			Message:    fmt.Sprintf("Ultimo reporte hace %s (umbral %dh)", alertFmtAge(age), staleHours),
+			Value:      alertFmtAge(age),
+			Threshold:  fmt.Sprintf("%dh", staleHours),
 			DetectedAt: time.Now(),
 		})
 	}

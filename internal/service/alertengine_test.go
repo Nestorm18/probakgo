@@ -395,6 +395,26 @@ func TestEvalPBSReportStale_NoReport(t *testing.T) {
 
 // ── evalPBSFill ───────────────────────────────────────────────────────────────
 
+func TestEvalPBSReportStale_UsesStaleHours(t *testing.T) {
+	ctx := context.Background()
+	db, st := openTestStore(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-hours", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	_, _ = db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-18*time.Hour), reportID)
+
+	cfg := defaultCfg()
+	alerts, _ := evalPBSReportStale(st, cfg)
+	if hasAlert(alerts, domain.AlertTypePBSReportStale, "pbs-hours") {
+		t.Error("unexpected pbs_report_stale alert inside stale-hours threshold")
+	}
+
+	_, _ = db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", time.Now().Add(-49*time.Hour), reportID)
+	alerts, _ = evalPBSReportStale(st, cfg)
+	if !hasAlert(alerts, domain.AlertTypePBSReportStale, "pbs-hours") {
+		t.Error("expected pbs_report_stale alert after stale-hours threshold")
+	}
+}
+
 func TestEvalPBSFill_WithinThreshold(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

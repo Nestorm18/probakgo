@@ -116,6 +116,13 @@ func (s *Store) ListAlertStateEvents(ctx context.Context, limit int) ([]domain.A
 	return s.ListAlertStateEventsPage(ctx, limit, 0)
 }
 
+func (s *Store) CountAlertStateEvents(ctx context.Context) (int, error) {
+	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM alert_state_events`)
+	var total int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM alert_state_events`).Scan(&total)
+	return total, err
+}
+
 func (s *Store) ListAlertStateEventsPage(ctx context.Context, limit, offset int) ([]domain.AlertStateEvent, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

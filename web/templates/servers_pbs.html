@@ -105,6 +105,7 @@
                   data-server-name="{{.Server.DisplayName}}"
                   data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}"
                   data-days-until-full="{{if .AlertConfig.DaysUntilFull}}{{deref .AlertConfig.DaysUntilFull}}{{end}}"
+                  data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
                   data-verify-alert="{{if .AlertConfig.VerifyAlert}}1{{else}}0{{end}}">
             <i class="bi bi-bell"></i>
             {{if .AlertOverrides.Has}}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill" style="background:var(--clr-accent);font-size:.58rem;line-height:1;padding:.18rem .32rem">{{.AlertOverrides.Count}}</span>{{end}}
@@ -158,6 +159,12 @@
               <input type="number" id="pbsAlertDaysUntilFull" name="days_until_full" class="form-control form-control-sm"
                      min="1" placeholder="Sin límite">
               <div class="form-text">Alerta si el disco se llena en N días</div>
+            </div>
+            <div class="alert-config-field">
+              <label class="form-label">Sin reporte (horas)</label>
+              <input type="number" id="pbsAlertStaleHours" name="stale_hours" class="form-control form-control-sm"
+                     min="0" placeholder="Global (heredado)">
+              <div class="form-text">0 = desactivado - vacio = global</div>
             </div>
             <div class="alert-config-field">
               <div class="form-check form-switch">
@@ -241,6 +248,7 @@ document.addEventListener('click', e => {
   document.getElementById('pbsAlertCfgForm').action = '/servers/pbs/' + d.serverId + '/alerts';
   document.getElementById('pbsAlertDiskPct').value = d.diskPct || '';
   document.getElementById('pbsAlertDaysUntilFull').value = d.daysUntilFull || '';
+  document.getElementById('pbsAlertStaleHours').value = d.staleHours || '';
   document.getElementById('pbsAlertVerify').checked = d.verifyAlert === '1';
   bootstrap.Modal.getOrCreateInstance(document.getElementById('pbsAlertCfgModal')).show();
 });

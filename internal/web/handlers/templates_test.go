@@ -140,16 +140,17 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 				Alert domain.Alert
 				Until time.Time
 			}{},
-			"SuppressedGroups": []suppressedAlertGroup{},
-			"ServerNames":      []string{"pve-1"},
-			"FilterSeverity":   "",
-			"FilterServer":     "",
-			"AlertEvents":      []domain.AlertStateEvent{{EventType: "appeared", ServerName: "pve-1", Title: "Sin reporte", Message: "test", CreatedAt: now}},
-			"HistoryPage":      1,
-			"HistoryPrevPage":  0,
-			"HistoryNextPage":  2,
-			"HistoryHasPrev":   false,
-			"HistoryHasNext":   true,
+			"SuppressedGroups":  []suppressedAlertGroup{},
+			"ServerNames":       []string{"pve-1"},
+			"FilterSeverity":    "",
+			"FilterServer":      "",
+			"AlertEvents":       []domain.AlertStateEvent{{EventType: "appeared", ServerName: "pve-1", Title: "Sin reporte", Message: "test", CreatedAt: now}},
+			"HistoryPage":       1,
+			"HistoryPrevPage":   0,
+			"HistoryNextPage":   2,
+			"HistoryHasPrev":    false,
+			"HistoryHasNext":    true,
+			"HistoryPagination": buildPagination(1, 1, 25, "severity=&server="),
 		}),
 		"alert_detail.html": base(map[string]any{
 			"Alert": domain.Alert{

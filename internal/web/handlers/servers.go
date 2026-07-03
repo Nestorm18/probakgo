@@ -194,6 +194,13 @@ func buildPBSAlertOverrideView(cfg domain.PBSAlertConfig) alertOverrideView {
 	if cfg.DaysUntilFull != nil {
 		parts = append(parts, fmt.Sprintf("Llenado %dd", *cfg.DaysUntilFull))
 	}
+	if cfg.StaleHours != nil {
+		if *cfg.StaleHours == 0 {
+			parts = append(parts, "Sin reporte desactivado")
+		} else {
+			parts = append(parts, fmt.Sprintf("Sin reporte %dh", *cfg.StaleHours))
+		}
+	}
 	if !cfg.VerifyAlert {
 		parts = append(parts, "Verificacion desactivada")
 	}
