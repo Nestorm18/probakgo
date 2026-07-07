@@ -32,12 +32,14 @@
   --row-hover-bg:  #e9eef5;
   --bs-table-hover-bg: #e9eef5;
   --bdr:           rgba(0,0,0,.08);
+  --border:        var(--bdr);
+  --border-color:  var(--bdr);
   --bs-list-group-border-color: rgba(0,0,0,.08);
 
   /* Text */
   --txt-primary:   #0f172a;
   --txt-secondary: #475569;
-  --txt-muted:     #94a3b8;
+  --txt-muted:     #64748b;
 
   /* Accent */
   --clr-accent:    #2563eb;
@@ -49,7 +51,11 @@
   --clr-ok:        #16a34a;
   --clr-warn:      #d97706;
   --clr-danger:    #dc2626;
+  --clr-secondary: #64748b;
+  --clr-info:      #0ea5e9;
   --clr-purple:    #7c3aed;
+  --clr-violet:    #8b5cf6;
+  --clr-windows:   #0a66c2;
 
   /* Status pills */
   --pill-ok-bg:    #f0fdf4; --pill-ok-txt:    #15803d; --pill-ok-bd:    #bbf7d0;
@@ -87,6 +93,10 @@
   --sb-bg:         #060b14;
   --sb-border:     rgba(255,255,255,.06);
   --sb-text:       #94a3b8;
+  --sb-hover-bg:   rgba(255,255,255,.06);
+  --sb-active-bg:  rgba(59,130,246,.16);
+  --sb-active-txt: #93c5fd;
+  --sb-active-bar: #3b82f6;
   --sb-label:      #475569;
   --sb-brand-txt:  #f1f5f9;
   --sb-hover-txt:  #e2e8f0;
@@ -106,7 +116,7 @@
 
   --txt-primary:   #f1f5f9;
   --txt-secondary: #94a3b8;
-  --txt-muted:     #475569;
+  --txt-muted:     #64748b;
 
   --clr-accent:    #3b82f6;
   --clr-accent-hv: #60a5fa;
@@ -116,6 +126,11 @@
   --clr-ok:        #22c55e;
   --clr-warn:      #f59e0b;
   --clr-danger:    #ef4444;
+  --clr-secondary: #64748b;
+  --clr-info:      #38bdf8;
+  --clr-purple:    #a78bfa;
+  --clr-violet:    #a78bfa;
+  --clr-windows:   #60a5fa;
 
   --pill-ok-bg:    rgba(34,197,94,.1);  --pill-ok-txt:    #4ade80; --pill-ok-bd:    rgba(34,197,94,.25);
   --pill-bad-bg:   rgba(239,68,68,.1);  --pill-bad-txt:   #f87171; --pill-bad-bd:   rgba(239,68,68,.25);
@@ -153,6 +168,8 @@
   --bs-table-border-color: rgba(255,255,255,.07);
   --bs-border-color:       rgba(255,255,255,.07);
   --bdr:                   rgba(255,255,255,.07);
+  --border:                var(--bdr);
+  --border-color:          var(--bdr);
   --bs-list-group-border-color: rgba(255,255,255,.07);
 }
 
@@ -554,7 +571,7 @@ div[style*="overflow:hidden"]:has(> .table) {
 }
 .compact-badge.pve { background: var(--clr-accent); }
 .compact-badge.pbs { background: var(--pill-muted-txt); }
-.compact-badge.windows { background: #0a66c2; }
+.compact-badge.windows { background: var(--clr-windows); }
 .compact-badge.critical { background: var(--clr-danger); }
 .compact-badge.warning { background: var(--clr-warn); }
 
