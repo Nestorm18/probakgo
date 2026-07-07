@@ -430,6 +430,10 @@ func (h *WebH) EmailTest(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/email?flash=Error:+"+err.Error(), http.StatusSeeOther)
 		return
 	}
+	if err := service.SendCriticalAlertTestEmail(h.store); err != nil {
+		http.Redirect(w, r, "/settings/email?flash=Error+en+alerta+de+prueba:+"+err.Error(), http.StatusSeeOther)
+		return
+	}
 	h.audit(r, "settings.email_test", "settings", "email", "Email", nil)
-	http.Redirect(w, r, "/settings/email?flash=Email+de+prueba+enviado&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/email?flash=Emails+de+prueba+enviados:+reporte+y+alerta&ok=1", http.StatusSeeOther)
 }

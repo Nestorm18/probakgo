@@ -204,6 +204,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		"api_key_edit.html": base(map[string]any{
 			"Key": domain.APIKey{ID: 1, Name: "cliente-pve", Key: "pbk-1234567890abcdef", ServerName: "pve-1", ServerURL: "https://10.0.0.1:8006"},
 		}),
+		"api_key_new.html": base(map[string]any{}),
 		"api_keys.html": base(map[string]any{
 			"Keys":               []map[string]any{},
 			"SearchQuery":        "",
@@ -341,6 +342,11 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Config":              emailConfig,
 			"ProductionChecklist": productionChecklist,
 		}),
+		"user_edit.html": base(map[string]any{
+			"User":            &domain.User{ID: 1, Username: "editor", Role: "editor", IsActive: true, CreatedAt: now},
+			"CurrentUsername": "admin",
+		}),
+		"user_new.html": base(map[string]any{}),
 		"users.html": base(map[string]any{
 			"Users":           []domain.User{},
 			"CurrentUsername": "admin",

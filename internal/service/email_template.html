@@ -40,29 +40,51 @@
                                             {{end}}
                                         </table>
                                         {{end}}
-                                        <table role="presentation" width="100%" cellpadding="10" cellspacing="0">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0 0;">
                                             <tr>
-                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
-                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPVE}}</p>
-                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PVE</p>
+                                                <td width="33.33%" style="padding: 0 4px 8px 0;">
+                                                    <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                                                        <tr><td style="text-align: center;">
+                                                            <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPVE}}</p>
+                                                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PVE</p>
+                                                        </td></tr>
+                                                    </table>
                                                 </td>
-                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
-                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPBS}}</p>
-                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PBS</p>
+                                                <td width="33.33%" style="padding: 0 4px 8px 4px;">
+                                                    <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                                                        <tr><td style="text-align: center;">
+                                                            <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalPBS}}</p>
+                                                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores PBS</p>
+                                                        </td></tr>
+                                                    </table>
                                                 </td>
-                                                <td width="33%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
-                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalWindows}}</p>
-                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores Windows</p>
+                                                <td width="33.33%" style="padding: 0 0 8px 4px;">
+                                                    <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                                                        <tr><td style="text-align: center;">
+                                                            <p style="margin: 0; font-size: 32px; font-weight: bold; color: {{.HeaderColor}};">{{.TotalWindows}}</p>
+                                                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Servidores Windows</p>
+                                                        </td></tr>
+                                                    </table>
                                                 </td>
                                             </tr>
+                                        </table>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: separate; border-spacing: 0 0;">
                                             <tr>
-                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
-                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: #dc3545;">{{.TotalIssues}}</p>
-                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Con Problemas</p>
+                                                <td width="50%" style="padding: 0 4px 0 0;">
+                                                    <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                                                        <tr><td style="text-align: center;">
+                                                            <p style="margin: 0; font-size: 32px; font-weight: bold; color: #dc3545;">{{.TotalIssues}}</p>
+                                                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Con Problemas</p>
+                                                        </td></tr>
+                                                    </table>
                                                 </td>
-                                                <td width="50%" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; text-align: center;">
-                                                    <p style="margin: 0; font-size: 32px; font-weight: bold; color: #28a745;">{{.TotalOK}}</p>
-                                                    <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Operativos</p>
+                                                <td width="50%" style="padding: 0 0 0 4px;">
+                                                    <table role="presentation" width="100%" cellpadding="15" cellspacing="0" style="background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                                                        <tr><td style="text-align: center;">
+                                                            <p style="margin: 0; font-size: 32px; font-weight: bold; color: #28a745;">{{.TotalOK}}</p>
+                                                            <p style="margin: 5px 0 0 0; font-size: 14px; color: #6c757d;">Operativos</p>
+                                                        </td></tr>
+                                                    </table>
                                                 </td>
                                             </tr>
                                         </table>
@@ -176,8 +198,8 @@
                             {{end}}
                             {{end}}
 
-                            {{if .PVEOk}}
-                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PVE Operativos</h2>
+                            {{if or .PVEOk .PBSOk .WindowsOk}}
+                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores operativos</h2>
                             {{range .PVEOk}}
                             <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
                                 <tr>
@@ -194,41 +216,33 @@
                                 </tr>
                             </table>
                             {{end}}
-                            {{end}}
-
-                            {{if .PBSOk}}
-                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores PBS Operativos</h2>
                             {{range .PBSOk}}
                             <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
                                 <tr>
                                     <td>
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td><h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
                                                 <td style="text-align: right;"><span style="background-color: #6c757d; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">PBS</span></td>
                                             </tr>
                                         </table>
-                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
                                         {{template "dstable" .}}
                                     </td>
                                 </tr>
                             </table>
                             {{end}}
-                            {{end}}
-
-                            {{if .WindowsOk}}
-                            <h2 style="font-size: 22px; color: #333; margin: 30px 0 20px 0; padding-bottom: 10px; border-bottom: 2px solid #e9ecef;">Servidores Windows Operativos</h2>
                             {{range .WindowsOk}}
                             <table role="presentation" width="100%" cellpadding="20" cellspacing="0" style="background-color: #fff; border: 1px solid #dee2e6; border-left: 4px solid #28a745; border-radius: 4px; margin-bottom: 15px;">
                                 <tr>
                                     <td>
                                         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                             <tr>
-                                                <td><h3 style="margin: 0 0 15px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
+                                                <td><h3 style="margin: 0 0 8px 0; font-size: 18px; color: #333;">{{.Name}}</h3></td>
                                                 <td style="text-align: right;"><span style="background-color: #0d6efd; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500;">WINDOWS</span></td>
                                             </tr>
                                         </table>
-                                        <p style="margin: 0 0 5px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
+                                        <p style="margin: 0 0 12px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
                                         {{template "wintable" .}}
                                     </td>
                                 </tr>

@@ -315,8 +315,33 @@ func TestBuildEmailData_IncludesWindowsOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("renderEmailTemplate: %v", err)
 	}
-	if !strings.Contains(html, "Servidores Windows Operativos") || !strings.Contains(html, "win-ok") || !strings.Contains(html, "C:") {
+	if !strings.Contains(html, "Servidores operativos") || !strings.Contains(html, "WINDOWS") || !strings.Contains(html, "win-ok") || !strings.Contains(html, "C:") {
 		t.Fatalf("rendered email does not include Windows details")
+	}
+}
+
+func TestRenderImmediateCriticalEmail_UsesReportStyle(t *testing.T) {
+	html := renderImmediateCriticalEmail([]domain.Alert{{
+		ServerName: "pve-prod",
+		ServerType: "pve",
+		Severity:   domain.AlertSeverityCritical,
+		Title:      "Backup fallido",
+		Message:    "El ultimo job termino con error",
+		Value:      "ERROR",
+		Threshold:  "OK",
+	}}, time.Date(2026, 6, 22, 6, 0, 0, 0, time.UTC))
+
+	for _, want := range []string{
+		"Probakgo alerta critica",
+		"1 alerta(s) critica(s) activa(s)",
+		"pve-prod",
+		"Backup fallido",
+		"El ultimo job termino con error",
+		"background-color:#dc3545",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("rendered critical email missing %q", want)
+		}
 	}
 }
 

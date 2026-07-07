@@ -94,6 +94,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		// API keys - list visible to all, writes admin-only, reveal admin-only
 		r.Get("/api-keys", h.APIKeys)
+		r.With(RequireAdmin).Get("/api-keys/new", h.NewAPIKeyPage)
 		r.With(RequireAdmin, sensitive).Post("/api-keys", h.CreateAPIKeyPost)
 		r.With(RequireAdmin).Get("/api-keys/{id}/edit", h.EditAPIKeyPage)
 		r.With(RequireAdmin, sensitive).Post("/api-keys/{id}/edit", h.EditAPIKeyPost)
@@ -104,6 +105,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 
 		// Users - admin only
 		r.With(RequireAdmin).Get("/users", h.Users)
+		r.With(RequireAdmin).Get("/users/new", h.UserNewPage)
+		r.With(RequireAdmin).Get("/users/{id}/edit", h.UserEditPage)
 		r.With(RequireAdmin, sensitive).Post("/users", h.CreateUserPost)
 		r.With(RequireAdmin, sensitive).Post("/users/{id}/username", h.ChangeUsernamePost)
 		r.With(RequireAdmin, sensitive).Post("/users/{id}/password", h.ChangePasswordPost)

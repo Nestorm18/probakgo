@@ -200,6 +200,40 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	return nil
 }
 
+// SendCriticalAlertTestEmail sends a synthetic critical alert email to validate SMTP and layout.
+func SendCriticalAlertTestEmail(st *store.Store) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	cfg, err := st.GetEmailConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("get email config: %w", err)
+	}
+	if cfg.SMTPUser == "" || cfg.SMTPPass == "" {
+		return fmt.Errorf("SMTP credentials not configured")
+	}
+	recipients := parseRecipients(cfg.Recipients)
+	if len(recipients) == 0 {
+		return fmt.Errorf("no email recipients configured")
+	}
+
+	now := time.Now()
+	alert := domain.Alert{
+		ID:         "test:critical-email",
+		ServerName: "Servidor de prueba",
+		ServerType: "pve",
+		Type:       domain.AlertTypeBackupError,
+		Severity:   domain.AlertSeverityCritical,
+		Title:      "Alerta critica de prueba",
+		Message:    "Este correo verifica el diseño de las alertas criticas. No corresponde a un fallo real.",
+		Value:      "PRUEBA",
+		Threshold:  "CRITICA",
+		DetectedAt: now,
+	}
+
+	return sendSMTP(cfg, recipients, "[PRUEBA] Probakgo alerta critica", renderImmediateCriticalEmail([]domain.Alert{alert}, now))
+}
+
 func shouldSendImmediateCriticalEmail(a domain.Alert) bool {
 	if a.Severity != domain.AlertSeverityCritical {
 		return false
@@ -214,24 +248,61 @@ func shouldSendImmediateCriticalEmail(a domain.Alert) bool {
 
 func renderImmediateCriticalEmail(alerts []domain.Alert, now time.Time) string {
 	var b strings.Builder
-	b.WriteString(`<div style="font-family:Arial,sans-serif;color:#111827">`)
-	b.WriteString(`<h2 style="margin:0 0 12px;color:#dc2626">Probakgo alerta critica</h2>`)
-	b.WriteString(`<p style="margin:0 0 16px;color:#4b5563">Detectado el `)
+	b.WriteString(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Probakgo alerta critica</title></head>`)
+	b.WriteString(`<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f5f5f5;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background-color:#f5f5f5;"><tr><td style="padding:20px;">`)
+	b.WriteString(`<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;">`)
+	b.WriteString(`<tr><td style="background-color:#dc3545;padding:28px 30px;text-align:center;">`)
+	b.WriteString(`<h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:650;">Probakgo alerta critica</h1>`)
+	b.WriteString(`<p style="margin:10px 0 0 0;color:#ffffff;font-size:15px;">`)
 	b.WriteString(template.HTMLEscapeString(now.Format("2006-01-02 15:04:05")))
-	b.WriteString(`.</p>`)
-	b.WriteString(`<table style="width:100%;border-collapse:collapse;font-size:14px">`)
-	b.WriteString(`<thead><tr><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Servidor</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Alerta</th><th align="left" style="border-bottom:1px solid #e5e7eb;padding:8px">Detalle</th></tr></thead><tbody>`)
+	b.WriteString(`</p></td></tr>`)
+	b.WriteString(`<tr><td style="padding:30px;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="18" cellspacing="0" style="background-color:#fff5f5;border-left:4px solid #dc3545;border-radius:4px;margin-bottom:22px;">`)
+	b.WriteString(`<tr><td>`)
+	b.WriteString(`<h2 style="margin:0 0 8px 0;font-size:19px;color:#842029;">`)
+	b.WriteString(template.HTMLEscapeString(fmt.Sprintf("%d alerta(s) critica(s) activa(s)", len(alerts))))
+	b.WriteString(`</h2>`)
+	b.WriteString(`<p style="margin:0;color:#664d03;font-size:14px;">Revisa estos servidores cuanto antes. Las alertas suprimidas o en mantenimiento no se incluyen en este aviso.</p>`)
+	b.WriteString(`</td></tr></table>`)
 	for _, a := range alerts {
-		b.WriteString(`<tr>`)
-		b.WriteString(`<td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="18" cellspacing="0" style="background-color:#ffffff;border:1px solid #dee2e6;border-left:4px solid #dc3545;border-radius:4px;margin-bottom:14px;">`)
+		b.WriteString(`<tr><td>`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>`)
+		b.WriteString(`<td><h3 style="margin:0 0 8px 0;font-size:18px;color:#333333;">`)
 		b.WriteString(template.HTMLEscapeString(a.ServerName))
-		b.WriteString(`</td><td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(`</h3></td>`)
+		b.WriteString(`<td style="text-align:right;"><span style="background-color:#dc3545;color:#ffffff;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">`)
+		b.WriteString(template.HTMLEscapeString(strings.ToUpper(string(a.ServerType))))
+		b.WriteString(`</span></td></tr></table>`)
+		b.WriteString(`<p style="margin:0 0 12px 0;color:#212529;font-size:15px;font-weight:600;">`)
 		b.WriteString(template.HTMLEscapeString(a.Title))
-		b.WriteString(`</td><td style="border-bottom:1px solid #f3f4f6;padding:8px">`)
+		b.WriteString(`</p>`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="12" cellspacing="0" style="background-color:#f8d7da;border:1px solid #f5c2c7;border-radius:4px;">`)
+		b.WriteString(`<tr><td><p style="margin:0;color:#842029;font-size:14px;line-height:1.45;">`)
 		b.WriteString(template.HTMLEscapeString(a.Message))
-		b.WriteString(`</td></tr>`)
+		b.WriteString(`</p></td></tr></table>`)
+		if a.Value != "" || a.Threshold != "" {
+			b.WriteString(`<p style="margin:10px 0 0 0;color:#6c757d;font-size:13px;">`)
+			if a.Value != "" {
+				b.WriteString(`<strong>Valor:</strong> `)
+				b.WriteString(template.HTMLEscapeString(a.Value))
+			}
+			if a.Value != "" && a.Threshold != "" {
+				b.WriteString(` &nbsp; `)
+			}
+			if a.Threshold != "" {
+				b.WriteString(`<strong>Umbral:</strong> `)
+				b.WriteString(template.HTMLEscapeString(a.Threshold))
+			}
+			b.WriteString(`</p>`)
+		}
+		b.WriteString(`</td></tr></table>`)
 	}
-	b.WriteString(`</tbody></table></div>`)
+	b.WriteString(`</td></tr>`)
+	b.WriteString(`<tr><td style="background-color:#f8f9fa;padding:18px 20px;text-align:center;border-top:1px solid #dee2e6;">`)
+	b.WriteString(`<p style="margin:0;color:#6c757d;font-size:13px;"><strong>Probakgo Monitor</strong> · Aviso automatico de alertas criticas</p>`)
+	b.WriteString(`</td></tr></table></td></tr></table></body></html>`)
 	return b.String()
 }
 

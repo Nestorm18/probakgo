@@ -2,9 +2,9 @@
 {{block "page_heading" .}}API Keys{{end}}
 {{block "page_actions" .}}
 {{if isAdmin .Role}}
-<button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+<a class="btn btn-sm btn-primary" href="/api-keys/new">
   <i class="bi bi-plus-lg me-1"></i>Nueva key
-</button>
+</a>
 {{end}}
 {{end}}
 {{block "page_content" .}}
@@ -122,44 +122,6 @@
 </div>
 
 {{if isAdmin .Role}}
-<!-- Create modal -->
-<div class="modal fade" id="createModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <form method="POST" action="/api-keys">
-          {{ .CSRFField }}
-        <div class="modal-header">
-          <h5 class="modal-title"><i class="bi bi-plus-circle me-2" style="color:var(--clr-accent)"></i>Nueva API Key</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Hostname del servidor <span style="color:var(--clr-danger)">*</span></label>
-            <input type="text" name="server_name" class="form-control" required placeholder="pbs">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Alias visible <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="text" name="name" class="form-control" placeholder="pbs-empresa">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">URL Proxmox <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="url" name="server_url" class="form-control" placeholder="https://192.168.1.10:8006">
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Token GitHub para instalación <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="password" name="github_token" class="form-control" placeholder="ghp_...">
-            <div class="form-text">Solo se usa para generar el comando de instalación; no se guarda.</div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-key me-1"></i>Crear key</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <!-- Reveal modal -->
 <div class="modal fade" id="revealModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">

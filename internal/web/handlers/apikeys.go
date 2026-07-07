@@ -73,12 +73,23 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *WebH) NewAPIKeyPage(w http.ResponseWriter, r *http.Request) {
+	username, role, _ := session.GetUser(r)
+	h.tmpl.Render(w, r, "api_key_new.html", map[string]any{
+		"Username": username,
+		"Role":     role,
+		"Flash":    r.URL.Query().Get("flash"),
+		"FlashOK":  r.URL.Query().Get("ok") == "1",
+	})
+}
+
 func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	back := formBackOrDefault(r, "/api-keys")
 	name := strings.TrimSpace(r.FormValue("name"))
 	serverName := strings.TrimSpace(r.FormValue("server_name"))
 	if serverName == "" {
-		http.Redirect(w, r, "/api-keys?flash=Hostname+del+servidor+requerido", http.StatusSeeOther)
+		redirectWithFlash(w, r, back, "Hostname del servidor requerido", false)
 		return
 	}
 	if name == "" {
@@ -88,7 +99,7 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	githubToken := strings.TrimSpace(r.FormValue("github_token"))
 	k, err := h.store.CreateAPIKey(ctx, name, serverName, serverURL)
 	if err != nil {
-		http.Redirect(w, r, "/api-keys?flash="+err.Error(), http.StatusSeeOther)
+		redirectWithFlash(w, r, back, err.Error(), false)
 		return
 	}
 	h.audit(r, "api_key.create", "api_key", strconv.FormatInt(k.ID, 10), k.Name, map[string]any{

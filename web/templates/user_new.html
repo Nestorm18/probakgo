@@ -1,0 +1,75 @@
+{{block "page_title" .}}Nuevo usuario - Probakgo{{end}}
+{{block "page_heading" .}}Nuevo usuario{{end}}
+{{block "page_actions" .}}
+<a href="/users" class="btn btn-sm btn-secondary"><i class="bi bi-arrow-left me-1"></i>Volver</a>
+{{end}}
+{{block "page_content" .}}
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header">
+        <strong><i class="bi bi-person-plus me-2"></i>Datos del usuario</strong>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="/users">
+          {{ .CSRFField }}
+          <input type="hidden" name="back" value="/users/new">
+
+          <div class="mb-3">
+            <label class="form-label">Nombre de usuario</label>
+            <input type="text" name="username" class="form-control" required autocomplete="off">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Contraseña</label>
+            <div class="input-group">
+              <input type="password" name="password" class="form-control pwd-input" required minlength="6" autocomplete="new-password">
+              <button type="button" class="btn btn-outline-secondary pwd-toggle" title="Mostrar/ocultar">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">Rol</label>
+            <select name="role" class="form-select">
+              <option value="reader">reader - solo lectura</option>
+              <option value="editor">editor - gestión de backups</option>
+              <option value="admin">admin - acceso completo</option>
+            </select>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="/users" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary"><i class="bi bi-person-check me-1"></i>Crear</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><strong><i class="bi bi-shield-lock me-2"></i>Seguridad</strong></div>
+      <div class="card-body" style="color:var(--txt-secondary);font-size:.9rem">
+        <p class="mb-2">Los usuarios editor y admin pueden quedar obligados a configurar 2FA según la política del sistema.</p>
+        <p class="mb-0">Para operaciones sensibles se solicitará 2FA si está activado en configuración.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{end}}
+{{block "page_scripts" .}}
+<script>
+document.querySelectorAll('.pwd-toggle').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    const input = btn.previousElementSibling;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    btn.innerHTML = `<i class="bi bi-eye${isPassword ? '-slash' : ''}"></i>`;
+  });
+});
+</script>
+{{end}}
