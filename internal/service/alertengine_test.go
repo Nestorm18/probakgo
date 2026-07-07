@@ -596,3 +596,28 @@ func TestRunAll_ReturnsAlertsFromMultipleEvaluators(t *testing.T) {
 		t.Errorf("missing alerts: disk_pve=%v, err_pve=%v, disk_pbs=%v", hasDiskPVE, hasErrPVE, hasDiskPBS)
 	}
 }
+
+func TestFilterMaintenanceAlerts_HidesServerAlerts(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-maint", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	stgID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "bkp", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, stgID, domain.StorageInfoPayload{Total: 1000, Used: 950, Avail: 50, Active: true, Enabled: true})
+	if err := st.UpsertServerMaintenance(ctx, "pve", serverID, time.Now().Add(time.Hour), "maintenance"); err != nil {
+		t.Fatalf("UpsertServerMaintenance: %v", err)
+	}
+
+	rawAlerts, err := RunAll(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(rawAlerts, domain.AlertTypeDisk, "pve-maint") {
+		t.Fatalf("raw alerts should include maintenance server alert: %+v", rawAlerts)
+	}
+	alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
+	if hasAlert(alerts, domain.AlertTypeDisk, "pve-maint") {
+		t.Fatalf("maintenance server returned visible alert: %+v", alerts)
+	}
+}

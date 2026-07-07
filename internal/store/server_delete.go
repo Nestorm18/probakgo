@@ -122,6 +122,7 @@ func hardDeleteLegacyPVE(ctx context.Context, tx txRunner, serverName string) er
 func hardDeletePVEByID(ctx context.Context, tx txRunner, id int64) error {
 	steps := []string{
 		`DELETE FROM server_heartbeats WHERE server_type = 'pve' AND server_id = ?`,
+		`DELETE FROM server_maintenance WHERE server_type = 'pve' AND server_id = ?`,
 		`DELETE FROM pve_vm_alert_config WHERE server_id = ?`,
 		`DELETE FROM pve_alert_config WHERE server_id = ?`,
 		`DELETE FROM vm_backup_configs WHERE server_type = 'pve' AND server_id = ?`,
@@ -185,6 +186,7 @@ func hardDeleteLegacyPBS(ctx context.Context, tx txRunner, serverName string) er
 func hardDeletePBSByID(ctx context.Context, tx txRunner, id int64) error {
 	steps := []string{
 		`DELETE FROM server_heartbeats WHERE server_type = 'pbs' AND server_id = ?`,
+		`DELETE FROM server_maintenance WHERE server_type = 'pbs' AND server_id = ?`,
 		`DELETE FROM pbs_alert_config WHERE server_id = ?`,
 		`DELETE FROM pbs_snapshots WHERE store_id IN (SELECT id FROM pbs_stores WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?))`,
 		`DELETE FROM pbs_store_history WHERE store_id IN (SELECT id FROM pbs_stores WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?))`,
@@ -270,6 +272,7 @@ func hardDeleteLegacyWindows(ctx context.Context, tx txRunner, serverName string
 func hardDeleteWindowsByID(ctx context.Context, tx txRunner, id int64) error {
 	steps := []string{
 		`DELETE FROM server_heartbeats WHERE server_type = 'windows' AND server_id = ?`,
+		`DELETE FROM server_maintenance WHERE server_type = 'windows' AND server_id = ?`,
 		`DELETE FROM windows_alert_config WHERE server_id = ?`,
 		`DELETE FROM windows_disks WHERE report_id IN (SELECT id FROM windows_reports WHERE server_id = ?)`,
 		`DELETE FROM windows_reports WHERE server_id = ?`,

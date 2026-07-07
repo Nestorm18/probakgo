@@ -25,10 +25,11 @@ func (h *WebH) SettingsHub(w http.ResponseWriter, r *http.Request) {
 		banCount = len(h.ban.ListBanned())
 	}
 	h.tmpl.Render(w, r, "settings_hub.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Config":   cfg,
-		"BanCount": banCount,
+		"Username":            username,
+		"Role":                role,
+		"Config":              cfg,
+		"BanCount":            banCount,
+		"ProductionChecklist": h.buildProductionChecklist(r, cfg),
 	})
 }
 
@@ -42,9 +43,10 @@ func (h *WebH) SystemSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.tmpl.Render(w, r, "system_settings.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Config":   cfg,
+		"Username":            username,
+		"Role":                role,
+		"Config":              cfg,
+		"ProductionChecklist": h.buildProductionChecklist(r, cfg),
 	})
 }
 

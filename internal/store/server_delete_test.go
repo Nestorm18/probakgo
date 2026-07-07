@@ -40,6 +40,9 @@ func TestHardDeleteServerDataForAPIKey_DeletesOnlyBoundServerAlerts(t *testing.T
 	if err := st.UpsertAlertSuppression(ctx, "backup_error:pve:"+itoa(server1), time.Now().Add(time.Hour), "test"); err != nil {
 		t.Fatalf("upsert suppression: %v", err)
 	}
+	if err := st.UpsertServerMaintenance(ctx, "pve", server1, time.Now().Add(time.Hour), "test"); err != nil {
+		t.Fatalf("upsert maintenance: %v", err)
+	}
 
 	if err := st.HardDeleteServerDataForAPIKey(ctx, key1.ID, "duplicate-host"); err != nil {
 		t.Fatalf("hard delete: %v", err)
@@ -48,6 +51,7 @@ func TestHardDeleteServerDataForAPIKey_DeletesOnlyBoundServerAlerts(t *testing.T
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_servers WHERE id = ?`, server1, 0)
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_alert_config WHERE server_id = ?`, server1, 0)
 	assertCount(t, st, `SELECT COUNT(*) FROM alert_suppressions WHERE alert_id LIKE ?`, "%:pve:"+itoa(server1)+"%", 0)
+	assertCount(t, st, `SELECT COUNT(*) FROM server_maintenance WHERE server_type = 'pve' AND server_id = ?`, server1, 0)
 
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_servers WHERE id = ?`, server2, 1)
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_alert_config WHERE server_id = ?`, server2, 1)

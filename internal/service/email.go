@@ -99,6 +99,14 @@ func SendDailyReport(st *store.Store, rep *ReportService) error {
 		slog.Info("email disabled, skipping daily report")
 		return nil
 	}
+	err = sendDailyReportWithConfig(ctx, st, rep, cfg)
+	if recordErr := st.RecordEmailDelivery(context.Background(), err); recordErr != nil {
+		slog.Warn("record email delivery status", "err", recordErr)
+	}
+	return err
+}
+
+func sendDailyReportWithConfig(ctx context.Context, st *store.Store, rep *ReportService, cfg *domain.EmailConfig) error {
 	if cfg.SMTPUser == "" || cfg.SMTPPass == "" {
 		return fmt.Errorf("SMTP credentials not configured")
 	}
@@ -151,11 +159,12 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 		return fmt.Errorf("load alert config: %w", err)
 	}
 	alertCfg.Report = rep
-	alerts, err := RunAll(st, alertCfg)
+	rawAlerts, err := RunAll(st, alertCfg)
 	if err != nil {
 		return fmt.Errorf("run alerts: %w", err)
 	}
-	_ = st.SyncAlertStates(ctx, alerts)
+	_ = st.SyncAlertStates(ctx, rawAlerts)
+	alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 	suppressed, _ := st.GetActiveSuppressions(ctx)
 
 	now := time.Now()
@@ -341,7 +350,8 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	windowsAlertReasons := make(map[int64][]string)
 	if alertCfg, err := LoadAlertConfigs(ctx, st); err == nil {
 		alertCfg.Report = rep
-		if alerts, err := RunAll(st, alertCfg); err == nil {
+		if rawAlerts, err := RunAll(st, alertCfg); err == nil {
+			alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 			suppressed, _ := st.GetActiveSuppressions(ctx)
 			for _, a := range alerts {
 				if _, ok := suppressed[a.ID]; ok {

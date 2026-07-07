@@ -690,6 +690,8 @@ div[style*="overflow:hidden"]:has(> .table) {
 .pbk-dialog {
   position: relative;
   width: min(420px, 100%);
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   padding: 1.35rem;
   border: 1px solid var(--card-border);
   border-radius: .875rem;

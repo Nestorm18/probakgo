@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 
 	"probakgo/internal/debug"
 	"probakgo/internal/domain"
@@ -86,4 +87,52 @@ func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) err
 		boolToInt(c.CriticalAlertsEnabled), boolToInt(c.EnforceTOTPNonReaders), boolToInt(c.SensitiveActionsRequireTOTP),
 	)
 	return err
+}
+
+func (s *Store) GetEmailDeliveryStatus(ctx context.Context) (*domain.EmailDeliveryStatus, error) {
+	debug.RecordQuery(ctx, `SELECT last_attempt_at, last_success_at, last_error FROM email_delivery_status WHERE id = 1`)
+	row := s.db.QueryRowContext(ctx, `SELECT last_attempt_at, last_success_at, last_error FROM email_delivery_status WHERE id = 1`)
+	var lastAttempt sql.NullTime
+	var lastSuccess sql.NullTime
+	var lastError sql.NullString
+	if err := row.Scan(&lastAttempt, &lastSuccess, &lastError); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	status := &domain.EmailDeliveryStatus{LastError: lastError.String}
+	if lastAttempt.Valid {
+		status.LastAttemptAt = &lastAttempt.Time
+	}
+	if lastSuccess.Valid {
+		status.LastSuccessAt = &lastSuccess.Time
+	}
+	return status, nil
+}
+
+func (s *Store) RecordEmailDelivery(ctx context.Context, err error) error {
+	lastError := ""
+	if err != nil {
+		lastError = strings.TrimSpace(err.Error())
+	}
+	if lastError == "" {
+		debug.RecordQuery(ctx, `INSERT INTO email_delivery_status (id, last_attempt_at, last_success_at, last_error) VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, '') ON CONFLICT(id) DO UPDATE SET ...`)
+		_, execErr := s.db.ExecContext(ctx, `
+			INSERT INTO email_delivery_status (id, last_attempt_at, last_success_at, last_error)
+			VALUES (1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, '')
+			ON CONFLICT(id) DO UPDATE SET
+				last_attempt_at=CURRENT_TIMESTAMP,
+				last_success_at=CURRENT_TIMESTAMP,
+				last_error=''`)
+		return execErr
+	}
+	debug.RecordQuery(ctx, `INSERT INTO email_delivery_status (id, last_attempt_at, last_error) VALUES (1, CURRENT_TIMESTAMP, ?) ON CONFLICT(id) DO UPDATE SET ...`)
+	_, execErr := s.db.ExecContext(ctx, `
+		INSERT INTO email_delivery_status (id, last_attempt_at, last_error)
+		VALUES (1, CURRENT_TIMESTAMP, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			last_attempt_at=CURRENT_TIMESTAMP,
+			last_error=excluded.last_error`, lastError)
+	return execErr
 }

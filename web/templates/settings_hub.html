@@ -19,6 +19,12 @@
             {{else}}
               <span class="badge" style="background:var(--clr-secondary)">URL actual</span>
             {{end}}
+            {{if .ProductionChecklist.Ready}}
+              <span class="badge ms-1" style="background:var(--clr-ok)">Listo</span>
+            {{else}}
+              {{if .ProductionChecklist.Bad}}<span class="badge ms-1" style="background:var(--clr-danger)">{{.ProductionChecklist.Bad}} critico{{if gt .ProductionChecklist.Bad 1}}s{{end}}</span>{{end}}
+              {{if .ProductionChecklist.Warnings}}<span class="badge ms-1" style="background:var(--clr-warn)">{{.ProductionChecklist.Warnings}} revisar</span>{{end}}
+            {{end}}
           </div>
         </div>
       </div>

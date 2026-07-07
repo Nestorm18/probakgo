@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"probakgo/internal/domain"
@@ -136,5 +137,43 @@ func TestUpsertEmailConfig_UpdateInPlace(t *testing.T) {
 	}
 	if cfg.RetentionMonths != 6 {
 		t.Errorf("RetentionMonths: want 6, got %d", cfg.RetentionMonths)
+	}
+}
+
+func TestEmailDeliveryStatus_RoundTrip(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+
+	status, err := st.GetEmailDeliveryStatus(ctx)
+	if err != nil {
+		t.Fatalf("get empty status: %v", err)
+	}
+	if status != nil {
+		t.Fatalf("want nil status before first delivery, got %+v", status)
+	}
+
+	if err := st.RecordEmailDelivery(ctx, errors.New("smtp failed")); err != nil {
+		t.Fatalf("record failure: %v", err)
+	}
+	status, err = st.GetEmailDeliveryStatus(ctx)
+	if err != nil {
+		t.Fatalf("get failure status: %v", err)
+	}
+	if status == nil || status.LastAttemptAt == nil || status.LastError != "smtp failed" {
+		t.Fatalf("unexpected failure status: %+v", status)
+	}
+	if status.LastSuccessAt != nil {
+		t.Fatalf("did not expect success after failure: %+v", status.LastSuccessAt)
+	}
+
+	if err := st.RecordEmailDelivery(ctx, nil); err != nil {
+		t.Fatalf("record success: %v", err)
+	}
+	status, err = st.GetEmailDeliveryStatus(ctx)
+	if err != nil {
+		t.Fatalf("get success status: %v", err)
+	}
+	if status == nil || status.LastAttemptAt == nil || status.LastSuccessAt == nil || status.LastError != "" {
+		t.Fatalf("unexpected success status: %+v", status)
 	}
 }

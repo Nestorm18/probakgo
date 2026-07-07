@@ -124,6 +124,29 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		AlertPBSStaleHours:       36,
 		AlertPVEHeartbeatMinutes: 15,
 	}
+	productionChecklist := productionChecklistView{
+		Items: []productionChecklistItem{
+			{
+				Title:    "HTTPS detectado",
+				Detail:   "test",
+				Status:   "OK",
+				CSSClass: "ok",
+				Icon:     "bi-shield-check",
+			},
+			{
+				Title:       "SESSION_SECURE=false",
+				Detail:      "test",
+				Status:      "Accion",
+				CSSClass:    "bad",
+				Icon:        "bi-cookie",
+				ActionPost:  "/settings/system/session-secure",
+				ActionLabel: "Activar",
+			},
+		},
+		OK:    1,
+		Bad:   1,
+		Ready: false,
+	}
 
 	return map[string]map[string]any{
 		"about.html": base(map[string]any{
@@ -205,17 +228,21 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Configs":    []domain.VMBackupConfig{},
 		}),
 		"dashboard.html": base(map[string]any{
-			"PVEOk":             1,
-			"PVEBackupErrors":   0,
-			"PVEStale":          0,
-			"PBSOk":             1,
-			"PBSStale":          0,
-			"WindowsOK":         1,
-			"WindowsDiskAlerts": 0,
-			"WindowsOffline":    0,
-			"PVERows":           []map[string]any{},
-			"PBSRows":           []map[string]any{},
-			"WindowsRows":       []map[string]any{},
+			"PVEOk":              1,
+			"PVEBackupErrors":    0,
+			"PVEStale":           0,
+			"PBSOk":              1,
+			"PBSStale":           0,
+			"PBSMaintenance":     0,
+			"WindowsOK":          1,
+			"WindowsDiskAlerts":  0,
+			"WindowsOffline":     0,
+			"WindowsMaintenance": 0,
+			"PVEMaintenance":     0,
+			"MaintenanceTotal":   0,
+			"PVERows":            []map[string]any{},
+			"PBSRows":            []map[string]any{},
+			"WindowsRows":        []map[string]any{},
 		}),
 		"email_settings.html": base(map[string]any{"Config": emailConfig}),
 		"ip_bans.html": base(map[string]any{
@@ -306,10 +333,14 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"HealthSummary": serverListHealthSummary{},
 		}),
 		"settings_hub.html": base(map[string]any{
-			"Config":   emailConfig,
-			"BanCount": 0,
+			"Config":              emailConfig,
+			"BanCount":            0,
+			"ProductionChecklist": productionChecklist,
 		}),
-		"system_settings.html": base(map[string]any{"Config": emailConfig}),
+		"system_settings.html": base(map[string]any{
+			"Config":              emailConfig,
+			"ProductionChecklist": productionChecklist,
+		}),
 		"users.html": base(map[string]any{
 			"Users":           []domain.User{},
 			"CurrentUsername": "admin",

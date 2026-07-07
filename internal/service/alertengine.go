@@ -67,7 +67,33 @@ func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	return all, nil
 }
 
+func FilterMaintenanceAlerts(ctx context.Context, st *store.Store, alerts []domain.Alert) []domain.Alert {
+	if len(alerts) == 0 {
+		return alerts
+	}
+	maintenance, err := st.GetActiveServerMaintenances(ctx)
+	if err != nil || len(maintenance) == 0 {
+		return alerts
+	}
+	filtered := make([]domain.Alert, 0, len(alerts))
+	for _, alert := range alerts {
+		if _, ok := maintenance[store.ServerMaintenanceKey(alert.ServerType, alert.ServerID)]; ok {
+			continue
+		}
+		filtered = append(filtered, alert)
+	}
+	return filtered
+}
+
 func CurrentAlerts(ctx context.Context, st *store.Store, rep *ReportService) ([]domain.Alert, error) {
+	alerts, err := CurrentAlertsRaw(ctx, st, rep)
+	if err != nil {
+		return nil, err
+	}
+	return FilterMaintenanceAlerts(ctx, st, alerts), nil
+}
+
+func CurrentAlertsRaw(ctx context.Context, st *store.Store, rep *ReportService) ([]domain.Alert, error) {
 	cfg, err := LoadAlertConfigs(ctx, st)
 	if err != nil {
 		return nil, err
@@ -884,6 +910,7 @@ func ActiveAlertCounts(ctx context.Context, st *store.Store, rep *ReportService)
 	}
 	cfg.Report = rep
 	all, _ := RunAll(st, cfg)
+	all = FilterMaintenanceAlerts(ctx, st, all)
 	supps, _ := st.GetActiveSuppressions(ctx)
 	for _, a := range all {
 		if _, suppressed := supps[a.ID]; suppressed {

@@ -65,6 +65,12 @@ type serverHealthView struct {
 	Title     string
 }
 
+type maintenanceView struct {
+	Active bool
+	Until  time.Time
+	Reason string
+}
+
 type serverListHealthSummary struct {
 	Total      int
 	OK         int
@@ -276,6 +282,28 @@ func buildServerHealth(count serverHealthView) serverHealthView {
 	return count
 }
 
+func buildMaintenanceHealth(m maintenanceView) serverHealthView {
+	if !m.Active {
+		return serverHealthView{}
+	}
+	return serverHealthView{
+		Label:    "Mantenimiento",
+		CSSClass: "info",
+		Title:    fmt.Sprintf("Modo mantenimiento activo hasta %s", m.Until.Format("02/01/2006 15:04")),
+	}
+}
+
+func buildMaintenanceView(m domain.ServerMaintenance) maintenanceView {
+	if !m.Active {
+		return maintenanceView{}
+	}
+	return maintenanceView{Active: true, Until: m.Until, Reason: m.Reason}
+}
+
+func maintenanceByServer(maintenance map[string]domain.ServerMaintenance, serverType string, serverID int64) maintenanceView {
+	return buildMaintenanceView(maintenance[fmt.Sprintf("%s:%d", serverType, serverID)])
+}
+
 func addServerHealthSummary(summary *serverListHealthSummary, health serverHealthView) {
 	summary.Total++
 	if health.HasAlerts {
@@ -334,6 +362,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
+	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pve")
 	healthSummary := serverListHealthSummary{}
@@ -347,7 +376,11 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			stale, _ = h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 		}
 		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
+		maint := maintenanceByServer(maintenance, "pve", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
+		if maint.Active {
+			health = buildMaintenanceHealth(maint)
+		}
 		addServerHealthSummary(&healthSummary, health)
 		r2 := map[string]any{
 			"Server":         sv,
@@ -360,6 +393,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"Heartbeat":      buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
 			"Swap":           buildSwapView(false, 0, 0),
 			"Health":         health,
+			"Maintenance":    maint,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -682,6 +716,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pbs")
 	healthSummary := serverListHealthSummary{}
@@ -689,7 +724,11 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 	for _, sv := range servers {
 		rep, _ := h.store.GetLatestPBSReport(ctx, sv.ID)
 		alertCfg, _ := h.store.GetPBSAlertConfig(ctx, sv.ID)
+		maint := maintenanceByServer(maintenance, "pbs", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
+		if maint.Active {
+			health = buildMaintenanceHealth(maint)
+		}
 		addServerHealthSummary(&healthSummary, health)
 		r2 := map[string]any{
 			"Server":         sv,
@@ -699,6 +738,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
 			"Swap":           buildSwapView(false, 0, 0),
 			"Health":         health,
+			"Maintenance":    maint,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -794,6 +834,7 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 	disksByReport, _ := h.store.GetWindowsDisksForReports(ctx, reportIDs)
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "windows")
 	healthSummary := serverListHealthSummary{}
@@ -811,7 +852,11 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 		if alertCfg.DiskPct != nil {
 			serverDiskThreshold = *alertCfg.DiskPct
 		}
+		maint := maintenanceByServer(maintenance, "windows", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
+		if maint.Active {
+			health = buildMaintenanceHealth(maint)
+		}
 		addServerHealthSummary(&healthSummary, health)
 		rows = append(rows, map[string]any{
 			"Server":         sv,
@@ -824,6 +869,7 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 			"AlertConfig":    alertCfg,
 			"AlertOverrides": buildWindowsAlertOverrideView(alertCfg),
 			"Health":         health,
+			"Maintenance":    maint,
 		})
 	}
 	h.tmpl.Render(w, r, "servers_windows.html", map[string]any{

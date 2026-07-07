@@ -35,6 +35,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 
 	pveReports, err := h.store.GetLatestPVEReports(ctx)
 	if err != nil {
@@ -54,7 +55,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pveBackupErrors := h.activePVEBackupErrorServers(ctx, pveServers, pveReports, pveTasks)
-	var pveOK, pveStale int
+	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
 		rep := pveReports[sv.ID]
@@ -62,14 +63,17 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
 		isStale := (rep == nil || rep.IsStale) && !ignoreStale
 		hasBackupError := pveBackupErrors[sv.ID]
-		if isStale {
+		maint := maintenanceByServer(maintenance, "pve", sv.ID)
+		if maint.Active {
+			pveMaintenance++
+		} else if isStale {
 			pveStale++
 		} else if hasBackupError {
-			// Counted separately as "backup con error".
+			pveBackupErrorCount++
 		} else {
 			pveOK++
 		}
-		row := map[string]any{"Server": sv, "IsStale": isStale, "HasBackupError": hasBackupError, "Swap": buildSwapView(false, 0, 0)}
+		row := map[string]any{"Server": sv, "IsStale": isStale, "HasBackupError": hasBackupError, "Swap": buildSwapView(false, 0, 0), "Maintenance": maint}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
 			row["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
@@ -94,24 +98,28 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pbsOK, pbsStale int
+	var pbsOK, pbsStale, pbsMaintenance int
 	var pbsRows []map[string]any
 	for _, sv := range pbsServers {
 		rep := pbsReports[sv.ID]
 		isStale := rep == nil || rep.IsStale
+		maint := maintenanceByServer(maintenance, "pbs", sv.ID)
 		fillLabel, fillClass := "Llenado OK", "ok"
-		if isStale {
+		if maint.Active {
+			pbsMaintenance++
+		} else if isStale {
 			pbsStale++
 		} else {
 			pbsOK++
 			fillLabel, fillClass = pbsFillBadge(pbsStores[rep.ID])
 		}
 		row := map[string]any{
-			"Server":    sv,
-			"IsStale":   isStale,
-			"FillLabel": fillLabel,
-			"FillClass": fillClass,
-			"Swap":      buildSwapView(false, 0, 0),
+			"Server":      sv,
+			"IsStale":     isStale,
+			"FillLabel":   fillLabel,
+			"FillClass":   fillClass,
+			"Swap":        buildSwapView(false, 0, 0),
+			"Maintenance": maint,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
@@ -159,6 +167,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var windowsOK, windowsOffline, windowsDiskAlerts int
+	var windowsMaintenance int
 	var windowsRows []map[string]any
 	for _, sv := range windowsServers {
 		rep := windowsReports[sv.ID]
@@ -173,7 +182,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		diskAlert := windowsHasDiskAlert(disks, serverDiskThreshold)
 		missingVolumeAlert := windowsMissingVolumeAlerts[sv.ID]
-		if !heartbeat.Online {
+		maint := maintenanceByServer(maintenance, "windows", sv.ID)
+		if maint.Active {
+			windowsMaintenance++
+		} else if !heartbeat.Online {
 			windowsOffline++
 		} else if diskAlert || missingVolumeAlert {
 			windowsDiskAlerts++
@@ -189,6 +201,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"Heartbeat":    heartbeat,
 			"HasDiskAlert": diskAlert || missingVolumeAlert,
 			"DiskSummary":  diskSummary,
+			"Maintenance":  maint,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
@@ -198,21 +211,25 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	alertCritical, alertWarning := service.ActiveAlertCounts(ctx, h.store, h.report)
 	h.tmpl.Render(w, r, "dashboard.html", map[string]any{
-		"Username":          username,
-		"Role":              role,
-		"AlertCritical":     alertCritical,
-		"AlertWarning":      alertWarning,
-		"PVERows":           pveRows,
-		"PBSRows":           pbsRows,
-		"WindowsRows":       windowsRows,
-		"PVEOk":             pveOK,
-		"PVEStale":          pveStale,
-		"PVEBackupErrors":   len(pveBackupErrors),
-		"PBSOk":             pbsOK,
-		"PBSStale":          pbsStale,
-		"WindowsOK":         windowsOK,
-		"WindowsOffline":    windowsOffline,
-		"WindowsDiskAlerts": windowsDiskAlerts,
+		"Username":           username,
+		"Role":               role,
+		"AlertCritical":      alertCritical,
+		"AlertWarning":       alertWarning,
+		"PVERows":            pveRows,
+		"PBSRows":            pbsRows,
+		"WindowsRows":        windowsRows,
+		"PVEOk":              pveOK,
+		"PVEStale":           pveStale,
+		"PVEBackupErrors":    pveBackupErrorCount,
+		"PVEMaintenance":     pveMaintenance,
+		"PBSOk":              pbsOK,
+		"PBSStale":           pbsStale,
+		"PBSMaintenance":     pbsMaintenance,
+		"WindowsOK":          windowsOK,
+		"WindowsOffline":     windowsOffline,
+		"WindowsDiskAlerts":  windowsDiskAlerts,
+		"WindowsMaintenance": windowsMaintenance,
+		"MaintenanceTotal":   pveMaintenance + pbsMaintenance + windowsMaintenance,
 	})
 }
 

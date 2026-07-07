@@ -59,22 +59,27 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 
-	allAlerts, err := h.runAlerts(ctx, true)
+	rawAlerts, err := h.runRawAlerts(ctx, true)
 	if err != nil {
 		slog.Error("run alerts", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
+	}
+	visibleAlerts := service.FilterMaintenanceAlerts(ctx, h.store, rawAlerts)
+	visibleAlertIDs := make(map[string]bool, len(visibleAlerts))
+	for _, a := range visibleAlerts {
+		visibleAlertIDs[a.ID] = true
 	}
 
 	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 
 	var active, suppressed []domain.Alert
 	matchedSuppressionIDs := make(map[string]bool)
-	for _, a := range allAlerts {
+	for _, a := range rawAlerts {
 		if _, ok := suppressions[a.ID]; ok {
 			suppressed = append(suppressed, a)
 			matchedSuppressionIDs[a.ID] = true
-		} else {
+		} else if visibleAlertIDs[a.ID] {
 			active = append(active, a)
 		}
 	}
@@ -194,7 +199,7 @@ func (h *WebH) AlertDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allAlerts, err := h.runAlerts(ctx, false)
+	allAlerts, err := h.runRawAlerts(ctx, false)
 	if err != nil {
 		slog.Error("run alerts detail", "err", err)
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
@@ -303,6 +308,14 @@ func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, erro
 }
 
 func (h *WebH) runAlerts(ctx context.Context, syncState bool) ([]domain.Alert, error) {
+	allAlerts, err := h.runRawAlerts(ctx, syncState)
+	if err != nil {
+		return nil, err
+	}
+	return service.FilterMaintenanceAlerts(ctx, h.store, allAlerts), nil
+}
+
+func (h *WebH) runRawAlerts(ctx context.Context, syncState bool) ([]domain.Alert, error) {
 	cfg, err := service.LoadAlertConfigs(ctx, h.store)
 	if err != nil {
 		return nil, err
@@ -363,7 +376,7 @@ func alertRedirectBack(r *http.Request) string {
 }
 
 func (h *WebH) alertMap(ctx context.Context) map[string]domain.Alert {
-	allAlerts, _ := h.runAlerts(ctx, false)
+	allAlerts, _ := h.runRawAlerts(ctx, false)
 	out := make(map[string]domain.Alert, len(allAlerts))
 	for _, alert := range allAlerts {
 		out[alert.ID] = alert

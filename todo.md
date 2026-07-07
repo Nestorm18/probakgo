@@ -22,7 +22,7 @@
 
 ## QOL - Produccion
 
-- Pendiente: pantalla "Checklist produccion" en `/about` o `/settings/system`.
+- Hecho: pantalla "Checklist produccion" en `/settings/system`.
 - Debe mostrar en verde/rojo: HTTPS detectado, `SESSION_SECURE=true`, 2FA obligatorio para no readers, 2FA requerido en operaciones delicadas, URL publica configurada, version actual, ultimo envio de correo OK y estado basico de retencion.
 - Debe servir como revision rapida antes de exponer la aplicacion o despues de actualizarla.
 

@@ -48,11 +48,13 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	maintenance := h.applyServerMaintenanceFromForm(r, "pve", id)
 	h.audit(r, "alert_config.pve_update", "pve_server", strconv.FormatInt(id, 10), "", map[string]any{
-		"disk_pct":    cfg.DiskPct,
-		"stale_hours": cfg.StaleHours,
-		"backup_err":  cfg.BackupErr,
-		"finish_time": cfg.ExpectedFinishTime,
+		"disk_pct":       cfg.DiskPct,
+		"stale_hours":    cfg.StaleHours,
+		"backup_err":     cfg.BackupErr,
+		"finish_time":    cfg.ExpectedFinishTime,
+		"maintenance_on": maintenance,
 	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/pve?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
@@ -84,8 +86,10 @@ func (h *WebH) WindowsAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	maintenance := h.applyServerMaintenanceFromForm(r, "windows", id)
 	h.audit(r, "alert_config.windows_update", "windows_server", strconv.FormatInt(id, 10), "", map[string]any{
-		"disk_pct": cfg.DiskPct,
+		"disk_pct":       cfg.DiskPct,
+		"maintenance_on": maintenance,
 	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/windows?flash=Configuracion+de+alertas+guardada&ok=1", http.StatusSeeOther)
@@ -172,11 +176,13 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	maintenance := h.applyServerMaintenanceFromForm(r, "pbs", id)
 	h.audit(r, "alert_config.pbs_update", "pbs_server", strconv.FormatInt(id, 10), "", map[string]any{
 		"disk_pct":        cfg.DiskPct,
 		"days_until_full": cfg.DaysUntilFull,
 		"stale_hours":     cfg.StaleHours,
 		"verify_alert":    cfg.VerifyAlert,
+		"maintenance_on":  maintenance,
 	})
 	if r.FormValue("back") == "list" {
 		http.Redirect(w, r, "/servers/pbs?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)

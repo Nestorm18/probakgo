@@ -89,7 +89,8 @@
           {{if gt .TaskUnknown 0}}<span class="status-pill info ms-1">{{.TaskUnknown}} no configurada{{if gt .TaskUnknown 1}}s{{end}}</span>{{end}}
         </td>
         <td>
-          {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+          {{if .Maintenance.Active}}<span class="status-pill info" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+          {{else if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
         <td class="text-end" style="white-space:nowrap">
@@ -104,7 +105,10 @@
                   data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}"
                   data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
                   data-backup-err="{{if .AlertConfig.BackupErr}}{{deref .AlertConfig.BackupErr}}{{else}}-1{{end}}"
-                  data-expected-finish-time="{{with .AlertConfig.ExpectedFinishTime}}{{.}}{{end}}">
+                  data-expected-finish-time="{{with .AlertConfig.ExpectedFinishTime}}{{.}}{{end}}"
+                  data-maintenance-active="{{if .Maintenance.Active}}1{{else}}0{{end}}"
+                  data-maintenance-until="{{if .Maintenance.Active}}{{formatTime .Maintenance.Until}}{{end}}"
+                  data-maintenance-reason="{{.Maintenance.Reason}}">
             <i class="bi bi-bell"></i>
             {{if .AlertOverrides.Has}}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill" style="background:var(--clr-accent);font-size:.58rem;line-height:1;padding:.18rem .32rem">{{.AlertOverrides.Count}}</span>{{end}}
           </button>
@@ -133,7 +137,7 @@
 
 <!-- Alert config modal (PVE) -->
 <div class="modal fade" id="pveAlertCfgModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-md">
+  <div class="modal-dialog modal-dialog-centered modal-md">
     <div class="modal-content">
       <div class="modal-header border-0 pb-1">
         <h6 class="modal-title fw-semibold">
@@ -146,6 +150,31 @@
         <input type="hidden" name="back" value="list">
         <div class="modal-body">
           <div class="alert-config-stack">
+            <div class="alert-config-field">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="maintenance_enabled" id="pveMaintenanceEnabled">
+                <label class="form-check-label" for="pveMaintenanceEnabled">Modo mantenimiento</label>
+              </div>
+              <div class="form-text">Silencia todas las alertas de este servidor durante el mantenimiento.</div>
+              <div class="row g-2 mt-2">
+                <div class="col-5">
+                  <select id="pveMaintenanceHours" name="maintenance_hours" class="form-select form-select-sm">
+                    <option value="keep">Mantener actual</option>
+                    <option value="1">1 hora</option>
+                    <option value="4">4 horas</option>
+                    <option value="12">12 horas</option>
+                    <option value="24" selected>1 dia</option>
+                    <option value="72">3 dias</option>
+                    <option value="168">7 dias</option>
+                    <option value="720">30 dias</option>
+                  </select>
+                </div>
+                <div class="col-7">
+                  <input type="text" id="pveMaintenanceReason" name="maintenance_reason" class="form-control form-control-sm" placeholder="Motivo opcional">
+                </div>
+              </div>
+              <div id="pveMaintenanceUntil" class="form-text"></div>
+            </div>
             <div class="alert-config-field">
               <label class="form-label">Disco lleno (%)</label>
               <input type="number" id="pveAlertDiskPct" name="disk_pct" class="form-control form-control-sm"
@@ -251,6 +280,11 @@ document.addEventListener('click', e => {
   document.getElementById('pveExpectedFinishTime').value = d.expectedFinishTime || '';
   const sel = document.getElementById('pveAlertBackupErr');
   sel.value = d.backupErr === '-1' || d.backupErr === '' ? '-1' : d.backupErr;
+  const maintenanceEnabled = d.maintenanceActive === '1';
+  document.getElementById('pveMaintenanceEnabled').checked = maintenanceEnabled;
+  document.getElementById('pveMaintenanceHours').value = maintenanceEnabled ? 'keep' : '24';
+  document.getElementById('pveMaintenanceReason').value = d.maintenanceReason || '';
+  document.getElementById('pveMaintenanceUntil').textContent = d.maintenanceUntil ? `Activo hasta ${d.maintenanceUntil}` : '';
   bootstrap.Modal.getOrCreateInstance(document.getElementById('pveAlertCfgModal')).show();
 });
 </script>

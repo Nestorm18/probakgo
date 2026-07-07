@@ -81,7 +81,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `028_windows_alert_config.up.sql`.
+- Current latest migration: `030_server_maintenance.up.sql`.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
 
@@ -98,7 +98,7 @@ Release assets must stay in sync with workflows and download handlers:
 - Add alert types by adding an evaluator to the `evaluators` slice.
 - PVE/PBS can have per-server overrides; PVE can also have per-VM overrides.
 - Windows currently uses global disk and heartbeat thresholds only.
-- Suppressions live in `alert_suppressions`; deleting API-key-bound server data must remove related suppressions and heartbeats.
+- Suppressions live in `alert_suppressions`; maintenance windows live in `server_maintenance`; deleting API-key-bound server data must remove related suppressions, maintenance and heartbeats.
 
 ## Important Behavior
 

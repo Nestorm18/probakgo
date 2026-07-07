@@ -102,7 +102,7 @@
 
 <!-- Create modal -->
 <div class="modal fade" id="createModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" action="/users">
           {{ .CSRFField }}
@@ -139,7 +139,7 @@
 
 <!-- Change username modal -->
 <div class="modal fade" id="usernameModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" id="usernameForm" action="">
           {{ .CSRFField }}
@@ -162,7 +162,7 @@
 
 <!-- Change role modal -->
 <div class="modal fade" id="roleModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" id="roleForm" action="">
           {{ .CSRFField }}
@@ -189,7 +189,7 @@
 
 <!-- Change password modal -->
 <div class="modal fade" id="pwdModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" id="pwdForm" action="">
           {{ .CSRFField }}

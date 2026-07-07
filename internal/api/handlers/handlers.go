@@ -37,7 +37,7 @@ func internalErr(w http.ResponseWriter, op string, err error) {
 
 func (h *H) sendImmediateCriticalAlerts() {
 	go func() {
-		if alerts, err := service.CurrentAlerts(context.Background(), h.store, h.report); err == nil {
+		if alerts, err := service.CurrentAlertsRaw(context.Background(), h.store, h.report); err == nil {
 			_ = h.store.SyncAlertStates(context.Background(), alerts)
 		} else {
 			slog.Warn("sync alert states", "err", err)

@@ -18,6 +18,21 @@
 </a>
 {{end}}
 
+{{if gt .MaintenanceTotal 0}}
+<div class="card mb-4 d-flex flex-row align-items-center gap-3 px-4 py-3" style="border-left:3px solid var(--clr-accent)">
+  <i class="bi bi-tools fs-5" style="color:var(--clr-accent)"></i>
+  <div class="flex-grow-1">
+    <span style="font-weight:600;color:var(--txt-primary)">Modo mantenimiento activo</span>
+    <span class="ms-3" style="font-size:.82rem;color:var(--txt-secondary)">
+      <span class="badge" style="background:var(--clr-accent)">{{.MaintenanceTotal}} servidor{{if gt .MaintenanceTotal 1}}es{{end}}</span>
+      {{if gt .PVEMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">PVE {{.PVEMaintenance}}</span>{{end}}
+      {{if gt .PBSMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">PBS {{.PBSMaintenance}}</span>{{end}}
+      {{if gt .WindowsMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">Windows {{.WindowsMaintenance}}</span>{{end}}
+    </span>
+  </div>
+</div>
+{{end}}
+
 <!-- Stat cards -->
 <div class="row g-3 mb-4 dashboard-stat-grid">
   <div class="col-6 col-md-3">
@@ -123,7 +138,8 @@
             <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           </div>
           <div class="dashboard-server-row-meta">
-            {{if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
+            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+            {{else if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
             {{else if .HasBackupError}}<span class="status-pill bad" style="font-size:.68rem">Backup error</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>{{end}}
             {{if .Swap.Enabled}}<span class="status-pill bad" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
@@ -154,7 +170,8 @@
             <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           </div>
           <div class="dashboard-server-row-meta">
-            {{if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
+            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+            {{else if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>
             <span class="status-pill {{.FillClass}}" style="font-size:.68rem">{{.FillLabel}}</span>{{end}}
             {{if .Swap.Enabled}}<span class="status-pill bad" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
@@ -185,11 +202,14 @@
             <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           </div>
           <div class="dashboard-server-row-meta">
+            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+            {{else}}
             {{if .Heartbeat.Online}}<span class="status-pill ok" style="font-size:.68rem">Online</span>
             {{else if .Heartbeat.Seen}}<span class="status-pill bad" style="font-size:.68rem">Offline</span>
             {{else}}<span class="status-pill warn" style="font-size:.68rem">Sin heartbeat</span>{{end}}
             {{if .HasDiskAlert}}<span class="status-pill bad" style="font-size:.68rem">{{.DiskSummary}}</span>
             {{else}}<span class="status-pill ok" style="font-size:.68rem">{{.DiskSummary}}</span>{{end}}
+            {{end}}
             {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
           <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>

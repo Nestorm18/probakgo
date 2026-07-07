@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -136,4 +137,57 @@ func TestAlertsStatusIncludesHeartbeatAlert(t *testing.T) {
 		}
 	}
 	t.Fatalf("heartbeat alert not found in response: %+v", resp.Alerts)
+}
+
+func TestAlertsStatusHidesMaintenanceAlert(t *testing.T) {
+	st := openAlertsHandlerDB(t)
+	ctx := context.Background()
+	serverID, err := st.UpsertPVEServer(ctx, "pve-maint", "10.0.0.10", "", "0.0.149", "")
+	if err != nil {
+		t.Fatalf("UpsertPVEServer: %v", err)
+	}
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	storageID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "backup", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, storageID, domain.StorageInfoPayload{Total: 1000, Used: 950, Avail: 50, Active: true, Enabled: true})
+	if err := st.UpsertServerMaintenance(ctx, "pve", serverID, time.Now().Add(time.Hour), "test"); err != nil {
+		t.Fatalf("UpsertServerMaintenance: %v", err)
+	}
+
+	h := New(st, nil, nil)
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/alerts/status.json", nil)
+	h.AlertsStatus(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: got %d, body %s", rr.Code, rr.Body.String())
+	}
+	var resp alertStatusResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.Critical != 0 || resp.Warning != 0 || len(resp.Alerts) != 0 {
+		t.Fatalf("maintenance alert should be hidden from status: %+v", resp)
+	}
+}
+
+func TestAlertMapIncludesMaintenanceAlertForDetailAndUnsuppress(t *testing.T) {
+	st := openAlertsHandlerDB(t)
+	ctx := context.Background()
+	serverID, err := st.UpsertPVEServer(ctx, "pve-maint", "10.0.0.10", "", "0.0.149", "")
+	if err != nil {
+		t.Fatalf("UpsertPVEServer: %v", err)
+	}
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	storageID, _ := st.InsertPVEStorage(ctx, reportID, domain.StoragePayload{Storage: "backup", Content: "backup"})
+	_ = st.InsertPVEStorageInfo(ctx, storageID, domain.StorageInfoPayload{Total: 1000, Used: 950, Avail: 50, Active: true, Enabled: true})
+	if err := st.UpsertServerMaintenance(ctx, "pve", serverID, time.Now().Add(time.Hour), "test"); err != nil {
+		t.Fatalf("UpsertServerMaintenance: %v", err)
+	}
+
+	h := New(st, nil, nil)
+	alertID := "disk:pve:" + strconv.FormatInt(serverID, 10) + ":backup"
+	alerts := h.alertMap(ctx)
+	if alerts[alertID].ID != alertID {
+		t.Fatalf("maintenance alert missing from raw alert map: %+v", alerts)
+	}
 }

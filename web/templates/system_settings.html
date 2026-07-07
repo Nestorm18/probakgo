@@ -5,6 +5,53 @@
 {{end}}
 {{block "page_content" .}}
 
+<div id="production-checklist" class="card mb-3">
+  <div class="card-header d-flex align-items-center gap-2 flex-wrap">
+    <i class="bi bi-clipboard2-check" style="color:var(--clr-accent)"></i>
+    <span>Checklist produccion</span>
+    {{if .ProductionChecklist.Ready}}
+      <span class="status-pill ok ms-auto">Listo</span>
+    {{else}}
+      {{if .ProductionChecklist.Bad}}<span class="status-pill bad ms-auto">{{.ProductionChecklist.Bad}} critico{{if ne .ProductionChecklist.Bad 1}}s{{end}}</span>{{end}}
+      {{if .ProductionChecklist.Warnings}}<span class="status-pill warn {{if eq .ProductionChecklist.Bad 0}}ms-auto{{end}}">{{.ProductionChecklist.Warnings}} revisar</span>{{end}}
+    {{end}}
+  </div>
+  <div class="card-body p-0" style="overflow-x:auto">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Control</th>
+          <th>Estado</th>
+          <th>Detalle</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .ProductionChecklist.Items}}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi {{.Icon}}" style="color:var(--clr-accent)"></i>
+              <span class="fw-semibold" style="color:var(--txt-primary)">{{.Title}}</span>
+            </div>
+          </td>
+          <td><span class="status-pill {{.CSSClass}}">{{.Status}}</span></td>
+          <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Detail}}</td>
+          <td class="text-end" style="white-space:nowrap">
+            {{if .ActionPost}}
+              <form method="post" action="{{.ActionPost}}" class="d-inline">
+                {{$.CSRFField}}
+                <button type="submit" class="btn btn-sm btn-primary">{{.ActionLabel}}</button>
+              </form>
+            {{else if .ActionURL}}<a href="{{.ActionURL}}" class="btn btn-sm btn-secondary">{{.ActionLabel}}</a>{{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <form method="POST" action="/settings/system">
   {{.CSRFField}}
   <div class="row g-3">

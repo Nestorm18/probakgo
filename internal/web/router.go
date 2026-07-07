@@ -131,6 +131,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Get("/settings", h.SettingsHub)
 		r.With(RequireAdmin).Get("/settings/system", h.SystemSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/system", h.SystemSettingsPost)
+		r.With(RequireAdmin, sensitive).Post("/settings/system/session-secure", h.EnableSessionSecurePost)
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/email", h.EmailSettingsPost)
 		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)

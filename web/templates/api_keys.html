@@ -124,7 +124,7 @@
 {{if isAdmin .Role}}
 <!-- Create modal -->
 <div class="modal fade" id="createModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <form method="POST" action="/api-keys">
           {{ .CSRFField }}
@@ -162,7 +162,7 @@
 
 <!-- Reveal modal -->
 <div class="modal fade" id="revealModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-eye me-2" style="color:var(--clr-accent)"></i>Ver clave completa</h5>

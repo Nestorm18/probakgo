@@ -303,6 +303,20 @@ type EmailConfig struct {
 	SensitiveActionsRequireTOTP bool   `db:"sensitive_actions_require_totp"`
 }
 
+type EmailDeliveryStatus struct {
+	LastAttemptAt *time.Time
+	LastSuccessAt *time.Time
+	LastError     string
+}
+
+type ServerMaintenance struct {
+	ServerType string
+	ServerID   int64
+	Until      time.Time
+	Reason     string
+	Active     bool
+}
+
 // Alert represents a detected condition requiring attention.
 type Alert struct {
 	ID         string // dedup key: "type:serverType:serverID:store:vmid"
