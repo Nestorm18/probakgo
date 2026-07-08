@@ -68,6 +68,58 @@ func TestShouldSendImmediateCriticalEmail_ExcludesPBSStale(t *testing.T) {
 	}
 }
 
+func TestCriticalAlertsPendingEmailSkipsAlreadySent(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	alert := domain.Alert{
+		ID:         "pve_heartbeat:pve:1",
+		Type:       domain.AlertTypePVEHeartbeat,
+		Severity:   domain.AlertSeverityCritical,
+		Title:      "Servidor offline",
+		ServerName: "pve-1",
+		ServerType: "pve",
+		ServerID:   1,
+	}
+	if err := st.SyncAlertStates(ctx, []domain.Alert{alert}); err != nil {
+		t.Fatalf("sync alert: %v", err)
+	}
+
+	pending, err := criticalAlertsPendingEmail(ctx, st, []domain.Alert{alert}, nil)
+	if err != nil {
+		t.Fatalf("pending first: %v", err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("first pending: got %d, want 1", len(pending))
+	}
+
+	if err := st.MarkAlertCriticalEmailSent(ctx, alert.ID, time.Now()); err != nil {
+		t.Fatalf("mark sent: %v", err)
+	}
+	pending, err = criticalAlertsPendingEmail(ctx, st, []domain.Alert{alert}, nil)
+	if err != nil {
+		t.Fatalf("pending second: %v", err)
+	}
+	if len(pending) != 0 {
+		t.Fatalf("already sent pending: got %d, want 0", len(pending))
+	}
+}
+
+func TestRenderResolvedCriticalEmail(t *testing.T) {
+	html := renderResolvedCriticalEmail([]domain.Alert{{
+		ID:         "pve_heartbeat:pve:1",
+		Type:       domain.AlertTypePVEHeartbeat,
+		Severity:   domain.AlertSeverityCritical,
+		Title:      "Servidor offline",
+		Message:    "No se recibe senal del servidor desde hace 17h",
+		ServerName: "pve-1",
+		ServerType: "pve",
+		ServerID:   1,
+	}}, time.Date(2026, 7, 8, 10, 0, 0, 0, time.UTC))
+	if !strings.Contains(html, "Probakgo alerta resuelta") || !strings.Contains(html, "RESUELTA") {
+		t.Fatalf("resolved email missing expected text:\n%s", html)
+	}
+}
+
 func TestNextRunTime_Future(t *testing.T) {
 	// 23:59 is in the future for all but 1 minute per day
 	next := nextRunTime("23:59", time.UTC)

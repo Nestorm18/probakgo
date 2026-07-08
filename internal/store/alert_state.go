@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"probakgo/internal/debug"
@@ -87,8 +88,14 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 		}
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE alert_states
-			SET is_present = 0, updated_at = ?
-			WHERE alert_id = ?`, now, alertID); err != nil {
+			SET is_present = 0,
+			    resolution_email_pending = CASE
+			        WHEN last_critical_email_at IS NOT NULL AND severity = ? THEN 1
+			        ELSE resolution_email_pending
+			    END,
+			    last_critical_email_at = NULL,
+			    updated_at = ?
+			WHERE alert_id = ?`, domain.AlertSeverityCritical, now, alertID); err != nil {
 			return err
 		}
 		if err := insertAlertEvent(ctx, tx, alertEventFromState(state, "resolved", "")); err != nil {
@@ -97,6 +104,65 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 	}
 
 	return tx.Commit()
+}
+
+func (s *Store) GetAlertCriticalEmailSentAt(ctx context.Context, alertID string) (time.Time, bool, error) {
+	debug.RecordQuery(ctx, `SELECT last_critical_email_at FROM alert_states WHERE alert_id = ? AND is_present = 1`)
+	var sentAt sql.NullTime
+	err := s.db.QueryRowContext(ctx, `
+		SELECT last_critical_email_at
+		FROM alert_states
+		WHERE alert_id = ? AND is_present = 1`, alertID).Scan(&sentAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return time.Time{}, false, nil
+		}
+		return time.Time{}, false, err
+	}
+	return sentAt.Time, sentAt.Valid, nil
+}
+
+func (s *Store) MarkAlertCriticalEmailSent(ctx context.Context, alertID string, sentAt time.Time) error {
+	debug.RecordQuery(ctx, `UPDATE alert_states SET last_critical_email_at = ?, updated_at = ? WHERE alert_id = ?`)
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE alert_states
+		SET last_critical_email_at = ?, updated_at = ?
+		WHERE alert_id = ?`, sentAt, sentAt, alertID)
+	return err
+}
+
+func (s *Store) ListPendingAlertResolutionEmails(ctx context.Context) ([]domain.Alert, error) {
+	debug.RecordQuery(ctx, `SELECT alert_id, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name FROM alert_states WHERE resolution_email_pending = 1 AND is_present = 0`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT alert_id, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name
+		FROM alert_states
+		WHERE resolution_email_pending = 1 AND is_present = 0
+		ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var alerts []domain.Alert
+	for rows.Next() {
+		var alert domain.Alert
+		if err := rows.Scan(&alert.ID, &alert.Severity, &alert.Title, &alert.Message, &alert.ServerName,
+			&alert.ServerType, &alert.ServerID, &alert.StoreName, &alert.VMID, &alert.VMName); err != nil {
+			return nil, err
+		}
+		alert.Type = strings.Split(alert.ID, ":")[0]
+		alerts = append(alerts, alert)
+	}
+	return alerts, rows.Err()
+}
+
+func (s *Store) MarkAlertResolutionEmailSent(ctx context.Context, alertID string, sentAt time.Time) error {
+	debug.RecordQuery(ctx, `UPDATE alert_states SET resolution_email_pending = 0, updated_at = ? WHERE alert_id = ?`)
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE alert_states
+		SET resolution_email_pending = 0, updated_at = ?
+		WHERE alert_id = ?`, sentAt, alertID)
+	return err
 }
 
 func (s *Store) InsertAlertStateEvent(ctx context.Context, entry domain.AlertStateEvent) error {
@@ -213,7 +279,8 @@ func updateAlertState(ctx context.Context, tx *sql.Tx, alert domain.Alert, now t
 	_, err := tx.ExecContext(ctx, `
 		UPDATE alert_states
 		SET is_present = 1, severity = ?, title = ?, message = ?, server_name = ?, server_type = ?,
-		    server_id = ?, store_name = ?, vmid = ?, vm_name = ?, last_seen_at = ?, updated_at = ?
+		    server_id = ?, store_name = ?, vmid = ?, vm_name = ?, resolution_email_pending = 0,
+		    last_seen_at = ?, updated_at = ?
 		WHERE alert_id = ?`,
 		alert.Severity, alert.Title, alert.Message, alert.ServerName, alert.ServerType,
 		alert.ServerID, alert.StoreName, alert.VMID, alert.VMName, now, now, alert.ID,

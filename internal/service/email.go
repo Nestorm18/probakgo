@@ -10,7 +10,6 @@ import (
 	"net/smtp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"probakgo/internal/domain"
@@ -19,13 +18,6 @@ import (
 
 //go:embed email_template.html
 var emailTemplateHTML string
-
-var criticalEmailState = struct {
-	sync.Mutex
-	sentAt map[string]time.Time
-}{sentAt: make(map[string]time.Time)}
-
-const criticalEmailThrottle = time.Hour
 
 type serverRow struct {
 	Name        string
@@ -134,7 +126,7 @@ func sendDailyReportWithConfig(ctx context.Context, st *store.Store, rep *Report
 	return sendSMTP(cfg, recipients, subject, html)
 }
 
-// SendImmediateCriticalAlerts sends an optional, throttled email for active critical alerts.
+// SendImmediateCriticalAlerts sends one optional email when a critical alert first appears.
 func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -163,13 +155,52 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	if err != nil {
 		return fmt.Errorf("run alerts: %w", err)
 	}
-	_ = st.SyncAlertStates(ctx, rawAlerts)
+	if err := st.SyncAlertStates(ctx, rawAlerts); err != nil {
+		return fmt.Errorf("sync alert states: %w", err)
+	}
 	alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 	suppressed, _ := st.GetActiveSuppressions(ctx)
 
 	now := time.Now()
+	selected, err := criticalAlertsPendingEmail(ctx, st, alerts, suppressed)
+	if err != nil {
+		return err
+	}
+	if len(selected) > 0 {
+		subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
+		if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+			return err
+		}
+
+		for _, a := range selected {
+			if err := st.MarkAlertCriticalEmailSent(ctx, a.ID, now); err != nil {
+				return fmt.Errorf("mark critical email sent: %w", err)
+			}
+		}
+	}
+
+	resolved, err := st.ListPendingAlertResolutionEmails(ctx)
+	if err != nil {
+		return fmt.Errorf("list resolved critical alerts: %w", err)
+	}
+	if len(resolved) == 0 {
+		return nil
+	}
+
+	subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
+	if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+		return err
+	}
+	for _, a := range resolved {
+		if err := st.MarkAlertResolutionEmailSent(ctx, a.ID, now); err != nil {
+			return fmt.Errorf("mark resolution email sent: %w", err)
+		}
+	}
+	return nil
+}
+
+func criticalAlertsPendingEmail(ctx context.Context, st *store.Store, alerts []domain.Alert, suppressed map[string]time.Time) ([]domain.Alert, error) {
 	var selected []domain.Alert
-	criticalEmailState.Lock()
 	for _, a := range alerts {
 		if !shouldSendImmediateCriticalEmail(a) {
 			continue
@@ -177,27 +208,16 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 		if _, ok := suppressed[a.ID]; ok {
 			continue
 		}
-		if last, ok := criticalEmailState.sentAt[a.ID]; ok && now.Sub(last) < criticalEmailThrottle {
+		_, sent, err := st.GetAlertCriticalEmailSentAt(ctx, a.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get critical email state: %w", err)
+		}
+		if sent {
 			continue
 		}
 		selected = append(selected, a)
 	}
-	criticalEmailState.Unlock()
-	if len(selected) == 0 {
-		return nil
-	}
-
-	subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
-	if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
-		return err
-	}
-
-	criticalEmailState.Lock()
-	for _, a := range selected {
-		criticalEmailState.sentAt[a.ID] = now
-	}
-	criticalEmailState.Unlock()
-	return nil
+	return selected, nil
 }
 
 // SendCriticalAlertTestEmail sends a synthetic critical alert email to validate SMTP and layout.
@@ -302,6 +322,51 @@ func renderImmediateCriticalEmail(alerts []domain.Alert, now time.Time) string {
 	b.WriteString(`</td></tr>`)
 	b.WriteString(`<tr><td style="background-color:#f8f9fa;padding:18px 20px;text-align:center;border-top:1px solid #dee2e6;">`)
 	b.WriteString(`<p style="margin:0;color:#6c757d;font-size:13px;"><strong>Probakgo Monitor</strong> · Aviso automatico de alertas criticas</p>`)
+	b.WriteString(`</td></tr></table></td></tr></table></body></html>`)
+	return b.String()
+}
+
+func renderResolvedCriticalEmail(alerts []domain.Alert, now time.Time) string {
+	var b strings.Builder
+	b.WriteString(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Probakgo alerta resuelta</title></head>`)
+	b.WriteString(`<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f5f5f5;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background-color:#f5f5f5;"><tr><td style="padding:20px;">`)
+	b.WriteString(`<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="margin:0 auto;background-color:#ffffff;border-radius:8px;overflow:hidden;">`)
+	b.WriteString(`<tr><td style="background-color:#198754;padding:28px 30px;text-align:center;">`)
+	b.WriteString(`<h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:650;">Probakgo alerta resuelta</h1>`)
+	b.WriteString(`<p style="margin:10px 0 0 0;color:#ffffff;font-size:15px;">`)
+	b.WriteString(template.HTMLEscapeString(now.Format("2006-01-02 15:04:05")))
+	b.WriteString(`</p></td></tr>`)
+	b.WriteString(`<tr><td style="padding:30px;">`)
+	b.WriteString(`<table role="presentation" width="100%" cellpadding="18" cellspacing="0" style="background-color:#f0fff4;border-left:4px solid #198754;border-radius:4px;margin-bottom:22px;">`)
+	b.WriteString(`<tr><td>`)
+	b.WriteString(`<h2 style="margin:0 0 8px 0;font-size:19px;color:#146c43;">`)
+	b.WriteString(template.HTMLEscapeString(fmt.Sprintf("%d alerta(s) solucionada(s)", len(alerts))))
+	b.WriteString(`</h2>`)
+	b.WriteString(`<p style="margin:0;color:#3f6b4b;font-size:14px;">Estas alertas ya no estan activas en la ultima comprobacion.</p>`)
+	b.WriteString(`</td></tr></table>`)
+	for _, a := range alerts {
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="18" cellspacing="0" style="background-color:#ffffff;border:1px solid #dee2e6;border-left:4px solid #198754;border-radius:4px;margin-bottom:14px;">`)
+		b.WriteString(`<tr><td>`)
+		b.WriteString(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>`)
+		b.WriteString(`<td><h3 style="margin:0 0 8px 0;font-size:18px;color:#333333;">`)
+		b.WriteString(template.HTMLEscapeString(a.ServerName))
+		b.WriteString(`</h3></td>`)
+		b.WriteString(`<td style="text-align:right;"><span style="background-color:#198754;color:#ffffff;padding:4px 12px;border-radius:12px;font-size:12px;font-weight:600;">RESUELTA</span></td>`)
+		b.WriteString(`</tr></table>`)
+		b.WriteString(`<p style="margin:0 0 12px 0;color:#212529;font-size:15px;font-weight:600;">`)
+		b.WriteString(template.HTMLEscapeString(a.Title))
+		b.WriteString(`</p>`)
+		if a.Message != "" {
+			b.WriteString(`<p style="margin:0;color:#495057;font-size:14px;line-height:1.45;">`)
+			b.WriteString(template.HTMLEscapeString(a.Message))
+			b.WriteString(`</p>`)
+		}
+		b.WriteString(`</td></tr></table>`)
+	}
+	b.WriteString(`</td></tr>`)
+	b.WriteString(`<tr><td style="background-color:#f8f9fa;padding:18px 20px;text-align:center;border-top:1px solid #dee2e6;">`)
+	b.WriteString(`<p style="margin:0;color:#6c757d;font-size:13px;"><strong>Probakgo Monitor</strong> &middot; Aviso automatico de recuperacion</p>`)
 	b.WriteString(`</td></tr></table></td></tr></table></body></html>`)
 	return b.String()
 }

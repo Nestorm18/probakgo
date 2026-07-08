@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestParseDisksJSON_Array(t *testing.T) {
 	got, err := parseDisksJSON([]byte(`[{"Name":"C:","Label":"System","FileSystem":"NTFS","DriveType":"Fixed","Total":1000,"Used":750,"Free":250,"Health":""},{"Name":"Physical 0","Label":"SSD","FileSystem":"","DriveType":"Physical","Total":1000,"Used":0,"Free":0,"Health":"OK"}]`))
@@ -52,5 +56,19 @@ func TestNormalizeAPIURL(t *testing.T) {
 		if got := normalizeAPIURL(in); got != want {
 			t.Fatalf("normalizeAPIURL(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestLoadEnvIntoProcessLoadsGitHubToken(t *testing.T) {
+	t.Setenv("GITHUB_TOKEN", "")
+	path := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(path, []byte("API_URL=http://probakgo.example\nGITHUB_TOKEN=\"expired-token\"\n"), 0600); err != nil {
+		t.Fatalf("write env: %v", err)
+	}
+	if err := loadEnvIntoProcess(path); err != nil {
+		t.Fatalf("loadEnvIntoProcess: %v", err)
+	}
+	if got := os.Getenv("GITHUB_TOKEN"); got != "expired-token" {
+		t.Fatalf("GITHUB_TOKEN: got %q, want expired-token", got)
 	}
 }

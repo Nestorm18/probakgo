@@ -12,7 +12,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.155"
+var version = "0.0.158"
 
 func main() {
 	closeLog := setupLogging()
@@ -83,6 +83,9 @@ func runHeartbeat() error {
 }
 
 func runUpdate() error {
+	if err := loadEnvIntoProcess(""); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	_, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-windows-client", version)
 	return err
 }

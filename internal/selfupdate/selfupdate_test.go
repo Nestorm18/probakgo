@@ -1,6 +1,9 @@
 package selfupdate
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"runtime"
 	"testing"
 )
@@ -53,5 +56,81 @@ func TestReleaseAssetName(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("releaseAssetName = %q, want %q", got, want)
+	}
+}
+
+func TestFetchLatestReleaseRetriesWithoutTokenWhenTokenRejected(t *testing.T) {
+	oldBaseURL := githubAPIBaseURL
+	t.Cleanup(func() { githubAPIBaseURL = oldBaseURL })
+	t.Setenv("GITHUB_TOKEN", "expired-token")
+
+	var authed, anonymous int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/repos/owner/repo/releases/latest" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "" {
+			authed++
+			http.Error(w, "bad credentials", http.StatusUnauthorized)
+			return
+		}
+		anonymous++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"tag_name":"v1.2.3","assets":[]}`)
+	}))
+	defer srv.Close()
+	githubAPIBaseURL = srv.URL
+
+	rel, err := fetchLatestRelease("owner/repo")
+	if err != nil {
+		t.Fatalf("fetchLatestRelease: %v", err)
+	}
+	if rel.TagName != "v1.2.3" {
+		t.Fatalf("tag: got %q, want v1.2.3", rel.TagName)
+	}
+	if authed != 1 || anonymous != 1 {
+		t.Fatalf("requests: authed=%d anonymous=%d, want 1/1", authed, anonymous)
+	}
+}
+
+func TestReleaseAssetRequestRetriesWithBrowserURLWhenTokenRejected(t *testing.T) {
+	oldBaseURL := githubAPIBaseURL
+	t.Cleanup(func() { githubAPIBaseURL = oldBaseURL })
+	t.Setenv("GITHUB_TOKEN", "expired-token")
+
+	var apiHits, browserHits int
+	apiSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		apiHits++
+		if r.URL.Path != "/repos/owner/repo/releases/assets/123" {
+			t.Fatalf("unexpected asset path: %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") == "" {
+			t.Fatal("expected authorization header on API asset request")
+		}
+		http.Error(w, "bad credentials", http.StatusForbidden)
+	}))
+	defer apiSrv.Close()
+	browserSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		browserHits++
+		if r.Header.Get("Authorization") != "" {
+			t.Fatal("browser fallback should not include authorization")
+		}
+		_, _ = io.WriteString(w, "asset")
+	}))
+	defer browserSrv.Close()
+	githubAPIBaseURL = apiSrv.URL
+
+	resp, err := doWithGitHubAuthFallback(&http.Client{}, func(withAuth bool) (*http.Request, error) {
+		return newReleaseAssetRequest("owner/repo", 123, browserSrv.URL+"/asset", withAuth)
+	})
+	if err != nil {
+		t.Fatalf("request with fallback: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status: got %d, want 200", resp.StatusCode)
+	}
+	if apiHits != 1 || browserHits != 1 {
+		t.Fatalf("hits: api=%d browser=%d, want 1/1", apiHits, browserHits)
 	}
 }

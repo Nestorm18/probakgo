@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+var githubAPIBaseURL = "https://api.github.com"
+
 type githubRelease struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
@@ -162,15 +164,19 @@ func versionParts(v string) ([]int, bool) {
 }
 
 func githubToken() string {
-	return os.Getenv("GITHUB_TOKEN")
+	return strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
 }
 
 func newAPIRequest(method, url string) (*http.Request, error) {
+	return newGitHubRequest(method, url, true)
+}
+
+func newGitHubRequest(method, url string, withAuth bool) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	if tok := githubToken(); tok != "" {
+	if tok := githubToken(); withAuth && tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	return req, nil
@@ -178,11 +184,9 @@ func newAPIRequest(method, url string) (*http.Request, error) {
 
 func fetchLatestRelease(repo string) (*githubRelease, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
-	req, err := newAPIRequest("GET", "https://api.github.com/repos/"+repo+"/releases/latest")
-	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
-	}
-	resp, err := client.Do(req)
+	resp, err := doWithGitHubAuthFallback(client, func(withAuth bool) (*http.Request, error) {
+		return newGitHubRequest("GET", githubAPIURL("/repos/"+repo+"/releases/latest"), withAuth)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("fetch: %w", err)
 	}
@@ -197,6 +201,36 @@ func fetchLatestRelease(repo string) (*githubRelease, error) {
 	return &rel, nil
 }
 
+func githubAPIURL(path string) string {
+	return strings.TrimRight(githubAPIBaseURL, "/") + path
+}
+
+func doWithGitHubAuthFallback(client *http.Client, build func(withAuth bool) (*http.Request, error)) (*http.Response, error) {
+	resp, err := doBuiltRequest(client, build, true)
+	if err != nil {
+		return nil, err
+	}
+	if githubToken() == "" || !shouldRetryGitHubAnonymous(resp.StatusCode) {
+		return resp, nil
+	}
+	status := resp.StatusCode
+	resp.Body.Close()
+	fmt.Printf("GitHub token rejected (HTTP %d), retrying without token...\n", status)
+	return doBuiltRequest(client, build, false)
+}
+
+func doBuiltRequest(client *http.Client, build func(withAuth bool) (*http.Request, error), withAuth bool) (*http.Response, error) {
+	req, err := build(withAuth)
+	if err != nil {
+		return nil, err
+	}
+	return client.Do(req)
+}
+
+func shouldRetryGitHubAnonymous(status int) bool {
+	return status == http.StatusUnauthorized || status == http.StatusForbidden
+}
+
 func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryName string) error {
 	executable, err := os.Executable()
 	if err != nil {
@@ -209,24 +243,9 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 
-	// For private repos (token present), download via API assets endpoint.
-	// For public repos, use the browser download URL directly.
-	var binReq *http.Request
-	if tok := githubToken(); tok != "" && binID != 0 {
-		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, binID)
-		binReq, err = newAPIRequest("GET", apiURL)
-		if err != nil {
-			return fmt.Errorf("build asset request: %w", err)
-		}
-		binReq.Header.Set("Accept", "application/octet-stream")
-	} else {
-		binReq, err = http.NewRequest("GET", downloadURL, nil)
-		if err != nil {
-			return fmt.Errorf("build download request: %w", err)
-		}
-	}
-
-	resp, err := client.Do(binReq)
+	resp, err := doWithGitHubAuthFallback(client, func(withAuth bool) (*http.Request, error) {
+		return newReleaseAssetRequest(repo, binID, downloadURL, withAuth)
+	})
 	if err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
@@ -270,22 +289,9 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 }
 
 func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL, binaryName, actualHash string) error {
-	var req *http.Request
-	var err error
-	if tok := githubToken(); tok != "" && sha256ID != 0 {
-		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo, sha256ID)
-		req, err = newAPIRequest("GET", apiURL)
-		if err != nil {
-			return fmt.Errorf("build checksum request: %w", err)
-		}
-		req.Header.Set("Accept", "application/octet-stream")
-	} else {
-		req, err = http.NewRequest("GET", sha256URL, nil)
-		if err != nil {
-			return fmt.Errorf("build checksum request: %w", err)
-		}
-	}
-	resp, err := client.Do(req)
+	resp, err := doWithGitHubAuthFallback(client, func(withAuth bool) (*http.Request, error) {
+		return newReleaseAssetRequest(repo, sha256ID, sha256URL, withAuth)
+	})
 	if err != nil {
 		return fmt.Errorf("fetch checksums: %w", err)
 	}
@@ -308,6 +314,19 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 		}
 	}
 	return fmt.Errorf("checksum not found in SHA256SUMS for %s", assetName)
+}
+
+func newReleaseAssetRequest(repo string, assetID int64, browserURL string, withAuth bool) (*http.Request, error) {
+	if githubToken() != "" && withAuth && assetID != 0 {
+		apiURL := fmt.Sprintf("%s/repos/%s/releases/assets/%d", strings.TrimRight(githubAPIBaseURL, "/"), repo, assetID)
+		req, err := newGitHubRequest("GET", apiURL, true)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("Accept", "application/octet-stream")
+		return req, nil
+	}
+	return http.NewRequest("GET", browserURL, nil)
 }
 
 func releaseAssetName(binaryName string) string {

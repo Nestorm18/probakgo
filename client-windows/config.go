@@ -41,35 +41,64 @@ func loadConfig(path string) (Config, error) {
 	if path == "" {
 		path = configPath()
 	}
-	f, err := os.Open(path)
-	if err != nil {
-		return Config{}, fmt.Errorf("open %s: %w", path, err)
-	}
-	defer f.Close()
 	cfg := Config{}
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		key, val, ok := strings.Cut(line, "=")
-		if !ok {
-			continue
-		}
-		val = strings.Trim(strings.TrimSpace(val), `"`)
-		switch strings.TrimSpace(key) {
+	if err := readEnvFile(path, func(key, val string) {
+		switch key {
 		case "API_URL":
 			cfg.APIURL = val
 		case "API_KEY":
 			cfg.APIKey = val
 		}
-	}
-	if err := sc.Err(); err != nil {
+	}); err != nil {
 		return Config{}, err
 	}
 	cfg.APIURL = normalizeAPIURL(cfg.APIURL)
 	return cfg, nil
+}
+
+func loadEnvIntoProcess(path string) error {
+	if path == "" {
+		path = configPath()
+	}
+	return readEnvFile(path, func(key, val string) {
+		_ = os.Setenv(key, val)
+	})
+}
+
+func readEnvFile(path string, set func(key, val string)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", path, err)
+	}
+	defer f.Close()
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		key, val, ok := parseEnvLine(sc.Text())
+		if !ok {
+			continue
+		}
+		set(key, val)
+	}
+	if err := sc.Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func parseEnvLine(line string) (string, string, bool) {
+	line = strings.TrimSpace(line)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false
+	}
+	key, val, ok := strings.Cut(line, "=")
+	if !ok {
+		return "", "", false
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", "", false
+	}
+	return key, strings.Trim(strings.TrimSpace(val), `"`), true
 }
 
 func normalizeAPIURL(raw string) string {
