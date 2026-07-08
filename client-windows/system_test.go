@@ -33,7 +33,7 @@ func TestAPIURL(t *testing.T) {
 	}{
 		{"https://probakgo.example", "/api/report/windows", "https://probakgo.example/api/report/windows"},
 		{"https://probakgo.example/api", "/api/report/windows", "https://probakgo.example/api/report/windows"},
-		{"192.168.10.222:36748", "/api/report/windows", "http://192.168.10.222:36748/api/report/windows"},
+		{"192.168.1.10:36748", "/api/report/windows", "http://192.168.1.10:36748/api/report/windows"},
 	}
 	for _, tc := range cases {
 		if got := apiURL(normalizeAPIURL(tc.base), tc.path); got != tc.want {
@@ -44,9 +44,9 @@ func TestAPIURL(t *testing.T) {
 
 func TestNormalizeAPIURL(t *testing.T) {
 	cases := map[string]string{
-		"192.168.10.222:36748":        "http://192.168.10.222:36748",
-		"http://192.168.10.222:36748": "http://192.168.10.222:36748",
-		"https://probakgo.example/":   "https://probakgo.example",
+		"192.168.1.10:36748":        "http://192.168.1.10:36748",
+		"http://192.168.1.10:36748": "http://192.168.1.10:36748",
+		"https://probakgo.example/": "https://probakgo.example",
 	}
 	for in, want := range cases {
 		if got := normalizeAPIURL(in); got != want {

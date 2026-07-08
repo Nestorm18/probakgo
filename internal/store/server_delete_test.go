@@ -13,11 +13,11 @@ func TestHardDeleteServerDataForAPIKey_DeletesOnlyBoundServerAlerts(t *testing.T
 	ctx := context.Background()
 	st := openTestDB(t)
 
-	key1, err := st.CreateAPIKey(ctx, "nicolas", "duplicate-host", "")
+	key1, err := st.CreateAPIKey(ctx, "pve-a", "duplicate-host", "")
 	if err != nil {
 		t.Fatalf("create key1: %v", err)
 	}
-	key2, err := st.CreateAPIKey(ctx, "nicolas-gestion", "duplicate-host", "")
+	key2, err := st.CreateAPIKey(ctx, "pve-b", "duplicate-host", "")
 	if err != nil {
 		t.Fatalf("create key2: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestHardDeleteServerDataForAPIKey_DeletesLegacyServerWithSameHostname(t *te
 	ctx := context.Background()
 	st := openTestDB(t)
 
-	key, err := st.CreateAPIKey(ctx, "nicolas", "duplicate-host", "")
+	key, err := st.CreateAPIKey(ctx, "pve-a", "duplicate-host", "")
 	if err != nil {
 		t.Fatalf("create key: %v", err)
 	}

@@ -9,7 +9,7 @@ func TestHostLooksPublic(t *testing.T) {
 	}{
 		{"localhost", false},
 		{"127.0.0.1:36748", false},
-		{"192.168.10.222:36748", false},
+		{"192.168.1.10:36748", false},
 		{"10.12.0.5", false},
 		{"172.20.1.5", false},
 		{"100.64.2.10:36748", false},

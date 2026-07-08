@@ -2,6 +2,10 @@
 .env
 .env.local
 
+# Local deployment scripts may contain private lab hosts
+/deploy.ps1
+/deploy.local.ps1
+
 # Cache
 .go-cache/
 .gocache/

@@ -432,7 +432,7 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
 
-	serverID, _ := st.UpsertPVEServer(ctx, "soporte2", "192.168.10.250", "", "0.0.44", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-sample", "192.168.1.50", "", "0.0.44", "")
 	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	now := time.Now()
 	if err := st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{
@@ -456,7 +456,7 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 		{"301", "wireguard-externos", false},
 		{"1000", "pbs-empresa", true},
 	} {
-		_, err := st.CreateVMBackupConfig(ctx, "soporte2", domain.CreateVMBackupConfigRequest{
+		_, err := st.CreateVMBackupConfig(ctx, "pve-sample", domain.CreateVMBackupConfigRequest{
 			VMID:      vm.id,
 			VMName:    vm.name,
 			Monday:    true,
@@ -471,7 +471,7 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 			t.Fatalf("CreateVMBackupConfig %s: %v", vm.id, err)
 		}
 		if vm.excluded {
-			if err := st.ToggleVMExclude(ctx, "soporte2", vm.id); err != nil {
+			if err := st.ToggleVMExclude(ctx, "pve-sample", vm.id); err != nil {
 				t.Fatalf("ToggleVMExclude %s: %v", vm.id, err)
 			}
 		}
@@ -488,14 +488,14 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 	if len(data.PVEIssues) != 1 {
 		t.Fatalf("want 1 PVE issue, got %d", len(data.PVEIssues))
 	}
-	if data.PVEIssues[0].Name != "soporte2" {
-		t.Errorf("issue server: got %q, want soporte2", data.PVEIssues[0].Name)
+	if data.PVEIssues[0].Name != "pve-sample" {
+		t.Errorf("issue server: got %q, want pve-sample", data.PVEIssues[0].Name)
 	}
 	if len(data.SummaryIssues) != 1 {
 		t.Fatalf("want 1 summary issue, got %d", len(data.SummaryIssues))
 	}
-	if data.SummaryIssues[0].Name != "soporte2" || data.SummaryIssues[0].Kind != "PVE" {
-		t.Errorf("summary issue: got %+v, want soporte2/PVE", data.SummaryIssues[0])
+	if data.SummaryIssues[0].Name != "pve-sample" || data.SummaryIssues[0].Kind != "PVE" {
+		t.Errorf("summary issue: got %+v, want pve-sample/PVE", data.SummaryIssues[0])
 	}
 	if data.TotalIssues != 1 {
 		t.Errorf("TotalIssues: got %d, want 1", data.TotalIssues)

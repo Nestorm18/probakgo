@@ -44,10 +44,10 @@ Subir los binarios por SCP (disponible en Windows 10/11 por defecto):
 
 ```powershell
 # Servidor → VM Debian
-scp probakgo root@192.168.10.222:/tmp/probakgo
+scp probakgo root@<ip-vm-servidor>:/tmp/probakgo
 
 # Cliente → nodo Proxmox
-scp probakgo-client root@192.168.10.230:/tmp/probakgo-client
+scp probakgo-client root@<ip-nodo-proxmox>:/tmp/probakgo-client
 ```
 
 El cliente Windows se prueba directamente en una maquina Windows con PowerShell como administrador.

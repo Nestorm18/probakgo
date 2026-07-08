@@ -110,9 +110,9 @@ func TestReportPVE_BoundServerNameMismatchRejected(t *testing.T) {
 func TestReportPVE_ServerNameTrimmed(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)
-	k, _ := ts.store.CreateAPIKey(ctx, "client", "nicolas-gestion ", "")
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-management ", "")
 
-	body := `{"hostname":"nicolas-gestion","ip_address":"10.0.0.1","storages":[]}`
+	body := `{"hostname":"pve-management","ip_address":"10.0.0.1","storages":[]}`
 	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -176,7 +176,7 @@ func TestReportPVE_UnbindAllowsDifferentServer(t *testing.T) {
 		t.Fatalf("unbind api key: %v", err)
 	}
 
-	body = `{"hostname":"nicolas","ip_address":"10.0.0.2","storages":[]}`
+	body = `{"hostname":"new-pve","ip_address":"10.0.0.2","storages":[]}`
 	req = httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)

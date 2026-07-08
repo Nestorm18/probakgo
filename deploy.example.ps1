@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
-# Deploy probakgo server + clients to test environment
+# Deploy probakgo server + clients to a test environment.
+# Copy this file to deploy.ps1 and set your own local hosts before running.
 param(
     [switch]$Server,
     [switch]$Clients,
@@ -10,15 +11,15 @@ param(
 )
 
 # ── Hosts ─────────────────────────────────────────────────────────────────────
-$SERVER_HOST  = "root@192.168.10.222"
-$CLIENT1_HOST = "root@192.168.10.230"   # PVE - also runs vzdump
-$CLIENT2_HOST = "root@192.168.10.248"   # PBS - also runs the client report
-$CLIENT3_HOST = "root@192.168.10.250"   # PVE - also runs vzdump
+$SERVER_HOST  = "root@192.168.1.10"
+$CLIENT1_HOST = "root@192.168.1.20"   # PVE - also runs vzdump
+$CLIENT2_HOST = "root@192.168.1.30"   # PBS - also runs the client report
+$CLIENT3_HOST = "root@192.168.1.40"   # PVE - also runs vzdump
 $CLIENT_HOSTS = @(
     @{ Host = $CLIENT1_HOST; Type = "PVE"; RunReport = $false },
     @{ Host = $CLIENT2_HOST; Type = "PBS"; RunReport = $true },
     @{ Host = $CLIENT3_HOST; Type = "PVE"; RunReport = $false }
-    # @{ Host = "root@192.168.10.xxx"; Type = "PVE"; RunReport = $false }
+    # @{ Host = "root@192.168.1.xxx"; Type = "PVE"; RunReport = $false }
 )
 
 # ── SSH password ──────────────────────────────────────────────────────────────

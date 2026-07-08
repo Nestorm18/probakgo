@@ -12,7 +12,7 @@ func TestRequestLooksPublicHTTP(t *testing.T) {
 		want bool
 	}{
 		{"localhost", "localhost:36748", false},
-		{"private ip", "192.168.10.222:36748", false},
+		{"private ip", "192.168.1.10:36748", false},
 		{"netbird cgnat", "100.64.2.10:36748", false},
 		{"public ip", "8.8.8.8:36748", true},
 		{"public dns", "probakgo.example.com", true},
