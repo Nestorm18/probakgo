@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"crypto/sha256"
 	"embed"
 	"io/fs"
 	"log/slog"
@@ -11,8 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/gorilla/csrf"
 
+	"probakgo/internal/netutil"
 	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
@@ -22,7 +21,7 @@ import (
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins, trustedProxies []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS, version, loc, secure, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st, rep)
 	}, func() bool {
@@ -43,7 +42,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	h.SetBanhammer(ban)
 
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
+	r.Use(netutil.TrustedProxyRealIP(trustedProxies))
 	r.Use(middleware.Recoverer)
 	r.Use(securityHeaders)
 	r.Use(webhandlers.DebugBarMiddleware(dev))
@@ -137,10 +136,10 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin, sensitive).Post("/settings/system/session-secure", h.EnableSessionSecurePost)
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/email", h.EmailSettingsPost)
-		r.With(RequireAdmin).Get("/settings/email/test", h.EmailTest)
+		r.With(RequireAdmin, sensitive).Post("/settings/email/test", h.EmailTest)
 		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance", h.MaintenanceSettingsPost)
-		r.With(RequireAdmin, sensitive).Get("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)
+		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)
 		r.With(RequireAdmin).Get("/settings/alerts", h.AlertsSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/alerts", h.AlertsSettingsPost)
 		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)
@@ -153,20 +152,21 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin, sensitive).Post("/about/update", h.AboutUpdatePost)
 	})
 
-	csrfKey := sha256.Sum256([]byte(sessionKey))
-	csrfOpts := []csrf.Option{csrf.Secure(secure)}
-	if len(trustedOrigins) > 0 {
-		csrfOpts = append(csrfOpts, csrf.TrustedOrigins(trustedOrigins))
+	protection, err := newCrossOriginProtection(trustedOrigins)
+	if err != nil {
+		return nil, err
 	}
-	protected := csrf.Protect(csrfKey[:], csrfOpts...)(r)
-	if !secure {
-		// gorilla/csrf v1.7.3 defaults to HTTPS scheme for origin comparison.
-		// PlaintextHTTPRequest marks the request as HTTP so sameOrigin works correctly.
-		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			protected.ServeHTTP(w, csrf.PlaintextHTTPRequest(req))
-		}), nil
+	return protection.Handler(r), nil
+}
+
+func newCrossOriginProtection(trustedOrigins []string) (*http.CrossOriginProtection, error) {
+	protection := http.NewCrossOriginProtection()
+	for _, origin := range trustedOrigins {
+		if err := protection.AddTrustedOrigin(origin); err != nil {
+			return nil, err
+		}
 	}
-	return protected, nil
+	return protection, nil
 }
 
 func securityHeaders(next http.Handler) http.Handler {

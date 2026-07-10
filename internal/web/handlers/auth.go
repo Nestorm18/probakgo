@@ -105,7 +105,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := session.SetUser(w, r, user.Username, user.Role); err != nil {
+	if err := session.SetUserWithVersion(w, r, user.Username, user.Role, user.SessionVersion); err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
@@ -167,7 +167,7 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		h.ban.ClearFailures(ip)
 	}
-	if err := session.SetUser(w, r, user.Username, user.Role); err != nil {
+	if err := session.SetUserWithVersion(w, r, user.Username, user.Role, user.SessionVersion); err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}

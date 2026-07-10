@@ -310,22 +310,6 @@
     else form.submit();
   }, true);
 
-  document.addEventListener('click', async e => {
-    const link = e.target.closest('a[data-sensitive-totp-link]');
-    if (!link) return;
-    e.preventDefault();
-    const code = await pbkDialog.code({
-      title: 'Confirmacion 2FA',
-      message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
-      placeholder: 'Codigo 2FA'
-    });
-    if (!code) {
-      return;
-    }
-    const url = new URL(link.href, window.location.origin);
-    url.searchParams.set('totp_code', code);
-    window.location.assign(url.toString());
-  }, true);
   {{end}}
 
   // Alert polling + browser notifications.

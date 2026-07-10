@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -19,8 +20,11 @@ type Config struct {
 	Timezone       string
 	SecureSession  bool
 	TrustedOrigins []string
+	TrustedProxies []string
 	Dev            bool
 }
+
+const exampleSessionKey = "change-me-in-production-32bytes!"
 
 func Load() *Config {
 	return &Config{
@@ -31,13 +35,13 @@ func Load() *Config {
 		Timezone:       getEnv("TIMEZONE", "Europe/Madrid"),
 		SecureSession:  getEnv("SESSION_SECURE", "false") == "true",
 		TrustedOrigins: parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
+		TrustedProxies: parseTrustedOrigins(os.Getenv("TRUSTED_PROXY_CIDRS")),
 		Dev:            os.Getenv("DEV") == "true",
 	}
 }
 
-// parseTrustedOrigins parses CSRF_TRUSTED_ORIGINS (comma-separated host:port values).
-// gorilla/csrf compares against the Host portion of the Origin header, so the
-// format must be "host:port" (e.g. "probakgo.local:36748"), not a full URL.
+// parseTrustedOrigins parses comma-separated full origins, for example
+// "https://probakgo.example". Schemes are required by CrossOriginProtection.
 func parseTrustedOrigins(raw string) []string {
 	if raw == "" {
 		return nil
@@ -73,6 +77,14 @@ func (c *Config) Validate() error {
 	}
 	if len(c.SessionKey) < 32 {
 		return fmt.Errorf("SESSION_KEY is too short (%d bytes): minimum 32 bytes required", len(c.SessionKey))
+	}
+	if c.SessionKey == exampleSessionKey {
+		return fmt.Errorf("SESSION_KEY uses the public example value; remove it so probakgo can generate a random key")
+	}
+	for _, raw := range c.TrustedProxies {
+		if _, err := netip.ParsePrefix(raw); err != nil {
+			return fmt.Errorf("invalid TRUSTED_PROXY_CIDRS entry %q: %w", raw, err)
+		}
 	}
 	return nil
 }

@@ -57,6 +57,8 @@ API_PORT=36748           # puerto (default: 36748)
 TIMEZONE=Europe/Madrid   # zona horaria del scheduler de email
 SESSION_SECURE=true      # activar si hay un proxy HTTPS delante
 DATABASE_PATH=./probakgo_data.db
+# TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128  # solo proxies que pueden enviar X-Forwarded-*
+# CSRF_TRUSTED_ORIGINS=https://monitor.example  # origenes adicionales, con esquema
 # GITHUB_TOKEN=ghp_...  # token GitHub para auto-actualización (necesario si el repo es privado)
 ```
 
@@ -86,7 +88,7 @@ server {
 }
 ```
 
-Con nginx delante, añade `SESSION_SECURE=true` al `.env` y reinicia el servicio.
+Con nginx delante, añade `SESSION_SECURE=true` y `TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128` al `.env`, y reinicia el servicio. Sin esa segunda variable, Probakgo ignora las cabeceras `X-Forwarded-*` para evitar que un cliente directo falsee su IP.
 
 ### Actualización manual
 

@@ -40,15 +40,40 @@ func GetUser(r *http.Request) (username, role string, ok bool) {
 }
 
 func SetUser(w http.ResponseWriter, r *http.Request, username, role string) error {
+	return SetUserWithVersion(w, r, username, role, 1)
+}
+
+func SetUserWithVersion(w http.ResponseWriter, r *http.Request, username, role string, version int) error {
 	sess, err := getSession(r)
 	if err != nil {
 		return err
 	}
 	sess.Values["username"] = username
 	sess.Values["role"] = role
+	sess.Values["session_version"] = version
 	delete(sess.Values, "pending_2fa_user_id")
 	delete(sess.Values, "pending_2fa_next")
 	return sess.Save(r, w)
+}
+
+func UserVersion(r *http.Request) (int, bool) {
+	if store == nil {
+		return 0, false
+	}
+	sess, err := getSession(r)
+	if err != nil {
+		return 0, false
+	}
+	switch v := sess.Values["session_version"].(type) {
+	case int:
+		return v, v > 0
+	case int64:
+		return int(v), v > 0
+	case float64:
+		return int(v), v > 0
+	default:
+		return 0, false
+	}
 }
 
 func SetPending2FA(w http.ResponseWriter, r *http.Request, userID int64, next string) error {

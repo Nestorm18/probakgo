@@ -27,3 +27,21 @@ func TestSensitiveTOTPFresh(t *testing.T) {
 		t.Fatal("fresh TOTP window should expire")
 	}
 }
+
+func TestUserVersion(t *testing.T) {
+	Init("test-session-key-32-bytes-long!!", false)
+	req := httptest.NewRequest("GET", "/", nil)
+	rr := httptest.NewRecorder()
+	if err := SetUserWithVersion(rr, req, "admin", "admin", 4); err != nil {
+		t.Fatalf("SetUserWithVersion: %v", err)
+	}
+
+	req2 := httptest.NewRequest("GET", "/", nil)
+	for _, c := range rr.Result().Cookies() {
+		req2.AddCookie(c)
+	}
+	version, ok := UserVersion(req2)
+	if !ok || version != 4 {
+		t.Fatalf("UserVersion: got (%d, %t), want (4, true)", version, ok)
+	}
+}

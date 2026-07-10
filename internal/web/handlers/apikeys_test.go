@@ -94,7 +94,7 @@ func TestCreateUserPostWritesAuditLog(t *testing.T) {
 	h := webhandlers.New(st, nil, nil)
 
 	req := httptest.NewRequest("POST", "/users",
-		strings.NewReader("username=alice&password=secret123&role=reader"))
+		strings.NewReader("username=alice&password=secret123456&role=reader"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	for _, c := range sessionCookies(t, "admin", "admin") {
 		req.AddCookie(c)
@@ -119,7 +119,7 @@ func TestCreateUserPostWritesAuditLog(t *testing.T) {
 	if rows[0].ActorUsername != "admin" {
 		t.Fatalf("actor: got %q, want admin", rows[0].ActorUsername)
 	}
-	if strings.Contains(rows[0].Metadata, "secret123") {
+	if strings.Contains(rows[0].Metadata, "secret123456") {
 		t.Fatal("audit metadata contains the submitted password")
 	}
 }

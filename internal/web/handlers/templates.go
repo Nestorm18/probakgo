@@ -10,8 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gorilla/csrf"
-
 	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 	"probakgo/internal/netutil"
@@ -189,8 +187,8 @@ func makeFuncMap(loc *time.Location) template.FuncMap {
 // Render renders a layout template (base.html + page).
 func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, data any) {
 	if m, ok := data.(map[string]any); ok {
-		m["CSRFField"] = csrf.TemplateField(r)
-		m["CSRFToken"] = csrf.Token(r)
+		m["CSRFField"] = template.HTML("")
+		m["CSRFToken"] = ""
 		m["Version"] = t.version
 		if _, has := m["Flash"]; !has {
 			m["Flash"] = r.URL.Query().Get("flash")

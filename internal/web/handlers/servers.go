@@ -1164,7 +1164,7 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
 
 	wr := csv.NewWriter(w)
-	_ = wr.Write([]string{"Fecha", "Estado backup", "Inicio backup", "Duracion (s)", "Sin reporte"})
+	_ = writeSafeCSV(wr, []string{"Fecha", "Estado backup", "Inicio backup", "Duracion (s)", "Sin reporte"})
 	for _, rep := range reports {
 		stale := "no"
 		if rep.IsStale {
@@ -1174,7 +1174,7 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 		if rep.BackupStarttime != 0 {
 			start = time.Unix(rep.BackupStarttime, 0).Format("02/01/2006 15:04")
 		}
-		_ = wr.Write([]string{
+		_ = writeSafeCSV(wr, []string{
 			rep.ReportedAt.Format("02/01/2006 15:04"),
 			rep.BackupStatus,
 			start,

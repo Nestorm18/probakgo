@@ -106,7 +106,8 @@ C:\ProgramData\Probakgo\probakgo-windows-client.exe update
 | `DATABASE_PATH` | `probakgo_data.db` | Ruta SQLite |
 | `TIMEZONE` | `Europe/Madrid` | Zona horaria |
 | `SESSION_SECURE` | `false` | Usar `true` si hay HTTPS delante |
-| `CSRF_TRUSTED_ORIGINS` | - | Origenes CSRF adicionales |
+| `TRUSTED_PROXY_CIDRS` | - | CIDR de nginx/proxy que puede enviar `X-Forwarded-*`; por ejemplo `127.0.0.1/32,::1/128` |
+| `CSRF_TRUSTED_ORIGINS` | - | Origenes web adicionales con esquema completo, por ejemplo `https://monitor.example` |
 | `DEV` | `false` | Barra debug |
 
 ### Cliente Proxmox `/opt/probakgo/.env`

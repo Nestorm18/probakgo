@@ -33,6 +33,9 @@ func TestCreateUser_And_GetByUsername(t *testing.T) {
 	if !u.IsActive {
 		t.Error("want IsActive=true by default")
 	}
+	if u.SessionVersion != 1 {
+		t.Errorf("SessionVersion: want 1, got %d", u.SessionVersion)
+	}
 }
 
 func TestToggleUser(t *testing.T) {
@@ -74,6 +77,9 @@ func TestUpdateUserPassword(t *testing.T) {
 	if u.PasswordHash != "new-hash" {
 		t.Errorf("PasswordHash: want new-hash, got %q", u.PasswordHash)
 	}
+	if u.SessionVersion != 2 {
+		t.Errorf("SessionVersion: want 2 after password update, got %d", u.SessionVersion)
+	}
 }
 
 func TestUpdateUserRole(t *testing.T) {
@@ -87,5 +93,8 @@ func TestUpdateUserRole(t *testing.T) {
 	u, _ := st.GetUser(ctx, id)
 	if u.Role != "admin" {
 		t.Errorf("Role: want admin, got %q", u.Role)
+	}
+	if u.SessionVersion != 2 {
+		t.Errorf("SessionVersion: want 2 after role update, got %d", u.SessionVersion)
 	}
 }

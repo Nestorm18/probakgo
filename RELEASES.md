@@ -9,6 +9,7 @@ Checklist para publicar una version de Probakgo.
 
 ```bash
 go test ./...
+go vet ./...
 ```
 
 3. Compila binarios sin CGO:
@@ -39,10 +40,11 @@ En Windows:
 ## Publicacion
 
 1. Crea el tag `v<version>`.
-2. Publica una GitHub Release con estos assets:
+2. El workflow `Release` publica la GitHub Release al recibir el tag. Debe incluir estos assets:
    - `probakgo_linux_amd64`
    - `probakgo-client_linux_amd64`
    - `probakgo-windows-client_windows_amd64.exe`
+   - `SHA256SUMS`
 3. Verifica que `/about/update`, `probakgo-client update` y la descarga de Windows desde la pantalla de API key usan la nueva version.
 4. Actualiza primero nodos no criticos y revisa:
    - `probakgo-client doctor`

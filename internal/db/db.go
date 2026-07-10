@@ -5,6 +5,8 @@ import (
 	"embed"
 	"fmt"
 	"log/slog"
+	"os"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -21,7 +23,19 @@ func Open(path string) (*sql.DB, error) {
 	if err := migrate(db); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	restrictSQLitePermissions(path)
 	return db, nil
+}
+
+func restrictSQLitePermissions(path string) {
+	if path == ":memory:" || strings.HasPrefix(path, "file:") {
+		return
+	}
+	for _, name := range []string{path, path + "-wal", path + "-shm"} {
+		if err := os.Chmod(name, 0600); err != nil && !os.IsNotExist(err) {
+			slog.Warn("could not restrict sqlite file permissions", "path", name, "err", err)
+		}
+	}
 }
 
 func migrate(db *sql.DB) error {

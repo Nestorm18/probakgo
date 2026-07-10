@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -20,10 +21,10 @@ func (h *WebH) AlertsCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serveCSV(w, "alertas_"+time.Now().Format("20060102")+".csv", func(wr *csv.Writer) {
-		_ = wr.Write([]string{"Estado", "Suprimida hasta", "Severidad", "Tipo", "Servidor", "Alerta", "Mensaje", "Valor", "Umbral", "Datastore", "VMID", "VM"})
+		_ = writeSafeCSV(wr, []string{"Estado", "Suprimida hasta", "Severidad", "Tipo", "Servidor", "Alerta", "Mensaje", "Valor", "Umbral", "Datastore", "VMID", "VM"})
 		for _, row := range rows {
 			a := row.Alert
-			_ = wr.Write([]string{row.State, row.SuppressedUntil, a.Severity, a.ServerType, a.ServerName, a.Title, a.Message, a.Value, a.Threshold, a.StoreName, int64Text(a.VMID), a.VMName})
+			_ = writeSafeCSV(wr, []string{row.State, row.SuppressedUntil, a.Severity, a.ServerType, a.ServerName, a.Title, a.Message, a.Value, a.Threshold, a.StoreName, int64Text(a.VMID), a.VMName})
 		}
 	})
 }
@@ -60,9 +61,9 @@ func (h *WebH) PVEServersCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serveCSV(w, "pve_"+time.Now().Format("20060102")+".csv", func(wr *csv.Writer) {
-		_ = wr.Write([]string{"ID", "Nombre", "Hostname", "IP", "IP publica", "Cliente", "Conexion", "Ultimo heartbeat", "Ultimo reporte", "Backup", "Estado"})
+		_ = writeSafeCSV(wr, []string{"ID", "Nombre", "Hostname", "IP", "IP publica", "Cliente", "Conexion", "Ultimo heartbeat", "Ultimo reporte", "Backup", "Estado"})
 		for _, row := range rows {
-			_ = wr.Write([]string{row.ID, row.Name, row.Hostname, row.IP, row.PublicIP, row.ClientVersion, row.Connection, row.LastHeartbeat, row.LastReport, row.BackupStatus, row.State})
+			_ = writeSafeCSV(wr, []string{row.ID, row.Name, row.Hostname, row.IP, row.PublicIP, row.ClientVersion, row.Connection, row.LastHeartbeat, row.LastReport, row.BackupStatus, row.State})
 		}
 	})
 }
@@ -83,9 +84,9 @@ func (h *WebH) PBSServersCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	serveCSV(w, "pbs_"+time.Now().Format("20060102")+".csv", func(wr *csv.Writer) {
-		_ = wr.Write([]string{"ID", "Nombre", "Hostname", "IP", "IP publica", "Cliente", "Ultimo reporte", "Estado", "Datastores"})
+		_ = writeSafeCSV(wr, []string{"ID", "Nombre", "Hostname", "IP", "IP publica", "Cliente", "Ultimo reporte", "Estado", "Datastores"})
 		for _, row := range rows {
-			_ = wr.Write([]string{row.ID, row.Name, row.Hostname, row.IP, row.PublicIP, row.ClientVersion, row.LastReport, row.State, row.Datastores})
+			_ = writeSafeCSV(wr, []string{row.ID, row.Name, row.Hostname, row.IP, row.PublicIP, row.ClientVersion, row.LastReport, row.State, row.Datastores})
 		}
 	})
 }
@@ -130,13 +131,13 @@ func (h *WebH) PBSServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 	reports, _ := h.store.ListPBSReports(r.Context(), id, limit)
 	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.DisplayName, time.Now().Format("20060102"))
 	serveCSV(w, filename, func(wr *csv.Writer) {
-		_ = wr.Write([]string{"Fecha", "Sin reporte", "Motivo"})
+		_ = writeSafeCSV(wr, []string{"Fecha", "Sin reporte", "Motivo"})
 		for _, rep := range reports {
 			stale := "no"
 			if rep.IsStale {
 				stale = "si"
 			}
-			_ = wr.Write([]string{formatExportTime(rep.ReportedAt), stale, rep.StaleReason})
+			_ = writeSafeCSV(wr, []string{formatExportTime(rep.ReportedAt), stale, rep.StaleReason})
 		}
 	})
 }
@@ -295,6 +296,26 @@ func serveCSV(w http.ResponseWriter, filename string, fn func(*csv.Writer)) {
 	wr := csv.NewWriter(w)
 	fn(wr)
 	wr.Flush()
+}
+
+func writeSafeCSV(wr *csv.Writer, row []string) error {
+	for i, value := range row {
+		row[i] = escapeCSVFormula(value)
+	}
+	return wr.Write(row)
+}
+
+func escapeCSVFormula(value string) string {
+	trimmed := strings.TrimLeft(value, " \t\r\n")
+	if trimmed == "" {
+		return value
+	}
+	switch trimmed[0] {
+	case '=', '+', '-', '@':
+		return "'" + value
+	default:
+		return value
+	}
 }
 
 func serveJSON(w http.ResponseWriter, v any) {

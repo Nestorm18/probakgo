@@ -29,8 +29,13 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 				http.Redirect(w, r, "/login?flash=Tu+sesión+ha+sido+invalidada", http.StatusSeeOther)
 				return
 			}
+			if sessionVersion, ok := session.UserVersion(r); !ok || sessionVersion != user.SessionVersion {
+				session.Clear(w, r)
+				http.Redirect(w, r, "/login?flash=Tu+sesion+ha+sido+invalidada", http.StatusSeeOther)
+				return
+			}
 			if user.Role != sessionRole {
-				_ = session.SetUser(w, r, username, user.Role)
+				_ = session.SetUserWithVersion(w, r, username, user.Role, user.SessionVersion)
 			}
 			if userNeedsTOTPEnforcement(st, r, user) {
 				_ = st.SetUserActive(r.Context(), user.ID, false)
@@ -38,6 +43,7 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 				http.Redirect(w, r, "/login?flash=Usuario+desactivado:+2FA+no+se+activo+dentro+del+plazo", http.StatusSeeOther)
 				return
 			}
+			w.Header().Set("Cache-Control", "no-store")
 			next.ServeHTTP(w, r)
 		})
 	}

@@ -55,7 +55,7 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/profile?flash=Las+nuevas+contrasenas+no+coinciden", http.StatusSeeOther)
 		return
 	}
-	if len(newPass) < 12 {
+	if len(newPass) < minPasswordLength {
 		http.Redirect(w, r, "/profile?flash=La+contrasena+debe+tener+al+menos+12+caracteres", http.StatusSeeOther)
 		return
 	}

@@ -29,7 +29,7 @@ import (
 	"probakgo/internal/web"
 )
 
-var version = "0.0.158"
+var version = "0.0.159"
 
 // web/ is at the project root, same directory as this file.
 //
@@ -118,8 +118,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	apiSrv := api.NewServer(st, authSvc, reportSvc)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, version, cfg.Dev, loc)
+	apiSrv := api.NewServer(st, authSvc, reportSvc, cfg.TrustedProxies)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, cfg.TrustedProxies, version, cfg.Dev, loc)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)
@@ -136,11 +136,13 @@ func main() {
 
 	addr := fmt.Sprintf("%s:%s", cfg.APIHost, cfg.APIPort)
 	srv := &http.Server{
-		Addr:         addr,
-		Handler:      mux,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 60 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    16 << 10,
 	}
 
 	ensureUpdateCron()

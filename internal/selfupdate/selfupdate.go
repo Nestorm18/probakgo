@@ -269,11 +269,13 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 	f.Close()
 	actualHash := hex.EncodeToString(h.Sum(nil))
 
-	if sha256URL != "" {
-		if err := verifyChecksum(client, repo, sha256ID, sha256URL, binaryName, actualHash); err != nil {
-			os.Remove(tmpPath)
-			return err
-		}
+	if sha256URL == "" || sha256ID == 0 {
+		os.Remove(tmpPath)
+		return fmt.Errorf("release does not include SHA256SUMS")
+	}
+	if err := verifyChecksum(client, repo, sha256ID, sha256URL, binaryName, actualHash); err != nil {
+		os.Remove(tmpPath)
+		return err
 	}
 
 	if runtime.GOOS == "windows" {

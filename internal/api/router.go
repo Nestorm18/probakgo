@@ -10,30 +10,34 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"probakgo/internal/api/handlers"
+	"probakgo/internal/netutil"
 	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
 )
 
 type Server struct {
-	auth          *service.AuthService
-	report        *service.ReportService
-	store         *store.Store
-	clientLimiter *ratelimit.Limiter
+	auth           *service.AuthService
+	report         *service.ReportService
+	store          *store.Store
+	clientLimiter  *ratelimit.Limiter
+	trustedProxies []string
 }
 
-func NewServer(st *store.Store, auth *service.AuthService, rep *service.ReportService) *Server {
+func NewServer(st *store.Store, auth *service.AuthService, rep *service.ReportService, trustedProxies []string) *Server {
 	return &Server{
-		store:         st,
-		auth:          auth,
-		report:        rep,
-		clientLimiter: ratelimit.New(300, time.Minute),
+		store:          st,
+		auth:           auth,
+		report:         rep,
+		clientLimiter:  ratelimit.New(300, time.Minute),
+		trustedProxies: trustedProxies,
 	}
 }
 
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RealIP)
+	r.Use(netutil.TrustedProxyRealIP(s.trustedProxies))
+	r.Use(limitRequestBody(maxAPIRequestBodyBytes))
 	r.Use(ratelimit.New(120, time.Minute).JSONMiddleware)
 	r.Use(requestLogger)
 	r.Use(middleware.Recoverer)
@@ -61,6 +65,21 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireServerKey).Put("/backup-config/pve/{server}/vms/{vmid}/toggle-exclude", h.ToggleVMExclude)
 
 	return r
+}
+
+const maxAPIRequestBodyBytes int64 = 8 << 20
+
+func limitRequestBody(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > maxBytes {
+				jsonError(w, http.StatusRequestEntityTooLarge, "request body too large")
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func requestLogger(next http.Handler) http.Handler {

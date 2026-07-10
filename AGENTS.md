@@ -81,7 +81,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `032_alert_resolution_email_pending.up.sql`.
+- Current latest migration: `033_user_session_version.up.sql`.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
 

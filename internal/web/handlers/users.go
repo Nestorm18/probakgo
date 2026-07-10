@@ -11,6 +11,8 @@ import (
 	"probakgo/internal/session"
 )
 
+const minPasswordLength = 12
+
 func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
@@ -73,6 +75,10 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 		redirectWithFlash(w, r, back, "Usuario y contraseña requeridos", false)
 		return
 	}
+	if len(pass) < minPasswordLength {
+		redirectWithFlash(w, r, back, "La contrasena debe tener al menos 12 caracteres", false)
+		return
+	}
 	if role != "admin" && role != "editor" && role != "reader" {
 		role = "reader"
 	}
@@ -131,6 +137,10 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if pass != confirm {
 		redirectWithFlash(w, r, back, "Las contraseñas no coinciden", false)
+		return
+	}
+	if len(pass) < minPasswordLength {
+		redirectWithFlash(w, r, back, "La contrasena debe tener al menos 12 caracteres", false)
 		return
 	}
 	curUsername, _, _ := session.GetUser(r)

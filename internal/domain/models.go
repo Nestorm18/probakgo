@@ -238,6 +238,7 @@ type User struct {
 	TOTPSecret         string     `db:"totp_secret" json:"-"`
 	TOTPConfirmedAt    *time.Time `db:"totp_confirmed_at"`
 	TOTPGraceStartedAt *time.Time `db:"totp_grace_started_at"`
+	SessionVersion     int        `db:"session_version" json:"-"`
 }
 
 type LoginAttempt struct {

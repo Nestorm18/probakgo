@@ -11,13 +11,16 @@ import (
 )
 
 type H struct {
-	store  *store.Store
-	auth   *service.AuthService
-	report *service.ReportService
+	store      *store.Store
+	auth       *service.AuthService
+	report     *service.ReportService
+	alertQueue chan struct{}
 }
 
 func New(st *store.Store, auth *service.AuthService, rep *service.ReportService) *H {
-	return &H{store: st, auth: auth, report: rep}
+	h := &H{store: st, auth: auth, report: rep, alertQueue: make(chan struct{}, 1)}
+	go h.runAlertQueue()
+	return h
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
@@ -36,7 +39,14 @@ func internalErr(w http.ResponseWriter, op string, err error) {
 }
 
 func (h *H) sendImmediateCriticalAlerts() {
-	go func() {
+	select {
+	case h.alertQueue <- struct{}{}:
+	default:
+	}
+}
+
+func (h *H) runAlertQueue() {
+	for range h.alertQueue {
 		if alerts, err := service.CurrentAlertsRaw(context.Background(), h.store, h.report); err == nil {
 			_ = h.store.SyncAlertStates(context.Background(), alerts)
 		} else {
@@ -45,7 +55,7 @@ func (h *H) sendImmediateCriticalAlerts() {
 		if err := service.SendImmediateCriticalAlerts(h.store, h.report); err != nil {
 			slog.Warn("send immediate critical alerts", "err", err)
 		}
-	}()
+	}
 }
 
 func (h *H) Health(w http.ResponseWriter, r *http.Request) {

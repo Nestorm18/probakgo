@@ -48,9 +48,12 @@
         <i class="bi bi-database-down me-2" style="color:var(--clr-accent)"></i>Copia de base de datos
       </div>
       <div class="card-body">
-        <a href="/settings/maintenance/database/download" class="btn btn-secondary" data-sensitive-totp-link="true">
-          <i class="bi bi-download me-1"></i>Descargar copia de seguridad
-        </a>
+        <form method="POST" action="/settings/maintenance/database/download" class="d-inline">
+          {{ .CSRFField }}
+          <button type="submit" class="btn btn-secondary">
+            <i class="bi bi-download me-1"></i>Descargar copia de seguridad
+          </button>
+        </form>
       </div>
     </div>
 

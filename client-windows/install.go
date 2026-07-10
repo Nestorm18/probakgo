@@ -17,6 +17,9 @@ func installWindowsClient(cfg Config) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
+	if err := restrictWindowsInstallDir(dir); err != nil {
+		return err
+	}
 	exePath := filepath.Join(dir, "probakgo-windows-client.exe")
 	self, err := os.Executable()
 	if err != nil {
@@ -48,6 +51,18 @@ func installWindowsClient(cfg Config) error {
 	fmt.Println("Log:", logPath())
 	fmt.Println("Scheduled task installed: Probakgo Windows Report (every 5 min)")
 	fmt.Println("Test:", exePath)
+	return nil
+}
+
+func restrictWindowsInstallDir(dir string) error {
+	cmd := exec.Command("icacls.exe", dir,
+		"/inheritance:r",
+		"/grant:r", "*S-1-5-18:(OI)(CI)F",
+		"/grant:r", "*S-1-5-32-544:(OI)(CI)F",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("restrict %s permissions: %w: %s", dir, err, string(out))
+	}
 	return nil
 }
 

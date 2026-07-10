@@ -2,11 +2,34 @@ package db
 
 import (
 	"database/sql"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	_ "modernc.org/sqlite"
 )
+
+func TestOpenRestrictsSQLitePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix file permissions are not available on Windows")
+	}
+
+	path := filepath.Join(t.TempDir(), "probakgo.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	defer db.Close()
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat database: %v", err)
+	}
+	if got, want := info.Mode().Perm(), os.FileMode(0600); got != want {
+		t.Fatalf("database permissions = %04o, want %04o", got, want)
+	}
+}
 
 func TestMigration018DeletesOrphanAPIKeyServers(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "probakgo.db")

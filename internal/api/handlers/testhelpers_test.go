@@ -32,7 +32,7 @@ func newTestServer(t *testing.T) *testServer {
 	st := store.New(db)
 	auth := service.NewAuth(st)
 	rep := service.NewReport(st, time.UTC)
-	srv := api.NewServer(st, auth, rep)
+	srv := api.NewServer(st, auth, rep, nil)
 	return &testServer{handler: srv.Router(), store: st}
 }
 
