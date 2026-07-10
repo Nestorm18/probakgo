@@ -97,6 +97,12 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	pbsTasks, err := h.store.GetPBSTasksForReports(ctx, pbsReportIDs)
+	if err != nil {
+		slog.Error("list pbs maintenance tasks", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
 
 	var pbsOK, pbsStale, pbsMaintenance int
 	var pbsRows []map[string]any
@@ -124,6 +130,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
 			row["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
+			label, class, failed := pbsTaskSummary(pbsTasks[rep.ID])
+			row["TaskLabel"] = label
+			row["TaskClass"] = class
+			row["HasTaskFailure"] = failed
 		}
 		pbsRows = append(pbsRows, row)
 	}
@@ -334,6 +344,59 @@ func pbsFillBadge(stores []domain.PBSStore) (label, class string) {
 	}
 	days := pbsDaysUntil(*nearest, now)
 	return fmt.Sprintf("Lleno en %dd", days), pbsFillClass(days)
+}
+
+type pbsTaskDisplay struct {
+	Title       string
+	Detail      string
+	Status      string
+	StatusTitle string
+	CSSClass    string
+	EndedAt     time.Time
+}
+
+func pbsTaskDisplays(tasks []domain.PBSTask) []pbsTaskDisplay {
+	rows := make([]pbsTaskDisplay, 0, len(tasks))
+	for _, task := range tasks {
+		row := pbsTaskDisplay{Status: "OK", StatusTitle: task.Status, CSSClass: "ok"}
+		if domain.PBSTaskFailed(task) {
+			row.CSSClass = "bad"
+			row.Status = "ERROR"
+		}
+		if task.EndTime > 0 {
+			row.EndedAt = time.Unix(task.EndTime, 0)
+		}
+		switch task.TaskType {
+		case "gc":
+			row.Title = "Garbage collection"
+			row.Detail = task.Store
+		default:
+			row.Title = "Sincronizacion"
+			remote := task.Remote
+			if remote == "" {
+				remote = task.JobID
+			}
+			datastore := task.RemoteStore
+			if datastore == "" {
+				datastore = task.Store
+			}
+			row.Detail = fmt.Sprintf("%s / %s", remote, datastore)
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+func pbsTaskSummary(tasks []domain.PBSTask) (label, class string, failed bool) {
+	if len(tasks) == 0 {
+		return "", "", false
+	}
+	for _, task := range tasks {
+		if domain.PBSTaskFailed(task) {
+			return "Error sync/GC", "bad", true
+		}
+	}
+	return "Sync/GC OK", "ok", false
 }
 
 type pbsStoreDisplay struct {

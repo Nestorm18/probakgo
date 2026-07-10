@@ -61,6 +61,9 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 	// PBS: old report (to be deleted) + current report (to survive)
 	pbsID, _ := st.UpsertPBSServer(ctx, "pbs-node", "10.0.0.2", "", "1.0", "")
 	oldPBS, _ := st.InsertPBSReport(ctx, pbsID)
+	if err := st.InsertPBSTask(ctx, oldPBS, domain.PBSTaskPayload{TaskType: "sync", JobID: "old", Status: "OK"}); err != nil {
+		t.Fatalf("insert old PBS task: %v", err)
+	}
 	db.Exec("UPDATE pbs_reports SET reported_at = ? WHERE id = ?", twoMonthsAgo, oldPBS)
 	_, _ = st.InsertPBSReport(ctx, pbsID)
 
@@ -74,6 +77,10 @@ func TestRunCleanup_DeletesOld(t *testing.T) {
 	db.QueryRow("SELECT COUNT(*) FROM pbs_reports WHERE id = ?", oldPBS).Scan(&count)
 	if count != 0 {
 		t.Error("old PBS report should be deleted")
+	}
+	db.QueryRow("SELECT COUNT(*) FROM pbs_maintenance_tasks WHERE report_id = ?", oldPBS).Scan(&count)
+	if count != 0 {
+		t.Error("old PBS maintenance tasks should be deleted")
 	}
 
 	if _, err := st.GetLatestPVEReport(ctx, pveID); err != nil {

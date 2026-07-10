@@ -53,6 +53,24 @@
   </div>
 </div>
 
+{{if .Tasks}}
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-arrow-left-right me-2" style="color:var(--clr-accent)"></i>Sincronizaciones y mantenimiento (ultimo reporte)</div>
+  <div class="card-body p-0" style="overflow-x:auto">
+    <table class="table table-sm mb-0" style="font-size:.8rem">
+      <thead><tr><th>Tipo</th><th>Origen / datastore</th><th>Estado</th><th>Finalizo</th></tr></thead>
+      <tbody>{{range .Tasks}}
+        <tr>
+          <td><i class="bi {{if eq .Title "Garbage collection"}}bi-recycle{{else}}bi-arrow-left-right{{end}} me-1"></i>{{.Title}}</td>
+          <td style="color:var(--txt-secondary)">{{.Detail}}</td>
+          <td><span class="status-pill {{.CSSClass}}" title="{{.StatusTitle}}">{{.Status}}</span></td>
+          <td style="color:var(--txt-muted)">{{if .EndedAt}}{{formatTime .EndedAt}}{{else}}-{{end}}</td>
+        </tr>
+      {{end}}</tbody>
+    </table>
+  </div>
+</div>
+{{end}}
 {{if .Stores}}
 <div class="mb-4">
   <div style="font-size:.72rem;font-weight:600;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">

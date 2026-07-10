@@ -135,3 +135,42 @@ func TestPBSDatastoreUsageParsing(t *testing.T) {
 		t.Errorf("gc still-bad: got %v, want 0", gc["still-bad"])
 	}
 }
+
+func TestPBSMaintenanceTasks(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/localhost/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{ //nolint:errcheck
+			map[string]any{"worker_type": "syncjob", "worker_id": "home-sync", "status": "stopped", "starttime": float64(100), "endtime": float64(200), "upid": "UPID:sync-1"},
+			map[string]any{"exitstatus": "ERROR: input/output error", "starttime": float64(110), "endtime": float64(210), "upid": "UPID:pbs:0000AA:00001122:000006A2:gc:synology:root@pam:"},
+		}})
+	})
+	mux.HandleFunc("/api2/json/config/sync", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{ //nolint:errcheck
+			map[string]any{"id": "home-sync", "remote": "casa", "remote-store": "synology", "store": "local"},
+		}})
+	})
+	mux.HandleFunc("/api2/json/nodes/localhost/tasks/UPID:sync-1/status", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"exitstatus": "OK"}}) //nolint:errcheck
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPBSClient(srv).maintenanceTasks()
+	if len(tasks) != 2 {
+		t.Fatalf("tasks: got %d, want 2", len(tasks))
+	}
+	var syncTask, gcTask map[string]any
+	for _, task := range tasks {
+		if task["task_type"] == "sync" {
+			syncTask = task
+		} else if task["task_type"] == "gc" {
+			gcTask = task
+		}
+	}
+	if syncTask == nil || syncTask["remote"] != "casa" || syncTask["remote_store"] != "synology" || syncTask["status"] != "OK" {
+		t.Fatalf("unexpected sync task: %#v", syncTask)
+	}
+	if gcTask == nil || gcTask["store"] != "synology" || gcTask["status"] != "ERROR: input/output error" {
+		t.Fatalf("unexpected gc task: %#v", gcTask)
+	}
+}

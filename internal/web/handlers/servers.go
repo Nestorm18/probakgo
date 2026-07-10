@@ -719,10 +719,16 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pbs")
+	latestReports, _ := h.store.GetLatestPBSReports(ctx)
+	reportIDs := make([]int64, 0, len(latestReports))
+	for _, report := range latestReports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	tasksByReport, _ := h.store.GetPBSTasksForReports(ctx, reportIDs)
 	healthSummary := serverListHealthSummary{}
 	var rows []map[string]any
 	for _, sv := range servers {
-		rep, _ := h.store.GetLatestPBSReport(ctx, sv.ID)
+		rep := latestReports[sv.ID]
 		alertCfg, _ := h.store.GetPBSAlertConfig(ctx, sv.ID)
 		maint := maintenanceByServer(maintenance, "pbs", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
@@ -745,6 +751,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
 			stores, _ := h.store.GetPBSStoresForReport(ctx, rep.ID)
 			r2["Stores"] = pbsStoreDisplays(stores)
+			r2["Tasks"] = pbsTaskDisplays(tasksByReport[rep.ID])
 		}
 		rows = append(rows, r2)
 	}
@@ -778,6 +785,7 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 	reports, _ := h.store.ListPBSReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
 
 	var storeDetails []map[string]any
+	var taskDetails []pbsTaskDisplay
 	if len(latestReports) > 0 {
 		stores, _ := h.store.GetPBSStoresForReport(ctx, latestReports[0].ID)
 		for _, st := range stores {
@@ -791,6 +799,8 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 				"Snapshots": snapshots,
 			})
 		}
+		tasks, _ := h.store.GetPBSTasksForReport(ctx, latestReports[0].ID)
+		taskDetails = pbsTaskDisplays(tasks)
 	}
 
 	alertCfg, _ := h.store.GetPBSAlertConfig(ctx, id)
@@ -802,6 +812,7 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Reports":     reports,
 		"Pagination":  pagination,
 		"Stores":      storeDetails,
+		"Tasks":       taskDetails,
 		"Swap":        latestPBSSwapView(latestReports),
 		"AlertConfig": alertCfg,
 		"Flash":       r.URL.Query().Get("flash"),

@@ -25,6 +25,7 @@ type serverRow struct {
 	StaleReason string
 	VMTasks     []vmTaskRow
 	Datastores  []datastoreRow
+	PBSTasks    []pbsTaskRow
 }
 
 type datastoreRow struct {
@@ -43,6 +44,13 @@ type vmTaskRow struct {
 	Size       string
 	IsMissing  bool
 	IsExcluded bool
+}
+
+type pbsTaskRow struct {
+	Type   string
+	Detail string
+	Status string
+	Failed bool
 }
 
 type diskAlertRow struct {
@@ -469,11 +477,23 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 				})
 			}
 		}
+		tasks, _ := st.GetPBSTasksForReport(ctx, r.ID)
+		var taskFailures []string
+		for _, task := range tasks {
+			row.PBSTasks = append(row.PBSTasks, emailPBSTaskRow(task))
+			if domain.PBSTaskFailed(task) {
+				_, _, message, _ := pbsTaskFailureAlert(task)
+				taskFailures = append(taskFailures, message)
+			}
+		}
 		if rep.IsStale(r.ReportedAt) {
 			row.StaleReason = "No se ha recibido el reporte de hoy"
 			pbsIssues = append(pbsIssues, row)
 		} else if r.IsStale {
 			row.StaleReason = r.StaleReason
+			pbsIssues = append(pbsIssues, row)
+		} else if len(taskFailures) > 0 {
+			row.StaleReason = strings.Join(taskFailures, "; ")
 			pbsIssues = append(pbsIssues, row)
 		} else {
 			pbsOk = append(pbsOk, row)
@@ -586,6 +606,26 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		DiskAlerts:    diskAlerts,
 		BackupErrors:  backupErrors,
 	}, nil
+}
+
+func emailPBSTaskRow(task domain.PBSTask) pbsTaskRow {
+	row := pbsTaskRow{Status: task.Status, Failed: domain.PBSTaskFailed(task)}
+	if task.TaskType == "gc" {
+		row.Type = "Garbage collection"
+		row.Detail = task.Store
+		return row
+	}
+	row.Type = "Sincronizacion"
+	remote := task.Remote
+	if remote == "" {
+		remote = task.JobID
+	}
+	datastore := task.RemoteStore
+	if datastore == "" {
+		datastore = task.Store
+	}
+	row.Detail = fmt.Sprintf("%s / %s", remote, datastore)
+	return row
 }
 
 func staleVMRows(configs []domain.VMBackupConfig, tasks []domain.PVEBackupTask) []vmTaskRow {

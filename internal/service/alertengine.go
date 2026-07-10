@@ -46,6 +46,7 @@ var evaluators = []AlertEvaluator{
 	evalPBSDisk,
 	evalPBSFill,
 	evalPBSVerify,
+	evalPBSTaskFailures,
 	evalWindowsDisk,
 	evalWindowsHeartbeat,
 	evalWindowsDiskHealth,
@@ -699,6 +700,77 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		}
 	}
 	return alerts, nil
+}
+
+func evalPBSTaskFailures(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
+	ctx := context.Background()
+	servers, err := st.ListPBSServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var alerts []domain.Alert
+	for _, sv := range servers {
+		report, err := st.GetLatestPBSReport(ctx, sv.ID)
+		if err != nil {
+			continue
+		}
+		tasks, err := st.GetPBSTasksForReport(ctx, report.ID)
+		if err != nil {
+			continue
+		}
+		for _, task := range tasks {
+			if !domain.PBSTaskFailed(task) {
+				continue
+			}
+			alertType, title, message, storeName := pbsTaskFailureAlert(task)
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("%s:pbs:%d:%s", alertType, sv.ID, pbsTaskAlertKey(task)),
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
+				StoreName:  storeName,
+				Type:       alertType,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      title,
+				Message:    message,
+				Value:      task.Status,
+				DetectedAt: time.Now(),
+			})
+		}
+	}
+	return alerts, nil
+}
+
+func pbsTaskFailureAlert(task domain.PBSTask) (alertType, title, message, storeName string) {
+	if task.TaskType == "gc" {
+		storeName = task.Store
+		return domain.AlertTypePBSGCFailed, "Garbage collection fallida",
+			fmt.Sprintf("Garbage collection datastore %q fallida: %s", task.Store, task.Status), storeName
+	}
+	storeName = task.Store
+	if task.RemoteStore != "" {
+		storeName = task.RemoteStore
+	}
+	remote := task.Remote
+	if remote == "" {
+		remote = task.JobID
+	}
+	datastore := task.RemoteStore
+	if datastore == "" {
+		datastore = task.Store
+	}
+	return domain.AlertTypePBSSyncFailed, "Sincronizacion remota fallida",
+		fmt.Sprintf("Sync remote %q datastore %q fallida: %s", remote, datastore, task.Status), storeName
+}
+
+func pbsTaskAlertKey(task domain.PBSTask) string {
+	key := task.JobID
+	if key == "" {
+		key = task.Remote + "-" + task.Store
+	}
+	key = strings.NewReplacer(":", "_", "/", "_", " ", "_").Replace(key)
+	if key == "" {
+		return "unknown"
+	}
+	return key
 }
 
 func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {

@@ -2,12 +2,19 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example vX.Y.Z
+        required: true
+        type: string
   push:
     tags: ['v*']
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     permissions:
       contents: write
 
@@ -19,22 +26,38 @@ jobs:
           go-version: '1.26.5'
           cache: true
 
+      - name: Validate release tag and version
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG"
+            exit 1
+          fi
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
+          CLIENT_VERSION=$(grep -oP 'var version = "\K[^" ]+' client/main.go)
+          WINDOWS_VERSION=$(grep -oP 'var version = "\K[^" ]+' client-windows/main.go)
+          if [[ "$SERVER_VERSION" != "$RELEASE_VERSION" || "$CLIENT_VERSION" != "$RELEASE_VERSION" || "$WINDOWS_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "Release tag $RELEASE_TAG does not match versions: server=$SERVER_VERSION client=$CLIENT_VERSION windows=$WINDOWS_VERSION"
+            exit 1
+          fi
+
       - name: Build server Linux amd64
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
+            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo_linux_amd64 .
 
       - name: Build client Linux amd64
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
+            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo-client_linux_amd64 ./client/
 
       - name: Build Windows client amd64
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${GITHUB_REF_NAME#v}" \
+            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo-windows-client_windows_amd64.exe ./client-windows/
 
       - name: Create checksums
@@ -43,7 +66,10 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             probakgo_linux_amd64
             probakgo-client_linux_amd64

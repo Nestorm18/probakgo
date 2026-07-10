@@ -16,8 +16,8 @@
 
 ## V2 - PBS
 
-- Pendiente: detectar tareas PBS de sincronizacion remota y garbage collection, guardar el ultimo estado por datastore/remoto y mostrarlo en dashboard, `/servers/pbs`, detalle PBS, alertas y correo.
-- Pendiente: generar alerta si falla una sincronizacion remota o un garbage collection, y permitir suprimirla/mantenimiento igual que el resto de alertas PBS.
+- Hecho: detectar tareas PBS de sincronizacion remota y garbage collection, guardar el ultimo estado por datastore/remoto y mostrarlo en dashboard, `/servers/pbs`, detalle PBS, alertas y correo.
+- Hecho: generar alerta critica si falla una sincronizacion remota o un garbage collection; usa las mismas supresiones y modo mantenimiento del resto de alertas PBS.
 - Ejemplos a reconocer en logs/tareas PBS: `Sync remote 'carnicas-pbs-casa' datastore 'synology' successful`, `Sync remote 'anteva' datastore 'bembibre' failed`, `Garbage Collect Datastore 'synology' successful`.
 
 ## V2 - Servidores genericos no Proxmox

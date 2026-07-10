@@ -188,6 +188,7 @@ func hardDeletePBSByID(ctx context.Context, tx txRunner, id int64) error {
 		`DELETE FROM server_heartbeats WHERE server_type = 'pbs' AND server_id = ?`,
 		`DELETE FROM server_maintenance WHERE server_type = 'pbs' AND server_id = ?`,
 		`DELETE FROM pbs_alert_config WHERE server_id = ?`,
+		`DELETE FROM pbs_maintenance_tasks WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?)`,
 		`DELETE FROM pbs_snapshots WHERE store_id IN (SELECT id FROM pbs_stores WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?))`,
 		`DELETE FROM pbs_store_history WHERE store_id IN (SELECT id FROM pbs_stores WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?))`,
 		`DELETE FROM pbs_gc_status WHERE store_id IN (SELECT id FROM pbs_stores WHERE report_id IN (SELECT id FROM pbs_reports WHERE server_id = ?))`,

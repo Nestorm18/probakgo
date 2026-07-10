@@ -119,7 +119,8 @@ type HeartbeatRequest struct {
 }
 
 type PBSInformation struct {
-	Data []PBSDatastorePayload `json:"data"`
+	Data  []PBSDatastorePayload `json:"data"`
+	Tasks []PBSTaskPayload      `json:"tasks,omitempty"`
 }
 
 type PBSDatastorePayload struct {
@@ -159,6 +160,21 @@ type GCStatusPayload struct {
 	RemovedChunks  int64  `json:"removed-chunks"`
 	StillBad       int64  `json:"still-bad"`
 	UPID           string `json:"upid"`
+}
+
+// PBSTaskPayload is the latest completed remote sync or garbage collection task.
+// It is intentionally separate from GCStatusPayload, which only contains datastore
+// accounting figures and does not indicate whether the GC job succeeded.
+type PBSTaskPayload struct {
+	TaskType    string `json:"task_type"`
+	JobID       string `json:"job_id"`
+	Remote      string `json:"remote"`
+	RemoteStore string `json:"remote_store"`
+	Store       string `json:"store"`
+	Status      string `json:"status"`
+	StartTime   int64  `json:"start_time"`
+	EndTime     int64  `json:"end_time"`
+	UPID        string `json:"upid"`
 }
 
 // --- Windows report payload (sent by windows client) ---

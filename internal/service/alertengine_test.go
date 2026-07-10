@@ -552,6 +552,34 @@ func TestEvalPBSVerify_Disabled_NoAlert(t *testing.T) {
 	}
 }
 
+func TestEvalPBSTaskFailures(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-tasks", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	if err := st.InsertPBSTask(ctx, reportID, domain.PBSTaskPayload{
+		TaskType: "sync", JobID: "home", Remote: "casa", RemoteStore: "synology", Status: "ERROR: timeout",
+	}); err != nil {
+		t.Fatalf("insert sync task: %v", err)
+	}
+	if err := st.InsertPBSTask(ctx, reportID, domain.PBSTaskPayload{
+		TaskType: "gc", Store: "synology", Status: "OK",
+	}); err != nil {
+		t.Fatalf("insert GC task: %v", err)
+	}
+
+	alerts, err := evalPBSTaskFailures(st, AlertConfigs{})
+	if err != nil {
+		t.Fatalf("eval PBS task failures: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypePBSSyncFailed, "pbs-tasks") {
+		t.Fatalf("expected sync failure alert, got %#v", alerts)
+	}
+	if hasAlert(alerts, domain.AlertTypePBSGCFailed, "pbs-tasks") {
+		t.Fatalf("unexpected GC failure alert, got %#v", alerts)
+	}
+}
+
 // ── RunAll ────────────────────────────────────────────────────────────────────
 
 func TestRunAll_NoServers_NoAlerts(t *testing.T) {

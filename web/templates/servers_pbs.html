@@ -91,6 +91,13 @@
             {{end}}
           </div>
           {{end}}
+          {{range .Tasks}}
+          <div class="mb-1 d-flex align-items-center gap-2 flex-wrap" style="font-size:.72rem">
+            <span style="color:var(--txt-secondary)"><i class="bi {{if eq .Title "Garbage collection"}}bi-recycle{{else}}bi-arrow-left-right{{end}} me-1"></i>{{.Title}}</span>
+            {{if .Detail}}<span style="color:var(--txt-muted)">{{.Detail}}</span>{{end}}
+            <span class="status-pill {{.CSSClass}}" title="{{.StatusTitle}}">{{.Status}}</span>
+          </div>
+          {{end}}
         </td>
         <td>
           {{if .Maintenance.Active}}<span class="status-pill info" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>

@@ -424,7 +424,7 @@ func (h *WebH) alertFromSuppressionID(ctx context.Context, alertID string) domai
 	}
 	if len(parts) >= 4 {
 		switch a.Type {
-		case domain.AlertTypeDisk, domain.AlertTypePBSFill, domain.AlertTypePBSStale, domain.AlertTypePBSVerify:
+		case domain.AlertTypeDisk, domain.AlertTypePBSFill, domain.AlertTypePBSStale, domain.AlertTypePBSVerify, domain.AlertTypePBSSyncFailed, domain.AlertTypePBSGCFailed:
 			a.StoreName = parts[3]
 		default:
 			if vmid, err := strconv.ParseInt(parts[3], 10, 64); err == nil {
@@ -467,6 +467,10 @@ func alertTitleFromID(alertID string) string {
 		return "Snapshot sin actualizar"
 	case domain.AlertTypePBSVerify:
 		return "Verificacion fallida"
+	case domain.AlertTypePBSSyncFailed:
+		return "Sincronizacion remota fallida"
+	case domain.AlertTypePBSGCFailed:
+		return "Garbage collection fallida"
 	case domain.AlertTypePVEStale:
 		return "PVE sin reporte"
 	case domain.AlertTypePBSReportStale:

@@ -568,3 +568,34 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 		t.Errorf("VM 1000 should be excluded missing warning, got %+v", missing["1000"])
 	}
 }
+
+func TestBuildEmailData_PBSTaskFailureMakesPBSIssue(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-sync", "10.0.0.2", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	if err := st.InsertPBSTask(ctx, reportID, domain.PBSTaskPayload{
+		TaskType: "sync", JobID: "home", Remote: "casa", RemoteStore: "synology", Status: "ERROR: timeout",
+	}); err != nil {
+		t.Fatalf("insert PBS task: %v", err)
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertBackupErr = false
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.PBSIssues) != 1 {
+		t.Fatalf("want 1 PBS issue, got %d", len(data.PBSIssues))
+	}
+	if !strings.Contains(data.PBSIssues[0].StaleReason, "Sync remote") {
+		t.Fatalf("unexpected PBS failure detail: %q", data.PBSIssues[0].StaleReason)
+	}
+	if len(data.PBSIssues[0].PBSTasks) != 1 || !data.PBSIssues[0].PBSTasks[0].Failed {
+		t.Fatalf("unexpected PBS task rows: %#v", data.PBSIssues[0].PBSTasks)
+	}
+}

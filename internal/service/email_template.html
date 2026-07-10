@@ -169,6 +169,7 @@
                                             <tr><td><h4 style="margin: 0; font-size: 16px; color: #842029;">{{.StaleReason}}</h4></td></tr>
                                         </table>
                                         {{template "dstable" .}}
+                                        {{template "pbstable" .}}
                                     </td>
                                 </tr>
                             </table>
@@ -228,6 +229,7 @@
                                         </table>
                                         <p style="margin: 0 0 12px 0; font-size: 14px; color: #6c757d;"><strong>IP:</strong> {{.IP}}</p>
                                         {{template "dstable" .}}
+                                        {{template "pbstable" .}}
                                     </td>
                                 </tr>
                             </table>
@@ -316,6 +318,27 @@
             {{if ge .UsedPct 90}}<span style="color: #dc3545; font-weight: 600;">{{.UsedPct}}%</span>
             {{else if ge .UsedPct 75}}<span style="color: #fd7e14; font-weight: 600;">{{.UsedPct}}%</span>
             {{else}}<span style="color: #28a745;">{{.UsedPct}}%</span>{{end}}
+        </td>
+    </tr>
+    {{end}}
+</table>
+{{end}}
+{{end}}
+{{define "pbstable"}}
+{{if .PBSTasks}}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #dee2e6; border-radius: 4px; overflow: hidden; font-size: 13px; margin-top: 12px;">
+    <tr style="background-color: #f8f9fa;">
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Tarea PBS</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Remoto / datastore</td>
+        <td style="padding: 8px 12px; font-weight: 600; color: #495057; border-bottom: 1px solid #dee2e6;">Estado</td>
+    </tr>
+    {{range .PBSTasks}}
+    <tr style="border-bottom: 1px solid #f0f0f0;">
+        <td style="padding: 8px 12px; font-weight: 500; color: #333;">{{.Type}}</td>
+        <td style="padding: 8px 12px; color: #6c757d;">{{.Detail}}</td>
+        <td style="padding: 8px 12px;">
+            {{if .Failed}}<span style="background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;">ERROR</span>
+            {{else}}<span style="background-color: #28a745; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500;">OK</span>{{end}}
         </td>
     </tr>
     {{end}}

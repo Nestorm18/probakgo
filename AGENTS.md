@@ -64,6 +64,7 @@ Release assets must stay in sync with workflows and download handlers:
 - Subcommands: `install`, `uninstall`, `update`, `heartbeat`, `doctor`, `version`.
 - `install` writes `/opt/probakgo/.env`, installs logrotate, update cron and the heartbeat systemd timer.
 - PVE auto-config reads `/cluster/backup` to infer expected VM backup days.
+- PBS reports include the latest completed remote sync and garbage collection tasks when its API exposes them.
 
 ### Windows Client
 
@@ -81,7 +82,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `033_user_session_version.up.sql`.
+- Current latest migration: `034_pbs_maintenance_tasks.up.sql`.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
 

@@ -170,6 +170,64 @@ func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain
 	return err
 }
 
+func (s *Store) InsertPBSTask(ctx context.Context, reportID int64, task domain.PBSTaskPayload) error {
+	debug.RecordQuery(ctx, `INSERT INTO pbs_maintenance_tasks (report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	_, err := s.db.ExecContext(ctx, `INSERT INTO pbs_maintenance_tasks
+		(report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		reportID, task.TaskType, task.JobID, task.Remote, task.RemoteStore, task.Store,
+		task.Status, task.StartTime, task.EndTime, task.UPID,
+	)
+	return err
+}
+
+func (s *Store) GetPBSTasksForReport(ctx context.Context, reportID int64) ([]domain.PBSTask, error) {
+	debug.RecordQuery(ctx, `SELECT id, report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid FROM pbs_maintenance_tasks WHERE report_id = ? ORDER BY task_type, job_id, remote, store`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid
+		FROM pbs_maintenance_tasks WHERE report_id = ? ORDER BY task_type, job_id, remote, store`, reportID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanPBSTasks(rows)
+}
+
+func (s *Store) GetPBSTasksForReports(ctx context.Context, reportIDs []int64) (map[int64][]domain.PBSTask, error) {
+	if len(reportIDs) == 0 {
+		return map[int64][]domain.PBSTask{}, nil
+	}
+	ph, args := int64InArgs(reportIDs)
+	debug.RecordQuery(ctx, `SELECT id, report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid FROM pbs_maintenance_tasks WHERE report_id IN (...) ORDER BY report_id, task_type, job_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid
+		FROM pbs_maintenance_tasks WHERE report_id IN (`+ph+`) ORDER BY report_id, task_type, job_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	tasks, err := scanPBSTasks(rows)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[int64][]domain.PBSTask)
+	for _, task := range tasks {
+		result[task.ReportID] = append(result[task.ReportID], task)
+	}
+	return result, nil
+}
+
+func scanPBSTasks(rows *sql.Rows) ([]domain.PBSTask, error) {
+	var tasks []domain.PBSTask
+	for rows.Next() {
+		var task domain.PBSTask
+		if err := rows.Scan(&task.ID, &task.ReportID, &task.TaskType, &task.JobID, &task.Remote,
+			&task.RemoteStore, &task.Store, &task.Status, &task.StartTime, &task.EndTime, &task.UPID); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, rows.Err()
+}
+
 func (s *Store) ListPBSServers(ctx context.Context) ([]domain.PBSServer, error) {
 	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pbs_servers LEFT JOIN api_keys ON ... WHERE is_deleted = 0 ORDER BY display_name`)
 	rows, err := s.db.QueryContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.is_deleted, s.created_at, s.updated_at
@@ -427,6 +485,7 @@ func (s *Store) DeleteOldPBSReports(ctx context.Context, cutoff time.Time) (int6
 	defer tx.Rollback() //nolint:errcheck
 
 	steps := []string{
+		`DELETE FROM pbs_maintenance_tasks WHERE report_id IN (SELECT id FROM pbs_reports WHERE reported_at < ?)`,
 		`DELETE FROM pbs_store_history WHERE store_id IN (
 			SELECT st.id FROM pbs_stores st
 			JOIN pbs_reports r ON r.id = st.report_id

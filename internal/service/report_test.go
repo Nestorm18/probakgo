@@ -124,6 +124,9 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 					},
 				},
 			},
+			Tasks: []domain.PBSTaskPayload{{
+				TaskType: "sync", JobID: "home-sync", Remote: "casa", RemoteStore: "synology", Store: "local", Status: "OK", EndTime: 123,
+			}},
 		},
 	}
 
@@ -167,6 +170,13 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 	}
 	if gc.UPID != "upid-test" {
 		t.Errorf("UPID: want upid-test, got %q", gc.UPID)
+	}
+	tasks, err := st.GetPBSTasksForReport(ctx, rep.ID)
+	if err != nil {
+		t.Fatalf("GetPBSTasksForReport: %v", err)
+	}
+	if len(tasks) != 1 || tasks[0].Remote != "casa" || tasks[0].Status != "OK" {
+		t.Fatalf("unexpected PBS tasks: %#v", tasks)
 	}
 }
 

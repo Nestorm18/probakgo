@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type PVEServer struct {
 	ID            int64     `db:"id"`
@@ -149,6 +152,26 @@ type PBSGCStatus struct {
 	RemovedChunks  int64  `db:"removed_chunks"`
 	StillBad       int64  `db:"still_bad"`
 	UPID           string `db:"upid"`
+}
+
+// PBSTask is the last completed sync or garbage collection task reported by PBS.
+type PBSTask struct {
+	ID          int64  `db:"id"`
+	ReportID    int64  `db:"report_id"`
+	TaskType    string `db:"task_type"`
+	JobID       string `db:"job_id"`
+	Remote      string `db:"remote"`
+	RemoteStore string `db:"remote_store"`
+	Store       string `db:"store"`
+	Status      string `db:"status"`
+	StartTime   int64  `db:"start_time"`
+	EndTime     int64  `db:"end_time"`
+	UPID        string `db:"upid"`
+}
+
+func PBSTaskFailed(task PBSTask) bool {
+	status := strings.ToLower(strings.TrimSpace(task.Status))
+	return strings.Contains(status, "error") || strings.Contains(status, "fail")
 }
 
 type PVEBackupTask struct {
@@ -360,6 +383,8 @@ const (
 	AlertTypePBSFill           = "pbs_fill"
 	AlertTypePBSStale          = "pbs_stale"
 	AlertTypePBSVerify         = "pbs_verify"
+	AlertTypePBSSyncFailed     = "pbs_sync_failed"
+	AlertTypePBSGCFailed       = "pbs_gc_failed"
 	AlertTypePVEStale          = "pve_stale"
 	AlertTypePVEHeartbeat      = "pve_heartbeat"
 	AlertTypePBSReportStale    = "pbs_report_stale"

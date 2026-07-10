@@ -13,7 +13,7 @@ Probakgo monitoriza **Proxmox VE**, **Proxmox Backup Server** y servidores **Win
 - Deteccion de backups fallidos, VMs sin backup, discos casi llenos y nodos sin heartbeat.
 - Alertas globales, por servidor y por VM, con supresion temporal.
 - Historial de jobs PVE con detalle por VM.
-- PBS con datastores, verificacion, estimacion de llenado y estado de montaje.
+- PBS con datastores, verificacion, estimacion de llenado, estado de montaje y resultado de sincronizaciones remotas/garbage collection.
 - Windows con discos, SMART basico, heartbeat y estado por servidor.
 - Alertas Windows por heartbeat, disco lleno, salud de disco y volumen desaparecido.
 - Informe diario por email.

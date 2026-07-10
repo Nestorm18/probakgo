@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -138,15 +139,191 @@ func (c *pbsClient) generateReport() (map[string]any, error) {
 			ds["groups"] = groupList
 		}
 	}
+	tasks := c.maintenanceTasks()
 	return map[string]any{
-		"hostname":        c.si.Hostname,
-		"ip_address":      c.si.localIP(),
-		"public_ip":       c.si.publicIP(),
-		"client_version":  version,
-		"machine_id":      c.si.machineID(),
-		"swap_total":      swap.Total,
-		"swap_used":       swap.Used,
-		"swap_enabled":    swap.Enabled,
-		"pbs_information": data,
+		"hostname":       c.si.Hostname,
+		"ip_address":     c.si.localIP(),
+		"public_ip":      c.si.publicIP(),
+		"client_version": version,
+		"machine_id":     c.si.machineID(),
+		"swap_total":     swap.Total,
+		"swap_used":      swap.Used,
+		"swap_enabled":   swap.Enabled,
+		"pbs_information": map[string]any{
+			"data":  data["data"],
+			"tasks": tasks,
+		},
 	}, nil
+}
+
+type pbsSyncJob struct {
+	remote      string
+	remoteStore string
+	store       string
+}
+
+// maintenanceTasks returns the latest completed sync and garbage collection task
+// for each PBS job/datastore. Task status is fetched separately because older PBS
+// releases do not always include exitstatus in the list endpoint.
+func (c *pbsClient) maintenanceTasks() []map[string]any {
+	result, err := c.get("nodes/localhost/tasks?limit=200")
+	if err != nil {
+		log.Printf("WARN: PBS maintenance tasks: %v", err)
+		return nil
+	}
+	rawTasks, _ := result["data"].([]any)
+	if len(rawTasks) == 0 {
+		return nil
+	}
+
+	jobs := c.syncJobs()
+	latest := make(map[string]map[string]any)
+	for _, raw := range rawTasks {
+		task, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		kind, jobID := classifyPBSTask(task)
+		if kind == "" {
+			continue
+		}
+		key := kind + ":" + jobID
+		if existing, found := latest[key]; !found || taskTime(task) > taskTime(existing) {
+			latest[key] = task
+		}
+	}
+
+	out := make([]map[string]any, 0, len(latest))
+	for _, task := range latest {
+		kind, jobID := classifyPBSTask(task)
+		status := taskString(task, "exitstatus")
+		if status == "" || strings.EqualFold(status, "stopped") {
+			upid := taskString(task, "upid")
+			if upid != "" {
+				if detail, err := c.get("nodes/localhost/tasks/" + url.PathEscape(upid) + "/status"); err == nil {
+					if data, ok := detail["data"].(map[string]any); ok {
+						status = taskString(data, "exitstatus")
+					}
+				}
+			}
+		}
+		if status == "" || strings.EqualFold(status, "running") || strings.EqualFold(status, "stopped") {
+			continue
+		}
+
+		remote := taskString(task, "remote")
+		remoteStore := taskString(task, "remote-store")
+		store := taskString(task, "store")
+		if kind == "sync" {
+			if job, ok := jobs[jobID]; ok {
+				if remote == "" {
+					remote = job.remote
+				}
+				if remoteStore == "" {
+					remoteStore = job.remoteStore
+				}
+				if store == "" {
+					store = job.store
+				}
+			}
+		}
+		if kind == "gc" && store == "" {
+			store = jobID
+		}
+		out = append(out, map[string]any{
+			"task_type":    kind,
+			"job_id":       jobID,
+			"remote":       remote,
+			"remote_store": remoteStore,
+			"store":        store,
+			"status":       status,
+			"start_time":   taskNumber(task, "starttime"),
+			"end_time":     taskNumber(task, "endtime"),
+			"upid":         taskString(task, "upid"),
+		})
+	}
+	return out
+}
+
+func (c *pbsClient) syncJobs() map[string]pbsSyncJob {
+	result, err := c.get("config/sync")
+	if err != nil {
+		log.Printf("WARN: PBS sync configuration: %v", err)
+		return nil
+	}
+	entries, _ := result["data"].([]any)
+	jobs := make(map[string]pbsSyncJob, len(entries))
+	for _, raw := range entries {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := taskString(entry, "id")
+		if id == "" {
+			continue
+		}
+		jobs[id] = pbsSyncJob{
+			remote:      taskString(entry, "remote"),
+			remoteStore: taskString(entry, "remote-store"),
+			store:       taskString(entry, "store"),
+		}
+	}
+	return jobs
+}
+
+func classifyPBSTask(task map[string]any) (kind, jobID string) {
+	workerID := taskString(task, "worker_id")
+	if workerID == "" {
+		workerID = taskString(task, "id")
+	}
+	upidType, upidID := pbsUPIDTask(taskString(task, "upid"))
+	if workerID == "" {
+		workerID = upidID
+	}
+	text := strings.ToLower(strings.Join([]string{
+		taskString(task, "worker_type"), taskString(task, "type"), upidType, taskString(task, "upid"), workerID,
+	}, " "))
+	switch {
+	case strings.Contains(text, "sync"):
+		return "sync", workerID
+	case strings.Contains(text, "garbage"), strings.Contains(text, ":gc"):
+		return "gc", workerID
+	default:
+		return "", ""
+	}
+}
+
+func pbsUPIDTask(upid string) (taskType, workerID string) {
+	parts := strings.Split(upid, ":")
+	if len(parts) < 7 || parts[0] != "UPID" {
+		return "", ""
+	}
+	return parts[5], parts[6]
+}
+
+func taskString(task map[string]any, key string) string {
+	if value, ok := task[key]; ok {
+		return strings.TrimSpace(fmt.Sprint(value))
+	}
+	return ""
+}
+
+func taskNumber(task map[string]any, key string) int64 {
+	switch value := task[key].(type) {
+	case float64:
+		return int64(value)
+	case int64:
+		return value
+	case int:
+		return int64(value)
+	default:
+		return 0
+	}
+}
+
+func taskTime(task map[string]any) int64 {
+	if end := taskNumber(task, "endtime"); end > 0 {
+		return end
+	}
+	return taskNumber(task, "starttime")
 }

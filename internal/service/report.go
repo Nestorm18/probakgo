@@ -119,6 +119,11 @@ func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.
 			}
 		}
 	}
+	for _, task := range req.PBSInformation.Tasks {
+		if err := r.store.InsertPBSTask(ctx, reportID, task); err != nil {
+			return fmt.Errorf("insert pbs maintenance task %s/%s: %w", task.TaskType, task.JobID, err)
+		}
+	}
 	return nil
 }
 

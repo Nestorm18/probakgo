@@ -39,8 +39,15 @@ En Windows:
 
 ## Publicacion
 
-1. Crea el tag `v<version>`.
-2. El workflow `Release` publica la GitHub Release al recibir el tag. Debe incluir estos assets:
+1. Crea y sube el tag `v<version>` para publicar automáticamente:
+
+```bash
+git tag v<version>
+git push origin v<version>
+```
+
+También puedes ejecutar `Release` manualmente desde GitHub Actions e introducir ese mismo tag en el campo `tag`.
+2. El workflow `Release` publica la GitHub Release. Debe incluir estos assets:
    - `probakgo_linux_amd64`
    - `probakgo-client_linux_amd64`
    - `probakgo-windows-client_windows_amd64.exe`
