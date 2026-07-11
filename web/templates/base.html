@@ -67,6 +67,9 @@
         <a href="/logout" class="btn btn-sm btn-secondary" title="Salir">
           <i class="bi bi-box-arrow-right"></i>
         </a>
+        <button class="theme-toggle sidebar-theme-toggle" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
+          <i class="bi" id="themeIcon" aria-hidden="true"></i>
+        </button>
       </div>
     </div>
   </nav>
@@ -74,7 +77,7 @@
   <!-- Main -->
   <div class="main-content">
     <header class="page-header">
-      <button class="btn btn-sm btn-secondary d-lg-none me-1" id="sidebarToggle">
+      <button class="btn btn-sm btn-secondary d-lg-none me-1" id="sidebarToggle" type="button" aria-label="Abrir menu de navegacion" aria-controls="sidebar" aria-expanded="false">
         <i class="bi bi-list"></i>
       </button>
       <h1>{{block "page_heading" .}}{{end}}</h1>
@@ -109,11 +112,6 @@
 
 <div class="toast-container position-fixed top-0 end-0 p-3" id="alertToastContainer" style="z-index:1080"></div>
 
-<!-- Theme toggle -->
-<button class="theme-toggle" id="themeToggle" title="Cambiar tema">
-  <i class="bi" id="themeIcon"></i>
-</button>
-
 <!-- Confirm modal (shared across all pages) -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-sm">
@@ -122,7 +120,7 @@
         <h6 class="modal-title fw-semibold">
           <i class="bi bi-exclamation-triangle-fill me-2" style="color:var(--clr-danger)"></i>Confirmar acción
         </h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body pt-1">
         <p id="confirmMsg" class="mb-0" style="font-size:.9rem;color:var(--txt-secondary)"></p>
@@ -154,10 +152,19 @@
 <script>
   // Sidebar toggle
   const sidebar = document.getElementById('sidebar');
-  document.getElementById('sidebarToggle')?.addEventListener('click', () => sidebar.classList.toggle('show'));
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  sidebarToggle?.addEventListener('click', () => {
+    sidebar.classList.toggle('show');
+    sidebarToggle.setAttribute('aria-expanded', sidebar.classList.contains('show') ? 'true' : 'false');
+  });
   document.addEventListener('click', e => {
     if (window.innerWidth < 992 && !sidebar.contains(e.target) && !e.target.closest('#sidebarToggle'))
       sidebar.classList.remove('show');
+    if (!sidebar.classList.contains('show')) sidebarToggle?.setAttribute('aria-expanded', 'false');
+  });
+  document.querySelectorAll('.copy-step-btn').forEach(btn => {
+    btn.setAttribute('aria-label', 'Copiar comando');
+    if (!btn.title) btn.title = 'Copiar comando';
   });
 
   // Theme toggle
@@ -401,7 +408,7 @@
       el.setAttribute('role', 'alert');
       el.setAttribute('aria-live', 'assertive');
       el.setAttribute('aria-atomic', 'true');
-      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
       el.querySelector('strong').textContent = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
       el.querySelector('.toast-body div').textContent = alert.message || 'Nueva alerta critica';
       toastContainer.appendChild(el);
@@ -417,7 +424,7 @@
       el.setAttribute('role', 'status');
       el.setAttribute('aria-live', 'polite');
       el.setAttribute('aria-atomic', 'true');
-      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
       el.querySelector('strong').textContent = title;
       el.querySelector('.toast-body div').textContent = message;
       toastContainer.appendChild(el);

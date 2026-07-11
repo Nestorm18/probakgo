@@ -3,7 +3,8 @@
 {{block "page_content" .}}
 
 <!-- Summary bar -->
-<div class="d-flex gap-3 mb-4 flex-wrap">
+<div class="alerts-toolbar">
+  <div class="alerts-toolbar-row">
   {{if .AlertCritical}}
   <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-danger) 30%,transparent)">
     <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
@@ -23,8 +24,7 @@
   </div>
   {{end}}
 
-  <!-- Filters -->
-  <div class="ms-auto d-flex gap-2 flex-wrap">
+  <div class="alerts-toolbar-actions">
     <button type="button" class="btn btn-sm btn-secondary" id="alertSoundBtn" title="Activar sonido de alertas">
       <i class="bi bi-volume-mute"></i><span class="ms-1">Sonido</span>
     </button>
@@ -33,6 +33,10 @@
     </button>
     <a href="/alerts.csv" class="btn btn-sm btn-secondary d-inline-flex align-items-center" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
     <a href="/alerts.json" class="btn btn-sm btn-secondary d-inline-flex align-items-center" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
+  </div>
+  </div>
+  <div class="alerts-toolbar-filters">
+    <i class="bi bi-funnel" aria-hidden="true"></i>
     <form method="get" action="/alerts" class="d-flex gap-2 flex-wrap">
       <select name="severity" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
         <option value="" {{if eq .FilterSeverity ""}}selected{{end}}>Todas las severidades</option>
@@ -74,6 +78,7 @@
         {{if gt .Warning 0}}<span class="badge compact-badge warning">{{.Warning}} advertencia{{if gt .Warning 1}}s{{end}}</span>{{end}}
         {{if $.Role}}{{if canEdit $.Role}}
         <button class="btn btn-sm btn-outline-secondary suppress-open-btn ms-1"
+                aria-label="Suprimir todas las alertas de este servidor"
                 title="Suprimir todas las alertas de este servidor"
                 data-alert-id="{{range $i, $a := .Alerts}}{{if $i}},{{end}}{{$a.ID}}{{end}}"
                 data-alert-title="Todas las alertas"
@@ -120,6 +125,7 @@
         <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="btn btn-sm btn-outline-secondary" title="Ver servidor"><i class="bi bi-server"></i></a>
         {{if $.Role}}{{if canEdit $.Role}}
         <button class="btn btn-sm btn-outline-secondary suppress-open-btn"
+                aria-label="Suprimir alerta"
                 title="Suprimir temporalmente"
                 data-alert-id="{{.ID}}"
                 data-alert-title="{{.Title}}"
@@ -260,7 +266,7 @@
     <div class="modal-content">
       <div class="modal-header border-0 pb-1">
         <h6 class="modal-title fw-semibold"><i class="bi bi-bell-slash me-2"></i>Suprimir alerta</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <form method="post" action="/alerts/suppress">
         {{.CSRFField}}

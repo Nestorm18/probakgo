@@ -17,8 +17,8 @@
   <div class="login-panel-left">
     <div class="login-panel-left-inner">
       <div class="login-app-logo"><i class="bi bi-hdd-rack-fill"></i></div>
-      <div class="login-headline">Monitorización<br>de backups<br>Proxmox</div>
-      <div class="login-subhead">Visibilidad completa de tus servidores PVE y PBS desde un solo lugar.</div>
+      <div class="login-headline">Monitorización<br>de servidores<br>y backups</div>
+      <div class="login-subhead">Visibilidad completa de tus servidores PVE, PBS y Windows desde un solo lugar.</div>
       <div class="login-features">
         <div class="login-feature-item"><i class="bi bi-check-circle-fill"></i>Estado en tiempo real</div>
         <div class="login-feature-item"><i class="bi bi-check-circle-fill"></i>Alertas por email</div>
@@ -30,6 +30,9 @@
 
   <!-- Panel derecho -->
   <div class="login-panel-right">
+    <button class="theme-toggle login-theme-toggle" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
+      <i class="bi" id="themeIcon" aria-hidden="true"></i>
+    </button>
     <div class="login-form-wrap">
       <div class="login-form-title">Bienvenido</div>
       <div class="login-form-sub">Inicia sesión en tu cuenta</div>
@@ -70,11 +73,6 @@
   </div>
 
 </div>
-
-<!-- Theme toggle -->
-<button class="theme-toggle" id="themeToggle" title="Cambiar tema">
-  <i class="bi" id="themeIcon"></i>
-</button>
 
 <script>
   const themeIcon = document.getElementById('themeIcon');

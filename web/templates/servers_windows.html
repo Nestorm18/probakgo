@@ -38,13 +38,13 @@
     <table class="table table-hover mb-0" style="min-width:920px">
       <thead>
         <tr>
-          <th data-sort="0" style="cursor:pointer;user-select:none">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
-          <th data-sort="1" style="cursor:pointer;user-select:none">Direccion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="0" aria-sort="none"><button type="button" class="sort-button">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="1" aria-sort="none"><button type="button" class="sort-button">Direccion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
           <th>Cliente</th>
-          <th data-sort="3" style="cursor:pointer;user-select:none">Conexion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
-          <th data-sort="4" style="cursor:pointer;user-select:none">Ultimo reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="3" aria-sort="none"><button type="button" class="sort-button">Conexion <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="4" aria-sort="none"><button type="button" class="sort-button">Ultimo reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
           <th>Discos</th>
-          <th data-sort="6" style="cursor:pointer;user-select:none">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)"></i></th>
+          <th data-sort="6" aria-sort="none"><button type="button" class="sort-button">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
           <th></th>
         </tr>
       </thead>
@@ -97,6 +97,7 @@
           <a href="/servers/windows/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary" title="Ver detalle"><i class="bi bi-eye"></i></a>
           {{if $.Role}}{{if canEdit $.Role}}
           <button class="btn btn-sm btn-outline-secondary windows-alert-cfg-btn position-relative"
+                  aria-label="Configurar alertas del servidor"
                   title="{{if .AlertOverrides.Has}}{{.AlertOverrides.Title}}{{else}}Alertas{{end}}"
                   data-server-id="{{.Server.ID}}"
                   data-server-name="{{.Server.DisplayName}}"
@@ -133,7 +134,7 @@
         <h6 class="modal-title fw-semibold">
           <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas - <span id="windowsAlertCfgName"></span>
         </h6>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <form id="windowsAlertCfgForm" method="post">
         {{.CSRFField}}
@@ -219,7 +220,7 @@
   if (!tbody) return;
   let sortCol = -1, sortAsc = true;
   document.querySelectorAll('th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
+    th.querySelector('.sort-button').addEventListener('click', () => {
       const col = parseInt(th.dataset.sort);
       sortAsc = sortCol === col ? !sortAsc : true;
       sortCol = col;
@@ -231,7 +232,9 @@
       });
       rows.forEach(r => tbody.appendChild(r));
       document.querySelectorAll('th[data-sort] .sort-icon').forEach(i => { i.className = 'bi sort-icon'; });
+      document.querySelectorAll('th[data-sort]').forEach(header => header.setAttribute('aria-sort', 'none'));
       th.querySelector('.sort-icon').className = `bi bi-caret-${sortAsc ? 'up' : 'down'}-fill sort-icon`;
+      th.setAttribute('aria-sort', sortAsc ? 'ascending' : 'descending');
     });
   });
 })();
