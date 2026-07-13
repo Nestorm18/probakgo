@@ -1,6 +1,10 @@
 name: Release
 
 on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: ['master']
   workflow_dispatch:
     inputs:
       tag:
@@ -12,62 +16,104 @@ on:
 
 jobs:
   release:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'master')
     runs-on: ubuntu-latest
-    env:
-      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
 
       - uses: actions/setup-go@v5
         with:
           go-version: '1.26.5'
           cache: true
 
-      - name: Validate release tag and version
+      - name: Resolve and validate release tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          EVENT_SHA: ${{ github.sha }}
         shell: bash
         run: |
+          SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            RELEASE_TAG="v$SERVER_VERSION"
+            RELEASE_SHA="$WORKFLOW_RUN_SHA"
+          elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            RELEASE_TAG="$REQUESTED_TAG"
+            RELEASE_SHA="$EVENT_SHA"
+          else
+            RELEASE_TAG="$REF_NAME"
+            RELEASE_SHA="$EVENT_SHA"
+          fi
           if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid release tag: $RELEASE_TAG"
             exit 1
           fi
           RELEASE_VERSION="${RELEASE_TAG#v}"
-          SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
           CLIENT_VERSION=$(grep -oP 'var version = "\K[^" ]+' client/main.go)
           WINDOWS_VERSION=$(grep -oP 'var version = "\K[^" ]+' client-windows/main.go)
           if [[ "$SERVER_VERSION" != "$RELEASE_VERSION" || "$CLIENT_VERSION" != "$RELEASE_VERSION" || "$WINDOWS_VERSION" != "$RELEASE_VERSION" ]]; then
             echo "Release tag $RELEASE_TAG does not match versions: server=$SERVER_VERSION client=$CLIENT_VERSION windows=$WINDOWS_VERSION"
             exit 1
           fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
+
+      - name: Check whether release already exists
+        id: existing_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists; nothing to publish."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Build server Linux amd64
+        if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo_linux_amd64 .
 
       - name: Build client Linux amd64
+        if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo-client_linux_amd64 ./client/
 
       - name: Build Windows client amd64
+        if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
             -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
             -o probakgo-windows-client_windows_amd64.exe ./client-windows/
 
       - name: Create checksums
+        if: steps.existing_release.outputs.exists != 'true'
         run: sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 probakgo-windows-client_windows_amd64.exe > SHA256SUMS
 
       - name: Publish GitHub Release
+        if: steps.existing_release.outputs.exists != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ env.RELEASE_SHA }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
