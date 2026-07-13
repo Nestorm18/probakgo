@@ -12,7 +12,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.161"
+var version = "0.0.162"
 
 func main() {
 	closeLog := setupLogging()
