@@ -442,7 +442,7 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 	return alerts, nil
 }
 
-func evalHostSwap(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
+func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	ctx := context.Background()
 	var alerts []domain.Alert
 	now := time.Now()
@@ -452,6 +452,9 @@ func evalHostSwap(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
 		return nil, err
 	}
 	for _, sv := range pveServers {
+		if svCfg, ok := cfg.PVEConfigs[sv.ID]; ok && svCfg.SwapAlert != nil && *svCfg.SwapAlert == 0 {
+			continue
+		}
 		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
 		if err != nil || !rep.SwapEnabled {
 			continue
@@ -474,6 +477,9 @@ func evalHostSwap(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
 		return nil, err
 	}
 	for _, sv := range pbsServers {
+		if svCfg, ok := cfg.PBSConfigs[sv.ID]; ok && svCfg.SwapAlert != nil && *svCfg.SwapAlert == 0 {
+			continue
+		}
 		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil || !rep.SwapEnabled {
 			continue

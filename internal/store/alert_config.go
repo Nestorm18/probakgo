@@ -9,16 +9,16 @@ import (
 )
 
 func (s *Store) GetPVEAlertConfig(ctx context.Context, serverID int64) (domain.PVEAlertConfig, error) {
-	debug.RecordQuery(ctx, `SELECT disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config WHERE server_id = ?`)
+	debug.RecordQuery(ctx, `SELECT disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert FROM pve_alert_config WHERE server_id = ?`)
 	row := s.db.QueryRowContext(ctx,
-		`SELECT disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config WHERE server_id = ?`,
+		`SELECT disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert FROM pve_alert_config WHERE server_id = ?`,
 		serverID,
 	)
 	var cfg domain.PVEAlertConfig
 	cfg.ServerID = serverID
-	var diskPct, staleHours, backupErr sql.NullInt64
+	var diskPct, staleHours, backupErr, swapAlert sql.NullInt64
 	var expectedFinish sql.NullString
-	if err := row.Scan(&diskPct, &staleHours, &backupErr, &expectedFinish); err == sql.ErrNoRows {
+	if err := row.Scan(&diskPct, &staleHours, &backupErr, &expectedFinish, &swapAlert); err == sql.ErrNoRows {
 		return cfg, nil
 	} else if err != nil {
 		return cfg, err
@@ -39,13 +39,17 @@ func (s *Store) GetPVEAlertConfig(ctx context.Context, serverID int64) (domain.P
 		v := expectedFinish.String
 		cfg.ExpectedFinishTime = &v
 	}
+	if swapAlert.Valid {
+		v := int(swapAlert.Int64)
+		cfg.SwapAlert = &v
+	}
 	return cfg, nil
 }
 
 func (s *Store) ListPVEAlertConfigs(ctx context.Context) (map[int64]domain.PVEAlertConfig, error) {
-	debug.RecordQuery(ctx, `SELECT server_id, disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config`)
+	debug.RecordQuery(ctx, `SELECT server_id, disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert FROM pve_alert_config`)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT server_id, disk_pct, stale_hours, backup_err, expected_finish_time FROM pve_alert_config`,
+		`SELECT server_id, disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert FROM pve_alert_config`,
 	)
 	if err != nil {
 		return nil, err
@@ -54,9 +58,9 @@ func (s *Store) ListPVEAlertConfigs(ctx context.Context) (map[int64]domain.PVEAl
 	configs := make(map[int64]domain.PVEAlertConfig)
 	for rows.Next() {
 		var cfg domain.PVEAlertConfig
-		var diskPct, staleHours, backupErr sql.NullInt64
+		var diskPct, staleHours, backupErr, swapAlert sql.NullInt64
 		var expectedFinish sql.NullString
-		if err := rows.Scan(&cfg.ServerID, &diskPct, &staleHours, &backupErr, &expectedFinish); err != nil {
+		if err := rows.Scan(&cfg.ServerID, &diskPct, &staleHours, &backupErr, &expectedFinish, &swapAlert); err != nil {
 			return nil, err
 		}
 		if diskPct.Valid {
@@ -75,23 +79,28 @@ func (s *Store) ListPVEAlertConfigs(ctx context.Context) (map[int64]domain.PVEAl
 			v := expectedFinish.String
 			cfg.ExpectedFinishTime = &v
 		}
+		if swapAlert.Valid {
+			v := int(swapAlert.Int64)
+			cfg.SwapAlert = &v
+		}
 		configs[cfg.ServerID] = cfg
 	}
 	return configs, rows.Err()
 }
 
 func (s *Store) UpsertPVEAlertConfig(ctx context.Context, cfg domain.PVEAlertConfig) error {
-	debug.RecordQuery(ctx, `INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	debug.RecordQuery(ctx, `INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO pve_alert_config (server_id, disk_pct, stale_hours, backup_err, expected_finish_time, swap_alert, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(server_id) DO UPDATE SET
 			disk_pct=excluded.disk_pct,
 			stale_hours=excluded.stale_hours,
 			backup_err=excluded.backup_err,
 			expected_finish_time=excluded.expected_finish_time,
+			swap_alert=excluded.swap_alert,
 			updated_at=excluded.updated_at`,
-		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.StaleHours), nullInt(cfg.BackupErr), nullString(cfg.ExpectedFinishTime),
+		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.StaleHours), nullInt(cfg.BackupErr), nullString(cfg.ExpectedFinishTime), nullInt(cfg.SwapAlert),
 	)
 	return err
 }
@@ -178,17 +187,17 @@ func (s *Store) DeletePVEVMAlertConfig(ctx context.Context, serverID, vmid int64
 }
 
 func (s *Store) GetPBSAlertConfig(ctx context.Context, serverID int64) (domain.PBSAlertConfig, error) {
-	debug.RecordQuery(ctx, `SELECT disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config WHERE server_id = ?`)
+	debug.RecordQuery(ctx, `SELECT disk_pct, days_until_full, stale_hours, verify_alert, swap_alert FROM pbs_alert_config WHERE server_id = ?`)
 	row := s.db.QueryRowContext(ctx,
-		`SELECT disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config WHERE server_id = ?`,
+		`SELECT disk_pct, days_until_full, stale_hours, verify_alert, swap_alert FROM pbs_alert_config WHERE server_id = ?`,
 		serverID,
 	)
 	var cfg domain.PBSAlertConfig
 	cfg.ServerID = serverID
 	cfg.VerifyAlert = true // default on
-	var diskPct, daysUntilFull, staleHours sql.NullInt64
+	var diskPct, daysUntilFull, staleHours, swapAlert sql.NullInt64
 	var verifyAlert int
-	if err := row.Scan(&diskPct, &daysUntilFull, &staleHours, &verifyAlert); err == sql.ErrNoRows {
+	if err := row.Scan(&diskPct, &daysUntilFull, &staleHours, &verifyAlert, &swapAlert); err == sql.ErrNoRows {
 		return cfg, nil
 	} else if err != nil {
 		return cfg, err
@@ -206,13 +215,17 @@ func (s *Store) GetPBSAlertConfig(ctx context.Context, serverID int64) (domain.P
 		cfg.StaleHours = &v
 	}
 	cfg.VerifyAlert = verifyAlert != 0
+	if swapAlert.Valid {
+		v := int(swapAlert.Int64)
+		cfg.SwapAlert = &v
+	}
 	return cfg, nil
 }
 
 func (s *Store) ListPBSAlertConfigs(ctx context.Context) (map[int64]domain.PBSAlertConfig, error) {
-	debug.RecordQuery(ctx, `SELECT server_id, disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config`)
+	debug.RecordQuery(ctx, `SELECT server_id, disk_pct, days_until_full, stale_hours, verify_alert, swap_alert FROM pbs_alert_config`)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT server_id, disk_pct, days_until_full, stale_hours, verify_alert FROM pbs_alert_config`,
+		`SELECT server_id, disk_pct, days_until_full, stale_hours, verify_alert, swap_alert FROM pbs_alert_config`,
 	)
 	if err != nil {
 		return nil, err
@@ -222,9 +235,9 @@ func (s *Store) ListPBSAlertConfigs(ctx context.Context) (map[int64]domain.PBSAl
 	for rows.Next() {
 		var cfg domain.PBSAlertConfig
 		cfg.VerifyAlert = true
-		var diskPct, daysUntilFull, staleHours sql.NullInt64
+		var diskPct, daysUntilFull, staleHours, swapAlert sql.NullInt64
 		var verifyAlert int
-		if err := rows.Scan(&cfg.ServerID, &diskPct, &daysUntilFull, &staleHours, &verifyAlert); err != nil {
+		if err := rows.Scan(&cfg.ServerID, &diskPct, &daysUntilFull, &staleHours, &verifyAlert, &swapAlert); err != nil {
 			return nil, err
 		}
 		if diskPct.Valid {
@@ -240,6 +253,10 @@ func (s *Store) ListPBSAlertConfigs(ctx context.Context) (map[int64]domain.PBSAl
 			cfg.StaleHours = &v
 		}
 		cfg.VerifyAlert = verifyAlert != 0
+		if swapAlert.Valid {
+			v := int(swapAlert.Int64)
+			cfg.SwapAlert = &v
+		}
 		configs[cfg.ServerID] = cfg
 	}
 	return configs, rows.Err()
@@ -250,17 +267,18 @@ func (s *Store) UpsertPBSAlertConfig(ctx context.Context, cfg domain.PBSAlertCon
 	if cfg.VerifyAlert {
 		verifyInt = 1
 	}
-	debug.RecordQuery(ctx, `INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, updated_at) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
+	debug.RecordQuery(ctx, `INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, swap_alert, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(server_id) DO UPDATE SET ...`)
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, updated_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO pbs_alert_config (server_id, disk_pct, days_until_full, stale_hours, verify_alert, swap_alert, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 		ON CONFLICT(server_id) DO UPDATE SET
 			disk_pct=excluded.disk_pct,
 			days_until_full=excluded.days_until_full,
 			stale_hours=excluded.stale_hours,
 			verify_alert=excluded.verify_alert,
+			swap_alert=excluded.swap_alert,
 			updated_at=excluded.updated_at`,
-		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.DaysUntilFull), nullInt(cfg.StaleHours), verifyInt,
+		cfg.ServerID, nullInt(cfg.DiskPct), nullInt(cfg.DaysUntilFull), nullInt(cfg.StaleHours), verifyInt, nullInt(cfg.SwapAlert),
 	)
 	return err
 }

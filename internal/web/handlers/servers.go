@@ -189,6 +189,13 @@ func buildPVEAlertOverrideView(cfg domain.PVEAlertConfig) alertOverrideView {
 	if cfg.ExpectedFinishTime != nil && *cfg.ExpectedFinishTime != "" {
 		parts = append(parts, "Hora limite "+*cfg.ExpectedFinishTime)
 	}
+	if cfg.SwapAlert != nil {
+		if *cfg.SwapAlert == 0 {
+			parts = append(parts, "Swap desactivada")
+		} else {
+			parts = append(parts, "Swap activada")
+		}
+	}
 	return buildAlertOverrideView(parts)
 }
 
@@ -209,6 +216,13 @@ func buildPBSAlertOverrideView(cfg domain.PBSAlertConfig) alertOverrideView {
 	}
 	if !cfg.VerifyAlert {
 		parts = append(parts, "Verificacion desactivada")
+	}
+	if cfg.SwapAlert != nil {
+		if *cfg.SwapAlert == 0 {
+			parts = append(parts, "Swap desactivada")
+		} else {
+			parts = append(parts, "Swap activada")
+		}
 	}
 	return buildAlertOverrideView(parts)
 }

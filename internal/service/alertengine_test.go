@@ -170,6 +170,42 @@ func TestEvalHostSwap_Disabled(t *testing.T) {
 	}
 }
 
+func TestEvalHostSwap_PVEAlertDisabledPerServer(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-swap-ignored", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPVEReportWithSwap(ctx, serverID, nil, domain.HostSwap{Total: 2 * 1000 * 1000 * 1000, Enabled: true})
+
+	cfg := defaultCfg()
+	disabled := 0
+	cfg.PVEConfigs[serverID] = domain.PVEAlertConfig{ServerID: serverID, SwapAlert: &disabled}
+	alerts, err := evalHostSwap(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeSwap, "pve-swap-ignored") {
+		t.Fatal("did not expect swap alert when disabled for PVE server")
+	}
+}
+
+func TestEvalHostSwap_PBSAlertDisabledPerServer(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-swap-ignored", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPBSReportWithSwap(ctx, serverID, domain.HostSwap{Total: 2 * 1000 * 1000 * 1000, Enabled: true})
+
+	cfg := defaultCfg()
+	disabled := 0
+	cfg.PBSConfigs[serverID] = domain.PBSAlertConfig{ServerID: serverID, SwapAlert: &disabled}
+	alerts, err := evalHostSwap(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeSwap, "pbs-swap-ignored") {
+		t.Fatal("did not expect swap alert when disabled for PBS server")
+	}
+}
+
 // ── evalPVEBackupErrors ───────────────────────────────────────────────────────
 
 func TestEvalPVEBackupErrors_ErrorTask(t *testing.T) {

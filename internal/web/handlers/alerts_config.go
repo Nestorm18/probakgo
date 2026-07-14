@@ -42,6 +42,11 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		}
 		cfg.ExpectedFinishTime = &v
 	}
+	if v := r.FormValue("swap_alert"); v != "" && v != "-1" {
+		if n, err := strconv.Atoi(v); err == nil && (n == 0 || n == 1) {
+			cfg.SwapAlert = &n
+		}
+	}
 
 	if err := h.store.UpsertPVEAlertConfig(ctx, cfg); err != nil {
 		slog.Error("upsert pve alert config", "err", err)
@@ -54,6 +59,7 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"stale_hours":    cfg.StaleHours,
 		"backup_err":     cfg.BackupErr,
 		"finish_time":    cfg.ExpectedFinishTime,
+		"swap_alert":     cfg.SwapAlert,
 		"maintenance_on": maintenance,
 	})
 	if r.FormValue("back") == "list" {
@@ -170,6 +176,11 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 			cfg.StaleHours = &n
 		}
 	}
+	if v := r.FormValue("swap_alert"); v != "" && v != "-1" {
+		if n, err := strconv.Atoi(v); err == nil && (n == 0 || n == 1) {
+			cfg.SwapAlert = &n
+		}
+	}
 
 	if err := h.store.UpsertPBSAlertConfig(ctx, cfg); err != nil {
 		slog.Error("upsert pbs alert config", "err", err)
@@ -182,6 +193,7 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"days_until_full": cfg.DaysUntilFull,
 		"stale_hours":     cfg.StaleHours,
 		"verify_alert":    cfg.VerifyAlert,
+		"swap_alert":      cfg.SwapAlert,
 		"maintenance_on":  maintenance,
 	})
 	if r.FormValue("back") == "list" {

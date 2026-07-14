@@ -116,6 +116,7 @@
                   data-days-until-full="{{if .AlertConfig.DaysUntilFull}}{{deref .AlertConfig.DaysUntilFull}}{{end}}"
                   data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
                   data-verify-alert="{{if .AlertConfig.VerifyAlert}}1{{else}}0{{end}}"
+                  data-swap-alert="{{if .AlertConfig.SwapAlert}}{{deref .AlertConfig.SwapAlert}}{{else}}-1{{end}}"
                   data-maintenance-active="{{if .Maintenance.Active}}1{{else}}0{{end}}"
                   data-maintenance-until="{{if .Maintenance.Active}}{{formatTime .Maintenance.Until}}{{end}}"
                   data-maintenance-reason="{{.Maintenance.Reason}}">
@@ -210,6 +211,15 @@
               </div>
               <div class="form-text">Avisa si una verificación PBS no termina correctamente.</div>
             </div>
+            <div class="alert-config-field">
+              <label class="form-label">Swap activa</label>
+              <select id="pbsAlertSwap" name="swap_alert" class="form-select form-select-sm">
+                <option value="-1">Global (activado)</option>
+                <option value="1">Activado</option>
+                <option value="0">Desactivado</option>
+              </select>
+              <div class="form-text">Avisa si el host tiene swap habilitada.</div>
+            </div>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
@@ -289,6 +299,7 @@ document.addEventListener('click', e => {
   document.getElementById('pbsAlertDaysUntilFull').value = d.daysUntilFull || '';
   document.getElementById('pbsAlertStaleHours').value = d.staleHours || '';
   document.getElementById('pbsAlertVerify').checked = d.verifyAlert === '1';
+  document.getElementById('pbsAlertSwap').value = d.swapAlert === '0' || d.swapAlert === '1' ? d.swapAlert : '-1';
   const maintenanceEnabled = d.maintenanceActive === '1';
   document.getElementById('pbsMaintenanceEnabled').checked = maintenanceEnabled;
   document.getElementById('pbsMaintenanceHours').value = maintenanceEnabled ? 'keep' : '24';

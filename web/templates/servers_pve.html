@@ -107,6 +107,7 @@
                   data-stale-hours="{{if .AlertConfig.StaleHours}}{{deref .AlertConfig.StaleHours}}{{end}}"
                   data-backup-err="{{if .AlertConfig.BackupErr}}{{deref .AlertConfig.BackupErr}}{{else}}-1{{end}}"
                   data-expected-finish-time="{{with .AlertConfig.ExpectedFinishTime}}{{.}}{{end}}"
+                  data-swap-alert="{{if .AlertConfig.SwapAlert}}{{deref .AlertConfig.SwapAlert}}{{else}}-1{{end}}"
                   data-maintenance-active="{{if .Maintenance.Active}}1{{else}}0{{end}}"
                   data-maintenance-until="{{if .Maintenance.Active}}{{formatTime .Maintenance.Until}}{{end}}"
                   data-maintenance-reason="{{.Maintenance.Reason}}">
@@ -203,6 +204,15 @@
                      placeholder="09:00">
               <div class="form-text">Vacío = 09:00 · si se supera sin reporte, alerta.</div>
             </div>
+            <div class="alert-config-field">
+              <label class="form-label">Swap activa</label>
+              <select id="pveAlertSwap" name="swap_alert" class="form-select form-select-sm">
+                <option value="-1">Global (activado)</option>
+                <option value="1">Activado</option>
+                <option value="0">Desactivado</option>
+              </select>
+              <div class="form-text">Avisa si el host tiene swap habilitada.</div>
+            </div>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
@@ -281,6 +291,7 @@ document.addEventListener('click', e => {
   document.getElementById('pveAlertDiskPct').value = d.diskPct || '';
   document.getElementById('pveAlertStaleHours').value = d.staleHours || '';
   document.getElementById('pveExpectedFinishTime').value = d.expectedFinishTime || '';
+  document.getElementById('pveAlertSwap').value = d.swapAlert === '0' || d.swapAlert === '1' ? d.swapAlert : '-1';
   const sel = document.getElementById('pveAlertBackupErr');
   sel.value = d.backupErr === '-1' || d.backupErr === '' ? '-1' : d.backupErr;
   const maintenanceEnabled = d.maintenanceActive === '1';

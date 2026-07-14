@@ -409,6 +409,7 @@ type PVEAlertConfig struct {
 	StaleHours         *int    // nil = use global; 0 = disabled
 	BackupErr          *int    // nil = use global; 0 = ignore; 1 = alert
 	ExpectedFinishTime *string // nil = 09:00; HH:MM cutoff for previous night's report
+	SwapAlert          *int    // nil = enabled globally; 0 = ignore; 1 = alert
 }
 
 // PVEVMAlertConfig holds per-VM overrides within a PVE server.
@@ -429,6 +430,7 @@ type PBSAlertConfig struct {
 	DaysUntilFull *int // nil = disabled; alert if disk fills in < N days
 	StaleHours    *int // nil = use global; 0 = disabled
 	VerifyAlert   bool
+	SwapAlert     *int // nil = enabled globally; 0 = ignore; 1 = alert
 }
 
 // WindowsAlertConfig holds per-server Windows alert thresholds.

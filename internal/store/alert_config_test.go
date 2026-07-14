@@ -18,7 +18,7 @@ func TestPVEAlertConfig_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.DiskPct != nil || cfg.StaleHours != nil || cfg.BackupErr != nil || cfg.ExpectedFinishTime != nil {
+	if cfg.DiskPct != nil || cfg.StaleHours != nil || cfg.BackupErr != nil || cfg.ExpectedFinishTime != nil || cfg.SwapAlert != nil {
 		t.Error("expected all nil fields when no row exists")
 	}
 }
@@ -34,6 +34,7 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 		StaleHours:         intPtr(0),
 		BackupErr:          intPtr(1),
 		ExpectedFinishTime: stringPtr("10:30"),
+		SwapAlert:          intPtr(0),
 	}
 	if err := st.UpsertPVEAlertConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -55,6 +56,9 @@ func TestPVEAlertConfig_RoundTrip(t *testing.T) {
 	if got.ExpectedFinishTime == nil || *got.ExpectedFinishTime != "10:30" {
 		t.Errorf("ExpectedFinishTime: got %v, want 10:30", got.ExpectedFinishTime)
 	}
+	if got.SwapAlert == nil || *got.SwapAlert != 0 {
+		t.Errorf("SwapAlert: got %v, want 0", got.SwapAlert)
+	}
 }
 
 func TestPVEAlertConfig_NullFields(t *testing.T) {
@@ -71,7 +75,7 @@ func TestPVEAlertConfig_NullFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}
-	if got.DiskPct != nil || got.StaleHours != nil || got.BackupErr != nil || got.ExpectedFinishTime != nil {
+	if got.DiskPct != nil || got.StaleHours != nil || got.BackupErr != nil || got.ExpectedFinishTime != nil || got.SwapAlert != nil {
 		t.Error("expected all nil after upsert with nil fields")
 	}
 }
@@ -118,7 +122,7 @@ func TestPBSAlertConfig_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.DiskPct != nil || cfg.DaysUntilFull != nil || cfg.StaleHours != nil {
+	if cfg.DiskPct != nil || cfg.DaysUntilFull != nil || cfg.StaleHours != nil || cfg.SwapAlert != nil {
 		t.Error("expected nil fields when no row exists")
 	}
 	if !cfg.VerifyAlert {
@@ -137,6 +141,7 @@ func TestPBSAlertConfig_RoundTrip(t *testing.T) {
 		DaysUntilFull: intPtr(14),
 		StaleHours:    intPtr(48),
 		VerifyAlert:   false,
+		SwapAlert:     intPtr(0),
 	}
 	if err := st.UpsertPBSAlertConfig(ctx, want); err != nil {
 		t.Fatalf("upsert: %v", err)
@@ -157,6 +162,9 @@ func TestPBSAlertConfig_RoundTrip(t *testing.T) {
 	}
 	if got.VerifyAlert {
 		t.Error("VerifyAlert: got true, want false")
+	}
+	if got.SwapAlert == nil || *got.SwapAlert != 0 {
+		t.Errorf("SwapAlert: got %v, want 0", got.SwapAlert)
 	}
 }
 
