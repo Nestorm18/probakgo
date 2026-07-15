@@ -97,6 +97,15 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	}
 	serverURL := r.FormValue("server_url")
 	githubToken := strings.TrimSpace(r.FormValue("github_token"))
+	configuredURL := ""
+	if cfg, cfgErr := h.store.GetEmailConfig(ctx); cfgErr == nil && cfg != nil {
+		configuredURL = cfg.PublicAPIURL
+	}
+	apiURL, err := installerAPIURL(r, configuredURL)
+	if err != nil {
+		redirectWithFlash(w, r, back, err.Error(), false)
+		return
+	}
 	k, err := h.store.CreateAPIKey(ctx, name, serverName, serverURL)
 	if err != nil {
 		redirectWithFlash(w, r, back, err.Error(), false)
@@ -107,14 +116,6 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		"server_url":  k.ServerURL,
 		"key_preview": service.KeyPreview(k.Key),
 	})
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	apiURL := scheme + "://" + r.Host
-	if cfg, err := h.store.GetEmailConfig(ctx); err == nil && cfg.PublicAPIURL != "" {
-		apiURL = cfg.PublicAPIURL
-	}
 	username, role, _ := session.GetUser(r)
 	h.tmpl.Render(w, r, "api_key_created.html", map[string]any{
 		"Username":    username,

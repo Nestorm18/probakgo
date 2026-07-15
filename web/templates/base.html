@@ -60,12 +60,12 @@
           <div class="sidebar-user-role">{{.Role}}</div>
         </div>
       </div>
-      <div class="d-flex gap-1">
-        <a href="/profile" class="btn btn-sm btn-secondary flex-fill" title="Perfil">
+      <div class="sidebar-footer-actions">
+        <a href="/profile" class="btn btn-sm btn-secondary sidebar-profile-action" title="Perfil">
           <i class="bi bi-person me-1"></i>Perfil
         </a>
-        <a href="/logout" class="btn btn-sm btn-secondary" title="Salir">
-          <i class="bi bi-box-arrow-right"></i>
+        <a href="/logout" class="btn btn-sm btn-secondary sidebar-icon-action" title="Salir" aria-label="Cerrar sesion">
+          <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
         </a>
         <button class="theme-toggle sidebar-theme-toggle" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
           <i class="bi" id="themeIcon" aria-hidden="true"></i>
@@ -288,6 +288,7 @@
     if ((form.method || '').toLowerCase() !== 'post') return;
     const action = form.getAttribute('action') || window.location.pathname;
     if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
+	if (action.includes('/alerts/suppress') || action.includes('/alerts/unsuppress')) return;
     if (form.querySelector('input[name="totp_code"]')?.value) return;
     if (sensitiveBypass.has(form)) {
       sensitiveBypass.delete(form);

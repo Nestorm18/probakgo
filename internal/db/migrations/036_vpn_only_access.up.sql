@@ -1,0 +1,1 @@
+ALTER TABLE email_config ADD COLUMN vpn_only_access INTEGER NOT NULL DEFAULT 0;

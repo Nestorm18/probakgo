@@ -277,8 +277,9 @@ code {
 }
 .sidebar-user {
   display: flex; align-items: center; gap: .6rem;
-  padding: .5rem .75rem; border-radius: .4rem;
+  padding: .625rem .75rem; border-radius: .5rem;
   background: var(--sb-user-area-bg); margin-bottom: .5rem;
+  border: 1px solid var(--sb-footer-btn-bd);
 }
 .sidebar-user-avatar {
   width: 28px; height: 28px; border-radius: 50%;
@@ -293,12 +294,37 @@ code {
 }
 .sidebar-user-role { font-size: .65rem; color: var(--sb-label); }
 
-.sidebar-footer .d-flex .btn {
+.sidebar-footer-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px 38px;
+  gap: .375rem;
+  align-items: stretch;
+}
+.sidebar-footer-actions .btn,
+.sidebar-theme-toggle {
+  height: 38px;
+  min-width: 0;
+  border-radius: .4rem;
+}
+.sidebar-profile-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.sidebar-icon-action {
+  width: 38px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-footer-actions .btn {
   background: var(--sb-footer-btn-bg) !important;
   border-color: var(--sb-footer-btn-bd) !important;
   color: var(--sb-footer-btn-color) !important;
 }
-.sidebar-footer .d-flex .btn:hover {
+.sidebar-footer-actions .btn:hover {
   background: var(--sb-footer-btn-hover-bg) !important;
   color: var(--sb-footer-btn-hv-color) !important;
 }
@@ -933,8 +959,8 @@ details[open] > summary::before { transform: rotate(90deg); }
   box-shadow: 0 2px 12px var(--toggle-shadow); transition: all .15s;
 }
 .theme-toggle:hover { color: var(--txt-primary); transform: scale(1.08); }
-.sidebar-theme-toggle { flex: 0 0 38px; background: var(--sb-footer-btn-bg); border-color: var(--sb-footer-btn-bd); color: var(--sb-footer-btn-color); box-shadow: none; }
-.sidebar-theme-toggle:hover { color: var(--sb-footer-btn-hv-color); }
+.sidebar-theme-toggle { width: 38px; flex: 0 0 38px; background: var(--sb-footer-btn-bg); border-color: var(--sb-footer-btn-bd); color: var(--sb-footer-btn-color); box-shadow: none; }
+.sidebar-theme-toggle:hover { color: var(--sb-footer-btn-hv-color); background: var(--sb-footer-btn-hover-bg); transform: none; }
 .login-theme-toggle { position: absolute; top: 1.25rem; right: 1.25rem; }
 
 /* ─── Info tiles (detail pages) ──────────────────────────────── */

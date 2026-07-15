@@ -56,27 +56,27 @@ var templateActive = map[string]string{
 }
 
 type Templates struct {
-	fs                   fs.FS
-	funcMap              template.FuncMap
-	loc                  *time.Location
-	version              string
-	secure               bool
-	badgeCounts          func() (int, int)
-	sensitiveTOTPEnabled func() bool
+	fs            fs.FS
+	funcMap       template.FuncMap
+	loc           *time.Location
+	version       string
+	secure        bool
+	badgeCounts   func() (int, int)
+	settingsFlags func() (sensitiveTOTP, vpnOnlyAccess bool)
 }
 
-func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int), sensitiveTOTPEnabled func() bool) *Templates {
+func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int), settingsFlags func() (bool, bool)) *Templates {
 	if loc == nil {
 		loc = time.Local
 	}
 	return &Templates{
-		fs:                   fs,
-		funcMap:              makeFuncMap(loc, version),
-		loc:                  loc,
-		version:              version,
-		secure:               secure,
-		badgeCounts:          badgeCounts,
-		sensitiveTOTPEnabled: sensitiveTOTPEnabled,
+		fs:            fs,
+		funcMap:       makeFuncMap(loc, version),
+		loc:           loc,
+		version:       version,
+		secure:        secure,
+		badgeCounts:   badgeCounts,
+		settingsFlags: settingsFlags,
 	}
 }
 
@@ -204,6 +204,15 @@ func isClientVersionCurrent(releaseVersion, clientVersion string) bool {
 // Render renders a layout template (base.html + page).
 func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, data any) {
 	if m, ok := data.(map[string]any); ok {
+		settingsLoaded := false
+		sensitiveTOTP, vpnOnly := false, false
+		loadSettingsFlags := func() {
+			if settingsLoaded || t.settingsFlags == nil {
+				return
+			}
+			sensitiveTOTP, vpnOnly = t.settingsFlags()
+			settingsLoaded = true
+		}
 		m["CSRFField"] = template.HTML("")
 		m["CSRFToken"] = ""
 		m["Version"] = t.version
@@ -217,10 +226,12 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 			m["ShowSessionSecureWarning"] = !t.secure && requestLooksPublicHTTPS(r)
 		}
 		if _, has := m["ShowPublicHTTPWarning"]; !has {
-			m["ShowPublicHTTPWarning"] = requestLooksPublicHTTP(r)
+			loadSettingsFlags()
+			m["ShowPublicHTTPWarning"] = requestLooksPublicHTTP(r) && !vpnOnly
 		}
-		if _, has := m["SensitiveActionsRequireTOTP"]; !has && t.sensitiveTOTPEnabled != nil {
-			m["SensitiveActionsRequireTOTP"] = t.sensitiveTOTPEnabled()
+		if _, has := m["SensitiveActionsRequireTOTP"]; !has {
+			loadSettingsFlags()
+			m["SensitiveActionsRequireTOTP"] = sensitiveTOTP
 		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]

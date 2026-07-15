@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -53,15 +52,15 @@ func (h *WebH) SystemSettings(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	existing, _ := h.store.GetEmailConfig(ctx)
-	publicURL := strings.TrimRight(strings.TrimSpace(r.FormValue("public_api_url")), "/")
-	if publicURL != "" {
-		u, err := url.Parse(publicURL)
-		if err != nil || u.Scheme == "" || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
-			http.Redirect(w, r, "/settings/system?flash=URL+publica+no+valida", http.StatusSeeOther)
-			return
-		}
+	publicURL, err := normalizePublicAPIURL(r.FormValue("public_api_url"))
+	if err != nil {
+		http.Redirect(w, r, "/settings/system?flash="+url.QueryEscape(err.Error()), http.StatusSeeOther)
+		return
 	}
-	cfg := domain.EmailConfig{PublicAPIURL: publicURL}
+	cfg := domain.EmailConfig{
+		PublicAPIURL:  publicURL,
+		VPNOnlyAccess: r.FormValue("vpn_only_access") == "on",
+	}
 	if existing != nil {
 		cfg.SMTPHost = existing.SMTPHost
 		cfg.SMTPPort = existing.SMTPPort
@@ -102,6 +101,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 	}
 	h.audit(r, "settings.system_update", "settings", "system", "Sistema", map[string]any{
 		"public_api_url_set":             cfg.PublicAPIURL != "",
+		"vpn_only_access":                cfg.VPNOnlyAccess,
 		"enforce_totp_non_readers":       cfg.EnforceTOTPNonReaders,
 		"sensitive_actions_require_totp": cfg.SensitiveActionsRequireTOTP,
 	})
@@ -162,6 +162,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
 		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 		cfg.SensitiveActionsRequireTOTP = existing.SensitiveActionsRequireTOTP
 	}
@@ -230,6 +231,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 		cfg.SensitiveActionsRequireTOTP = existing.SensitiveActionsRequireTOTP
@@ -352,6 +354,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.RetentionMonths = existing.RetentionMonths
 		cfg.RetentionEnabled = existing.RetentionEnabled
 		cfg.PublicAPIURL = existing.PublicAPIURL
+		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 		cfg.SensitiveActionsRequireTOTP = existing.SensitiveActionsRequireTOTP

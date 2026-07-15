@@ -17,6 +17,12 @@ import (
 
 var githubAPIBaseURL = "https://api.github.com"
 
+const (
+	maxReleaseMetadataBytes = 2 << 20
+	maxReleaseBinaryBytes   = 256 << 20
+	maxChecksumBytes        = 1 << 20
+)
+
 type githubRelease struct {
 	TagName string `json:"tag_name"`
 	Assets  []struct {
@@ -195,7 +201,7 @@ func fetchLatestRelease(repo string) (*githubRelease, error) {
 		return nil, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
 	}
 	var rel githubRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := decodeJSONWithLimit(resp.Body, &rel, maxReleaseMetadataBytes); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
 	return &rel, nil
@@ -253,6 +259,9 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download returned HTTP %d", resp.StatusCode)
 	}
+	if resp.ContentLength > maxReleaseBinaryBytes {
+		return fmt.Errorf("download exceeds maximum size")
+	}
 
 	tmpPath := executable + ".new"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
@@ -261,7 +270,7 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 	}
 
 	h := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(f, h), resp.Body); err != nil {
+	if _, err := copyWithLimit(io.MultiWriter(f, h), resp.Body, maxReleaseBinaryBytes); err != nil {
 		f.Close()
 		os.Remove(tmpPath)
 		return fmt.Errorf("write: %w", err)
@@ -301,7 +310,7 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("checksum download returned HTTP %d", resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := readAllWithLimit(resp.Body, maxChecksumBytes)
 	if err != nil {
 		return fmt.Errorf("read checksums: %w", err)
 	}
@@ -316,6 +325,36 @@ func verifyChecksum(client *http.Client, repo string, sha256ID int64, sha256URL,
 		}
 	}
 	return fmt.Errorf("checksum not found in SHA256SUMS for %s", assetName)
+}
+
+func decodeJSONWithLimit(r io.Reader, dst any, max int64) error {
+	body, err := readAllWithLimit(r, max)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(body, dst)
+}
+
+func readAllWithLimit(r io.Reader, max int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, max+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > max {
+		return nil, fmt.Errorf("response exceeds maximum size")
+	}
+	return body, nil
+}
+
+func copyWithLimit(dst io.Writer, src io.Reader, max int64) (int64, error) {
+	n, err := io.Copy(dst, io.LimitReader(src, max+1))
+	if err != nil {
+		return n, err
+	}
+	if n > max {
+		return n, fmt.Errorf("response exceeds maximum size")
+	}
+	return n, nil
 }
 
 func newReleaseAssetRequest(repo string, assetID int64, browserURL string, withAuth bool) (*http.Request, error) {

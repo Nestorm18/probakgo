@@ -61,6 +61,13 @@
           <i class="bi bi-globe2 me-2" style="color:var(--clr-accent)"></i>URL pública de Probakgo
         </div>
         <div class="card-body">
+		  <div class="mb-3">
+			<div class="form-check form-switch">
+			  <input type="checkbox" name="vpn_only_access" value="on" class="form-check-input" id="vpn_only_access" {{if .Config.VPNOnlyAccess}}checked{{end}}>
+			  <label class="form-check-label" for="vpn_only_access">Acceso exclusivo por VPN privada</label>
+			</div>
+			<div class="form-text">Activalo solo si Probakgo no esta publicado en el router y el panel se abre exclusivamente por NetBird, WireGuard u otra VPN cifrada.</div>
+		  </div>
           <div class="mb-3">
             <label class="form-label">URL para instalación de clientes</label>
             <input type="url" name="public_api_url" class="form-control" value="{{.Config.PublicAPIURL}}" placeholder="https://probakgo.midominio.com:36748">
@@ -88,7 +95,7 @@
               <input type="checkbox" name="sensitive_actions_require_totp" value="on" class="form-check-input" id="sensitive_actions_require_totp" {{if .Config.SensitiveActionsRequireTOTP}}checked{{end}}>
               <label class="form-check-label" for="sensitive_actions_require_totp">Forzar 2FA en operaciones delicadas</label>
             </div>
-            <div class="form-text">Bloquea cambios de usuarios, API keys, configuración, backup-config, supresiones de alertas y actualizaciones si el usuario no tiene 2FA activo.</div>
+            <div class="form-text">Bloquea cambios de usuarios, API keys, configuracion, backup-config y actualizaciones si el usuario no tiene 2FA activo. Suprimir o reactivar alertas no requiere codigo.</div>
           </div>
         </div>
       </div>

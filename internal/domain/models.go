@@ -321,6 +321,7 @@ type EmailConfig struct {
 	AlertBackupErr              bool   `db:"alert_backup_err"`
 	AlertPBSStaleHours          int    `db:"alert_pbs_stale_hours"` // 0 = disabled
 	PublicAPIURL                string `db:"public_api_url"`
+	VPNOnlyAccess               bool   `db:"vpn_only_access"`
 	AlertPVEHeartbeatMinutes    int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
 	CriticalAlertsEnabled       bool   `db:"critical_alerts_enabled"`
 	EnforceTOTPNonReaders       bool   `db:"enforce_totp_non_readers"`

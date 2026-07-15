@@ -11,6 +11,11 @@ import (
 
 const githubRepo = "Nestorm18/probakgo"
 
+const (
+	maxGitHubMetadataBytes = 2 << 20
+	maxReleaseAssetBytes   = 256 << 20
+)
+
 type releaseAsset struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -61,10 +66,16 @@ func (h *WebH) downloadReleaseAsset(w http.ResponseWriter, r *http.Request, asse
 		http.Error(w, fmt.Sprintf("GitHub devolvio HTTP %d", resp.StatusCode), http.StatusBadGateway)
 		return
 	}
+	if resp.ContentLength > maxReleaseAssetBytes {
+		http.Error(w, "el asset de GitHub supera el tamano permitido", http.StatusBadGateway)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
-	_, _ = io.Copy(w, resp.Body)
+	if _, err := copyWithLimit(w, resp.Body, maxReleaseAssetBytes); err != nil {
+		return
+	}
 }
 
 func latestAssetID(r *http.Request, token, assetName string) (int64, error) {
@@ -85,7 +96,7 @@ func latestAssetID(r *http.Request, token, assetName string) (int64, error) {
 	}
 
 	var rel githubLatestRelease
-	if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
+	if err := decodeJSONWithLimit(resp.Body, &rel, maxGitHubMetadataBytes); err != nil {
 		return 0, fmt.Errorf("error leyendo respuesta de GitHub")
 	}
 	for _, asset := range rel.Assets {
@@ -94,6 +105,28 @@ func latestAssetID(r *http.Request, token, assetName string) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("asset %q no encontrado en la ultima release", assetName)
+}
+
+func decodeJSONWithLimit(r io.Reader, dst any, max int64) error {
+	data, err := io.ReadAll(io.LimitReader(r, max+1))
+	if err != nil {
+		return err
+	}
+	if int64(len(data)) > max {
+		return fmt.Errorf("respuesta demasiado grande")
+	}
+	return json.Unmarshal(data, dst)
+}
+
+func copyWithLimit(dst io.Writer, src io.Reader, max int64) (int64, error) {
+	n, err := io.Copy(dst, io.LimitReader(src, max+1))
+	if err != nil {
+		return n, err
+	}
+	if n > max {
+		return n, fmt.Errorf("respuesta demasiado grande")
+	}
+	return n, nil
 }
 
 func setGitHubHeaders(req *http.Request, token string) {

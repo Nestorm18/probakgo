@@ -148,3 +148,18 @@ func TestReleaseAssetRequestRetriesWithBrowserURLWhenTokenRejected(t *testing.T)
 		t.Fatalf("hits: api=%d browser=%d, want 1/1", apiHits, browserHits)
 	}
 }
+
+func TestResponseLimits(t *testing.T) {
+	body, err := readAllWithLimit(strings.NewReader("12345"), 5)
+	if err != nil || string(body) != "12345" {
+		t.Fatalf("read at limit = %q, %v", body, err)
+	}
+	if _, err := readAllWithLimit(strings.NewReader("123456"), 5); err == nil {
+		t.Fatal("expected oversized read to fail")
+	}
+
+	var dst strings.Builder
+	if _, err := copyWithLimit(&dst, strings.NewReader("123456"), 5); err == nil {
+		t.Fatal("expected oversized copy to fail")
+	}
+}

@@ -24,9 +24,12 @@ import (
 func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins, trustedProxies []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS, version, loc, secure, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st, rep)
-	}, func() bool {
+	}, func() (bool, bool) {
 		cfg, err := st.GetEmailConfig(context.Background())
-		return err == nil && cfg != nil && cfg.SensitiveActionsRequireTOTP
+		if err != nil || cfg == nil {
+			return false, false
+		}
+		return cfg.SensitiveActionsRequireTOTP, cfg.VPNOnlyAccess
 	})
 	h := webhandlers.New(st, tmpl, rep)
 
@@ -69,8 +72,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/alerts.csv", h.AlertsCSV)
 		r.Get("/alerts.json", h.AlertsJSON)
 		r.Get("/alerts/status.json", h.AlertsStatus)
-		r.With(sensitive).Post("/alerts/suppress", h.AlertSuppressPost)
-		r.With(sensitive).Post("/alerts/unsuppress", h.AlertUnsuppressPost)
+		r.Post("/alerts/suppress", h.AlertSuppressPost)
+		r.Post("/alerts/unsuppress", h.AlertUnsuppressPost)
 		r.Get("/servers/pve", h.PVEServers)
 		r.Get("/servers/pve.csv", h.PVEServersCSV)
 		r.Get("/servers/pve.json", h.PVEServersJSON)

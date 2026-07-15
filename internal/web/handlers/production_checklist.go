@@ -50,6 +50,8 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 	switch {
 	case scheme == "https":
 		add(checklistOK("HTTPS detectado", "El panel se esta usando por HTTPS.", "bi-shield-check"))
+	case cfg != nil && cfg.VPNOnlyAccess:
+		add(checklistOK("Acceso por VPN privada", "HTTP esta aceptado porque el panel se ha declarado accesible solo por VPN.", "bi-shield-check"))
 	case publicURLScheme == "https":
 		add(checklistOK("HTTPS configurado", "La URL publica configurada usa HTTPS.", "bi-shield-check"))
 	case publicHost:
@@ -60,6 +62,8 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 
 	if h.tmpl != nil && h.tmpl.secure {
 		add(checklistOK("SESSION_SECURE=true", "La cookie de sesion se marca como segura.", "bi-cookie"))
+	} else if cfg != nil && cfg.VPNOnlyAccess && scheme != "https" {
+		add(checklistOK("Sesion protegida por VPN", "SESSION_SECURE=false es necesario mientras el panel se use por HTTP dentro de la VPN.", "bi-cookie"))
 	} else {
 		item := checklistBad("SESSION_SECURE=false", "Activalo si hay HTTPS delante para proteger la cookie.", "bi-cookie", "/settings/system", "Ver sistema")
 		if scheme == "https" {
@@ -93,6 +97,8 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 	if cfg != nil && cfg.PublicAPIURL != "" {
 		if publicURLScheme == "https" {
 			add(checklistOK("URL publica configurada", cfg.PublicAPIURL, "bi-globe2"))
+		} else if cfg.VPNOnlyAccess {
+			add(checklistOK("URL VPN configurada", cfg.PublicAPIURL, "bi-diagram-3"))
 		} else {
 			add(checklistWarn("URL publica sin HTTPS", cfg.PublicAPIURL, "bi-globe2", "/settings/system", "Revisar URL"))
 		}
