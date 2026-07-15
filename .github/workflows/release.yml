@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.sha || github.ref }}
+          ref: ${{ inputs.sha || github.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
-          if [[ "$EVENT_NAME" == "workflow_call" ]]; then
+          if [[ -n "$REQUESTED_TAG" && -n "$REQUESTED_SHA" ]]; then
             RELEASE_TAG="$REQUESTED_TAG"
             RELEASE_SHA="$REQUESTED_SHA"
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
