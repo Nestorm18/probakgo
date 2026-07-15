@@ -341,11 +341,7 @@ func releaseAssetName(binaryName string) string {
 
 func replaceWindowsExecutable(executable, tmpPath string) error {
 	scriptPath := tmpPath + ".cmd"
-	script := fmt.Sprintf(`@echo off
-ping 127.0.0.1 -n 3 > nul
-move /Y "%s" "%s" > nul
-del "%%~f0" > nul 2>&1
-`, tmpPath, executable)
+	script := windowsReplacementScript(executable, tmpPath)
 	if err := os.WriteFile(scriptPath, []byte(script), 0600); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("create replacement script: %w", err)
@@ -357,4 +353,17 @@ del "%%~f0" > nul 2>&1
 		return fmt.Errorf("start replacement script: %w", err)
 	}
 	return nil
+}
+
+func windowsReplacementScript(executable, tmpPath string) string {
+	return fmt.Sprintf(`@echo off
+for /L %%%%i in (1,1,60) do (
+  move /Y "%s" "%s" > nul 2>&1
+  if not exist "%s" goto replaced
+  ping 127.0.0.1 -n 3 > nul
+)
+exit /b 1
+:replaced
+del "%%~f0" > nul 2>&1
+`, tmpPath, executable, tmpPath)
 }

@@ -72,7 +72,11 @@
           <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
         </td>
-        <td><code>{{.Server.ClientVersion}}</code></td>
+        <td>
+          {{if clientVersionOutdated .Server.ClientVersion}}<span class="status-pill warn" title="Version anterior a {{$.Version}}">{{.Server.ClientVersion}}</span>
+          {{else if clientVersionCurrent .Server.ClientVersion}}<span class="status-pill ok" title="Cliente actualizado">{{.Server.ClientVersion}}</span>
+          {{else}}<code>{{.Server.ClientVersion}}</code>{{end}}
+        </td>
         <td>{{if .Swap.Enabled}}<span class="status-pill {{.Swap.CSSClass}}" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">
           <span class="status-pill {{.Heartbeat.CSSClass}}">{{.Heartbeat.Label}}</span>

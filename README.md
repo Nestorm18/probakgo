@@ -79,7 +79,9 @@ Invoke-WebRequest -Uri "https://github.com/Nestorm18/probakgo/releases/latest/do
 & "$env:TEMP\probakgo-windows-client.exe" install --api-url http://tu-servidor:36748 --api-key pbk-...
 ```
 
-El instalador copia el binario a `C:\ProgramData\Probakgo`, escribe `.env`, crea la tarea programada `Probakgo Windows Report` cada 5 minutos y deja logs en `C:\ProgramData\Probakgo\probakgo-windows-client.log`. El log rota a diario como `probakgo-windows-client-YYYY-MM-DD.log` y conserva solo los ultimos 7 dias.
+El instalador copia el binario a `C:\ProgramData\Probakgo`, escribe `.env`, crea `Probakgo Windows Report` cada 5 minutos y `Probakgo Windows Update` a las 04:17. Ambas tareas se ejecutan como `SYSTEM`. Los logs quedan en `C:\ProgramData\Probakgo\probakgo-windows-client.log`, rotan a diario como `probakgo-windows-client-YYYY-MM-DD.log` y conservan solo los ultimos 7 dias.
+
+Si el cliente ya esta instalado, ejecutar un instalador mas reciente actualiza el binario existente. El instalador detiene las instancias lanzadas por las tareas y reintenta la sustitucion si el ejecutable estaba ocupado.
 
 Diagnostico:
 
@@ -93,6 +95,8 @@ Actualizar cliente Windows:
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe update
 ```
+
+El comando permite forzar la comprobacion; normalmente la tarea diaria realiza la actualizacion automaticamente.
 
 ## Configuracion
 

@@ -72,7 +72,7 @@ Release assets must stay in sync with workflows and download handlers:
 - Full report goes to `POST /api/report/windows`.
 - Heartbeat uses `POST /api/heartbeat` with `server_type=windows`.
 - Machine ID is Windows `MachineGuid`.
-- `install --api-url ... --api-key ...` installs to `C:\ProgramData\Probakgo`, writes `.env`, and creates scheduled task `Probakgo Windows Report` every 5 minutes as SYSTEM.
+- `install --api-url ... --api-key ...` installs to `C:\ProgramData\Probakgo`, writes `.env`, and creates `Probakgo Windows Report` every 5 minutes plus `Probakgo Windows Update` daily as SYSTEM.
 - Subcommands: `install`, `update`, `heartbeat`, `doctor`, `version`.
 - Logs are written to `C:\ProgramData\Probakgo\probakgo-windows-client.log`, rotate daily as `probakgo-windows-client-YYYY-MM-DD.log`, and keep the last 7 days only.
 - Reports local/public IP, version, MachineGuid, fixed logical volumes and best-effort physical disk health.

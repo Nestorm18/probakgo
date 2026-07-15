@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -56,6 +57,19 @@ func TestReleaseAssetName(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("releaseAssetName = %q, want %q", got, want)
+	}
+}
+
+func TestWindowsReplacementScriptRetriesAndDeletesItself(t *testing.T) {
+	script := windowsReplacementScript(`C:\Probakgo\client.exe`, `C:\Probakgo\client.exe.new`)
+	for _, want := range []string{
+		`for /L %%i in (1,1,60)`,
+		`move /Y "C:\Probakgo\client.exe.new" "C:\Probakgo\client.exe"`,
+		`del "%~f0"`,
+	} {
+		if !strings.Contains(script, want) {
+			t.Fatalf("replacement script does not contain %q:\n%s", want, script)
+		}
 	}
 }
 

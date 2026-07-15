@@ -12,7 +12,7 @@ import (
 	"probakgo/internal/selfupdate"
 )
 
-var version = "0.0.168"
+var version = "0.0.170"
 
 func main() {
 	closeLog := setupLogging()
@@ -51,6 +51,9 @@ func main() {
 }
 
 func runReport() error {
+	if err := ensureUpdateScheduledTask(); err != nil {
+		log.Printf("WARN: could not ensure automatic update task: %v", err)
+	}
 	cfg, err := loadConfig("")
 	if err != nil {
 		return err
@@ -124,10 +127,15 @@ func runDoctor() error {
 	fmt.Println("Probakgo API: OK.")
 	fmt.Printf("Machine ID: %s\n", mid)
 	fmt.Printf("Disks detected: %d\n", len(disks))
-	if err := checkScheduledTask(); err != nil {
-		fmt.Printf("Scheduled task: WARN: %v\n", err)
+	if err := checkScheduledTask(reportTaskName); err != nil {
+		fmt.Printf("Report task: WARN: %v\n", err)
 	} else {
-		fmt.Println("Scheduled task: OK.")
+		fmt.Println("Report task: OK.")
+	}
+	if err := checkScheduledTask(updateTaskName); err != nil {
+		fmt.Printf("Update task: WARN: %v\n", err)
+	} else {
+		fmt.Println("Update task: OK.")
 	}
 	fmt.Println("Log:", logPath())
 	return nil

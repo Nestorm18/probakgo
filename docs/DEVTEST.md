@@ -169,6 +169,7 @@ Verifica tarea y logs:
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
 schtasks /Query /TN "Probakgo Windows Report"
+schtasks /Query /TN "Probakgo Windows Update"
 Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 ```
 

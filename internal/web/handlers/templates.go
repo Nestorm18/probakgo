@@ -13,6 +13,7 @@ import (
 	"probakgo/internal/debug"
 	"probakgo/internal/domain"
 	"probakgo/internal/netutil"
+	"probakgo/internal/selfupdate"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -70,7 +71,7 @@ func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, bad
 	}
 	return &Templates{
 		fs:                   fs,
-		funcMap:              makeFuncMap(loc),
+		funcMap:              makeFuncMap(loc, version),
 		loc:                  loc,
 		version:              version,
 		secure:               secure,
@@ -79,7 +80,7 @@ func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, bad
 	}
 }
 
-func makeFuncMap(loc *time.Location) template.FuncMap {
+func makeFuncMap(loc *time.Location, releaseVersion string) template.FuncMap {
 	if loc == nil {
 		loc = time.Local
 	}
@@ -141,6 +142,12 @@ func makeFuncMap(loc *time.Location) template.FuncMap {
 		"isAdmin": func(role string) bool { return role == "admin" },
 		"canEdit": func(role string) bool { return role == "admin" || role == "editor" },
 		"not":     func(v bool) bool { return !v },
+		"clientVersionOutdated": func(clientVersion string) bool {
+			return isClientVersionOutdated(releaseVersion, clientVersion)
+		},
+		"clientVersionCurrent": func(clientVersion string) bool {
+			return isClientVersionCurrent(releaseVersion, clientVersion)
+		},
 		"formatTimeAgo": func(v any) string {
 			var t time.Time
 			switch tv := v.(type) {
@@ -182,6 +189,16 @@ func makeFuncMap(loc *time.Location) template.FuncMap {
 			return parts[0] + "-" + tok[:8] + "..." + tok[len(tok)-4:]
 		},
 	}
+}
+
+func isClientVersionOutdated(releaseVersion, clientVersion string) bool {
+	newer, ok := selfupdate.IsNewer(releaseVersion, clientVersion)
+	return ok && newer
+}
+
+func isClientVersionCurrent(releaseVersion, clientVersion string) bool {
+	newer, ok := selfupdate.IsNewer(releaseVersion, clientVersion)
+	return ok && !newer
 }
 
 // Render renders a layout template (base.html + page).
