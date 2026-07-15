@@ -72,7 +72,7 @@
           <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
         </td>
         <td><code>{{.Server.ClientVersion}}</code></td>
-        <td>{{if .Swap.Enabled}}<span class="status-pill bad" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td>{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
         <td style="font-size:.82rem;color:var(--txt-secondary)">
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>

@@ -156,7 +156,7 @@ func buildSwapView(enabled bool, used, total int64) swapView {
 	view := swapView{
 		Enabled:  true,
 		Label:    "swap",
-		CSSClass: "bad",
+		CSSClass: "warn",
 		Title:    fmt.Sprintf("Swap activa: %s usados de %s", domain.FormatBytes(used), domain.FormatBytes(total)),
 		Used:     used,
 		Total:    total,
@@ -165,6 +165,27 @@ func buildSwapView(enabled bool, used, total int64) swapView {
 		view.Title = fmt.Sprintf("Swap activa: %s configurados, sin uso actual", domain.FormatBytes(total))
 	}
 	return view
+}
+
+func buildPVESwapListView(view swapView, alertEnabled, suppressed bool) swapView {
+	if !view.Enabled {
+		return view
+	}
+	if !alertEnabled {
+		view.CSSClass = "muted"
+		view.Title += " - alerta desactivada"
+	} else if suppressed {
+		view.CSSClass = "muted"
+		view.Title += " - alerta suprimida"
+	} else {
+		view.CSSClass = "bad"
+	}
+	return view
+}
+
+func swapSuppressed(suppressions map[string]time.Time, serverType string, serverID int64) bool {
+	_, ok := suppressions[fmt.Sprintf("swap:%s:%d", serverType, serverID)]
+	return ok
 }
 
 func buildPVEAlertOverrideView(cfg domain.PVEAlertConfig) alertOverrideView {
@@ -377,6 +398,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
+	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pve")
 	healthSummary := serverListHealthSummary{}
@@ -412,7 +434,12 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
 			r2["BackupStatus"] = rep.BackupStatus
-			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
+			swapAlertEnabled := alertCfg.SwapAlert == nil || *alertCfg.SwapAlert != 0
+			r2["Swap"] = buildPVESwapListView(
+				buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal),
+				swapAlertEnabled,
+				swapSuppressed(suppressions, "pve", sv.ID),
+			)
 
 			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
 			if len(tasks) > 0 {

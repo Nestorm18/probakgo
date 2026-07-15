@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,6 +24,7 @@ jobs:
           cache: true
 
       - name: Check version sync
+        id: version
         run: |
           SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
           CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
@@ -31,6 +34,7 @@ jobs:
             exit 1
           fi
           echo "Version sync OK: $SERVER_VER"
+          echo "version=$SERVER_VER" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: go build ./...
@@ -40,3 +44,13 @@ jobs:
 
       - name: Test
         run: go test ./...
+
+  release:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: v${{ needs.build.outputs.version }}
+      sha: ${{ github.sha }}

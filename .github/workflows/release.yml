@@ -1,10 +1,14 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
-    branches: ['master']
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+      sha:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -16,11 +20,6 @@ on:
 
 jobs:
   release:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'master')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.event_name == 'workflow_call' && inputs.sha || github.ref }}
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -40,15 +39,15 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           REQUESTED_TAG: ${{ inputs.tag }}
+          REQUESTED_SHA: ${{ inputs.sha }}
           REF_NAME: ${{ github.ref_name }}
-          WORKFLOW_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
           EVENT_SHA: ${{ github.sha }}
         shell: bash
         run: |
           SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
-          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
-            RELEASE_TAG="v$SERVER_VERSION"
-            RELEASE_SHA="$WORKFLOW_RUN_SHA"
+          if [[ "$EVENT_NAME" == "workflow_call" ]]; then
+            RELEASE_TAG="$REQUESTED_TAG"
+            RELEASE_SHA="$REQUESTED_SHA"
           elif [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
             RELEASE_TAG="$REQUESTED_TAG"
             RELEASE_SHA="$EVENT_SHA"
