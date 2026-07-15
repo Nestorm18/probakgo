@@ -464,14 +464,13 @@ func grantPBSTokenACL(tokenID string) {
 	}
 }
 
-// runPBSGenerateToken tries several invocation styles for proxmox-backup-manager
-// and returns the token secret on success, or "" on failure.
+// runPBSGenerateToken prefers the portable plain-output form. Some PBS versions
+// reject --output-format specifically for generate-token.
 func runPBSGenerateToken(tokenID string) string {
-	// Try: flag after subcommand args, then flag before subcommand (some PBS versions differ)
 	attempts := [][]string{
+		{"user", "generate-token", "root@pam", tokenID},
 		{"user", "generate-token", "root@pam", tokenID, "--output-format", "json"},
 		{"--output-format", "json", "user", "generate-token", "root@pam", tokenID},
-		{"user", "generate-token", "root@pam", tokenID},
 	}
 	for _, args := range attempts {
 		cmd := exec.Command("proxmox-backup-manager", args...)
@@ -483,17 +482,23 @@ func runPBSGenerateToken(tokenID string) string {
 			}
 			continue
 		}
-		if val := jsonField(out, "value"); val != "" {
+		if val := parsePBSGenerateTokenOutput(out); val != "" {
 			return val
 		}
-		if val := extractUUID(string(out)); val != "" {
-			return val
-		}
+		fmt.Println("WARN: generate-token succeeded but its secret could not be read; token creation will not be repeated")
+		return ""
 	}
 	return ""
 }
 
-var uuidRe = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}`)
+func parsePBSGenerateTokenOutput(out []byte) string {
+	if val := jsonField(out, "value"); val != "" {
+		return val
+	}
+	return extractUUID(string(out))
+}
+
+var uuidRe = regexp.MustCompile(`[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}`)
 
 func extractUUID(s string) string {
 	return uuidRe.FindString(s)

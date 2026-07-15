@@ -48,3 +48,16 @@ func TestMergeEnvContentAddsMissingProvidedValue(t *testing.T) {
 		t.Fatalf("API_KEY was not added:\n%s", got)
 	}
 }
+
+func TestParsePBSGenerateTokenOutput(t *testing.T) {
+	const secret = "d63e505a-e3ec-449a-9bc7-1da610d4ccde"
+	tests := []string{
+		`{"value":"` + secret + `"}`,
+		"Result: {\n  \"tokenid\": \"root@pam!probakgo-client\",\n  \"value\": \"" + secret + "\"\n}\n",
+	}
+	for _, output := range tests {
+		if got := parsePBSGenerateTokenOutput([]byte(output)); got != secret {
+			t.Fatalf("parsePBSGenerateTokenOutput() = %q, want %q for %q", got, secret, output)
+		}
+	}
+}
