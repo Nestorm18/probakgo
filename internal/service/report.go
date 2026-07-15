@@ -95,34 +95,11 @@ func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.
 		return fmt.Errorf("upsert pbs server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPBSReportWithSwap(ctx, serverID, domain.HostSwap{
+	err = r.store.InsertPBSReportData(ctx, serverID, domain.HostSwap{
 		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
-	})
+	}, req.PBSInformation)
 	if err != nil {
 		return fmt.Errorf("insert pbs report: %w", err)
-	}
-
-	for _, ds := range req.PBSInformation.Data {
-		storeID, err := r.store.InsertPBSStore(ctx, reportID, ds)
-		if err != nil {
-			return fmt.Errorf("insert pbs store %s: %w", ds.Store, err)
-		}
-		if err := r.store.InsertPBSStoreHistory(ctx, storeID, ds.History); err != nil {
-			return fmt.Errorf("insert pbs history: %w", err)
-		}
-		if err := r.store.InsertPBSGCStatus(ctx, storeID, ds.GCStatus); err != nil {
-			return fmt.Errorf("insert gc status: %w", err)
-		}
-		for _, g := range ds.Groups {
-			if err := r.store.InsertPBSSnapshot(ctx, storeID, g); err != nil {
-				return fmt.Errorf("insert pbs snapshot %s/%s: %w", g.BackupType, g.BackupID, err)
-			}
-		}
-	}
-	for _, task := range req.PBSInformation.Tasks {
-		if err := r.store.InsertPBSTask(ctx, reportID, task); err != nil {
-			return fmt.Errorf("insert pbs maintenance task %s/%s: %w", task.TaskType, task.JobID, err)
-		}
 	}
 	return nil
 }

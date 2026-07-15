@@ -10,6 +10,10 @@ import (
 	"probakgo/internal/domain"
 )
 
+type pbsExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
 func (s *Store) UpsertPBSServer(ctx context.Context, name, ip, publicIP, clientVersion, machineID string) (int64, error) {
 	debug.RecordQuery(ctx, `SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`)
 	row := s.db.QueryRowContext(ctx, `SELECT id FROM pbs_servers WHERE name = ? AND is_deleted = 0`, name)
@@ -80,12 +84,16 @@ func (s *Store) InsertPBSReport(ctx context.Context, serverID int64) (int64, err
 }
 
 func (s *Store) InsertPBSReportWithSwap(ctx context.Context, serverID int64, swap domain.HostSwap) (int64, error) {
+	return insertPBSReportWithSwap(ctx, s.db, serverID, swap)
+}
+
+func insertPBSReportWithSwap(ctx context.Context, db pbsExecer, serverID int64, swap domain.HostSwap) (int64, error) {
 	swapEnabled := 0
 	if swap.Enabled {
 		swapEnabled = 1
 	}
 	debug.RecordQuery(ctx, `INSERT INTO pbs_reports (server_id, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?)`)
-	res, err := s.db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?)`,
+	res, err := db.ExecContext(ctx, `INSERT INTO pbs_reports (server_id, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?)`,
 		serverID, swap.Total, swap.Used, swapEnabled)
 	if err != nil {
 		return 0, fmt.Errorf("insert pbs_report: %w", err)
@@ -94,8 +102,12 @@ func (s *Store) InsertPBSReportWithSwap(ctx context.Context, serverID int64, swa
 }
 
 func (s *Store) InsertPBSStore(ctx context.Context, reportID int64, ds domain.PBSDatastorePayload) (int64, error) {
+	return insertPBSStore(ctx, s.db, reportID, ds)
+}
+
+func insertPBSStore(ctx context.Context, db pbsExecer, reportID int64, ds domain.PBSDatastorePayload) (int64, error) {
 	debug.RecordQuery(ctx, `INSERT INTO pbs_stores (report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO pbs_stores (report_id, store, total, used, avail, estimated_full_date, mount_status, history_start, history_delta)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, ds.Store, ds.Total, ds.Used, ds.Avail,
@@ -108,9 +120,16 @@ func (s *Store) InsertPBSStore(ctx context.Context, reportID int64, ds domain.PB
 }
 
 func (s *Store) InsertPBSStoreHistory(ctx context.Context, storeID int64, history []*float64) error {
+	return insertPBSStoreHistory(ctx, s.db, storeID, history)
+}
+
+func insertPBSStoreHistory(ctx context.Context, db pbsExecer, storeID int64, history []*float64) error {
+	if len(history) == 0 {
+		return nil
+	}
+	debug.RecordQuery(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`)
 	for i, v := range history {
-		debug.RecordQuery(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`)
-		_, err := s.db.ExecContext(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`, storeID, i, v)
+		_, err := db.ExecContext(ctx, `INSERT INTO pbs_store_history (store_id, position, value) VALUES (?, ?, ?)`, storeID, i, v)
 		if err != nil {
 			return err
 		}
@@ -119,8 +138,12 @@ func (s *Store) InsertPBSStoreHistory(ctx context.Context, storeID int64, histor
 }
 
 func (s *Store) InsertPBSSnapshot(ctx context.Context, storeID int64, g domain.PBSGroupPayload) error {
+	return insertPBSSnapshot(ctx, s.db, storeID, g)
+}
+
+func insertPBSSnapshot(ctx context.Context, db pbsExecer, storeID int64, g domain.PBSGroupPayload) error {
 	debug.RecordQuery(ctx, `INSERT INTO pbs_snapshots (store_id, backup_type, backup_id, last_backup, backup_count, owner, comment, verification_state, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO pbs_snapshots (store_id, backup_type, backup_id, last_backup, backup_count,
 		 owner, comment, verification_state, size)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -155,11 +178,15 @@ func (s *Store) GetPBSSnapshotsForStore(ctx context.Context, storeID int64) ([]d
 }
 
 func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain.GCStatusPayload) error {
+	return insertPBSGCStatus(ctx, s.db, storeID, gc)
+}
+
+func insertPBSGCStatus(ctx context.Context, db pbsExecer, storeID int64, gc *domain.GCStatusPayload) error {
 	if gc == nil {
 		return nil
 	}
 	debug.RecordQuery(ctx, `INSERT INTO pbs_gc_status (store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count, pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO pbs_gc_status (store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
 		 pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -171,14 +198,56 @@ func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain
 }
 
 func (s *Store) InsertPBSTask(ctx context.Context, reportID int64, task domain.PBSTaskPayload) error {
+	return insertPBSTask(ctx, s.db, reportID, task)
+}
+
+func insertPBSTask(ctx context.Context, db pbsExecer, reportID int64, task domain.PBSTaskPayload) error {
 	debug.RecordQuery(ctx, `INSERT INTO pbs_maintenance_tasks (report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx, `INSERT INTO pbs_maintenance_tasks
+	_, err := db.ExecContext(ctx, `INSERT INTO pbs_maintenance_tasks
 		(report_id, task_type, job_id, remote, remote_store, store, status, start_time, end_time, upid)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, task.TaskType, task.JobID, task.Remote, task.RemoteStore, task.Store,
 		task.Status, task.StartTime, task.EndTime, task.UPID,
 	)
 	return err
+}
+
+// InsertPBSReportData stores a complete PBS report atomically. Keeping all
+// child inserts in one transaction avoids an fsync for every history point.
+func (s *Store) InsertPBSReportData(ctx context.Context, serverID int64, swap domain.HostSwap, info domain.PBSInformation) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	reportID, err := insertPBSReportWithSwap(ctx, tx, serverID, swap)
+	if err != nil {
+		return err
+	}
+	for _, ds := range info.Data {
+		storeID, err := insertPBSStore(ctx, tx, reportID, ds)
+		if err != nil {
+			return fmt.Errorf("insert pbs store %s: %w", ds.Store, err)
+		}
+		if err := insertPBSStoreHistory(ctx, tx, storeID, ds.History); err != nil {
+			return fmt.Errorf("insert pbs history: %w", err)
+		}
+		if err := insertPBSGCStatus(ctx, tx, storeID, ds.GCStatus); err != nil {
+			return fmt.Errorf("insert gc status: %w", err)
+		}
+		for _, group := range ds.Groups {
+			if err := insertPBSSnapshot(ctx, tx, storeID, group); err != nil {
+				return fmt.Errorf("insert pbs snapshot %s/%s: %w", group.BackupType, group.BackupID, err)
+			}
+		}
+	}
+	for _, task := range info.Tasks {
+		if err := insertPBSTask(ctx, tx, reportID, task); err != nil {
+			return fmt.Errorf("insert pbs maintenance task %s/%s: %w", task.TaskType, task.JobID, err)
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) GetPBSTasksForReport(ctx context.Context, reportID int64) ([]domain.PBSTask, error) {

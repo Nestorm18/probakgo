@@ -106,6 +106,7 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
+	historyValue := 42.5
 
 	req := &domain.PBSReportRequest{
 		Hostname:      "pbs-01",
@@ -118,6 +119,13 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 					Total: 500,
 					Used:  200,
 					Avail: 300,
+					History: []*float64{
+						&historyValue,
+						nil,
+					},
+					Groups: []domain.PBSGroupPayload{{
+						BackupType: "vm", BackupID: "100", BackupCount: 2, LastBackup: 123, VerificationState: "ok",
+					}},
 					GCStatus: &domain.GCStatusPayload{
 						DiskBytes: 1024,
 						UPID:      "upid-test",
@@ -159,6 +167,14 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 	}
 	if stores[0].Total != 500 {
 		t.Errorf("Total: want 500, got %d", stores[0].Total)
+	}
+	history, err := st.GetPBSHistory(ctx, stores[0].ID)
+	if err != nil || len(history) != 2 || history[0] == nil || *history[0] != historyValue || history[1] != nil {
+		t.Fatalf("unexpected PBS history: %#v, err=%v", history, err)
+	}
+	snapshots, err := st.GetPBSSnapshotsForStore(ctx, stores[0].ID)
+	if err != nil || len(snapshots) != 1 || snapshots[0].BackupID != "100" {
+		t.Fatalf("unexpected PBS snapshots: %#v, err=%v", snapshots, err)
 	}
 
 	gc, err := st.GetPBSGCStatus(ctx, stores[0].ID)
