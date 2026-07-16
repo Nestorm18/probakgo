@@ -126,11 +126,11 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		// Backup config - editor + admin
 		r.With(RequireEditor).Get("/backup-config/{server}", h.BackupConfig)
 		r.With(RequireEditor).Get("/backup-config/{server}/vm/new", h.BackupConfigVMNewPage)
-		r.With(RequireEditor, sensitive).Post("/backup-config/{server}/vm/new", h.BackupConfigVMNewPost)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/new", h.BackupConfigVMNewPost)
 		r.With(RequireEditor).Get("/backup-config/{server}/vm/{vmid}/edit", h.BackupConfigVMEditPage)
-		r.With(RequireEditor, sensitive).Post("/backup-config/{server}/vm/{vmid}/edit", h.BackupConfigVMEditPost)
-		r.With(RequireEditor, sensitive).Post("/backup-config/{server}/vm/{vmid}/delete", h.BackupConfigVMDelete)
-		r.With(RequireEditor, sensitive).Post("/backup-config/{server}/vm/{vmid}/toggle", h.BackupConfigVMToggle)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/edit", h.BackupConfigVMEditPost)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/delete", h.BackupConfigVMDelete)
+		r.With(RequireEditor).Post("/backup-config/{server}/vm/{vmid}/toggle", h.BackupConfigVMToggle)
 
 		// Settings - admin only
 		r.With(RequireAdmin).Get("/settings", h.SettingsHub)

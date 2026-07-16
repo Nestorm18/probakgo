@@ -289,6 +289,7 @@
     const action = form.getAttribute('action') || window.location.pathname;
     if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
 	if (action.includes('/alerts/suppress') || action.includes('/alerts/unsuppress')) return;
+	if (action.includes('/backup-config/')) return;
     if (form.querySelector('input[name="totp_code"]')?.value) return;
     if (sensitiveBypass.has(form)) {
       sensitiveBypass.delete(form);
