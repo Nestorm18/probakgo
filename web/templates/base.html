@@ -286,6 +286,7 @@
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
     if ((form.method || '').toLowerCase() !== 'post') return;
+	if ({{if .SensitiveTOTPFresh}}true{{else}}false{{end}}) return;
     const action = form.getAttribute('action') || window.location.pathname;
     if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
 	if (action.includes('/alerts/suppress') || action.includes('/alerts/unsuppress')) return;

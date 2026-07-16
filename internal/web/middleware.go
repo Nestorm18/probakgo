@@ -12,6 +12,8 @@ import (
 	"probakgo/internal/totp"
 )
 
+const sensitiveTOTPFreshDuration = 10 * time.Minute
+
 // RequireLogin checks the session cookie and verifies the user is still active in DB.
 // If the user's role changed since login, the session is refreshed so downstream
 // middleware (RequireEditor, RequireAdmin) see the current role.
@@ -79,13 +81,14 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 				return
 			}
 			now := time.Now()
-			if session.SensitiveTOTPFresh(r, now) {
-				next.ServeHTTP(w, r)
-				return
-			}
 			code := strings.TrimSpace(r.FormValue("totp_code"))
-			if code != "" && totp.Validate(code, user.TOTPSecret, now) {
-				_ = session.SetSensitiveTOTPFresh(w, r, now.Add(5*time.Minute))
+			if code != "" {
+				if totp.Validate(code, user.TOTPSecret, now) {
+					_ = session.SetSensitiveTOTPFresh(w, r, now.Add(sensitiveTOTPFreshDuration))
+					next.ServeHTTP(w, r)
+					return
+				}
+			} else if session.SensitiveTOTPFresh(r, now) {
 				next.ServeHTTP(w, r)
 				return
 			}

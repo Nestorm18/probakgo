@@ -259,6 +259,12 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	durations := c.aggregateTaskDurations(aggregate.upid)
 	var vmids []int64
 	for vmid, files := range filesByVMID {
+		// Shared PBS datastores also expose snapshots created by other PVE nodes.
+		if len(names) > 0 {
+			if _, local := names[vmid]; !local {
+				continue
+			}
+		}
 		for _, f := range files {
 			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
 				vmids = append(vmids, vmid)

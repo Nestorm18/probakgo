@@ -14,6 +14,7 @@ import (
 	"probakgo/internal/domain"
 	"probakgo/internal/netutil"
 	"probakgo/internal/selfupdate"
+	"probakgo/internal/session"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -232,6 +233,9 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		if _, has := m["SensitiveActionsRequireTOTP"]; !has {
 			loadSettingsFlags()
 			m["SensitiveActionsRequireTOTP"] = sensitiveTOTP
+		}
+		if _, has := m["SensitiveTOTPFresh"]; !has {
+			m["SensitiveTOTPFresh"] = session.SensitiveTOTPFresh(r, time.Now())
 		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]

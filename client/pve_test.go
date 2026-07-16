@@ -221,6 +221,8 @@ func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
 		101: {{ctime: 10010, size: 39_000_000, volid: "nas:backup/vzdump-qemu-101.vma.zst"}},
 		3100: {{ctime: 10130, size: 3_730_000_000,
 			volid: "nas:backup/vzdump-qemu-3100.vma.zst"}},
+		9000: {{ctime: 10020, size: 9_000_000_000,
+			volid: "PBS:backup/vm/9000/foreign-snapshot"}},
 	}
 
 	tasks := newTestPVEClient(srv).backupJobTasks(
@@ -229,7 +231,7 @@ func TestBackupJobTasksReconstructsAggregateJobFromFiles(t *testing.T) {
 	)
 
 	if len(tasks) != 2 {
-		t.Fatalf("expected 2 reconstructed tasks, got %d", len(tasks))
+		t.Fatalf("expected 2 local reconstructed tasks, got %d", len(tasks))
 	}
 	if got := tasks[0]["vmid"]; got != int64(101) {
 		t.Errorf("first vmid: got %v, want 101", got)
