@@ -89,6 +89,11 @@ type backupFile struct {
 	volid string
 }
 
+type backupLogInfo struct {
+	durations map[int64]int64
+	vmids     map[int64]struct{}
+}
+
 func (c *pveClient) vmNames() map[int64]string {
 	names := make(map[int64]string)
 	for _, ep := range []string{
@@ -184,13 +189,22 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 	jobDuration := jobEnd - jobStart
 
+	logInfoByUPID := make(map[string]backupLogInfo)
+	getLogInfo := func(upid string) backupLogInfo {
+		if info, ok := logInfoByUPID[upid]; ok {
+			return info
+		}
+		info := c.aggregateTaskInfo(upid)
+		logInfoByUPID[upid] = info
+		return info
+	}
 	logDurations := make(map[int64]int64)
 	var aggregateDuration int64
 	for _, t := range jobTasks {
 		if parseVMID(t.id) == 0 && aggregateDuration == 0 {
 			aggregateDuration = int64(t.end - t.start)
 		}
-		for vmid, duration := range c.aggregateTaskDurations(t.upid) {
+		for vmid, duration := range getLogInfo(t.upid).durations {
 			logDurations[vmid] = duration
 		}
 	}
@@ -253,22 +267,29 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 
 	// Some scheduled multi-VM jobs are reported by PVE only as an aggregate task
-	// with an empty id (vzdump::root@pam:). In that case, reconstruct per-VM
-	// rows from backup files created during the aggregate job window.
+	// with an empty id (vzdump::root@pam:). Reconstruct its rows from the task
+	// log; storage contents may include snapshots created by another PVE node.
 	aggregate := jobTasks[0]
-	durations := c.aggregateTaskDurations(aggregate.upid)
+	logInfo := getLogInfo(aggregate.upid)
+	durations := logInfo.durations
 	var vmids []int64
-	for vmid, files := range filesByVMID {
-		// Shared PBS datastores also expose snapshots created by other PVE nodes.
-		if len(names) > 0 {
-			if _, local := names[vmid]; !local {
-				continue
-			}
+	if len(logInfo.vmids) > 0 {
+		for vmid := range logInfo.vmids {
+			vmids = append(vmids, vmid)
 		}
-		for _, f := range files {
-			if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
-				vmids = append(vmids, vmid)
-				break
+	} else {
+		for vmid, files := range filesByVMID {
+			// Shared PBS datastores also expose snapshots created by other PVE nodes.
+			if len(names) > 0 {
+				if _, local := names[vmid]; !local {
+					continue
+				}
+			}
+			for _, f := range files {
+				if f.ctime >= int64(aggregate.start)-60 && f.ctime <= int64(aggregate.end)+60 {
+					vmids = append(vmids, vmid)
+					break
+				}
 			}
 		}
 	}
@@ -340,9 +361,13 @@ func (c *pveClient) taskExitStatus(upid string) string {
 	return str(payload["exitstatus"])
 }
 
-func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
+func (c *pveClient) aggregateTaskInfo(upid string) backupLogInfo {
+	empty := backupLogInfo{
+		durations: make(map[int64]int64),
+		vmids:     make(map[int64]struct{}),
+	}
 	if upid == "" {
-		return nil
+		return empty
 	}
 	var lines []string
 	const pageLimit = 500
@@ -350,7 +375,7 @@ func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
 		data, err := c.get(fmt.Sprintf("nodes/%s/tasks/%s/log?start=%d&limit=%d", c.si.Hostname, url.PathEscape(upid), start, pageLimit))
 		if err != nil {
 			log.Printf("WARN: could not read vzdump task log %s: %v", upid, err)
-			return nil
+			return empty
 		}
 		raw, _ := data["data"].([]any)
 		for _, item := range raw {
@@ -370,13 +395,37 @@ func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
 	if len(durations) == 0 {
 		log.Printf("WARN: no per-VM durations found in vzdump task log %s (%d lines)", upid, len(lines))
 	}
-	return durations
+	return backupLogInfo{
+		durations: durations,
+		vmids:     parseBackupVMIDs(lines),
+	}
+}
+
+func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
+	return c.aggregateTaskInfo(upid).durations
 }
 
 var finishedBackupREs = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)Finished Backup of (?:VM|CT)\s+(\d+)\s+\((\d{1,2}:\d{2}(?::\d{2})?)\)`),
 	regexp.MustCompile(`(?i)Finished Backup of (?:VM|CT)\s+(\d+).*?\b(?:duration|in|took)\s+(\d{1,2}:\d{2}(?::\d{2})?)`),
 	regexp.MustCompile(`(?i)Backup of (?:VM|CT)\s+(\d+).*?finished.*?\((\d{1,2}:\d{2}(?::\d{2})?)\)`),
+}
+
+var startedBackupRE = regexp.MustCompile(`(?i)Starting Backup of (?:VM|CT)\s+(\d+)`)
+
+func parseBackupVMIDs(lines []string) map[int64]struct{} {
+	vmids := make(map[int64]struct{})
+	for _, line := range lines {
+		matches := startedBackupRE.FindStringSubmatch(line)
+		if len(matches) != 2 {
+			continue
+		}
+		vmid, err := strconv.ParseInt(matches[1], 10, 64)
+		if err == nil {
+			vmids[vmid] = struct{}{}
+		}
+	}
+	return vmids
 }
 
 func parseBackupDurations(lines []string) map[int64]int64 {

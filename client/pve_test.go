@@ -323,7 +323,7 @@ func TestBackupJobTasksUsesAggregateLogDurations(t *testing.T) {
 
 	filesByVMID := map[int64][]backupFile{
 		101:  {{ctime: 10010, size: 39_000_000, volid: "nas:backup/vzdump-qemu-101.vma.zst"}},
-		3100: {{ctime: 10130, size: 3_730_000_000, volid: "nas:backup/vzdump-qemu-3100.vma.zst"}},
+		9000: {{ctime: 10130, size: 9_000_000_000, volid: "PBS:backup/vm/9000/foreign-snapshot"}},
 	}
 
 	tasks := newTestPVEClient(srv).backupJobTasks(
@@ -345,6 +345,27 @@ func TestBackupJobTasksUsesAggregateLogDurations(t *testing.T) {
 	}
 	if got := tasks[1]["duration"]; got != int64(3605) {
 		t.Errorf("vm 3100 duration: got %v, want 3605", got)
+	}
+	if got := tasks[1]["filename"]; got != "" {
+		t.Errorf("vm 3100 filename: got %v, want empty when storage listing is incomplete", got)
+	}
+}
+
+func TestParseBackupVMIDs(t *testing.T) {
+	got := parseBackupVMIDs([]string{
+		"INFO: Starting Backup of VM 608 (qemu)",
+		"INFO: Starting Backup of CT 609 (lxc)",
+		"INFO: Starting Backup of VM 608 (qemu)",
+		"INFO: unrelated",
+	})
+
+	if len(got) != 2 {
+		t.Fatalf("got %d VMIDs, want 2", len(got))
+	}
+	for _, vmid := range []int64{608, 609} {
+		if _, ok := got[vmid]; !ok {
+			t.Errorf("missing VMID %d", vmid)
+		}
 	}
 }
 
