@@ -206,6 +206,15 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	if data.HeaderColor != "#dc3545" {
 		t.Errorf("want red header, got %q", data.HeaderColor)
 	}
+	if data.PVEColor != "#dc3545" {
+		t.Errorf("want red PVE metric, got %q", data.PVEColor)
+	}
+	if data.PBSColor != "#28a745" {
+		t.Errorf("want green PBS metric, got %q", data.PBSColor)
+	}
+	if data.WindowsColor != "#28a745" {
+		t.Errorf("want green Windows metric, got %q", data.WindowsColor)
+	}
 }
 
 func TestBuildEmailData_NoReportAllVMsExcluded_NoPVEIssue(t *testing.T) {

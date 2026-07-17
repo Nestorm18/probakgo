@@ -11,9 +11,9 @@
       <div class="card-header d-flex justify-content-between align-items-center gap-2">
         <strong><i class="bi bi-person me-2"></i>{{.User.Username}}</strong>
         <div class="d-flex gap-2 flex-wrap justify-content-end">
-          {{if eq .User.Role "admin"}}<span class="status-pill warn">admin</span>
-          {{else if eq .User.Role "editor"}}<span class="status-pill ok">editor</span>
-          {{else}}<span class="status-pill muted">reader</span>{{end}}
+          {{if eq .User.Role "admin"}}<span class="status-pill warn">Administrador</span>
+          {{else if eq .User.Role "editor"}}<span class="status-pill ok">Editor</span>
+          {{else}}<span class="status-pill muted">Lector</span>{{end}}
           {{if .User.IsActive}}<span class="status-pill ok">Activo</span>
           {{else}}<span class="status-pill bad">Inactivo</span>{{end}}
           {{if .User.TOTPEnabled}}<span class="status-pill ok">2FA activo</span>
@@ -61,9 +61,9 @@
           <label class="form-label">Rol</label>
           <div class="input-group">
             <select name="role" class="form-select">
-              <option value="reader" {{if eq .User.Role "reader"}}selected{{end}}>reader - solo lectura</option>
-              <option value="editor" {{if eq .User.Role "editor"}}selected{{end}}>editor - gestión de backups</option>
-              <option value="admin" {{if eq .User.Role "admin"}}selected{{end}}>admin - acceso completo</option>
+              <option value="reader" {{if eq .User.Role "reader"}}selected{{end}}>Lector - solo lectura</option>
+              <option value="editor" {{if eq .User.Role "editor"}}selected{{end}}>Editor - gestión de backups</option>
+              <option value="admin" {{if eq .User.Role "admin"}}selected{{end}}>Administrador - acceso completo</option>
             </select>
             <button type="submit" class="btn btn-primary"><i class="bi bi-floppy me-1"></i>Guardar</button>
           </div>
@@ -136,7 +136,7 @@
       <div class="card-header"><strong><i class="bi bi-exclamation-triangle me-2"></i>Zona delicada</strong></div>
       <div class="card-body">
         {{if eq .User.Role "admin"}}
-        <p class="mb-0" style="font-size:.85rem;color:var(--txt-muted)">Los usuarios admin no se pueden eliminar desde la web.</p>
+        <p class="mb-0" style="font-size:.85rem;color:var(--txt-muted)">Los usuarios administradores no se pueden eliminar desde la web.</p>
         {{else}}
         <form id="del-user-{{.User.ID}}" method="POST" action="/users/{{.User.ID}}/delete">
           {{ .CSRFField }}

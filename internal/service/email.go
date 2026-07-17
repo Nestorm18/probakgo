@@ -75,6 +75,9 @@ type emailData struct {
 	TotalPVE      int
 	TotalPBS      int
 	TotalWindows  int
+	PVEColor      string
+	PBSColor      string
+	WindowsColor  string
 	TotalIssues   int
 	TotalOK       int
 	PVEIssues     []serverRow
@@ -595,6 +598,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		TotalPVE:      len(pveServers),
 		TotalPBS:      len(pbsServers),
 		TotalWindows:  len(windowsServers),
+		PVEColor:      emailStatusColor(len(pveIssues)+len(backupErrors) > 0),
+		PBSColor:      emailStatusColor(len(pbsIssues) > 0),
+		WindowsColor:  emailStatusColor(len(windowsIssues) > 0),
 		TotalIssues:   backupProblems,
 		TotalOK:       totalOK,
 		PVEIssues:     pveIssues,
@@ -606,6 +612,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		DiskAlerts:    diskAlerts,
 		BackupErrors:  backupErrors,
 	}, nil
+}
+
+func emailStatusColor(hasIssues bool) string {
+	if hasIssues {
+		return "#dc3545"
+	}
+	return "#28a745"
 }
 
 func emailPBSTaskRow(task domain.PBSTask) pbsTaskRow {

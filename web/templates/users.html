@@ -30,9 +30,9 @@
           {{end}}
         </td>
         <td>
-          {{if eq .Role "admin"}}<span class="status-pill warn">admin</span>
-          {{else if eq .Role "editor"}}<span class="status-pill ok">editor</span>
-          {{else}}<span class="status-pill muted">reader</span>{{end}}
+          {{if eq .Role "admin"}}<span class="status-pill warn">Administrador</span>
+          {{else if eq .Role "editor"}}<span class="status-pill ok">Editor</span>
+          {{else}}<span class="status-pill muted">Lector</span>{{end}}
         </td>
         <td>
           {{if .TOTPEnabled}}<span class="status-pill ok">Activo</span>
@@ -58,9 +58,9 @@
 </div>
 
 <div class="mt-3 d-flex gap-3 flex-wrap" style="font-size:.78rem;color:var(--txt-muted)">
-  <span><span class="status-pill warn" style="font-size:.7rem">admin</span> Gestión completa</span>
-  <span><span class="status-pill ok" style="font-size:.7rem">editor</span> Gestión de backup configs</span>
-  <span><span class="status-pill muted" style="font-size:.7rem">reader</span> Solo lectura</span>
+  <span><span class="status-pill warn" style="font-size:.7rem">Administrador</span> Gestión completa</span>
+  <span><span class="status-pill ok" style="font-size:.7rem">Editor</span> Gestión de backup configs</span>
+  <span><span class="status-pill muted" style="font-size:.7rem">Lector</span> Solo lectura</span>
 </div>
 
 {{end}}

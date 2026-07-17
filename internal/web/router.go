@@ -139,7 +139,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin, sensitive).Post("/settings/system/session-secure", h.EnableSessionSecurePost)
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/email", h.EmailSettingsPost)
-		r.With(RequireAdmin, sensitive).Post("/settings/email/test", h.EmailTest)
+		r.With(RequireAdmin).Post("/settings/email/test", h.EmailTest)
 		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance", h.MaintenanceSettingsPost)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)
@@ -152,7 +152,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin, sensitive).Post("/settings/reset", h.ResetDatabasePost)
 
 		r.With(RequireAdmin).Get("/about", h.About)
-		r.With(RequireAdmin, sensitive).Post("/about/update", h.AboutUpdatePost)
+		r.With(RequireAdmin).Post("/about/update", h.AboutUpdatePost)
 	})
 
 	protection, err := newCrossOriginProtection(trustedOrigins)
