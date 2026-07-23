@@ -251,25 +251,26 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 		}
 		if len(tasks) == 0 {
 			status := strings.TrimSpace(rep.BackupStatus)
-			if status == "" || strings.EqualFold(status, "OK") {
+			if status == "" || domain.PVEBackupStatusOK(status) {
 				continue
 			}
 			if !resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
 				continue
 			}
+			severity, title := pveBackupAlertPresentation(status)
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				Type:       domain.AlertTypeBackupError,
-				Severity:   domain.AlertSeverityCritical,
-				Title:      "Backup fallido",
+				Severity:   severity,
+				Title:      title,
 				Message:    fmt.Sprintf("Ultimo job: %s", status),
 				DetectedAt: time.Now(),
 			})
 			continue
 		}
 		for _, t := range tasks {
-			if t.Status == "OK" {
+			if domain.PVEBackupStatusOK(t.Status) {
 				continue
 			}
 			vmCfg := findVMConfig(vmCfgs, t.VMID)
@@ -280,19 +281,27 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			if name == "" {
 				name = fmt.Sprintf("VM %d", t.VMID)
 			}
+			severity, title := pveBackupAlertPresentation(t.Status)
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d:%d", sv.ID, t.VMID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				VMID: t.VMID, VMName: name,
 				Type:       domain.AlertTypeBackupError,
-				Severity:   domain.AlertSeverityCritical,
-				Title:      "Backup fallido",
+				Severity:   severity,
+				Title:      title,
 				Message:    fmt.Sprintf("%s: %s", name, t.Status),
 				DetectedAt: time.Now(),
 			})
 		}
 	}
 	return alerts, nil
+}
+
+func pveBackupAlertPresentation(status string) (severity, title string) {
+	if domain.PVEBackupStatusWarning(status) {
+		return domain.AlertSeverityWarning, "Backup con advertencias"
+	}
+	return domain.AlertSeverityCritical, "Backup fallido"
 }
 
 func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {

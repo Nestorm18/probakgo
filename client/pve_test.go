@@ -130,8 +130,8 @@ func TestLastBackupStatusEmpty(t *testing.T) {
 
 	bs := newTestPVEClient(srv).lastBackupStatus()
 
-	if bs.OK {
-		t.Error("expected OK=false for empty task list")
+	if bs.Status != "ERROR" {
+		t.Errorf("Status: got %q, want ERROR for empty task list", bs.Status)
 	}
 	if bs.StartTime != -1 || bs.EndTime != -1 || bs.Duration != -1 {
 		t.Errorf("expected -1 times, got start=%d end=%d dur=%d", bs.StartTime, bs.EndTime, bs.Duration)
@@ -157,8 +157,8 @@ func TestLastBackupStatusPicksMostRecent(t *testing.T) {
 
 	bs := newTestPVEClient(srv).lastBackupStatus()
 
-	if bs.OK {
-		t.Error("expected OK=false: most recent task had ERROR status")
+	if bs.Status != "ERROR: disk full" {
+		t.Errorf("Status: got %q, want most recent task error", bs.Status)
 	}
 	if bs.StartTime != 3000 {
 		t.Errorf("StartTime: got %d, want 3000", bs.StartTime)
@@ -186,11 +186,50 @@ func TestLastBackupStatusMostRecentOK(t *testing.T) {
 
 	bs := newTestPVEClient(srv).lastBackupStatus()
 
-	if !bs.OK {
-		t.Error("expected OK=true: most recent task was OK")
+	if bs.Status != "OK" {
+		t.Errorf("Status: got %q, want OK", bs.Status)
 	}
 	if bs.StartTime != 3000 {
 		t.Errorf("StartTime: got %d, want 3000", bs.StartTime)
+	}
+}
+
+func TestLastBackupStatusPreservesWarning(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"starttime": float64(3000),
+					"endtime":   float64(5000),
+					"status":    "WARNINGS: 1",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	bs := newTestPVEClient(srv).lastBackupStatus()
+	if bs.Status != "WARNINGS: 1" {
+		t.Errorf("Status: got %q, want WARNINGS: 1", bs.Status)
+	}
+}
+
+func TestJobBackupStatusWarningUnlessThereIsFailure(t *testing.T) {
+	warnings := []map[string]any{
+		{"status": "OK", "starttime": int64(100), "endtime": int64(200)},
+		{"status": "WARNINGS: 1", "starttime": int64(200), "endtime": int64(300)},
+	}
+	if got := jobBackupStatus(warnings).Status; got != "WARNINGS: 1" {
+		t.Errorf("warning job: got %q, want WARNINGS: 1", got)
+	}
+
+	withFailure := append(warnings, map[string]any{
+		"status": "ERROR: disk full", "starttime": int64(300), "endtime": int64(400),
+	})
+	if got := jobBackupStatus(withFailure).Status; got != "ERROR: disk full" {
+		t.Errorf("failed job: got %q, want ERROR: disk full", got)
 	}
 }
 
@@ -288,8 +327,8 @@ func TestBackupJobTasksUsesExitStatusForStoppedAggregateJob(t *testing.T) {
 	if got := tasks[0]["status"]; got != "OK" {
 		t.Fatalf("status: got %v, want OK", got)
 	}
-	if bs := jobBackupStatus(tasks); !bs.OK {
-		t.Fatal("jobBackupStatus should be OK when Proxmox exitstatus is OK")
+	if bs := jobBackupStatus(tasks); bs.Status != "OK" {
+		t.Fatalf("jobBackupStatus: got %q, want OK", bs.Status)
 	}
 }
 
@@ -635,8 +674,8 @@ func TestGenerateReportUsesAggregateStatusWhenBackupTasksCannotBeReconstructed(t
 	}
 
 	status := report["last_backup_status"].(backupStatus)
-	if !status.OK {
-		t.Fatalf("last_backup_status should be OK when aggregate vzdump task is OK")
+	if status.Status != "OK" {
+		t.Fatalf("last_backup_status: got %q, want OK", status.Status)
 	}
 	if tasks, ok := report["backup_tasks"].([]map[string]any); ok && len(tasks) != 0 {
 		t.Fatalf("expected no reconstructed backup tasks, got %d", len(tasks))

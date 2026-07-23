@@ -86,7 +86,8 @@
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
         <td>
-          {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
+          {{if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
+          {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
           {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
           {{if gt .TaskMissing 0}}<span class="status-pill warn ms-1">{{.TaskMissing}} sin backup</span>{{end}}

@@ -54,7 +54,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pveBackupErrors := h.activePVEBackupErrorServers(ctx, pveServers, pveReports, pveTasks)
+	pveBackupAlerts := h.activePVEBackupAlertServers(ctx, pveServers, pveReports, pveTasks)
 	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
@@ -62,7 +62,9 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
 		isStale := (rep == nil || rep.IsStale) && !ignoreStale
-		hasBackupError := pveBackupErrors[sv.ID]
+		backupSeverity := pveBackupAlerts[sv.ID]
+		hasBackupError := backupSeverity == domain.AlertSeverityCritical
+		hasBackupWarning := backupSeverity == domain.AlertSeverityWarning
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
 		if maint.Active {
 			pveMaintenance++
@@ -73,7 +75,11 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		} else {
 			pveOK++
 		}
-		row := map[string]any{"Server": sv, "IsStale": isStale, "HasBackupError": hasBackupError, "Swap": buildSwapView(false, 0, 0), "Maintenance": maint}
+		row := map[string]any{
+			"Server": sv, "IsStale": isStale,
+			"HasBackupError": hasBackupError, "HasBackupWarning": hasBackupWarning,
+			"Swap": buildSwapView(false, 0, 0), "Maintenance": maint,
+		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
 			row["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
@@ -243,8 +249,8 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *WebH) activePVEBackupErrorServers(ctx context.Context, servers []domain.PVEServer, reports map[int64]*domain.PVEReport, tasksByReport map[int64][]domain.PVEBackupTask) map[int64]bool {
-	result := make(map[int64]bool)
+func (h *WebH) activePVEBackupAlertServers(ctx context.Context, servers []domain.PVEServer, reports map[int64]*domain.PVEReport, tasksByReport map[int64][]domain.PVEBackupTask) map[int64]string {
+	result := make(map[int64]string)
 	cfg, err := service.LoadAlertConfigs(ctx, h.store)
 	if err != nil {
 		return result
@@ -259,7 +265,7 @@ func (h *WebH) activePVEBackupErrorServers(ctx context.Context, servers []domain
 		tasks := tasksByReport[rep.ID]
 		if len(tasks) == 0 {
 			status := strings.TrimSpace(rep.BackupStatus)
-			if status == "" || strings.EqualFold(status, "OK") {
+			if status == "" || domain.PVEBackupStatusOK(status) {
 				continue
 			}
 			if !dashboardBackupErrEnabled(svCfg, nil, cfg.GlobalBackupErr) {
@@ -268,11 +274,15 @@ func (h *WebH) activePVEBackupErrorServers(ctx context.Context, servers []domain
 			if _, ok := suppressed[fmt.Sprintf("backup_error:pve:%d", sv.ID)]; ok {
 				continue
 			}
-			result[sv.ID] = true
+			if domain.PVEBackupStatusWarning(status) {
+				result[sv.ID] = domain.AlertSeverityWarning
+			} else {
+				result[sv.ID] = domain.AlertSeverityCritical
+			}
 			continue
 		}
 		for _, task := range tasks {
-			if strings.EqualFold(strings.TrimSpace(task.Status), "OK") {
+			if domain.PVEBackupStatusOK(task.Status) {
 				continue
 			}
 			vmCfg := dashboardFindVMConfig(cfg.PVEVMConfigs[sv.ID], task.VMID)
@@ -282,7 +292,13 @@ func (h *WebH) activePVEBackupErrorServers(ctx context.Context, servers []domain
 			if _, ok := suppressed[fmt.Sprintf("backup_error:pve:%d:%d", sv.ID, task.VMID)]; ok {
 				continue
 			}
-			result[sv.ID] = true
+			if domain.PVEBackupStatusWarning(task.Status) {
+				if result[sv.ID] == "" {
+					result[sv.ID] = domain.AlertSeverityWarning
+				}
+				continue
+			}
+			result[sv.ID] = domain.AlertSeverityCritical
 			break
 		}
 	}

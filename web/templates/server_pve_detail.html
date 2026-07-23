@@ -102,7 +102,8 @@
           <span class="status-pill bad">SIN BACKUP</span>
           {{end}}
           {{else}}
-          {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
+          {{if backupStatusOK .Status}}<span class="status-pill ok">OK</span>
+          {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">ADVERTENCIA</span>
           {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
           {{end}}
         </td>
@@ -222,6 +223,7 @@
               data-bs-toggle="collapse" data-bs-target="#job-hist-{{$i}}">
         <span style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime $job.Report.ReportedAt}}</span>
         {{if $job.AllOK}}<span class="status-pill ok">OK</span>
+        {{else if $job.HasWarnings}}<span class="status-pill warn">ADVERTENCIA</span>
         {{else}}<span class="status-pill bad">ERROR</span>{{end}}
       </button>
       <div id="job-hist-{{$i}}" class="collapse">
@@ -235,7 +237,8 @@
             <td style="font-family:'DM Mono',monospace;color:var(--txt-muted)">{{.VMID}}</td>
             <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
             <td>
-              {{if eq .Status "OK"}}<span class="status-pill ok">OK</span>
+              {{if backupStatusOK .Status}}<span class="status-pill ok">OK</span>
+              {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">ADVERTENCIA</span>
               {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
             </td>
             <td style="color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
@@ -270,7 +273,8 @@
       <tr>
         <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
         <td>
-          {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
+          {{if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
+          {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
           {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>

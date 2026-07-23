@@ -396,9 +396,16 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	if err != nil {
 		return emailData{}, err
 	}
+	maintenance, err := st.GetActiveServerMaintenances(ctx)
+	if err != nil {
+		return emailData{}, err
+	}
 
 	var pveIssues, pveOk []serverRow
 	for _, sv := range pveServers {
+		if _, active := maintenance[store.ServerMaintenanceKey("pve", sv.ID)]; active {
+			continue
+		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
 		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
 		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
@@ -458,6 +465,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 
 	var pbsIssues, pbsOk []serverRow
 	for _, sv := range pbsServers {
+		if _, active := maintenance[store.ServerMaintenanceKey("pbs", sv.ID)]; active {
+			continue
+		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
 		r, err := st.GetLatestPBSReport(ctx, sv.ID)
 		if err != nil {
@@ -539,6 +549,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 
 	var windowsIssues, windowsOk []serverRow
 	for _, sv := range windowsServers {
+		if _, active := maintenance[store.ServerMaintenanceKey("windows", sv.ID)]; active {
+			continue
+		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
 		r, err := st.GetLatestWindowsReport(ctx, sv.ID)
 		if err != nil {

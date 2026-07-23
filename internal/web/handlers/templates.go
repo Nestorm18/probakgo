@@ -99,7 +99,9 @@ func makeFuncMap(loc *time.Location, releaseVersion string) template.FuncMap {
 				return "–"
 			}
 		},
-		"formatBytes": domain.FormatBytes,
+		"formatBytes":         domain.FormatBytes,
+		"backupStatusOK":      domain.PVEBackupStatusOK,
+		"backupStatusWarning": domain.PVEBackupStatusWarning,
 		"pct": func(used, total int64) int {
 			if total == 0 {
 				return 0

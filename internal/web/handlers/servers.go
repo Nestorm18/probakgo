@@ -381,6 +381,12 @@ func latestPBSSwapView(reports []domain.PBSReport) swapView {
 	return buildSwapView(reports[0].SwapEnabled, reports[0].SwapUsed, reports[0].SwapTotal)
 }
 
+func normalizePVEReportBackupStatuses(reports []domain.PVEReport, tasksByReport map[int64][]domain.PVEBackupTask) {
+	for i := range reports {
+		reports[i].BackupStatus = domain.PVEBackupStatusSummary(tasksByReport[reports[i].ID], reports[i].BackupStatus)
+	}
+}
+
 func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
@@ -433,7 +439,6 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
-			r2["BackupStatus"] = rep.BackupStatus
 			swapAlertEnabled := alertCfg.SwapAlert == nil || *alertCfg.SwapAlert != 0
 			r2["Swap"] = buildPVESwapListView(
 				buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal),
@@ -442,6 +447,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			)
 
 			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
+			r2["BackupStatus"] = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
 			if len(tasks) > 0 {
 				if len(configs) > 0 {
 					jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
@@ -499,6 +505,12 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	totalReports, _ := h.store.CountPVEReports(ctx, id)
 	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
 	reports, _ := h.store.ListPVEReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, report := range reports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	reportTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
+	normalizePVEReportBackupStatuses(reports, reportTasks)
 
 	var storages []map[string]any
 	var latestReportID int64
@@ -594,16 +606,24 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		allOK := true
+		hasWarnings := false
 		for _, t := range tasks {
-			if t.Status != "OK" {
+			if domain.PVEBackupStatusWarning(t.Status) {
 				allOK = false
+				hasWarnings = true
+				continue
+			}
+			if !domain.PVEBackupStatusOK(t.Status) {
+				allOK = false
+				hasWarnings = false
 				break
 			}
 		}
 		jobHistory = append(jobHistory, map[string]any{
-			"Report": latestReports[i],
-			"Tasks":  tasks,
-			"AllOK":  allOK,
+			"Report":      latestReports[i],
+			"Tasks":       tasks,
+			"AllOK":       allOK,
+			"HasWarnings": hasWarnings,
 		})
 	}
 
@@ -689,6 +709,12 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 	totalReports, _ := h.store.CountPVEReportsByDays(ctx, id, days)
 	pagination := buildPagination(page, totalReports, reportHistoryPageSize, fmt.Sprintf("days=%d", days))
 	reports, _ := h.store.ListPVEReportsByDaysPage(ctx, id, days, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, report := range reports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	reportTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
+	normalizePVEReportBackupStatuses(reports, reportTasks)
 
 	var storages []map[string]any
 	var totalBackups int
@@ -1210,6 +1236,12 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	reports, _ := h.store.ListPVEReportsByDays(ctx, id, days)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, report := range reports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	reportTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
+	normalizePVEReportBackupStatuses(reports, reportTasks)
 
 	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.DisplayName, time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")

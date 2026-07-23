@@ -187,6 +187,45 @@ type PVEBackupTask struct {
 	Filename  string `db:"filename"`
 }
 
+func PVEBackupStatusOK(status string) bool {
+	return strings.EqualFold(strings.TrimSpace(status), "OK")
+}
+
+func PVEBackupStatusWarning(status string) bool {
+	status = strings.ToUpper(strings.TrimSpace(status))
+	return strings.HasPrefix(status, "WARNING")
+}
+
+// PVEBackupStatusSummary derives the overall job status from its per-VM tasks.
+// A real failure takes precedence over warnings, and warnings take precedence
+// over OK. The original Proxmox status is retained for display and diagnostics.
+func PVEBackupStatusSummary(tasks []PVEBackupTask, fallback string) string {
+	if len(tasks) == 0 {
+		return strings.TrimSpace(fallback)
+	}
+	warning := ""
+	for _, task := range tasks {
+		status := strings.TrimSpace(task.Status)
+		switch {
+		case PVEBackupStatusOK(status):
+			continue
+		case PVEBackupStatusWarning(status):
+			if warning == "" {
+				warning = status
+			}
+		default:
+			if status == "" {
+				return "ERROR"
+			}
+			return status
+		}
+	}
+	if warning != "" {
+		return warning
+	}
+	return "OK"
+}
+
 type WindowsServer struct {
 	ID            int64     `db:"id"`
 	Name          string    `db:"name"`

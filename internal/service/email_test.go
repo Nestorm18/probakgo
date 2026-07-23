@@ -217,6 +217,35 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	}
 }
 
+func TestBuildEmailData_MaintenanceServerIsNotReportedAsIssue(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPVEServer(ctx, "dentalber2", "10.0.0.2", "", "1.0", "")
+	if err := st.UpsertServerMaintenance(ctx, "pve", serverID, time.Now().Add(30*24*time.Hour), "Servidor de respaldo"); err != nil {
+		t.Fatalf("UpsertServerMaintenance: %v", err)
+	}
+
+	cfg, _ := st.GetEmailConfig(ctx)
+	cfg.AlertDiskPct = 0
+	cfg.AlertBackupErr = false
+
+	data, err := buildEmailData(ctx, st, svc, cfg)
+	if err != nil {
+		t.Fatalf("buildEmailData: %v", err)
+	}
+	if len(data.PVEIssues) != 0 {
+		t.Fatalf("maintenance server returned as PVE issue: %+v", data.PVEIssues)
+	}
+	if len(data.SummaryIssues) != 0 {
+		t.Fatalf("maintenance server returned in summary: %+v", data.SummaryIssues)
+	}
+	if data.TotalIssues != 0 {
+		t.Fatalf("TotalIssues: got %d, want 0", data.TotalIssues)
+	}
+}
+
 func TestBuildEmailData_NoReportAllVMsExcluded_NoPVEIssue(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

@@ -238,6 +238,34 @@ func TestEvalPVEBackupErrors_OKTask_NoAlert(t *testing.T) {
 	}
 }
 
+func TestEvalPVEBackupErrors_WarningTask_IsWarningAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-warning", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{
+		VMID: 200, VMName: "servidor", Status: "WARNINGS: 1",
+	})
+
+	alerts, err := evalPVEBackupErrors(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("evalPVEBackupErrors: %v", err)
+	}
+	for _, alert := range alerts {
+		if alert.VMID != 200 {
+			continue
+		}
+		if alert.Severity != domain.AlertSeverityWarning {
+			t.Errorf("Severity: got %q, want warning", alert.Severity)
+		}
+		if alert.Title != "Backup con advertencias" {
+			t.Errorf("Title: got %q", alert.Title)
+		}
+		return
+	}
+	t.Fatal("expected backup warning alert for VM 200")
+}
+
 func TestEvalPVEBackupErrors_ReportStatusFallbackForOldClients(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

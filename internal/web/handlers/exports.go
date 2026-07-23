@@ -210,7 +210,8 @@ func (h *WebH) exportPVERows(r *http.Request) ([]pveExportRow, error) {
 		backupStatus := ""
 		if rep != nil {
 			lastReport = formatExportTime(rep.ReportedAt)
-			backupStatus = rep.BackupStatus
+			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
+			backupStatus = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
 			stale, _ := h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 			if stale || rep.IsStale {
 				state = "Sin reporte"

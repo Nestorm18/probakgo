@@ -77,10 +77,10 @@ func (c *pveClient) validateConnection() bool {
 }
 
 type backupStatus struct {
-	OK        bool  `json:"status"`
-	StartTime int64 `json:"starttime"`
-	EndTime   int64 `json:"endtime"`
-	Duration  int64 `json:"duration"`
+	Status    string `json:"status"`
+	StartTime int64  `json:"starttime"`
+	EndTime   int64  `json:"endtime"`
+	Duration  int64  `json:"duration"`
 }
 
 type backupFile struct {
@@ -470,7 +470,7 @@ func parseClockDuration(s string) (int64, bool) {
 }
 
 func (c *pveClient) lastBackupStatus() backupStatus {
-	empty := backupStatus{OK: false, StartTime: -1, EndTime: -1, Duration: -1}
+	empty := backupStatus{Status: "ERROR", StartTime: -1, EndTime: -1, Duration: -1}
 	data, err := c.get(fmt.Sprintf("nodes/%s/tasks?typefilter=vzdump&limit=50", c.si.Hostname))
 	if err != nil {
 		log.Printf("WARN: could not get backup tasks: %v", err)
@@ -501,7 +501,7 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 	sort.Slice(finished, func(i, j int) bool { return finished[i].end > finished[j].end })
 	last := finished[0]
 	return backupStatus{
-		OK:        last.status == "OK",
+		Status:    last.status,
 		StartTime: int64(last.start),
 		EndTime:   int64(last.end),
 		Duration:  int64(last.end - last.start),
@@ -644,17 +644,27 @@ func (c *pveClient) reportBackupStatus(tasks []map[string]any) backupStatus {
 }
 
 // jobBackupStatus derives the overall backup status from all tasks in the job.
-// If any VM failed, the job is considered failed - even if later VMs succeeded.
+// Failures take precedence over warnings, and warnings take precedence over OK.
 func jobBackupStatus(tasks []map[string]any) backupStatus {
 	if len(tasks) == 0 {
-		return backupStatus{OK: false, StartTime: -1, EndTime: -1, Duration: -1}
+		return backupStatus{Status: "ERROR", StartTime: -1, EndTime: -1, Duration: -1}
 	}
-	allOK := true
+	status := "OK"
 	var minStart int64 = 1 << 62
 	var maxEnd int64
 	for _, t := range tasks {
-		if str(t["status"]) != "OK" {
-			allOK = false
+		taskStatus := strings.TrimSpace(str(t["status"]))
+		if !strings.EqualFold(taskStatus, "OK") {
+			if strings.HasPrefix(strings.ToUpper(taskStatus), "WARNING") {
+				if status == "OK" {
+					status = taskStatus
+				}
+			} else {
+				status = taskStatus
+				if status == "" {
+					status = "ERROR"
+				}
+			}
 		}
 		if s, _ := t["starttime"].(int64); s < minStart {
 			minStart = s
@@ -664,7 +674,7 @@ func jobBackupStatus(tasks []map[string]any) backupStatus {
 		}
 	}
 	return backupStatus{
-		OK:        allOK,
+		Status:    status,
 		StartTime: minStart,
 		EndTime:   maxEnd,
 		Duration:  maxEnd - minStart,

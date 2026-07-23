@@ -53,8 +53,10 @@
   <div class="col-6 col-lg-3">
     <div class="card h-100"><div class="card-body">
       <div style="font-size:.72rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.35rem">Último backup</div>
-      {{if eq .BackupStatus "OK"}}
+      {{if backupStatusOK .BackupStatus}}
         <span class="status-pill ok">OK</span>
+      {{else if backupStatusWarning .BackupStatus}}
+        <span class="status-pill warn">{{.BackupStatus}}</span>
       {{else if .BackupStatus}}
         <span class="status-pill bad">{{.BackupStatus}}</span>
       {{else}}
@@ -181,7 +183,8 @@
         <tr>
           <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
           <td>
-            {{if eq .BackupStatus "OK"}}<span class="status-pill ok">OK</span>
+            {{if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
+            {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
             {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
             {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
           </td>
