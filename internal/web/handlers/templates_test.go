@@ -69,6 +69,24 @@ func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	}
 }
 
+func TestAboutUpdateCheckSkipsSensitiveTOTPPrompt(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/about", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `action="/about/update" data-totp-skip`) {
+		t.Fatalf("update check form must bypass the client-side sensitive TOTP prompt:\n%s", body)
+	}
+	if !strings.Contains(body, `form.hasAttribute('data-totp-skip')`) {
+		t.Fatalf("base template does not honor the TOTP bypass marker:\n%s", body)
+	}
+}
+
 func TestProfile2FASetupAllowsQRDataURI(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
