@@ -429,6 +429,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"IsStale":        stale,
 			"TaskMissing":    0,
 			"TaskUnknown":    0,
+			"BackupStatus":   "",
 			"AlertConfig":    alertCfg,
 			"AlertOverrides": buildPVEAlertOverrideView(alertCfg),
 			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
