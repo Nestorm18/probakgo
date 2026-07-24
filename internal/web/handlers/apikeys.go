@@ -20,6 +20,12 @@ const apiKeysPageSize = 25
 func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
+	user, err := h.store.GetUserByUsername(ctx, username)
+	if err != nil {
+		slog.Error("get current user for api keys", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	if page < 1 {
 		page = 1
@@ -70,6 +76,7 @@ func (h *WebH) APIKeys(w http.ResponseWriter, r *http.Request) {
 		"KeysNextPage":       page + 1,
 		"KeysHasPrev":        page > 1,
 		"KeysHasNext":        hasNext,
+		"UserTOTPEnabled":    user.TOTPEnabled,
 	})
 }
 

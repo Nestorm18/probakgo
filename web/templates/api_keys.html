@@ -144,12 +144,27 @@
         <div id="revealForm">
           <label class="form-label">Tu contraseña para confirmar</label>
           <input type="password" id="revealPassword" class="form-control" placeholder="Contraseña actual" autocomplete="current-password">
+          {{if .SensitiveActionsRequireTOTP}}
+            {{if .SensitiveTOTPFresh}}
+            {{else if .UserTOTPEnabled}}
+            <label class="form-label mt-3" for="revealTOTP">Código 2FA</label>
+            <input type="text" id="revealTOTP" class="form-control" placeholder="Código de 6 dígitos"
+                   inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}">
+            {{else}}
+            <div class="alert alert-warning mt-3 mb-0">
+              Debes <a href="/profile" class="alert-link">activar 2FA en tu perfil</a> para mostrar una clave completa.
+            </div>
+            {{end}}
+          {{end}}
           <div id="revealError" class="text-danger mt-2 d-none" style="font-size:.82rem"></div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-        <button type="button" class="btn btn-primary" id="revealSubmit"><i class="bi bi-eye me-1"></i>Mostrar</button>
+        <button type="button" class="btn btn-primary" id="revealSubmit"
+                {{if and .SensitiveActionsRequireTOTP (not .UserTOTPEnabled)}}disabled{{end}}>
+          <i class="bi bi-eye me-1"></i>Mostrar
+        </button>
       </div>
     </div>
   </div>
@@ -166,6 +181,8 @@
   modal.addEventListener('show.bs.modal', e => {
     currentKeyId = e.relatedTarget.dataset.kid;
     document.getElementById('revealPassword').value = '';
+    const totpInput = document.getElementById('revealTOTP');
+    if (totpInput) totpInput.value = '';
     document.getElementById('revealError').classList.add('d-none');
     document.getElementById('revealKeyDisplay').classList.add('d-none');
     document.getElementById('revealForm').classList.remove('d-none');
@@ -174,12 +191,24 @@
   });
   document.getElementById('revealSubmit').addEventListener('click', async () => {
     const pass = document.getElementById('revealPassword').value;
-    if (!pass) return;
+    const totpInput = document.getElementById('revealTOTP');
+    const error = document.getElementById('revealError');
+    if (!pass) {
+      error.textContent = 'Introduce tu contraseña.';
+      error.classList.remove('d-none');
+      return;
+    }
+    if (totpInput && !totpInput.value.trim()) {
+      error.textContent = 'Introduce el código 2FA.';
+      error.classList.remove('d-none');
+      return;
+    }
     const btn = document.getElementById('revealSubmit');
     btn.disabled = true;
     try {
       const fd = new FormData();
       fd.append('password', pass);
+      if (totpInput) fd.append('totp_code', totpInput.value.trim());
       const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
       const res = await fetch(`/api-keys/${currentKeyId}/reveal`, {
         method: 'POST',
@@ -202,6 +231,9 @@
     } finally { btn.disabled = false; }
   });
   document.getElementById('revealPassword')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('revealSubmit').click();
+  });
+  document.getElementById('revealTOTP')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('revealSubmit').click();
   });
   document.getElementById('revealCopyBtn')?.addEventListener('click', () => {

@@ -105,6 +105,48 @@ func TestProfile2FASetupAllowsQRDataURI(t *testing.T) {
 	}
 }
 
+func TestAPIKeysRevealRequestsTOTPWhenRequired(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/api-keys", nil)
+	rr := httptest.NewRecorder()
+	data := templateFixtures(time.Now())["api_keys.html"]
+	data["UserTOTPEnabled"] = true
+	data["SensitiveTOTPFresh"] = false
+
+	tmpl.Render(rr, req, "api_keys.html", data)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `id="revealTOTP"`) {
+		t.Fatalf("API key reveal does not request the TOTP code:\n%s", body)
+	}
+	if !strings.Contains(body, `fd.append('totp_code', totpInput.value.trim())`) {
+		t.Fatalf("API key reveal does not submit the TOTP code:\n%s", body)
+	}
+}
+
+func TestAPIKeysRevealExplainsMissingTOTP(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/api-keys", nil)
+	rr := httptest.NewRecorder()
+	data := templateFixtures(time.Now())["api_keys.html"]
+	data["UserTOTPEnabled"] = false
+	data["SensitiveTOTPFresh"] = false
+
+	tmpl.Render(rr, req, "api_keys.html", data)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `activar 2FA en tu perfil`) {
+		t.Fatalf("API key reveal does not explain how to enable TOTP:\n%s", body)
+	}
+	if !strings.Contains(body, `id="revealSubmit"`) || !strings.Contains(body, `disabled`) {
+		t.Fatalf("API key reveal action remains enabled without TOTP:\n%s", body)
+	}
+}
+
 func templateFixtures(now time.Time) map[string]map[string]any {
 	base := func(extra map[string]any) map[string]any {
 		data := map[string]any{
@@ -225,6 +267,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		"api_key_new.html": base(map[string]any{}),
 		"api_keys.html": base(map[string]any{
 			"Keys":               []map[string]any{},
+			"UserTOTPEnabled":    true,
 			"SearchQuery":        "",
 			"SearchQueryEscaped": "",
 			"KeysPage":           1,
