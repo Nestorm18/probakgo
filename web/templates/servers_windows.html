@@ -188,7 +188,7 @@
 </div>
 
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 (function() {
   const input = document.getElementById('serverFilter');
   const tbody = document.querySelector('.server-tbody');

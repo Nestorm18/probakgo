@@ -226,7 +226,7 @@
 </div>
 {{end}}
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 (function() {
   const input = document.getElementById('dashboardServerFilter');
   const countEl = document.getElementById('dashboardFilterCount');

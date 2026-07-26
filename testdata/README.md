@@ -1,44 +1,83 @@
-# testdata - Fixtures de prueba
+# testdata: fixtures PVE/PBS
 
-Simula la recepción de reportes sin necesitar un nodo Proxmox real.
+Payloads de referencia para probar reportes sin consultar una API Proxmox real.
 
-## Requisitos
+## Contenido
 
-- El servidor `probakgo` en ejecución (`./probakgo`)
-- Una API key `pbk-` activa (créala en la web UI → API Keys)
-- `curl` instalado
+| Archivo | Tipo | Hostname / Machine ID | Datos |
+|---|---|---|---|
+| `fixture_pve.json` | PVE | `soporte1` / `11223344-5566-7788-99aa-bbccddeeff00` | Storages, contenidos y último backup |
+| `fixture_pbs.json` | PBS | `pbs-test` / `aabbccdd-eeff-0011-2233-445566778899` | Datastore, histórico y GC |
+| `seed_history.go` | SQLite | `soporte1` y `pbs-test` | Seis días adicionales de históricos |
+| `seed.sh` | Script de carga HTTP | ambos | Envía ambos fixtures con claves y Machine ID independientes |
 
-## Uso
+Los JSON no cubren todas las funciones recientes: no incluyen heartbeat separado, tareas PVE del último job, swap ni tareas PBS de sync/GC.
+
+## Requisitos de la API actual
+
+Cada petición necesita:
+
+- una API key `pbk-` activa;
+- `X-Machine-ID`;
+- un hostname igual al asociado a la key;
+- una key distinta por equipo.
+
+`seed.sh` cumple estos requisitos: acepta una key PVE y otra PBS, envía `X-Machine-ID` y mantiene una identidad distinta para cada fixture.
+
+## Carga rápida
 
 ```bash
-bash testdata/seed.sh http://localhost:36748 pbk-tuclaveaqui
+bash testdata/seed.sh \
+  http://localhost:36748 \
+  pbk-CLAVE-PVE \
+  pbk-CLAVE-PBS
 ```
 
-O si tienes `API_KEY=pbk-...` en tu `.env`:
+También puede leer `API_URL`, `PVE_API_KEY` y `PBS_API_KEY` desde `.env`.
+
+## Cargar los fixtures manualmente
+
+1. Arranca Probakgo.
+2. Crea dos API keys:
+   - hostname `soporte1`;
+   - hostname `pbs-test`.
+3. Envía cada fixture con su key y Machine ID.
 
 ```bash
-bash testdata/seed.sh
+curl -fS -X POST http://localhost:36748/api/report/pve \
+  -H "Authorization: Bearer pbk-CLAVE-PVE" \
+  -H "X-Machine-ID: 11223344-5566-7788-99aa-bbccddeeff00" \
+  -H "Content-Type: application/json" \
+  --data-binary @testdata/fixture_pve.json
+
+curl -fS -X POST http://localhost:36748/api/report/pbs \
+  -H "Authorization: Bearer pbk-CLAVE-PBS" \
+  -H "X-Machine-ID: aabbccdd-eeff-0011-2233-445566778899" \
+  -H "Content-Type: application/json" \
+  --data-binary @testdata/fixture_pbs.json
 ```
 
-Tras ejecutarlo, abre `http://localhost:36748` y verás en el dashboard:
-- 1 servidor PBS (`pbs-test`) con el datastore `synology`
-- 1 servidor PVE (`soporte1`) con 3 storages y 5 backups de VMs/contenedores
+Después abre `http://localhost:36748`. Deben aparecer:
 
-## Fixtures incluidos
+- PVE `soporte1`, con cuatro storages de ejemplo y backups de VM/CT;
+- PBS `pbs-test`, con el datastore `synology`.
 
-| Archivo | Tipo | Contenido |
-|---------|------|-----------|
-| `fixture_pbs.json` | PBS | 1 datastore (synology, 2.7 TB usados de 2.9 TB) |
-| `fixture_pve.json` | PVE | 3 storages, VMs 100–103 + CT 200 |
+## Añadir histórico
 
-Puedes ejecutar `seed.sh` varias veces para actualizar el timestamp del último reporte.
-
-## Historial de reportes
-
-Para poblar el gráfico de duración y la vista de historial con datos de los últimos 7 días, ejecuta después del seed normal:
+Con ambos servidores ya creados:
 
 ```bash
 go run testdata/seed_history.go
 ```
 
-Inserta 6 días adicionales con distintos estados (OK / warning / error) y duraciones, sin necesitar un cliente real ni `sqlite3` instalado.
+El programa:
+
+- lee `DATABASE_PATH` de `.env` o usa `probakgo_data.db`;
+- busca `soporte1` y `pbs-test`;
+- inserta seis días adicionales con estados/duraciones PVE y crecimiento PBS.
+
+Detén el servidor antes de manipular directamente la base si quieres evitar que la UI o los schedulers lean datos a mitad de la carga. Hazlo solo sobre una base de laboratorio.
+
+## Limpieza
+
+Usa **Configuración → Reiniciar BD** después de descargar una copia si necesitas conservar el escenario. Los usuarios se mantienen.

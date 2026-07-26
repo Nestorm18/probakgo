@@ -10,9 +10,10 @@ import (
 	"time"
 
 	"probakgo/internal/selfupdate"
+	appversion "probakgo/internal/version"
 )
 
-var version = "0.0.190"
+func currentVersion() string { return appversion.Version }
 
 func main() {
 	closeLog := setupLogging()
@@ -21,7 +22,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version":
-			fmt.Println(version)
+			fmt.Println(currentVersion())
 			return
 		case "install":
 			if err := runInstall(os.Args[2:]); err != nil {
@@ -62,7 +63,7 @@ func runReport() error {
 	if err != nil {
 		return err
 	}
-	log.Printf("probakgo-windows-client v%s", version)
+	log.Printf("probakgo-windows-client v%s", currentVersion())
 	log.Printf("Hostname    : %s", req.Hostname)
 	log.Printf("API URL     : %s", cfg.APIURL)
 	log.Printf("Disks       : %d", len(req.Disks))
@@ -89,7 +90,7 @@ func runUpdate() error {
 	if err := loadEnvIntoProcess(""); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	_, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-windows-client", version)
+	_, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-windows-client", currentVersion())
 	return err
 }
 

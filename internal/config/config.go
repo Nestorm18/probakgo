@@ -17,6 +17,7 @@ type Config struct {
 	APIHost        string
 	APIPort        string
 	SessionKey     string
+	DataKey        string
 	Timezone       string
 	SecureSession  bool
 	TrustedOrigins []string
@@ -32,6 +33,7 @@ func Load() *Config {
 		APIHost:        getEnv("API_HOST", "0.0.0.0"),
 		APIPort:        getEnv("API_PORT", "36748"),
 		SessionKey:     loadSessionKey(),
+		DataKey:        os.Getenv("DATA_ENCRYPTION_KEY"),
 		Timezone:       getEnv("TIMEZONE", "Europe/Madrid"),
 		SecureSession:  getEnv("SESSION_SECURE", "false") == "true",
 		TrustedOrigins: parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
@@ -80,6 +82,9 @@ func (c *Config) Validate() error {
 	}
 	if c.SessionKey == exampleSessionKey {
 		return fmt.Errorf("SESSION_KEY uses the public example value; remove it so probakgo can generate a random key")
+	}
+	if c.DataKey != "" && len(c.DataKey) < 32 {
+		return fmt.Errorf("DATA_ENCRYPTION_KEY is too short (%d bytes): minimum 32 bytes required", len(c.DataKey))
 	}
 	for _, raw := range c.TrustedProxies {
 		if _, err := netip.ParsePrefix(raw); err != nil {

@@ -4,14 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+
+	"probakgo/internal/secretbox"
 )
 
 type Store struct {
-	db *sql.DB
+	db      *sql.DB
+	secrets *secretbox.Box
 }
 
 func New(db *sql.DB) *Store {
 	return &Store{db: db}
+}
+
+func NewEncrypted(db *sql.DB, masterKey string) (*Store, error) {
+	box, err := secretbox.New(masterKey)
+	if err != nil {
+		return nil, err
+	}
+	return &Store{db: db, secrets: box}, nil
 }
 
 func (s *Store) DBSize(ctx context.Context) int64 {

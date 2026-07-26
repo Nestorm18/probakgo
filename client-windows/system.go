@@ -40,7 +40,7 @@ func buildReportRequest(ctx context.Context, cfg Config) (domain.WindowsReportRe
 		Hostname:      hostname,
 		IPAddress:     localIP(),
 		PublicIP:      publicIP(ctx),
-		ClientVersion: version,
+		ClientVersion: currentVersion(),
 		MachineID:     mid,
 		Disks:         disks,
 	}, nil
@@ -57,7 +57,7 @@ func buildHeartbeatRequest(ctx context.Context, cfg Config) (domain.HeartbeatReq
 		Hostname:      hostname,
 		IPAddress:     localIP(),
 		PublicIP:      publicIP(ctx),
-		ClientVersion: version,
+		ClientVersion: currentVersion(),
 		MachineID:     mid,
 	}, nil
 }

@@ -12,9 +12,10 @@ import (
 	"github.com/joho/godotenv"
 
 	"probakgo/internal/selfupdate"
+	appversion "probakgo/internal/version"
 )
 
-var version = "0.0.190"
+func currentVersion() string { return appversion.Version }
 
 func main() {
 	log.SetFlags(log.Ldate | log.Ltime)
@@ -36,7 +37,7 @@ func main() {
 			runUninstall(os.Args[2:])
 			return
 		case "update":
-			updated, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", version)
+			updated, err := selfupdate.Run("Nestorm18/probakgo", "probakgo-client", currentVersion())
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Update failed: %v\n", err)
 				os.Exit(1)
@@ -60,7 +61,7 @@ func main() {
 			runDoctor()
 			return
 		case "version":
-			fmt.Printf("probakgo-client v%s\n", version)
+			fmt.Printf("probakgo-client v%s\n", currentVersion())
 			return
 		}
 	}
@@ -92,7 +93,7 @@ func main() {
 	}
 	flag.Parse()
 
-	log.Printf("probakgo-client v%s", version)
+	log.Printf("probakgo-client v%s", currentVersion())
 	ensureHeartbeatTimerInstalled()
 
 	cfg := loadConfig()
@@ -199,7 +200,7 @@ func runHeartbeat() {
 		log.Println("ERROR: could not detect server type (PVE or PBS)")
 		os.Exit(1)
 	}
-	log.Printf("probakgo-client v%s", version)
+	log.Printf("probakgo-client v%s", currentVersion())
 	log.Printf("Server type : %s", cfg.ServerType)
 	log.Printf("Hostname    : %s", si.Hostname)
 	log.Printf("API URL     : %s", cfg.APIURL)

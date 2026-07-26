@@ -1,6 +1,4 @@
 /* ─── Google Fonts ───────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
-
 /* ─── Light theme (default) ──────────────────────────────────── */
 :root {
   --sidebar-w: 240px;
@@ -179,7 +177,7 @@
 body {
   background: var(--body-bg);
   color: var(--txt-primary);
-  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: .9rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -190,7 +188,7 @@ a { color: var(--clr-accent); text-decoration: none; }
 a:hover { color: var(--clr-accent-hv); }
 
 code {
-  font-family: 'DM Mono', 'SFMono-Regular', Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: .8em;
   color: var(--code-txt);
   background: var(--code-bg);
@@ -605,7 +603,7 @@ div[style*="overflow:hidden"]:has(> .table) {
 .form-control, .form-select {
   background: var(--input-bg); border: 1px solid var(--input-border);
   color: var(--txt-primary); border-radius: .4rem;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
   font-size: .85rem;
   transition: border-color .15s, box-shadow .15s;
 }
@@ -619,7 +617,7 @@ div[style*="overflow:hidden"]:has(> .table) {
 .form-text  { font-size: .73rem; color: var(--txt-muted); }
 .input-group-text {
   background: var(--input-grp-bg); border-color: var(--input-border); color: var(--txt-muted);
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 .filter-search .input-group-text {
   border-right: 0;
@@ -664,7 +662,7 @@ div[style*="overflow:hidden"]:has(> .table) {
 /* ─── Buttons ────────────────────────────────────────────────── */
 .btn {
   border-radius: .4rem; font-size: .8rem; font-weight: 500;
-  transition: all .15s; font-family: 'DM Sans', system-ui, sans-serif;
+  transition: all .15s; font-family: system-ui, sans-serif;
 }
 .btn-primary   { background: var(--clr-accent); border-color: var(--clr-accent); color: #fff; }
 .btn-primary:hover { background: var(--clr-accent-hv); border-color: var(--clr-accent-hv); color: #fff; }
@@ -925,7 +923,7 @@ div[style*="overflow:hidden"]:has(> .table) {
   border: 1px solid var(--card-border); background: var(--btn-sec-bg);
   cursor: pointer; font-size: .8rem; color: var(--txt-secondary);
   transition: all .12s; user-select: none;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: system-ui, sans-serif;
 }
 .day-check-label:hover { border-color: var(--btn-sec-hv-bd); color: var(--txt-primary); }
 .day-check-label input[type=checkbox] { display: none; }

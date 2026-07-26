@@ -16,7 +16,7 @@ func sendHeartbeat(cfg *Config, si *SysInfo) error {
 		"hostname":       si.Hostname,
 		"server_type":    cfg.ServerType,
 		"ip_address":     si.localIP(),
-		"client_version": version,
+		"client_version": currentVersion(),
 		"machine_id":     machineID,
 	}
 	body, err := json.Marshal(data)

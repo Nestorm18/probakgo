@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -60,7 +60,7 @@ func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	for _, eval := range evaluators {
 		alerts, err := eval(st, cfg)
 		if err != nil {
-			log.Printf("alert evaluator error: %v", err)
+			slog.Warn("alert evaluator error", "err", err)
 			continue
 		}
 		all = append(all, alerts...)

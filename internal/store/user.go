@@ -13,7 +13,7 @@ func (s *Store) GetUserByUsername(ctx context.Context, username string) (*domain
 	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip,
 		totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at, session_version
 		FROM users WHERE username = ?`, username)
-	return scanUser(row)
+	return s.scanUser(row)
 }
 
 func (s *Store) GetUser(ctx context.Context, id int64) (*domain.User, error) {
@@ -21,7 +21,7 @@ func (s *Store) GetUser(ctx context.Context, id int64) (*domain.User, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT id, username, password_hash, role, is_active, created_at, last_login_at, last_login_ip,
 		totp_enabled, totp_secret, totp_confirmed_at, totp_grace_started_at, session_version
 		FROM users WHERE id = ?`, id)
-	return scanUser(row)
+	return s.scanUser(row)
 }
 
 func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
@@ -54,6 +54,12 @@ func (s *Store) ListUsers(ctx context.Context) ([]domain.User, error) {
 		u.LastLoginIP = lastLoginIP.String
 		u.TOTPEnabled = totpEnabled != 0
 		u.TOTPSecret = totpSecret.String
+		if s.secrets != nil {
+			u.TOTPSecret, err = s.secrets.Decrypt(u.TOTPSecret)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if totpConfirmedAt.Valid {
 			u.TOTPConfirmedAt = &totpConfirmedAt.Time
 		}
@@ -93,8 +99,16 @@ func (s *Store) UpdateUserPassword(ctx context.Context, id int64, hash string) e
 }
 
 func (s *Store) EnableUserTOTP(ctx context.Context, id int64, secret string) error {
+	storedSecret := secret
+	if s.secrets != nil {
+		var err error
+		storedSecret, err = s.secrets.Encrypt(secret)
+		if err != nil {
+			return err
+		}
+	}
 	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=1, totp_secret=?, totp_confirmed_at=CURRENT_TIMESTAMP, totp_grace_started_at=NULL, session_version=session_version+1 WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=1, totp_secret=?, totp_confirmed_at=CURRENT_TIMESTAMP, totp_grace_started_at=NULL, session_version=session_version+1 WHERE id=?`, secret, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=1, totp_secret=?, totp_confirmed_at=CURRENT_TIMESTAMP, totp_grace_started_at=NULL, session_version=session_version+1 WHERE id=?`, storedSecret, id)
 	return err
 }
 
@@ -157,7 +171,7 @@ func (s *Store) HasUsers(ctx context.Context) (bool, error) {
 	return count > 0, err
 }
 
-func scanUser(row *sql.Row) (*domain.User, error) {
+func (s *Store) scanUser(row *sql.Row) (*domain.User, error) {
 	var u domain.User
 	var isActive int
 	var lastLoginAt sql.NullTime
@@ -177,6 +191,13 @@ func scanUser(row *sql.Row) (*domain.User, error) {
 	u.LastLoginIP = lastLoginIP.String
 	u.TOTPEnabled = totpEnabled != 0
 	u.TOTPSecret = totpSecret.String
+	if s.secrets != nil {
+		var err error
+		u.TOTPSecret, err = s.secrets.Decrypt(u.TOTPSecret)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if totpConfirmedAt.Valid {
 		u.TOTPConfirmedAt = &totpConfirmedAt.Time
 	}

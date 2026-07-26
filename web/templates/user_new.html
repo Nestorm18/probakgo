@@ -61,7 +61,7 @@
 
 {{end}}
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 document.querySelectorAll('.pwd-toggle').forEach(btn => {
   btn.addEventListener('click', e => {
     e.preventDefault();

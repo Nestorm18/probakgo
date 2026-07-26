@@ -185,7 +185,7 @@
 
 {{end}}
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 document.addEventListener('click', e => {
   const btn = e.target.closest('.suppress-open-btn');
   if (!btn) return;

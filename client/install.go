@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"probakgo/internal/schedule"
 )
 
 const (
@@ -197,8 +199,9 @@ func runInstall(args []string) {
 	must(os.WriteFile(logrotateConfPath, []byte(logrotateConf), 0644), "write logrotate config")
 	fmt.Println("logrotate: " + logrotateConfPath)
 
-	// 7. Install cron: auto-update at 01:00 + PBS daily report at 06:00
-	cronContent := fmt.Sprintf("0 1 * * * root %s update >> %s/update.log 2>&1\n", binaryPath, logDir)
+	// 7. Install cron: auto-update during the 01:00 hour + PBS daily report at 06:00
+	updateMinute := schedule.DailyMinute(schedule.HostSeed() + ":probakgo-client-update")
+	cronContent := fmt.Sprintf("%d 1 * * * root %s update >> %s/update.log 2>&1\n", updateMinute, binaryPath, logDir)
 	if isPBS {
 		cronContent += fmt.Sprintf("0 6 * * * root %s >> %s/report.log 2>&1\n", binaryPath, logDir)
 	}
@@ -206,9 +209,9 @@ func runInstall(args []string) {
 		fmt.Printf("WARN: could not install cron: %v\n", err)
 	} else {
 		if isPBS {
-			fmt.Printf("Cron installed: %s (update 01:00, report 06:00)\n", clientCronPath)
+			fmt.Printf("Cron installed: %s (update 01:%02d, report 06:00)\n", clientCronPath, updateMinute)
 		} else {
-			fmt.Printf("Auto-update cron installed: %s\n", clientCronPath)
+			fmt.Printf("Auto-update cron installed: %s (01:%02d)\n", clientCronPath, updateMinute)
 		}
 	}
 	installHeartbeatTimer()

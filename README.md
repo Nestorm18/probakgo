@@ -1,54 +1,94 @@
 # probakgo
 
-Monitor de infraestructura Proxmox y Windows: binario unico, SQLite embebido y web UI en el mismo puerto.
+Monitor de copias de seguridad e infraestructura para Proxmox VE, Proxmox Backup Server y Windows.
 
-[![Go 1.22+](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://golang.org)
+[![Go 1.26.5](https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm_NC_1.0-blue)](LICENSE)
 
-Probakgo monitoriza **Proxmox VE**, **Proxmox Backup Server** y servidores **Windows**. Centraliza estado de backups, discos, heartbeat y alertas en una web simple con informes por email.
+El servidor se distribuye como un único binario con la web y las migraciones embebidas, usa SQLite sin CGO y escucha por defecto en el puerto `36748`. Los clientes envían reportes autenticados con claves `pbk-` vinculadas al Machine ID del primer equipo que las usa.
 
-## Caracteristicas
+## Funcionalidad actual
 
-- Dashboard con estado de PVE, PBS y Windows.
-- Deteccion de backups fallidos, VMs sin backup, discos casi llenos y nodos sin heartbeat.
-- Alertas globales, por servidor y por VM, con supresion temporal.
-- Historial de jobs PVE con detalle por VM.
-- PBS con datastores, verificacion, estimacion de llenado, estado de montaje y resultado de sincronizaciones remotas/garbage collection.
-- Windows con discos, SMART basico, heartbeat y estado por servidor.
-- Alertas Windows por heartbeat, disco lleno, salud de disco y volumen desaparecido.
-- Informe diario por email.
-- Auto-update del servidor y de los clientes via GitHub Releases.
-- Control de acceso por roles: `reader`, `editor`, `admin`.
+### Monitorización
+
+- Dashboard unificado para PVE, PBS y Windows, con estado, último reporte, heartbeat, IP local/pública y versión del cliente.
+- PVE: storages, swap, último job `vzdump`, detalle por VM/CT, tamaño/duración/fichero e historial de jobs.
+- Configuración de backups esperados por VM y día; el instalador PVE intenta importarla desde `/cluster/backup`.
+- PBS: datastores, uso, tendencia y fecha estimada de llenado, montaje, grupos/snapshots, verificación, garbage collection y sincronizaciones remotas.
+- Windows: volúmenes lógicos, espacio usado/libre, salud física best-effort, heartbeat e historial.
+- Exportaciones CSV/JSON de alertas, servidores PVE/PBS e históricos.
+
+### Alertas y avisos
+
+- Disco, backup fallido o pequeño, VM esperada ausente, VM desconocida, reporte/heartbeat atrasado y swap activa.
+- PBS: llenado estimado, verificación fallida y fallos de sync/garbage collection. La antigüedad de snapshots retenidos es informativa y no genera alerta.
+- Windows: disco, heartbeat, salud de disco y volumen desaparecido respecto al reporte anterior.
+- Umbrales globales y overrides por servidor; PVE añade overrides por VM.
+- Supresión temporal por alerta y modo mantenimiento por servidor.
+- Estado e historial de alertas, badges en vivo, sonido/notificaciones opcionales del navegador.
+- Informe diario por SMTP y, opcionalmente, emails inmediatos al aparecer o resolverse alertas críticas.
+
+### Administración y seguridad
+
+- Roles `reader`, `editor` y `admin`.
+- 2FA TOTP por usuario, política opcional para exigirlo a editores/administradores y confirmación TOTP para acciones sensibles.
+- Revocación de sesiones al cambiar contraseña, rol, estado o 2FA.
+- Protección CSRF/origen, límites de peticiones, cabeceras de seguridad y confianza explícita de proxies.
+- CSP con nonce por petición para scripts y SRI en Bootstrap, Bootstrap Icons y Chart.js.
+- Bloqueo progresivo de IP tras intentos de login fallidos y gestión de baneos desde la web.
+- Audit log de cambios administrativos.
+- API keys, credenciales SMTP y secretos TOTP cifrados en SQLite mediante una clave externa.
+- Checklist de producción para HTTPS/VPN, cookie segura, 2FA, URL pública, email y retención.
+- Retención automática, descarga de una copia SQLite y reinicio operativo que preserva usuarios, auditoría y migraciones.
+- Servicio systemd endurecido y ejecutado como usuario dedicado `probakgo` en la instalación estándar.
+- Auto-update verificado mediante `SHA256SUMS`; las releases publican procedencia firmada verificable.
+
+CPU y RAM del cliente Windows están fuera del alcance actual.
 
 ## Arquitectura
 
 ```text
-probakgo-client          -> POST /api/report/pve      -> probakgo
-probakgo-client          -> POST /api/report/pbs      -> probakgo
-probakgo-windows-client  -> POST /api/report/windows  -> probakgo
-probakgo-client          -> POST /api/heartbeat       -> probakgo
-                                                        |
-                                                     SQLite
-                                                        |
-                                                 Web UI :36748
+PVE vzdump hook ───────────────┐
+PBS report cron (06:00) ───────┼─ probakgo-client ── POST /api/report/{pve|pbs}
+PVE/PBS heartbeat (cada 5 min) ┘                  └─ POST /api/heartbeat
+
+Windows task (cada 5 min) ─────── probakgo-windows-client
+                                      ├─ POST /api/report/windows
+                                      └─ POST /api/heartbeat
+
+                                      probakgo :36748
+                                      ├─ REST API /api/*
+                                      ├─ Web UI /
+                                      └─ SQLite + migraciones embebidas
 ```
 
-El cliente Proxmox se ejecuta como hook de vzdump y con heartbeat systemd cada 5 minutos. El cliente Windows se instala como tarea programada cada 5 minutos.
+## Instalación rápida
 
-## Instalacion rapida
-
-### Servidor
+### Servidor Linux
 
 ```bash
-mkdir -p /opt/probakgo && cd /opt/probakgo
-wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo_linux_amd64 -O probakgo
-chmod +x probakgo
+mkdir -p /opt/probakgo
+wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo_linux_amd64 \
+  -O /opt/probakgo/probakgo
+chmod +x /opt/probakgo/probakgo
+cd /opt/probakgo
 ./probakgo
 ```
 
-Abre `http://localhost:36748`. El usuario inicial es `probakgo`; la contrasena se genera en el primer arranque y aparece en los logs del servidor.
+En el primer arranque:
 
-Diagnostico:
+- se genera y guarda `SESSION_KEY` en `.env`;
+- se genera `DATA_ENCRYPTION_KEY` y se cifran API keys, SMTP y TOTP antes de persistirlos;
+- se crea el administrador `probakgo` y su contraseña aleatoria queda en un archivo `0600`, nunca en logs;
+- si se ejecuta como `root` desde `/opt/probakgo`, se instala un servicio endurecido con usuario dedicado y un auto-update diario repartido durante la hora de la 01:00.
+
+En otra terminal, recupera una sola vez la contraseña, abre `http://<ip-servidor>:36748` y cámbiala:
+
+```bash
+/opt/probakgo/probakgo initial-password
+```
+
+Después ejecuta:
 
 ```bash
 /opt/probakgo/probakgo doctor
@@ -56,113 +96,132 @@ Diagnostico:
 
 ### Cliente Proxmox
 
+Crea una API key en **API Keys → Nueva API Key**. El hostname indicado debe coincidir con el que enviará el nodo.
+
 ```bash
-# Crea una API key pbk- en la web UI: API Keys -> Nueva
-wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 -O /tmp/probakgo-client
+wget https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-client_linux_amd64 \
+  -O /tmp/probakgo-client
 chmod +x /tmp/probakgo-client
-/tmp/probakgo-client install --api-url http://tu-servidor:36748 --api-key pbk-...
+/tmp/probakgo-client install \
+  --api-url http://<ip-servidor>:36748 \
+  --api-key pbk-...
 ```
 
-Diagnostico:
+El instalador crea `/opt/probakgo/.env`, genera el token Proxmox si no se aporta, añade `/usr/local/bin/probakgo-client`, configura logs/update/heartbeat y:
+
+- en PVE, registra el hook de `vzdump`, sincroniza la configuración esperada y envía un reporte inicial;
+- en PBS, programa además un reporte diario a las 06:00.
+
+Verificación:
 
 ```bash
-/opt/probakgo/probakgo-client doctor
+probakgo-client doctor
+probakgo-client --vzdump-hook   # PVE: fuerza un reporte
+probakgo-client                 # PBS: envía un reporte
 ```
 
 ### Cliente Windows
 
-En Windows, abre PowerShell como administrador:
+Abre PowerShell como administrador:
 
 ```powershell
-# Crea una API key pbk- en la web UI: API Keys -> Nueva
-Invoke-WebRequest -Uri "https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-windows-client_windows_amd64.exe" -OutFile "$env:TEMP\probakgo-windows-client.exe"
-& "$env:TEMP\probakgo-windows-client.exe" install --api-url http://tu-servidor:36748 --api-key pbk-...
+Invoke-WebRequest `
+  -Uri "https://github.com/Nestorm18/probakgo/releases/latest/download/probakgo-windows-client_windows_amd64.exe" `
+  -OutFile "$env:TEMP\probakgo-windows-client.exe"
+
+& "$env:TEMP\probakgo-windows-client.exe" install `
+  --api-url http://<ip-servidor>:36748 `
+  --api-key pbk-...
 ```
 
-El instalador copia el binario a `C:\ProgramData\Probakgo`, escribe `.env`, crea `Probakgo Windows Report` cada 5 minutos y `Probakgo Windows Update` a las 04:17. Ambas tareas se ejecutan como `SYSTEM`. Los logs quedan en `C:\ProgramData\Probakgo\probakgo-windows-client.log`, rotan a diario como `probakgo-windows-client-YYYY-MM-DD.log` y conservan solo los ultimos 7 dias.
+Se instala en `C:\ProgramData\Probakgo`, restringe sus ACL a `SYSTEM` y administradores, y crea:
 
-Si el cliente ya esta instalado, ejecutar un instalador mas reciente actualiza el binario existente. El instalador detiene las instancias lanzadas por las tareas y reintenta la sustitucion si el ejecutable estaba ocupado.
+- `Probakgo Windows Report`, cada 5 minutos;
+- `Probakgo Windows Update`, a diario a las 04:17.
 
-Diagnostico:
+Ambas tareas se ejecutan como `SYSTEM`. Los logs rotan diariamente y conservan 7 días.
 
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
 Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 ```
 
-Actualizar cliente Windows:
-
-```powershell
-C:\ProgramData\Probakgo\probakgo-windows-client.exe update
-```
-
-El comando permite forzar la comprobacion; normalmente la tarea diaria realiza la actualizacion automaticamente.
-
-## Configuracion
+## Configuración
 
 ### Servidor `.env`
 
-| Variable | Por defecto | Descripcion |
-|---|---:|---|
-| `SESSION_KEY` | auto | Clave de sesion generada en el primer arranque |
-| `API_HOST` | `0.0.0.0` | Interfaz de escucha |
-| `API_PORT` | `36748` | Puerto |
-| `DATABASE_PATH` | `probakgo_data.db` | Ruta SQLite |
-| `TIMEZONE` | `Europe/Madrid` | Zona horaria |
-| `SESSION_SECURE` | `false` | Usar `true` si hay HTTPS delante |
-| `TRUSTED_PROXY_CIDRS` | - | CIDR de nginx/proxy que puede enviar `X-Forwarded-*`; por ejemplo `127.0.0.1/32,::1/128` |
-| `CSRF_TRUSTED_ORIGINS` | - | Origenes web adicionales con esquema completo, por ejemplo `https://monitor.example` |
-| `DEV` | `false` | Barra debug |
+| Variable | Valor por defecto | Descripción |
+|---|---|---|
+| `API_HOST` | `0.0.0.0` | Dirección de escucha |
+| `API_PORT` | `36748` | Puerto HTTP |
+| `DATABASE_PATH` | `probakgo_data.db` | Ruta de SQLite |
+| `SESSION_KEY` | generada | Mínimo 32 bytes; se persiste en el primer arranque |
+| `DATA_ENCRYPTION_KEY` | generada | Mínimo 32 bytes; cifra API keys, SMTP y TOTP. Debe respaldarse junto a SQLite |
+| `TIMEZONE` | `Europe/Madrid` | Zona horaria del scheduler de email |
+| `SESSION_SECURE` | `false` | Debe ser `true` cuando el panel se sirve por HTTPS |
+| `TRUSTED_PROXY_CIDRS` | vacío | CIDR de proxies autorizados para `X-Forwarded-*` |
+| `CSRF_TRUSTED_ORIGINS` | vacío | Orígenes completos adicionales, separados por comas |
+| `DEV` | `false` | Activa la barra de depuración |
+| `GITHUB_TOKEN` | vacío | Necesario para releases privadas |
+
+La URL usada en los comandos de instalación y la declaración de acceso exclusivo por VPN se guardan desde **Configuración → Sistema**.
 
 ### Cliente Proxmox `/opt/probakgo/.env`
 
-| Variable | Descripcion |
+| Variable | Descripción |
 |---|---|
 | `API_URL` | URL del servidor Probakgo |
-| `API_KEY` | API key `pbk-` |
-| `PROXMOX_TOKEN` | Token API generado por `install` |
-| `PROXMOX_SECRET` | Secret del token |
-| `PROXMOX_VERIFY_TLS` | `false` para certificados auto-firmados |
+| `API_KEY` | Clave `pbk-` |
+| `PROXMOX_TOKEN` / `PROXMOX_SECRET` | Credenciales API de Proxmox |
+| `PROXMOX_VERIFY_TLS` | `false` para el certificado autofirmado habitual |
 | `PROXMOX_CA_BUNDLE` | CA personalizada opcional |
+| `SERVER_TYPE` | Override opcional: `pve` o `pbs` |
+| `DEBUG_MODE` / `DEBUG_API_CALLS` | Depuración opcional |
+| `GITHUB_TOKEN` | Token para releases privadas |
 
-### Cliente Windows `C:\ProgramData\Probakgo\.env`
+El cliente Windows solo guarda `API_URL` y `API_KEY` en `C:\ProgramData\Probakgo\.env`.
 
-| Variable | Descripcion |
+## Comandos
+
+| Binario | Comandos |
 |---|---|
-| `API_URL` | URL del servidor Probakgo |
-| `API_KEY` | API key `pbk-` |
+| `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>` |
+| `probakgo-client` | `install`, `uninstall`, `update`, `heartbeat`, `doctor`, `version` |
+| `probakgo-windows-client.exe` | reporte por defecto, `install`, `update`, `heartbeat`, `doctor`, `version` |
 
-## Compilar desde codigo fuente
+El modo reporte del cliente Proxmox acepta `--server-type`, `--vzdump-hook`, `--file`, `--debug` y `--debug-api-calls`.
 
-Requiere Go. Los binarios se compilan sin CGO.
+## Compilar y probar
+
+Requiere Go 1.26.5.
 
 ```bash
-# Servidor
 go build -o probakgo .
-
-# Cliente Proxmox
 go build -o probakgo-client ./client/
-
-# Cliente Windows
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o probakgo-windows-client.exe ./client-windows/
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 \
+  go build -o probakgo-windows-client.exe ./client-windows/
+go vet ./...
+go test ./...
 ```
 
-Inyectar version:
+La versión única vive en `internal/version/version.go` y se inyecta en los tres binarios durante la release. Los assets publicados son:
 
-```bash
-CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo .
-CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo-client ./client/
-GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags "-X main.version=1.0.0" -o probakgo-windows-client.exe ./client-windows/
-```
+- `probakgo_linux_amd64`
+- `probakgo-client_linux_amd64`
+- `probakgo-windows-client_windows_amd64.exe`
+- `SHA256SUMS`
 
-## Documentacion
+CI exige al menos un 35 % de cobertura global. El workflow de release usa el entorno `release` y genera attestations firmadas para los tres binarios.
 
-| Documento | Descripcion |
+## Documentación
+
+| Documento | Contenido |
 |---|---|
-| [INSTALLATION.md](INSTALLATION.md) | Instalacion completa, nginx, HTTPS, clientes y troubleshooting |
-| [RELEASES.md](RELEASES.md) | Checklist de publicacion y rollback |
-| [docs/DEVTEST.md](docs/DEVTEST.md) | Pruebas end-to-end |
+| [INSTALLATION.md](INSTALLATION.md) | Instalación completa, proxy HTTPS, clientes, seguridad y troubleshooting |
+| [RELEASES.md](RELEASES.md) | CI, publicación, comprobaciones y rollback |
+| [docs/DEVTEST.md](docs/DEVTEST.md) | Prueba end-to-end en laboratorio |
+| [testdata/README.md](testdata/README.md) | Fixtures PVE/PBS locales |
 
 ## Licencia
 
-[PolyForm Noncommercial 1.0.0](LICENSE). Uso libre para fines no comerciales.
+[PolyForm Noncommercial 1.0.0](LICENSE). Uso permitido para fines no comerciales según sus términos.

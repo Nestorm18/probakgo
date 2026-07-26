@@ -23,18 +23,16 @@ jobs:
           go-version: '1.26.5'
           cache: true
 
-      - name: Check version sync
+      - name: Read version
         id: version
         run: |
-          SERVER_VER=$(grep -oP 'var version = "\K[^"]+' main.go)
-          CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client/main.go)
-          WINDOWS_CLIENT_VER=$(grep -oP 'var version = "\K[^"]+' client-windows/main.go)
-          if [ "$SERVER_VER" != "$CLIENT_VER" ] || [ "$SERVER_VER" != "$WINDOWS_CLIENT_VER" ]; then
-            echo "ERROR: server version ($SERVER_VER), client version ($CLIENT_VER), windows client version ($WINDOWS_CLIENT_VER) - keep them in sync"
+          APP_VERSION=$(grep -oP 'var Version = "\K[^"]+' internal/version/version.go)
+          if [[ ! "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "ERROR: invalid version in internal/version/version.go: $APP_VERSION"
             exit 1
           fi
-          echo "Version sync OK: $SERVER_VER"
-          echo "version=$SERVER_VER" >> "$GITHUB_OUTPUT"
+          echo "Version: $APP_VERSION"
+          echo "version=$APP_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: go build ./...
@@ -42,14 +40,22 @@ jobs:
       - name: Vet
         run: go vet ./...
 
-      - name: Test
-        run: go test ./...
+      - name: Test and enforce coverage floor
+        shell: bash
+        run: |
+          go test -coverprofile=coverage.out ./...
+          TOTAL=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
+          echo "Total coverage: ${TOTAL}%"
+          awk -v total="$TOTAL" 'BEGIN { if (total + 0 < 35) exit 1 }'
 
   release:
     needs: build
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     uses: ./.github/workflows/release.yml
     with:
       tag: v${{ needs.build.outputs.version }}

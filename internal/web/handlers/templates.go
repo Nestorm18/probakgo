@@ -15,6 +15,7 @@ import (
 	"probakgo/internal/netutil"
 	"probakgo/internal/selfupdate"
 	"probakgo/internal/session"
+	"probakgo/internal/web/csp"
 )
 
 var standaloneTemplates = map[string]bool{
@@ -218,6 +219,7 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		}
 		m["CSRFField"] = template.HTML("")
 		m["CSRFToken"] = ""
+		m["CSPNonce"] = csp.Nonce(r)
 		m["Version"] = t.version
 		if _, has := m["Flash"]; !has {
 			m["Flash"] = r.URL.Query().Get("flash")
@@ -322,7 +324,7 @@ func renderTemplateError(w http.ResponseWriter, r *http.Request, name, phase str
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>%s</title>
-  <style>
+  <style nonce="%s">
     body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;margin:0;background:#f8fafc;color:#0f172a}
     main{max-width:960px;margin:48px auto;padding:0 24px}
     .box{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:24px;box-shadow:0 8px 24px rgba(15,23,42,.06)}
@@ -343,6 +345,7 @@ func renderTemplateError(w http.ResponseWriter, r *http.Request, name, phase str
 </body>
 </html>`,
 		template.HTMLEscapeString(title),
+		template.HTMLEscapeString(csp.Nonce(r)),
 		template.HTMLEscapeString(title),
 		template.HTMLEscapeString(phase),
 		template.HTMLEscapeString(name),

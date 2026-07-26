@@ -17,7 +17,7 @@ type doctor struct {
 
 func runDoctor() {
 	d := &doctor{}
-	fmt.Printf("probakgo-client doctor v%s\n\n", version)
+	fmt.Printf("probakgo-client doctor v%s\n\n", currentVersion())
 
 	cfg := loadConfig()
 	si := newSysInfo(cfg)

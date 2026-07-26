@@ -42,6 +42,12 @@ func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error)
 	if err != nil {
 		return nil, err
 	}
+	if s.secrets != nil {
+		c.SMTPPass, err = s.secrets.Decrypt(c.SMTPPass)
+		if err != nil {
+			return nil, err
+		}
+	}
 	c.IsEnabled = isEnabled != 0
 	c.RetentionEnabled = retEnabled != 0
 	c.AlertBackupErr = alertBackupErr != 0
@@ -53,6 +59,14 @@ func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error)
 }
 
 func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) error {
+	smtpPassword := c.SMTPPass
+	if s.secrets != nil {
+		var err error
+		smtpPassword, err = s.secrets.Encrypt(smtpPassword)
+		if err != nil {
+			return err
+		}
+	}
 	debug.RecordQuery(ctx, `INSERT INTO email_config (id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_windows_disk_pct, alert_backup_err, alert_pbs_stale_hours, public_api_url, vpn_only_access, alert_pve_heartbeat_minutes, critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO email_config (
@@ -82,7 +96,7 @@ func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) err
 			critical_alerts_enabled=excluded.critical_alerts_enabled,
 			enforce_totp_non_readers=excluded.enforce_totp_non_readers,
 			sensitive_actions_require_totp=excluded.sensitive_actions_require_totp`,
-		c.SMTPHost, c.SMTPPort, c.SMTPUser, c.SMTPPass,
+		c.SMTPHost, c.SMTPPort, c.SMTPUser, smtpPassword,
 		c.Recipients, boolToInt(c.IsEnabled), c.SendTime,
 		c.RetentionMonths, boolToInt(c.RetentionEnabled), c.AlertDiskPct, c.AlertWindowsDiskPct, boolToInt(c.AlertBackupErr),
 		c.AlertPBSStaleHours, c.PublicAPIURL, boolToInt(c.VPNOnlyAccess), c.AlertPVEHeartbeatMinutes,

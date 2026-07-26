@@ -152,7 +152,7 @@ Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80</pre>
 
 {{end}}
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 function copyText(text, btn) {
   const done = () => {
     const orig = btn.innerHTML;

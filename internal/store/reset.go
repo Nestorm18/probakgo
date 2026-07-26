@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-// ResetAllData deletes all operational data. Users are preserved.
+// ResetAllData deletes all operational data. Users, audit logs and migration
+// history are preserved so administrators retain access and a security trail.
 func (s *Store) ResetAllData(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -29,14 +30,19 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		"pve_storages",
 		"pve_reports",
 		"pve_servers",
+		"pbs_maintenance_tasks",
 		"pbs_snapshots",
 		"pbs_store_history",
 		"pbs_gc_status",
 		"pbs_stores",
 		"pbs_reports",
 		"pbs_servers",
+		"windows_disks",
+		"windows_reports",
+		"windows_servers",
 		"api_keys",
 		"vm_backup_configs",
+		"email_delivery_status",
 		"email_config",
 		"ip_bans",
 		"login_attempts",

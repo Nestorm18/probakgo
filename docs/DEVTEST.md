@@ -1,170 +1,223 @@
-# Guía de pruebas reales (devtest)
+# Guía de pruebas reales
 
-Cómo desplegar **probakgo** en tu entorno local de VMs + Proxmox para validar el flujo end-to-end real (servidor + cliente + backup real → dashboard).
+Despliegue de laboratorio para validar el flujo completo: servidor, clientes, reportes, heartbeat, alertas, email y actualización.
 
----
+## Entorno recomendado
 
-## Setup necesario
+- Una VM Linux x86-64 para el servidor.
+- Un nodo PVE 7+.
+- Opcional: un PBS 2+.
+- Opcional: una máquina Windows.
+- Acceso `root`/administrador y conectividad al puerto `36748`.
+- Go 1.26.5 en la máquina de desarrollo.
 
-- 1 VM Linux x86-64 para el servidor probakgo (Debian/Ubuntu mínimo, 1GB RAM, 2GB disco)
-- 1 nodo Proxmox VE 7+ accesible por red desde la VM del servidor (puede ser virtualizado o físico)
-- Acceso root SSH al nodo Proxmox
-- Conectividad de red entre la VM servidor y el Proxmox en el puerto 36748
+No uses credenciales ni bases de datos de producción.
 
----
+## 1. Comprobaciones locales
 
-## 1. Compilar desde Windows (cross-compile para Linux AMD64)
+Desde la raíz del repositorio:
 
-Si tu máquina de desarrollo es Windows, compila los binarios para Linux antes de subirlos:
+```powershell
+go build ./...
+go vet ./...
+go test ./...
+```
+
+Comprueba también la versión única:
+
+```powershell
+Select-String -Path internal\version\version.go -Pattern 'var Version'
+```
+
+## 2. Compilar desde Windows
 
 ```powershell
 $env:GOOS = "linux"
 $env:GOARCH = "amd64"
 $env:CGO_ENABLED = "0"
 
-# Servidor
 go build -o probakgo .
-
-# Cliente
 go build -o probakgo-client ./client/
 
-# Cliente Windows
 $env:GOOS = "windows"
 $env:GOARCH = "amd64"
-$env:CGO_ENABLED = "0"
 go build -o probakgo-windows-client.exe ./client-windows/
 
-# Restaurar entorno tras compilar
 Remove-Item Env:GOOS
 Remove-Item Env:GOARCH
 Remove-Item Env:CGO_ENABLED
 ```
 
-Subir los binarios por SCP (disponible en Windows 10/11 por defecto):
+Sube los binarios:
 
 ```powershell
-# Servidor → VM Debian
 scp probakgo root@<ip-vm-servidor>:/tmp/probakgo
-
-# Cliente → nodo Proxmox
-scp probakgo-client root@<ip-nodo-proxmox>:/tmp/probakgo-client
+scp probakgo-client root@<ip-pve>:/tmp/probakgo-client
+# Opcional:
+scp probakgo-client root@<ip-pbs>:/tmp/probakgo-client
 ```
 
-El cliente Windows se prueba directamente en una maquina Windows con PowerShell como administrador.
+El cliente Windows se prueba directamente en Windows.
 
-En la VM Debian, crear el directorio, mover y dar permisos:
+## 3. Servidor
+
+En la VM:
 
 ```bash
-mkdir -p /opt/probakgo
+install -d -m 0755 /opt/probakgo
 mv /tmp/probakgo /opt/probakgo/probakgo
 chmod +x /opt/probakgo/probakgo
-```
-
----
-
-## 2. Servidor
-
-### Arrancar
-
-Con el binario ya movido a `/opt/probakgo/` (sección 1), arráncalo:
-
-```bash
 cd /opt/probakgo
 ./probakgo
 ```
 
-En el primer arranque (como root) auto-instala:
-- `SESSION_KEY` aleatoria persistida en `.env`
-- Servicio systemd `probakgo.service`
-- Cron de auto-update en `/etc/cron.d/probakgo` (01:00 diario)
+El primer arranque como `root`:
 
-### Acceder a la web UI
+- guarda `SESSION_KEY` en `.env`;
+- guarda `DATA_ENCRYPTION_KEY` en `.env`;
+- crea/migra `probakgo_data.db`;
+- crea el usuario `probakgo`;
+- guarda la contraseña inicial en un archivo `0600`, sin escribirla en el log;
+- instala `probakgo.service` con el usuario de sistema `probakgo` y el cron de update con jitter.
 
+No existe una contraseña inicial fija. Recupérala una sola vez:
+
+```bash
+/opt/probakgo/probakgo initial-password
 ```
+
+Inicia sesión en:
+
+```text
 http://<ip-vm-servidor>:36748
 ```
 
-- Usuario: `probakgo`
-- Contraseña: `admin123`
-- **Cambia la contraseña inmediatamente** desde Usuarios → editar contraseña
-
-En los logs del primer arranque aparece también una API key `adm-...` (preview). La clave completa la consigues entrando a la web → API Keys.
-
-### Arrancar como servicio
+Cambia la contraseña, activa 2FA en **Perfil** y ejecuta:
 
 ```bash
+/opt/probakgo/probakgo doctor
 systemctl status probakgo
-systemctl restart probakgo
-journalctl -u probakgo -f         # tail de logs en vivo
+systemctl cat probakgo
 ```
 
----
+La unidad debe incluir `User=probakgo`, `NoNewPrivileges=true`, `PrivateTmp=true` y `ProtectSystem=strict`.
 
-## 3. Crear API key para el cliente
+Si el proceso manual sigue ejecutándose, termínalo antes de arrancar el servicio para evitar que ambos usen el mismo puerto.
 
-En la web UI:
+## 4. Configuración inicial en la web
 
-1. Ir a **API Keys → Nueva API Key**
-2. **Tipo:** `server (pbk-)` - cliente Proxmox
-3. **Nombre:** identifica el nodo, ej. `pve-lab`
-4. Copiar la clave generada - **sólo se muestra una vez**
+Como administrador:
 
-La pantalla de key creada muestra pestanas para **Linux / Proxmox** y **Windows**. Usa la pestana que corresponda al tipo de cliente.
+1. Abre **Configuración → Sistema**.
+2. Configura la URL pública/interna que deben usar los clientes.
+3. Si el laboratorio solo entra por VPN, marca esa opción; no la uses para un puerto publicado.
+4. Activa 2FA para acciones sensibles si quieres probar el flujo completo.
+5. Revisa el checklist de producción.
+6. En **Configuración → Alertas**, define umbrales fáciles de provocar.
+7. Opcional: configura SMTP y envía una prueba.
 
----
+## 5. Crear API keys
 
-### Token GitHub para repo privado
+Crea una key distinta por equipo en **API Keys → Nueva API Key**.
 
-Si la release de `probakgo` está en un repositorio privado, crea un token temporal en GitHub antes de generar el comando de instalación:
+- **Hostname del servidor** debe coincidir exactamente con el hostname que enviará el cliente.
+- **Alias visible** es opcional.
+- **URL Proxmox** es opcional.
+- Copia la clave `pbk-`; no existen claves administrativas `adm-`.
 
-1. En GitHub, entra en **Settings** → **Developer settings** → **Personal access tokens**.
-2. Preferible: **Fine-grained tokens** → **Generate new token**.
-3. Selecciona el repositorio `Nestorm18/probakgo`.
-4. En permisos, concede **Contents: Read-only**. No necesita permisos de escritura.
-5. Pon una expiración corta, por ejemplo 1 día o 7 días.
-6. Copia el token y pégalo en el campo **Token GitHub para instalación** al crear la API key en Probakgo.
+La key se enlaza al Machine ID en el primer heartbeat/reporte. Para reutilizarla tras reinstalar un host, desvincúlala desde la web.
 
-Probakgo usa ese token sólo para generar el comando de descarga con `wget` y el comando `install --github-token`. No se guarda en la base de datos.
-
----
-
-## 4. Cliente en el nodo Proxmox
-
-### Subir el cliente al nodo
-
-El binario `probakgo-client` ya está en `/tmp/` del nodo Proxmox (subido en la sección 1).
-
-### Instalar en el nodo
+## 6. Instalar en PVE
 
 ```bash
-ssh root@<ip-proxmox>
+ssh root@<ip-pve>
+chmod +x /tmp/probakgo-client
 
 /tmp/probakgo-client install \
   --api-url http://<ip-vm-servidor>:36748 \
-  --api-key pbk-<clave-creada-arriba>
+  --api-key pbk-...
 ```
 
-El subcomando `install` hace automáticamente:
+Comprueba:
 
-1. Copia el binario a `/opt/probakgo/probakgo-client`
-2. Detecta el tipo de nodo (PVE o PBS) desde `/etc/issue`
-3. Genera un token API de Proxmox con `pveum` (PVE) o `proxmox-backup-manager` (PBS)
-4. Escribe `/opt/probakgo/.env`
-5. Registra el hook vzdump en `/etc/vzdump.conf`
-6. Configura logrotate
-7. Instala cron de auto-update en `/etc/cron.d/probakgo-client`
+```bash
+probakgo-client doctor
+systemctl status probakgo-client-heartbeat.timer --no-pager
+grep probakgo /etc/vzdump.conf
+tail -n 50 /var/log/probakgo/hook.log
+```
 
----
+La instalación debe:
 
-## 4b. Cliente Windows
+- generar el token Proxmox;
+- crear `/opt/probakgo/.env`;
+- registrar el hook;
+- instalar el heartbeat cada 5 minutos;
+- instalar update en un minuto estable por host dentro de la hora de la 01:00;
+- importar VMs/días esperados desde los jobs activos;
+- enviar un primer reporte.
 
-En una maquina Windows, abre PowerShell como administrador:
+### Reporte manual
+
+```bash
+probakgo-client --vzdump-hook
+```
+
+### Backup real
+
+```bash
+vzdump 100 --storage <storage-backup> --mode snapshot
+```
+
+Al terminar el job, valida en la web:
+
+- estado y duración;
+- tareas del último job por VM;
+- fichero y tamaño cuando Proxmox permite emparejarlos;
+- storages, swap y heartbeat;
+- historial;
+- VMs esperadas, ausentes y desconocidas.
+
+## 7. Instalar en PBS
+
+```bash
+ssh root@<ip-pbs>
+chmod +x /tmp/probakgo-client
+
+/tmp/probakgo-client install \
+  --api-url http://<ip-vm-servidor>:36748 \
+  --api-key pbk-...
+```
+
+Comprueba:
+
+```bash
+probakgo-client doctor
+probakgo-client
+cat /etc/cron.d/probakgo-client
+```
+
+El cron debe contener update a `1:<minuto-jitter>` y reporte a las 06:00. En la web revisa:
+
+- datastores y tendencia;
+- grupos/snapshots y verificación;
+- montaje y estimación de llenado;
+- último sync remoto y garbage collection si la API los expone;
+- heartbeat y swap.
+
+Un snapshot antiguo retenido no debe generar por sí solo una alerta. Sí deben hacerlo, según configuración, un reporte PBS atrasado, verificación fallida, disco/llenado o fallo de sync/GC.
+
+## 8. Instalar en Windows
+
+PowerShell como administrador:
 
 ```powershell
-.\probakgo-windows-client.exe install --api-url http://<ip-vm-servidor>:36748 --api-key pbk-<clave-creada-arriba>
+.\probakgo-windows-client.exe install `
+  --api-url http://<ip-vm-servidor>:36748 `
+  --api-key pbk-...
 ```
 
-Verifica tarea y logs:
+Verifica:
 
 ```powershell
 C:\ProgramData\Probakgo\probakgo-windows-client.exe doctor
@@ -173,142 +226,175 @@ schtasks /Query /TN "Probakgo Windows Update"
 Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 ```
 
-Para forzar un envio manual:
+Fuerza heartbeat y reporte:
 
 ```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe heartbeat
 C:\ProgramData\Probakgo\probakgo-windows-client.exe
 ```
 
----
+Valida:
 
-## 5. Verificar que llegan datos
+- tarea de reporte cada 5 minutos;
+- tarea de update diaria a las 04:17;
+- MachineGuid, IPs y versión;
+- volúmenes fijos y salud best-effort;
+- alertas de disco, heartbeat, salud y volumen desaparecido;
+- override de disco y modo mantenimiento del servidor.
 
-### Envío manual (sin esperar a un backup real)
+CPU y RAM no deben aparecer: están fuera del alcance actual.
+
+## 9. Fixtures sin Proxmox
+
+Los fixtures actuales se cargan con dos claves y sus cabeceras Machine ID:
 
 ```bash
-# En el nodo Proxmox
-/opt/probakgo/probakgo-client --vzdump-hook
+curl -fS -X POST http://localhost:36748/api/report/pve \
+  -H "Authorization: Bearer pbk-CLAVE-PVE" \
+  -H "X-Machine-ID: 11223344-5566-7788-99aa-bbccddeeff00" \
+  -H "Content-Type: application/json" \
+  --data-binary @testdata/fixture_pve.json
+
+curl -fS -X POST http://localhost:36748/api/report/pbs \
+  -H "Authorization: Bearer pbk-CLAVE-PBS" \
+  -H "X-Machine-ID: aabbccdd-eeff-0011-2233-445566778899" \
+  -H "Content-Type: application/json" \
+  --data-binary @testdata/fixture_pbs.json
 ```
 
-Debería aparecer el nodo en el dashboard del servidor en segundos.
-
-### Backup real para ver el flujo completo
-
-Lanza un backup desde la web de Proxmox o por consola:
+La forma abreviada equivalente usa el script actualizado:
 
 ```bash
-# Backup de la VM 100, por ejemplo
-vzdump 100 --storage <tu-storage-backup> --mode snapshot
+bash testdata/seed.sh http://localhost:36748 pbk-CLAVE-PVE pbk-CLAVE-PBS
 ```
 
-Cuando termine, el hook vzdump invoca automáticamente al cliente y envía el reporte. Verás en el dashboard:
-- Status del último backup (OK/error)
-- Duración
-- Storages disponibles + %used
-- Listado de VMs/CTs con sus backups
+Después puedes ejecutar `go run testdata/seed_history.go`. Consulta [testdata/README.md](../testdata/README.md).
 
----
+## 10. Pruebas de alertas
 
-## 6. Inspeccionar qué datos manda el cliente
+Prueba al menos:
 
-### Modo debug (recomendado para la primera prueba)
+1. Baja temporalmente un umbral de disco.
+2. Detén un heartbeat durante más tiempo que el umbral.
+3. Genera o carga un backup fallido.
+4. Marca una VM como esperada y omítela del último job.
+5. Activa swap en un host de laboratorio.
+6. Fuerza un estado Windows no saludable o simula un volumen ausente.
+7. En PBS, usa un fixture/task fallido para sync o GC.
+
+Para cada caso:
+
+- aparece severidad y detalle correctos;
+- CSV/JSON contiene la alerta;
+- supresión oculta el aviso durante el plazo;
+- modo mantenimiento oculta todas las alertas de ese servidor;
+- al resolverla, queda el evento histórico;
+- si SMTP crítico está activo, se envía una vez al aparecer y otra al resolverse.
+
+La página usa polling para badges/notificaciones; prueba también sonido y permisos del navegador si forman parte del despliegue.
+
+## 11. Seguridad y roles
+
+Valida con un usuario de cada rol:
+
+| Acción | reader | editor | admin |
+|---|---:|---:|---:|
+| Ver dashboard/servidores/alertas | Sí | Sí | Sí |
+| Editar backup config | No | Sí | Sí |
+| Editar alertas por servidor | No | Sí | Sí |
+| Gestionar usuarios/API keys/settings | No | No | Sí |
+
+Además:
+
+- login con y sin TOTP;
+- plazo de 3 días cuando se fuerza 2FA a no-readers;
+- confirmación TOTP para acciones sensibles;
+- revocación de sesión tras cambios de seguridad;
+- revelado de API key con contraseña y TOTP;
+- bloqueo progresivo de IP y desbloqueo administrativo;
+- entradas del audit log sin secretos.
+- ausencia de errores CSP en la consola: cada script debe llevar nonce y los recursos CDN deben validar SRI.
+
+## 12. Base de datos
+
+En la VM:
 
 ```bash
-/opt/probakgo/probakgo-client --debug --debug-api-calls --vzdump-hook
-```
-
-- `--debug` - log verbose en stdout
-- `--debug-api-calls` - guarda respuestas crudas de la API de Proxmox en `debug/`
-
-### Logs persistentes del cliente
-
-```bash
-tail -f /var/log/probakgo-client.log
-```
-
-### Estructura de los datos (referencia)
-
-| Campo PVE | Descripción |
-|---|---|
-| `hostname` | nombre del nodo |
-| `ip_address` / `public_ip` | IP local y pública |
-| `machine_id` | binding de seguridad (de `/etc/machine-id`) |
-| `client_version` | versión de probakgo-client |
-| `last_backup_status` | status, starttime, endtime, duration del último vzdump |
-| `storages[]` | tipo, path, content, capacidad, %used, prune_backups |
-| `storages[].content_data[]` | VMs/CTs con vmid, formato, size, ctime, notas |
-
-| Campo PBS | Descripción |
-|---|---|
-| `hostname` / `ip_address` / `machine_id` | igual que PVE |
-| `datastores[]` | name, total, used, avail, %used |
-
----
-
-## 7. Inspeccionar la BD del servidor
-
-```bash
-# En la VM servidor
+cd /opt/probakgo
 sqlite3 probakgo_data.db ".tables"
-
-sqlite3 probakgo_data.db "SELECT hostname, last_backup_status, reported_at FROM pve_reports ORDER BY reported_at DESC LIMIT 5;"
-
-sqlite3 probakgo_data.db "SELECT * FROM api_keys;"
+sqlite3 probakgo_data.db \
+  "SELECT name, applied_at FROM schema_migrations ORDER BY name;"
+sqlite3 probakgo_data.db \
+  "SELECT name, key_type, is_active, machine_id, last_used FROM api_keys;"
+sqlite3 probakgo_data.db \
+  "SELECT server_type, server_id, last_seen_at FROM server_heartbeats;"
 ```
 
----
+La última migración actual es `037_secret_storage.up.sql`. Hay números repetidos (`012` y `013`), por lo que el identificador real es el nombre completo del archivo.
 
-## Resolución de problemas
-
-### El cliente no conecta con el servidor
+Comprueba que los secretos no están en claro:
 
 ```bash
-# Comprobar que el servidor responde
-curl http://<ip-vm-servidor>:36748/api/health
-
-# Ejecutar cliente con debug
-/opt/probakgo/probakgo-client --debug --vzdump-hook
+sqlite3 probakgo_data.db \
+  "SELECT key LIKE 'enc:v1:%', length(key_hash) FROM api_keys;"
+sqlite3 probakgo_data.db \
+  "SELECT smtp_password LIKE 'enc:v1:%' FROM email_config WHERE smtp_password <> '';"
+sqlite3 probakgo_data.db \
+  "SELECT totp_secret LIKE 'enc:v1:%' FROM users WHERE totp_secret <> '';"
 ```
 
-### El nodo no aparece en el dashboard
+Antes de probar una actualización:
 
 ```bash
-# Verificar API key activa
-sqlite3 probakgo_data.db "SELECT name, key_type, is_active, last_used FROM api_keys WHERE key_type='server';"
-
-# Ver logs del servidor
-journalctl -u probakgo -n 50
-```
-
-### El hook vzdump no se ejecuta
-
-```bash
-# Comprobar que está registrado
-grep probakgo /etc/vzdump.conf
-
-# Comprobar permisos
-ls -la /opt/probakgo/probakgo-client
-```
-
-### Limpieza para repetir la prueba
-
-```bash
-# En el nodo Proxmox - desinstalar cliente
-rm -rf /opt/probakgo
-sed -i '/probakgo/d' /etc/vzdump.conf
-rm -f /etc/cron.d/probakgo-client /etc/logrotate.d/probakgo-client
-
-# En la VM servidor - reset completo
 systemctl stop probakgo
-rm probakgo_data.db .env
-./probakgo                # vuelve a generar SESSION_KEY y crear el admin
+cp probakgo_data.db probakgo_data.before-test.db
+cp .env probakgo.before-test.env
+systemctl start probakgo
 ```
 
----
+## 13. Actualización
 
-## Notas de seguridad
+Con una release de laboratorio válida:
 
-- No uses credenciales de producción en estas VMs de prueba
-- La API key `adm-...` del primer arranque permite acceso completo vía API - trátala como secreto
-- Cambia `admin123` antes de cualquier prueba realista
-- Si la VM servidor está expuesta fuera del lab, configura `SESSION_SECURE=true` y un proxy HTTPS delante (ver `INSTALLATION.md`)
+```bash
+/opt/probakgo/probakgo update
+probakgo-client update
+```
+
+Windows:
+
+```powershell
+C:\ProgramData\Probakgo\probakgo-windows-client.exe update
+```
+
+Verifica versión, `SHA256SUMS`, attestation (`gh attestation verify`), reinicio del servidor y permanencia de `.env`, timers y tareas.
+
+## 14. Limpieza segura
+
+PVE/PBS:
+
+```bash
+probakgo-client uninstall
+```
+
+Windows no tiene subcomando `uninstall`; elimina primero las tareas desde PowerShell como administrador y conserva una copia de logs si la necesitas:
+
+```powershell
+schtasks /Delete /TN "Probakgo Windows Report" /F
+schtasks /Delete /TN "Probakgo Windows Update" /F
+```
+
+Después retira `C:\ProgramData\Probakgo` mediante el procedimiento habitual del laboratorio.
+
+En el servidor, usa **Configuración → Mantenimiento** para descargar una copia y **Configuración → Reiniciar BD** para reiniciar datos operativos conservando usuarios, audit log y migraciones. No borres a mano una base mientras el servicio está activo.
+
+## Criterio de aceptación
+
+La prueba se considera completa cuando:
+
+- los tres tipos de servidor aparecen con identidad y heartbeat correctos;
+- los reportes se actualizan por sus mecanismos automáticos;
+- alertas, supresión, mantenimiento, historial y email funcionan;
+- roles, 2FA, claves e IP bans respetan la política;
+- exports y copia SQLite se descargan;
+- `doctor`, tests y actualización no muestran fallos críticos.

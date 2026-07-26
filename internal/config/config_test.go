@@ -20,3 +20,15 @@ func TestValidateAcceptsTrustedProxyCIDRs(t *testing.T) {
 		t.Fatalf("Validate: %v", err)
 	}
 }
+
+func TestValidateRejectsShortDataEncryptionKey(t *testing.T) {
+	cfg := &Config{
+		APIPort:    "36748",
+		Timezone:   "Europe/Madrid",
+		SessionKey: "test-session-key-32-bytes-long!!",
+		DataKey:    "short",
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted a short DATA_ENCRYPTION_KEY")
+	}
+}

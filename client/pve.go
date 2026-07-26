@@ -625,7 +625,7 @@ func (c *pveClient) generateReport() (map[string]any, error) {
 		"hostname":           c.si.Hostname,
 		"ip_address":         c.si.localIP(),
 		"public_ip":          c.si.publicIP(),
-		"client_version":     version,
+		"client_version":     currentVersion(),
 		"machine_id":         c.si.machineID(),
 		"swap_total":         swap.Total,
 		"swap_used":          swap.Used,

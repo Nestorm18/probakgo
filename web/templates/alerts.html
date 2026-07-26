@@ -38,12 +38,12 @@
   <div class="alerts-toolbar-filters">
     <i class="bi bi-funnel" aria-hidden="true"></i>
     <form method="get" action="/alerts" class="d-flex gap-2 flex-wrap">
-      <select name="severity" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <select name="severity" class="form-select form-select-sm js-auto-submit" style="width:auto">
         <option value="" {{if eq .FilterSeverity ""}}selected{{end}}>Todas las severidades</option>
         <option value="critical" {{if eq .FilterSeverity "critical"}}selected{{end}}>Crítica</option>
         <option value="warning" {{if eq .FilterSeverity "warning"}}selected{{end}}>Advertencia</option>
       </select>
-      <select name="server" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+      <select name="server" class="form-select form-select-sm js-auto-submit" style="width:auto">
         <option value="" {{if eq .FilterServer ""}}selected{{end}}>Todos los servidores</option>
         {{range .ServerNames}}
         <option value="{{.}}" {{if eq . $.FilterServer}}selected{{end}}>{{.}}</option>
@@ -302,7 +302,7 @@
 
 {{end}}
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 document.addEventListener('click', e => {
   const btn = e.target.closest('.suppress-open-btn');
   if (!btn) return;

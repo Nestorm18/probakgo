@@ -11,6 +11,7 @@ import (
 
 	"probakgo/internal/domain"
 	"probakgo/internal/session"
+	"probakgo/internal/web/csp"
 )
 
 func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
@@ -66,6 +67,24 @@ func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	}
 	if !strings.Contains(body, "alert-success") {
 		t.Fatalf("success flash style not rendered:\n%s", body)
+	}
+}
+
+func TestTemplatesApplyRequestCSPNonce(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	req := httptest.NewRequest(http.MethodGet, "/about", nil)
+	req, nonce, err := csp.WithNonce(req)
+	if err != nil {
+		t.Fatalf("WithNonce: %v", err)
+	}
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
+
+	if !strings.Contains(rr.Body.String(), `nonce="`+nonce+`"`) {
+		t.Fatal("rendered scripts do not carry the request CSP nonce")
 	}
 }
 

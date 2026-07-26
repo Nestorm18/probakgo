@@ -14,6 +14,7 @@ import (
 	dbpkg "probakgo/internal/db"
 	"probakgo/internal/netutil"
 	"probakgo/internal/store"
+	appversion "probakgo/internal/version"
 )
 
 type doctorResult struct {
@@ -31,7 +32,7 @@ func runServerDoctor() error {
 	}
 
 	cfg := config.Load()
-	add("OK", "Version", "probakgo v"+version)
+	add("OK", "Version", "probakgo v"+appversion.Version)
 	if err := cfg.Validate(); err != nil {
 		add("FAIL", "Configuracion", err.Error())
 	} else {
@@ -42,6 +43,11 @@ func runServerDoctor() error {
 		add("WARN", "SESSION_KEY", "no esta definida en el entorno; las sesiones pueden perderse al reiniciar")
 	} else if len(cfg.SessionKey) >= 32 {
 		add("OK", "SESSION_KEY", "definida")
+	}
+	if cfg.DataKey == "" {
+		add("WARN", "DATA_ENCRYPTION_KEY", "no esta definida; el servidor la generara antes de almacenar secretos")
+	} else if len(cfg.DataKey) >= 32 {
+		add("OK", "DATA_ENCRYPTION_KEY", "definida")
 	}
 
 	checkListenAddress(add, cfg)
@@ -59,7 +65,18 @@ func runServerDoctor() error {
 	} else {
 		defer db.Close()
 		add("OK", "Migraciones", "aplicadas correctamente")
-		st := store.New(db)
+		st, storeErr := newStore(db, cfg)
+		if storeErr != nil {
+			add("FAIL", "Cifrado", storeErr.Error())
+			st = store.New(db)
+		}
+		if protected, err := st.ValidateProtectedSecrets(ctx); err != nil {
+			add("FAIL", "Cifrado", err.Error())
+		} else if protected {
+			add("OK", "Cifrado", "API keys, SMTP y TOTP protegidos y clave valida")
+		} else {
+			add("WARN", "Cifrado", "no hay secretos cifrados todavia")
+		}
 		if users, err := st.ListUsers(ctx); err != nil {
 			add("WARN", "Usuarios", "no se pudieron leer: "+err.Error())
 		} else if len(users) == 0 {

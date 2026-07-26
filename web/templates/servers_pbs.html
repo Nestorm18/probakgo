@@ -236,7 +236,7 @@
 </div>
 
 {{block "page_scripts" .}}
-<script>
+<script nonce="{{.CSPNonce}}">
 // Filter
 (function() {
   const input = document.getElementById('serverFilter');

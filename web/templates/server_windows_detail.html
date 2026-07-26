@@ -219,8 +219,8 @@
 {{end}}
 {{block "page_scripts" .}}
 {{if .DiskChartData}}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script>
+<script nonce="{{.CSPNonce}}" src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<script nonce="{{.CSPNonce}}">
 (function(){
   const raw = [{{range $i, $p := .DiskChartData}}{{if $i}},{{end}}{"label":"{{$p.Label}}","disk":"{{$p.Disk}}","usedPct":{{$p.UsedPct}},"used":{{$p.Used}},"total":{{$p.Total}}}{{end}}];
   if (!raw.length) return;

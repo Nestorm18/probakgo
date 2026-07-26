@@ -14,7 +14,38 @@ import (
 	"probakgo/internal/domain"
 	"probakgo/internal/session"
 	"probakgo/internal/store"
+	"probakgo/internal/web/csp"
 )
+
+func TestSecurityHeadersUseAUniqueScriptNonce(t *testing.T) {
+	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(csp.Nonce(r)))
+	}))
+
+	var previousNonce string
+	for i := 0; i < 2; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		rr := httptest.NewRecorder()
+		handler.ServeHTTP(rr, req)
+
+		nonce := rr.Body.String()
+		if nonce == "" {
+			t.Fatal("request did not receive a CSP nonce")
+		}
+		header := rr.Header().Get("Content-Security-Policy")
+		if !strings.Contains(header, "script-src 'self' 'nonce-"+nonce+"'") {
+			t.Fatalf("CSP header does not authorize its request nonce: %q", header)
+		}
+		scriptPolicy := strings.Split(strings.Split(header, "script-src ")[1], ";")[0]
+		if strings.Contains(scriptPolicy, "'unsafe-inline'") {
+			t.Fatalf("script policy still permits unsafe-inline: %q", scriptPolicy)
+		}
+		if nonce == previousNonce {
+			t.Fatal("CSP nonce was reused across requests")
+		}
+		previousNonce = nonce
+	}
+}
 
 func TestSensitiveTOTPRecentSessionNeverAcceptsExplicitWrongCode(t *testing.T) {
 	sqlDB, err := db.Open(filepath.Join(t.TempDir(), "probakgo-test.db"))

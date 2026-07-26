@@ -21,8 +21,12 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -44,7 +48,7 @@ jobs:
           EVENT_SHA: ${{ github.sha }}
         shell: bash
         run: |
-          SERVER_VERSION=$(grep -oP 'var version = "\K[^" ]+' main.go)
+          APP_VERSION=$(grep -oP 'var Version = "\K[^" ]+' internal/version/version.go)
           if [[ -n "$REQUESTED_TAG" && -n "$REQUESTED_SHA" ]]; then
             RELEASE_TAG="$REQUESTED_TAG"
             RELEASE_SHA="$REQUESTED_SHA"
@@ -60,10 +64,8 @@ jobs:
             exit 1
           fi
           RELEASE_VERSION="${RELEASE_TAG#v}"
-          CLIENT_VERSION=$(grep -oP 'var version = "\K[^" ]+' client/main.go)
-          WINDOWS_VERSION=$(grep -oP 'var version = "\K[^" ]+' client-windows/main.go)
-          if [[ "$SERVER_VERSION" != "$RELEASE_VERSION" || "$CLIENT_VERSION" != "$RELEASE_VERSION" || "$WINDOWS_VERSION" != "$RELEASE_VERSION" ]]; then
-            echo "Release tag $RELEASE_TAG does not match versions: server=$SERVER_VERSION client=$CLIENT_VERSION windows=$WINDOWS_VERSION"
+          if [[ "$APP_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "Release tag $RELEASE_TAG does not match internal version: $APP_VERSION"
             exit 1
           fi
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
@@ -86,26 +88,32 @@ jobs:
         if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
+            -ldflags="-s -w -X probakgo/internal/version.Version=${RELEASE_TAG#v}" \
             -o probakgo_linux_amd64 .
 
       - name: Build client Linux amd64
         if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
+            -ldflags="-s -w -X probakgo/internal/version.Version=${RELEASE_TAG#v}" \
             -o probakgo-client_linux_amd64 ./client/
 
       - name: Build Windows client amd64
         if: steps.existing_release.outputs.exists != 'true'
         run: |
           CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-            -ldflags="-s -w -X main.version=${RELEASE_TAG#v}" \
+            -ldflags="-s -w -X probakgo/internal/version.Version=${RELEASE_TAG#v}" \
             -o probakgo-windows-client_windows_amd64.exe ./client-windows/
 
       - name: Create checksums
         if: steps.existing_release.outputs.exists != 'true'
         run: sha256sum probakgo_linux_amd64 probakgo-client_linux_amd64 probakgo-windows-client_windows_amd64.exe > SHA256SUMS
+
+      - name: Attest release binaries
+        if: steps.existing_release.outputs.exists != 'true'
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-checksums: SHA256SUMS
 
       - name: Publish GitHub Release
         if: steps.existing_release.outputs.exists != 'true'

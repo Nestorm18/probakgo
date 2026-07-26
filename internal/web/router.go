@@ -15,6 +15,7 @@ import (
 	"probakgo/internal/ratelimit"
 	"probakgo/internal/service"
 	"probakgo/internal/store"
+	"probakgo/internal/web/csp"
 	webhandlers "probakgo/internal/web/handlers"
 )
 
@@ -174,19 +175,26 @@ func newCrossOriginProtection(trustedOrigins []string) (*http.CrossOriginProtect
 
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestWithNonce, nonce, err := csp.WithNonce(r)
+		if err != nil {
+			slog.Error("generate CSP nonce", "err", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'none'; "+
-				"script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "+
-				"style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "+
-				"font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com; "+
+				"script-src 'self' 'nonce-"+nonce+"' https://cdn.jsdelivr.net; "+
+				"style-src 'self' 'nonce-"+nonce+"' https://cdn.jsdelivr.net; "+
+				"style-src-attr 'unsafe-inline'; "+
+				"font-src 'self' https://cdn.jsdelivr.net; "+
 				"img-src 'self' data:; "+
-				"connect-src 'self' https://cdn.jsdelivr.net; "+
+				"connect-src 'self'; "+
 				"frame-ancestors 'self'; "+
 				"base-uri 'self'; "+
 				"form-action 'self';")
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, requestWithNonce)
 	})
 }
