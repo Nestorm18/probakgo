@@ -57,6 +57,9 @@ func main() {
 		case "heartbeat":
 			runHeartbeat()
 			return
+		case "sync-backups":
+			runSyncBackups()
+			return
 		case "doctor":
 			runDoctor()
 			return
@@ -86,6 +89,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  uninstall   Remove all installed files and revoke the Proxmox API token\n")
 		fmt.Fprintf(os.Stderr, "  update      Self-update to the latest GitHub release\n")
 		fmt.Fprintf(os.Stderr, "  heartbeat   Send a lightweight liveness heartbeat to Probakgo\n")
+		fmt.Fprintf(os.Stderr, "  sync-backups  Re-sync PVE VM IDs, names and backup days\n")
 		fmt.Fprintf(os.Stderr, "  doctor      Check config, connectivity, hook and heartbeat timer\n")
 		fmt.Fprintf(os.Stderr, "  version     Print version\n\n")
 		fmt.Fprintf(os.Stderr, "Flags (report mode):\n")
@@ -175,10 +179,21 @@ func runUpdatedClientPostUpdate() error {
 func runClientPostUpdate(updated bool) {
 	if os.Getuid() == 0 {
 		ensureHeartbeatTimerInstalled()
+		ensureVzdumpHookInstalled()
+		if err := autoSyncInstalledBackupConfig(); err != nil {
+			fmt.Fprintf(os.Stderr, "WARN: backup config auto-sync failed: %v\n", err)
+		}
 		return
 	}
 	if updated {
 		fmt.Fprintln(os.Stderr, "WARN: run as root once to install the heartbeat systemd timer")
+	}
+}
+
+func runSyncBackups() {
+	if err := syncInstalledBackupConfig(true); err != nil {
+		log.Printf("ERROR: %v", err)
+		os.Exit(1)
 	}
 }
 

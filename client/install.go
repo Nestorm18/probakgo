@@ -41,9 +41,12 @@ PENDING_FILE="$INSTALL_DIR/.report_pending"
 log_msg() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
 if [ "$1" = "job-end" ]; then
-    log_msg "INFO: Backup completed, reporting..."
+    log_msg "INFO: Backup completed, scheduling report..."
     touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
     (
+        # Return from the hook first so PVE can publish endtime/exitstatus for
+        # the aggregate vzdump task before the client asks for the latest job.
+        sleep 5
         flock -w 30 200 || {
             log_msg "WARN: Could not acquire lock, saving as pending"
             echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
@@ -53,7 +56,7 @@ if [ "$1" = "job-end" ]; then
         "$INSTALL_DIR/probakgo-client" --vzdump-hook >> "$LOG_FILE" 2>&1
         log_msg "INFO: Exit code: $?"
         [ -f "$PENDING_FILE" ] && rm -f "$PENDING_FILE"
-    ) 200>"$LOCK_FILE"
+    ) 200>"$LOCK_FILE" </dev/null >> "$LOG_FILE" 2>&1 &
 fi
 exit 0
 `
@@ -379,6 +382,54 @@ func ensureHeartbeatTimerInstalled() {
 		return
 	}
 	installHeartbeatTimer()
+}
+
+func ensureVzdumpHookInstalled() {
+	if os.Getuid() != 0 {
+		return
+	}
+	self, err := os.Executable()
+	if err != nil {
+		return
+	}
+	self, err = filepath.EvalSymlinks(self)
+	if err != nil || self != binaryPath {
+		return
+	}
+	if _, err := os.Stat(vzdumpConfPath); err != nil {
+		return
+	}
+	if err := os.MkdirAll(installDir, 0755); err != nil {
+		fmt.Printf("WARN: could not create %s: %v\n", installDir, err)
+		return
+	}
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		fmt.Printf("WARN: could not create %s: %v\n", logDir, err)
+		return
+	}
+	if err := os.WriteFile(hookPath, []byte(hookScript), 0755); err != nil {
+		fmt.Printf("WARN: could not refresh vzdump hook: %v\n", err)
+		return
+	}
+	hookLine := "script: " + hookPath
+	if !fileContains(vzdumpConfPath, hookLine) {
+		f, err := os.OpenFile(vzdumpConfPath, os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			fmt.Printf("WARN: could not open %s: %v\n", vzdumpConfPath, err)
+			return
+		}
+		_, writeErr := fmt.Fprintf(f, "%s\n", hookLine)
+		closeErr := f.Close()
+		if writeErr != nil {
+			fmt.Printf("WARN: could not register vzdump hook: %v\n", writeErr)
+			return
+		}
+		if closeErr != nil {
+			fmt.Printf("WARN: could not close %s: %v\n", vzdumpConfPath, closeErr)
+			return
+		}
+	}
+	fmt.Println("vzdump hook refreshed")
 }
 
 func removeHeartbeatTimer() {

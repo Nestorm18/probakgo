@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -130,6 +131,10 @@ func (c *pveClient) discoverPVEBackupSchedules(vms []discoveredVM) (map[string]p
 }
 
 func syncBackupConfig(cfg *Config, serverName, machineID string, vms []discoveredVM, schedules ...map[string]pveBackupSchedule) (created, updated, skipped int, err error) {
+	return syncBackupConfigWithOverwrite(cfg, serverName, machineID, vms, false, schedules...)
+}
+
+func syncBackupConfigWithOverwrite(cfg *Config, serverName, machineID string, vms []discoveredVM, overwriteExisting bool, schedules ...map[string]pveBackupSchedule) (created, updated, skipped int, err error) {
 	if len(vms) == 0 {
 		return 0, 0, 0, nil
 	}
@@ -150,8 +155,20 @@ func syncBackupConfig(cfg *Config, serverName, machineID string, vms []discovere
 	}
 
 	for _, vm := range vms {
-		payload := vmConfigPayload(vm, scheduleByVMID[vm.VMID].Days)
+		days := scheduleByVMID[vm.VMID].Days
+		payload := vmConfigPayload(vm, days)
 		if existingCfg, ok := existing[vm.VMID]; ok {
+			if overwriteExisting {
+				if backupConfigMatches(existingCfg, vm, days) {
+					skipped++
+					continue
+				}
+				if err := updateVMConfig(base, cfg.APIKey, machineID, vm.VMID, payload); err != nil {
+					return created, updated, skipped, err
+				}
+				updated++
+				continue
+			}
 			if !hasAnyScheduledDay(existingCfg) {
 				if err := updateVMConfig(base, cfg.APIKey, machineID, vm.VMID, payload); err != nil {
 					return created, updated, skipped, err
@@ -168,6 +185,55 @@ func syncBackupConfig(cfg *Config, serverName, machineID string, vms []discovere
 		created++
 	}
 	return created, updated, skipped, nil
+}
+
+func syncInstalledBackupConfig(overwriteExisting bool) error {
+	return syncInstalledBackupConfigForMode(overwriteExisting, true)
+}
+
+func autoSyncInstalledBackupConfig() error {
+	return syncInstalledBackupConfigForMode(false, false)
+}
+
+func syncInstalledBackupConfigForMode(overwriteExisting, requirePVE bool) error {
+	cfg := loadConfig()
+	si := newSysInfo(cfg)
+	if cfg.ServerType == "" || cfg.ServerType == "unknown" {
+		cfg.ServerType = si.detectServerType()
+	}
+	if cfg.ServerType != "pve" {
+		if !requirePVE {
+			return nil
+		}
+		return fmt.Errorf("sync-backups is only available on Proxmox VE")
+	}
+	if cfg.APIURL == "" || cfg.APIKey == "" {
+		return fmt.Errorf("API_URL and API_KEY are required")
+	}
+	if cfg.ProxmoxToken == "" || cfg.ProxmoxSecret == "" {
+		return fmt.Errorf("PROXMOX_TOKEN and PROXMOX_SECRET are required")
+	}
+
+	pve := newPVEClient(cfg, si)
+	vms, err := pve.discoverPVEVMs()
+	if err != nil {
+		return fmt.Errorf("list PVE VMs: %w", err)
+	}
+	schedules, scheduleErr := pve.discoverPVEBackupSchedules(vms)
+	if scheduleErr != nil {
+		if overwriteExisting {
+			return fmt.Errorf("read PVE backup jobs: %w", scheduleErr)
+		}
+		fmt.Fprintf(os.Stderr, "WARN: could not read PVE backup jobs, using Monday-Friday defaults: %v\n", scheduleErr)
+	}
+	created, updated, skipped, err := syncBackupConfigWithOverwrite(
+		cfg, si.Hostname, si.machineID(), vms, overwriteExisting, schedules,
+	)
+	if err != nil {
+		return fmt.Errorf("sync backup config: %w", err)
+	}
+	fmt.Printf("Backup config sync: %d created, %d updated, %d unchanged\n", created, updated, skipped)
+	return nil
 }
 
 func fetchExistingVMConfigs(baseURL, apiKey, machineID string) (map[string]backupConfig, error) {
@@ -274,6 +340,21 @@ func vmConfigPayload(vm discoveredVM, days backupDays) map[string]any {
 
 func hasAnyScheduledDay(cfg backupConfig) bool {
 	return cfg.Monday || cfg.Tuesday || cfg.Wednesday || cfg.Thursday || cfg.Friday || cfg.Saturday || cfg.Sunday
+}
+
+func backupConfigMatches(cfg backupConfig, vm discoveredVM, days backupDays) bool {
+	if !days.any() {
+		days = backupDays{Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true}
+	}
+	return cfg.VMID == vm.VMID &&
+		cfg.VMName == vm.Name &&
+		cfg.Monday == days.Monday &&
+		cfg.Tuesday == days.Tuesday &&
+		cfg.Wednesday == days.Wednesday &&
+		cfg.Thursday == days.Thursday &&
+		cfg.Friday == days.Friday &&
+		cfg.Saturday == days.Saturday &&
+		cfg.Sunday == days.Sunday
 }
 
 func backupJobEnabled(v any) bool {

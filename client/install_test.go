@@ -61,3 +61,12 @@ func TestParsePBSGenerateTokenOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestHookScriptDefersReportUntilAfterJobEnd(t *testing.T) {
+	if !strings.Contains(hookScript, "sleep 5") {
+		t.Fatal("hook must wait briefly after job-end before reading PVE tasks")
+	}
+	if !strings.Contains(hookScript, `2>&1 &`) {
+		t.Fatal("hook report must run in the background so job-end can return")
+	}
+}

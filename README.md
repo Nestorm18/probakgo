@@ -116,6 +116,7 @@ Verificación:
 
 ```bash
 probakgo-client doctor
+probakgo-client sync-backups    # PVE: resincroniza VMID, nombre y días
 probakgo-client --vzdump-hook   # PVE: fuerza un reporte
 probakgo-client                 # PBS: envía un reporte
 ```
@@ -186,7 +187,7 @@ El cliente Windows solo guarda `API_URL` y `API_KEY` en `C:\ProgramData\Probakgo
 | Binario | Comandos |
 |---|---|
 | `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>` |
-| `probakgo-client` | `install`, `uninstall`, `update`, `heartbeat`, `doctor`, `version` |
+| `probakgo-client` | `install`, `uninstall`, `update`, `heartbeat`, `sync-backups`, `doctor`, `version` |
 | `probakgo-windows-client.exe` | reporte por defecto, `install`, `update`, `heartbeat`, `doctor`, `version` |
 
 El modo reporte del cliente Proxmox acepta `--server-type`, `--vzdump-hook`, `--file`, `--debug` y `--debug-api-calls`.

@@ -1,6 +1,7 @@
 package webhandlers
 
 import (
+	"html"
 	"html/template"
 	"net/http"
 	"net/http/httptest"
@@ -83,7 +84,8 @@ func TestTemplatesApplyRequestCSPNonce(t *testing.T) {
 
 	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
 
-	if !strings.Contains(rr.Body.String(), `nonce="`+nonce+`"`) {
+	body := html.UnescapeString(rr.Body.String())
+	if !strings.Contains(body, `nonce="`+nonce+`"`) {
 		t.Fatal("rendered scripts do not carry the request CSP nonce")
 	}
 }

@@ -223,3 +223,54 @@ func TestSyncBackupConfigUsesDiscoveredSchedule(t *testing.T) {
 		t.Fatalf("created body: %+v", created)
 	}
 }
+
+func TestSyncBackupConfigWithOverwriteRefreshesExistingSchedule(t *testing.T) {
+	var updated map[string]any
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/backup-config/pve/pve-01", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"server": "pve-01",
+			"configs": []any{
+				map[string]any{
+					"vm_id": "100", "vm_name": "old-name",
+					"monday": true, "tuesday": true, "wednesday": true,
+					"thursday": true, "friday": true,
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api/backup-config/pve/pve-01/vms/100", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.NotFound(w, r)
+			return
+		}
+		if err := json.NewDecoder(r.Body).Decode(&updated); err != nil {
+			t.Fatalf("decode update body: %v", err)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	created, updatedCount, skipped, err := syncBackupConfigWithOverwrite(
+		&Config{APIURL: srv.URL, APIKey: "pbk-test"},
+		"pve-01",
+		"machine-123",
+		[]discoveredVM{{VMID: "100", Name: "current-name"}},
+		true,
+		map[string]pveBackupSchedule{
+			"100": {Days: backupDays{
+				Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true,
+			}},
+		},
+	)
+	if err != nil {
+		t.Fatalf("syncBackupConfigWithOverwrite: %v", err)
+	}
+	if created != 0 || updatedCount != 1 || skipped != 0 {
+		t.Fatalf("created/updated/skipped: got %d/%d/%d, want 0/1/0", created, updatedCount, skipped)
+	}
+	if updated["vm_name"] != "current-name" || updated["saturday"] != true || updated["sunday"] == true {
+		t.Fatalf("updated body: %+v", updated)
+	}
+}
