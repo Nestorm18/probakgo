@@ -54,6 +54,7 @@ type backupConfig struct {
 
 func (c *pveClient) discoverPVEVMs() ([]discoveredVM, error) {
 	var vms []discoveredVM
+	seen := make(map[string]bool)
 	successes := 0
 	for _, ep := range []string{
 		fmt.Sprintf("nodes/%s/qemu", c.si.Hostname),
@@ -66,30 +67,53 @@ func (c *pveClient) discoverPVEVMs() ([]discoveredVM, error) {
 		successes++
 		raw, _ := data["data"].([]any)
 		for _, item := range raw {
-			vm, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			vmidF, ok := vm["vmid"].(float64)
-			if !ok {
-				continue
-			}
-			name, _ := vm["name"].(string)
-			vms = append(vms, discoveredVM{
-				VMID: strconv.FormatInt(int64(vmidF), 10),
-				Name: name,
-			})
+			appendDiscoveredVM(&vms, seen, item, "")
 		}
 	}
-	if successes == 0 {
-		return nil, fmt.Errorf("could not query QEMU or LXC inventory")
+
+	// PVE 6 installations can return an empty per-node inventory even though
+	// the cluster resource endpoint exposes the guests. It also handles a
+	// partially unavailable QEMU/LXC endpoint without losing the other type.
+	if len(vms) == 0 || successes < 2 {
+		data, err := c.get("cluster/resources?type=vm")
+		if err == nil {
+			raw, _ := data["data"].([]any)
+			for _, item := range raw {
+				appendDiscoveredVM(&vms, seen, item, c.si.Hostname)
+			}
+		} else if successes == 0 {
+			return nil, fmt.Errorf("could not query PVE guest inventory: %w", err)
+		}
 	}
+
 	sort.Slice(vms, func(i, j int) bool {
 		a, _ := strconv.Atoi(vms[i].VMID)
 		b, _ := strconv.Atoi(vms[j].VMID)
 		return a < b
 	})
 	return vms, nil
+}
+
+func appendDiscoveredVM(vms *[]discoveredVM, seen map[string]bool, item any, node string) {
+	vm, ok := item.(map[string]any)
+	if !ok {
+		return
+	}
+	if itemNode := strings.TrimSpace(pveValueString(vm["node"])); node != "" && itemNode != "" && itemNode != node {
+		return
+	}
+	if guestType := strings.ToLower(strings.TrimSpace(pveValueString(vm["type"]))); guestType != "" && guestType != "qemu" && guestType != "lxc" {
+		return
+	}
+	vmid := pveValueString(vm["vmid"])
+	if vmid == "" || seen[vmid] {
+		return
+	}
+	seen[vmid] = true
+	*vms = append(*vms, discoveredVM{
+		VMID: vmid,
+		Name: pveValueString(vm["name"]),
+	})
 }
 
 func (c *pveClient) discoverPVEBackupSchedules(vms []discoveredVM) (map[string]pveBackupSchedule, error) {
@@ -109,7 +133,7 @@ func (c *pveClient) discoverPVEBackupSchedules(vms []discoveredVM) (map[string]p
 		if !ok || !backupJobEnabled(job["enabled"]) {
 			continue
 		}
-		scheduleText, _ := job["schedule"].(string)
+		scheduleText := pveBackupScheduleText(job)
 		schedule, ok := parsePVEBackupSchedule(scheduleText)
 		if !ok {
 			continue
@@ -128,6 +152,36 @@ func (c *pveClient) discoverPVEBackupSchedules(vms []discoveredVM) (map[string]p
 		}
 	}
 	return schedules, nil
+}
+
+func pveBackupScheduleText(job map[string]any) string {
+	if schedule := strings.TrimSpace(pveValueString(job["schedule"])); schedule != "" {
+		return schedule
+	}
+	days := strings.TrimSpace(pveValueString(job["dow"]))
+	start := strings.TrimSpace(pveValueString(job["starttime"]))
+	return strings.TrimSpace(days + " " + start)
+}
+
+func pveValueString(v any) string {
+	switch x := v.(type) {
+	case string:
+		return strings.TrimSpace(x)
+	case json.Number:
+		return x.String()
+	case float64:
+		return strconv.FormatFloat(x, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(x), 'f', -1, 32)
+	case int:
+		return strconv.Itoa(x)
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case int32:
+		return strconv.FormatInt(int64(x), 10)
+	default:
+		return ""
+	}
 }
 
 func syncBackupConfig(cfg *Config, serverName, machineID string, vms []discoveredVM, schedules ...map[string]pveBackupSchedule) (created, updated, skipped int, err error) {
@@ -467,8 +521,14 @@ func parsePVEDays(token string) (backupDays, bool) {
 		if part == "" {
 			continue
 		}
+		rangeSeparator := ""
 		if strings.Contains(part, "..") {
-			bounds := strings.SplitN(part, "..", 2)
+			rangeSeparator = ".."
+		} else if strings.Contains(part, "-") {
+			rangeSeparator = "-"
+		}
+		if rangeSeparator != "" {
+			bounds := strings.SplitN(part, rangeSeparator, 2)
 			start, ok1 := pveDayIndex(bounds[0])
 			end, ok2 := pveDayIndex(bounds[1])
 			if !ok1 || !ok2 {

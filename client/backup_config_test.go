@@ -46,6 +46,48 @@ func TestDiscoverPVEVMsListsQEMUAndLXC(t *testing.T) {
 	}
 }
 
+func TestDiscoverPVEVMsFallsBackToPVE6ClusterResources(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/qemu", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/lxc", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}}) //nolint:errcheck
+	})
+	mux.HandleFunc("/api2/json/cluster/resources", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("type") != "vm" {
+			t.Fatalf("resource type: got %q, want vm", r.URL.Query().Get("type"))
+		}
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"node": "test-node", "type": "qemu", "vmid": "100", "name": "server"},
+				map[string]any{"node": "test-node", "type": "lxc", "vmid": float64(101), "name": "proxy"},
+				map[string]any{"node": "other-node", "type": "qemu", "vmid": float64(200), "name": "foreign"},
+				map[string]any{"node": "test-node", "type": "storage", "vmid": float64(300), "name": "not-a-guest"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	got, err := newTestPVEClient(srv).discoverPVEVMs()
+	if err != nil {
+		t.Fatalf("discoverPVEVMs: %v", err)
+	}
+	want := []discoveredVM{
+		{VMID: "100", Name: "server"},
+		{VMID: "101", Name: "proxy"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("VMs: got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("VM[%d]: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
 func TestSyncBackupConfigCreatesMissingAndUpdatesUnscheduledVMs(t *testing.T) {
 	var created []map[string]any
 	var updated []map[string]any
@@ -156,6 +198,41 @@ func TestDiscoverPVEBackupSchedulesUsesClusterBackupJobs(t *testing.T) {
 	got := schedules["100"].Days
 	if !got.Monday || !got.Friday || !got.Saturday || got.Sunday {
 		t.Fatalf("VM 100 days: got %+v, want mon..sat", got)
+	}
+}
+
+func TestDiscoverPVEBackupSchedulesSupportsPVE6DowAndStarttime(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/cluster/backup", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"enabled":   float64(1),
+					"dow":       "mon-fri",
+					"starttime": "21:00",
+					"vmid":      "100,101",
+				},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	schedules, err := newTestPVEClient(srv).discoverPVEBackupSchedules([]discoveredVM{
+		{VMID: "100", Name: "server"},
+		{VMID: "101", Name: "vpn"},
+	})
+	if err != nil {
+		t.Fatalf("discoverPVEBackupSchedules: %v", err)
+	}
+	for _, vmid := range []string{"100", "101"} {
+		got, ok := schedules[vmid]
+		if !ok {
+			t.Fatalf("missing schedule for VM %s", vmid)
+		}
+		if got.StartMin != 21*60 || !got.Days.Monday || !got.Days.Friday || got.Days.Saturday || got.Days.Sunday {
+			t.Fatalf("VM %s schedule: got %+v", vmid, got)
+		}
 	}
 }
 
