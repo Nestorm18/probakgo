@@ -121,7 +121,7 @@ func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
 
 func (h *H) pveServerIDForKey(r *http.Request, hostname string) (int64, error) {
 	k, _ := apictx.APIKey(r.Context())
-	return h.store.UpsertPVEServerForAPIKey(r.Context(), k.ID, hostname, "", "", "", k.MachineID)
+	return h.store.ResolvePVEServerForAPIKey(r.Context(), k.ID, hostname, k.MachineID)
 }
 
 func toVMConfigResponse(c domain.VMBackupConfig) domain.VMBackupConfigResponse {

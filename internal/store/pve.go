@@ -77,6 +77,43 @@ func (s *Store) UpsertPVEServerForAPIKey(ctx context.Context, apiKeyID int64, na
 	return id, err
 }
 
+// ResolvePVEServerForAPIKey returns the PVE server associated with an API key
+// without modifying metadata populated by reports or heartbeats.
+func (s *Store) ResolvePVEServerForAPIKey(ctx context.Context, apiKeyID int64, name, machineID string) (int64, error) {
+	if apiKeyID <= 0 {
+		return 0, fmt.Errorf("api key id is required")
+	}
+
+	debug.RecordQuery(ctx, `SELECT id FROM pve_servers WHERE api_key_id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT id FROM pve_servers WHERE api_key_id = ? AND is_deleted = 0`, apiKeyID)
+	var id int64
+	if err := row.Scan(&id); err == nil {
+		return id, nil
+	} else if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	debug.RecordQuery(ctx, `SELECT id FROM pve_servers WHERE name = ? AND machine_id = ? AND api_key_id IS NULL AND is_deleted = 0`)
+	legacy := s.db.QueryRowContext(ctx, `SELECT id FROM pve_servers WHERE name = ? AND machine_id = ? AND api_key_id IS NULL AND is_deleted = 0`, name, machineID)
+	if err := legacy.Scan(&id); err == nil {
+		debug.RecordQuery(ctx, `UPDATE pve_servers SET api_key_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`)
+		_, err := s.db.ExecContext(ctx, `UPDATE pve_servers SET api_key_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, apiKeyID, id)
+		return id, err
+	} else if err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	debug.RecordQuery(ctx, `INSERT INTO pve_servers (name, machine_id, api_key_id) VALUES (?, ?, ?)`)
+	res, err := s.db.ExecContext(ctx,
+		`INSERT INTO pve_servers (name, machine_id, api_key_id) VALUES (?, ?, ?)`,
+		name, machineID, apiKeyID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("insert pve_server: %w", err)
+	}
+	return res.LastInsertId()
+}
+
 func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.BackupStatus) (int64, error) {
 	return s.InsertPVEReportWithSwap(ctx, serverID, bs, domain.HostSwap{})
 }
