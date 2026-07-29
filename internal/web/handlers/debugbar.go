@@ -152,6 +152,16 @@ func debugBarHTML(p debugBarParams) string {
 		statusColor = "#dc2626"
 	}
 
+	queryColor := "#64748b"
+	switch {
+	case len(p.queries) > 100:
+		queryColor = "#dc2626"
+	case len(p.queries) > 30:
+		queryColor = "#d97706"
+	case len(p.queries) > 0:
+		queryColor = "#16a34a"
+	}
+
 	heap := fmtBytesDebug(p.ms.HeapAlloc)
 	sys := fmtBytesDebug(p.ms.Sys)
 	stack := fmtBytesDebug(p.ms.StackInuse)
@@ -238,7 +248,7 @@ func debugBarHTML(p debugBarParams) string {
 	var tmplDataDetail string
 	tmplDataIndicator := ""
 	if p.tmplData != "" {
-		tmplDataIndicator = `<span class="pd">{ }</span>`
+		tmplDataIndicator = `<span class="pd pbk-dbg-hide-md">{ }</span>`
 		var sb strings.Builder
 		fmt.Fprintf(&sb, `<details style="%s;background:#fafaf0"><summary style="%s">`, subPanelStyle, summaryStyle)
 		sb.WriteString(`<span style="color:#475569;font-weight:600">template data</span></summary>`)
@@ -252,28 +262,37 @@ func debugBarHTML(p debugBarParams) string {
 	detSummaryStyle := `padding:4px 16px;cursor:pointer;color:#94a3b8;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;border-top:1px solid #e2e8f0;outline:none`
 
 	return fmt.Sprintf(`<style>
-#pbk-dbg{position:fixed;bottom:0;left:0;right:0;background:#f8fafc;color:#475569;font:11px/1 'Courier New',monospace;z-index:2147483647;border-top:2px solid #cbd5e1;box-shadow:0 -2px 8px rgba(0,0,0,.1)}
-#pbk-dbg-bar{display:flex;align-items:center;cursor:pointer;user-select:none}
-.pd{padding:5px 10px;border-right:1px solid #e2e8f0;white-space:nowrap}
-#pbk-dbg-det{padding:8px 16px;background:#f1f5f9;line-height:2;display:grid;grid-template-columns:repeat(3,1fr);gap:0 24px}
-.pk{color:#94a3b8}.pv{color:#1e293b;font-weight:500}
+#pbk-dbg,#pbk-dbg *{box-sizing:border-box}
+#pbk-dbg{position:fixed;bottom:0;left:0;right:0;background:#f8fafc;color:#475569;font:11px/1.25 'Courier New',monospace;z-index:2147483647;border-top:2px solid #cbd5e1;box-shadow:0 -2px 8px rgba(15,23,42,.12)}
+#pbk-dbg-bar{display:flex;align-items:center;width:100%%;min-height:29px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;user-select:none;overflow-x:auto;scrollbar-width:thin}
+#pbk-dbg-bar:focus-visible{outline:2px solid #3b82f6;outline-offset:-2px}
+#pbk-dbg .pd{flex:0 0 auto;padding:7px 10px;border-right:1px solid #e2e8f0;white-space:nowrap}
+#pbk-dbg .pbk-dbg-grow{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#pbk-dbg-body{max-height:min(62vh,560px);overflow:auto;border-top:1px solid #e2e8f0}
+#pbk-dbg details>summary::before{content:"›";font-family:inherit;margin-right:6px;font-size:14px;line-height:1;transition:transform .15s;display:inline-block}
+#pbk-dbg details[open]>summary::before{transform:rotate(90deg)}
+#pbk-dbg-det{padding:9px 16px;background:#f1f5f9;line-height:2;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 24px}
+#pbk-dbg .pk{color:#94a3b8}#pbk-dbg .pv{color:#1e293b;font-weight:500}
+@media(max-width:900px){#pbk-dbg .pbk-dbg-hide-md{display:none}#pbk-dbg-det{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){#pbk-dbg .pbk-dbg-hide-sm{display:none}#pbk-dbg-det{grid-template-columns:1fr}#pbk-dbg .pd{padding-inline:8px}}
 </style>
 <div id="pbk-dbg">
-<div id="pbk-dbg-bar">
+<button type="button" id="pbk-dbg-bar" aria-controls="pbk-dbg-body" aria-expanded="false">
 <span class="pd" style="color:#3b82f6;font-weight:bold">◈ dev</span>
 <span class="pd" style="color:%s;font-weight:bold">%d</span>
 <span class="pd" style="color:%s">⏱ %s</span>
-<span class="pd">💾 %s heap</span>
-<span class="pd">📦 %s</span>
-<span class="pd"><b>%s</b> %s</span>
-<span class="pd">📄 %s</span>
-<span class="pd">🧵 %d go</span>
+<span class="pd pbk-dbg-hide-md">💾 %s heap</span>
+<span class="pd pbk-dbg-hide-sm">📦 %s</span>
+<span class="pd pbk-dbg-grow"><b>%s</b> %s</span>
+<span class="pd pbk-dbg-hide-sm">📄 %s</span>
+<span class="pd" style="color:%s"><b>SQL</b> %d</span>
+<span class="pd pbk-dbg-hide-md">🧵 %d go</span>
 %s
-<span class="pd" style="margin-left:auto;border-left:1px solid #e2e8f0;border-right:none">👤 %s</span>
+<span class="pd pbk-dbg-hide-sm" style="margin-left:auto;border-left:1px solid #e2e8f0;border-right:none">👤 %s</span>
 <span class="pd" id="pbk-dbg-arrow" style="border-right:none">▲</span>
-</div>
+</button>
 <div id="pbk-dbg-body">
-<details><summary style="%s"><span style="color:#475569;font-weight:600">request &amp; runtime</span> <span>%s %s · %s · %s heap</span></summary>
+<details open><summary style="%s"><span style="color:#475569;font-weight:600">request &amp; runtime</span> <span>%s %s · %s · %s heap</span></summary>
 <div id="pbk-dbg-det">
 <div><span class="pk">method </span><span class="pv">%s</span></div>
 <div><span class="pk">status </span><span class="pv" style="color:%s">%d</span></div>
@@ -307,22 +326,27 @@ func debugBarHTML(p debugBarParams) string {
 (function(){
   var dbg=document.getElementById('pbk-dbg');
   var body=document.getElementById('pbk-dbg-body');
+  var bar=document.getElementById('pbk-dbg-bar');
   var arrow=document.getElementById('pbk-dbg-arrow');
   function syncPad(){
     var h=dbg.offsetHeight+'px';
     document.querySelectorAll('.sidebar,.main-content').forEach(function(el){el.style.paddingBottom=h});
   }
-  var open=localStorage.getItem('pbk-dbg')!=='0';
+  var open=localStorage.getItem('pbk-dbg')==='1';
   body.style.display=open?'block':'none';
   arrow.textContent=open?'▲':'▼';
-  document.getElementById('pbk-dbg-bar').onclick=function(){
+  bar.setAttribute('aria-expanded',open?'true':'false');
+  bar.onclick=function(){
     var showing=body.style.display==='block';
     body.style.display=showing?'none':'block';
     arrow.textContent=showing?'▼':'▲';
+    bar.setAttribute('aria-expanded',showing?'false':'true');
     localStorage.setItem('pbk-dbg',showing?'0':'1');
     syncPad();
   };
   dbg.addEventListener('toggle',syncPad,true);
+  if(window.ResizeObserver){new ResizeObserver(syncPad).observe(dbg)}
+  window.addEventListener('resize',syncPad);
   syncPad();
 })();
 </script>`,
@@ -332,6 +356,7 @@ func debugBarHTML(p debugBarParams) string {
 		heap,
 		fmtBytesDebug(uint64(p.respSize)),
 		p.method, p.path, tmplDisp,
+		queryColor, len(p.queries),
 		goroutines,
 		tmplDataIndicator,
 		userDisp,

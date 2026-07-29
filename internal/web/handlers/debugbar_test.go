@@ -90,6 +90,31 @@ func TestDebugBarDurationWarningStartsAt200ms(t *testing.T) {
 	}
 }
 
+func TestDebugBarIsCompactResponsiveAndShowsSQLCount(t *testing.T) {
+	html := debugBarHTML(debugBarParams{
+		elapsed: 250 * time.Millisecond,
+		status:  http.StatusOK,
+		method:  http.MethodGet,
+		path:    "/servers/pve",
+		ct:      "text/html",
+		queries: make([]string, 101),
+	})
+
+	for _, want := range []string{
+		`aria-controls="pbk-dbg-body"`,
+		`localStorage.getItem('pbk-dbg')==='1'`,
+		`@media(max-width:900px)`,
+		`style="color:#dc2626"><b>SQL</b> 101`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("debug bar missing %q", want)
+		}
+	}
+	if strings.Contains(html, "%!") {
+		t.Fatalf("debug bar contains a formatting error:\n%s", html)
+	}
+}
+
 func authenticatedRequest(t *testing.T, path string) *http.Request {
 	t.Helper()
 	session.Init("01234567890123456789012345678901", false)
