@@ -239,7 +239,21 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"WindowsCount": 1,
 		}),
 		"alerts.html": base(map[string]any{
-			"AlertGroups": []alertGroup{},
+			"AlertGroups": []alertGroup{{
+				ServerName: "pve-1",
+				ServerType: "pve",
+				ServerID:   1,
+				Warning:    1,
+				Alerts: []domain.Alert{{
+					ID:         "disk:pve:1:local",
+					ServerName: "pve-1",
+					ServerType: "pve",
+					ServerID:   1,
+					Severity:   domain.AlertSeverityWarning,
+					Title:      "Disco casi lleno",
+					Message:    "90% usado",
+				}},
+			}},
 			"Suppressed": []struct {
 				Alert domain.Alert
 				Until time.Time
@@ -371,6 +385,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		}),
 		"server_pve_detail.html": base(map[string]any{
 			"Server":          pveServer,
+			"ServerURL":       "https://pve.example.test:8006",
 			"BackupTasks":     []domain.PVEBackupTask{},
 			"BackupRows":      []pveBackupJobRow{},
 			"BackupJobStart":  int64(0),

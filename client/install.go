@@ -40,23 +40,45 @@ PENDING_FILE="$INSTALL_DIR/.report_pending"
 
 log_msg() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
+if [ "$1" = "run-report" ]; then
+    touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
+    exec 200>"$LOCK_FILE"
+    flock -w 30 200 || {
+        log_msg "WARN: Could not acquire lock, saving as pending"
+        echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
+        exit 0
+    }
+    log_msg "INFO: Running probakgo-client..."
+    "$INSTALL_DIR/probakgo-client" --vzdump-hook >> "$LOG_FILE" 2>&1
+    EXIT_CODE=$?
+    log_msg "INFO: Exit code: $EXIT_CODE"
+    if [ "$EXIT_CODE" -eq 0 ]; then
+        [ -f "$PENDING_FILE" ] && rm -f "$PENDING_FILE"
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
+    fi
+    exit "$EXIT_CODE"
+fi
+
 if [ "$1" = "job-end" ]; then
     log_msg "INFO: Backup completed, scheduling report..."
     touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
-    (
-        # Return from the hook first so PVE can publish endtime/exitstatus for
-        # the aggregate vzdump task before the client asks for the latest job.
-        sleep 5
-        flock -w 30 200 || {
-            log_msg "WARN: Could not acquire lock, saving as pending"
-            echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
-            exit 0
-        }
-        log_msg "INFO: Running probakgo-client..."
-        "$INSTALL_DIR/probakgo-client" --vzdump-hook >> "$LOG_FILE" 2>&1
-        log_msg "INFO: Exit code: $?"
-        [ -f "$PENDING_FILE" ] && rm -f "$PENDING_FILE"
-    ) 200>"$LOCK_FILE" </dev/null >> "$LOG_FILE" 2>&1 &
+    # A transient systemd timer escapes the vzdump task scope. PVE 6 kills
+    # ordinary background children when the backup job finishes.
+    UNIT_NAME="probakgo-report-$(date +%s)-$$"
+    if command -v systemd-run >/dev/null 2>&1 &&
+       systemd-run --quiet --collect --unit="$UNIT_NAME" --on-active=5s \
+           --timer-property=AccuracySec=1s \
+           "$INSTALL_DIR/vzdump_client.sh" run-report; then
+        log_msg "INFO: Report scheduled via systemd"
+    else
+        log_msg "WARN: systemd scheduling unavailable, using background fallback"
+        (
+            # Return from the hook first so PVE can publish endtime/exitstatus.
+            sleep 5
+            "$INSTALL_DIR/vzdump_client.sh" run-report
+        ) </dev/null >> "$LOG_FILE" 2>&1 &
+    fi
 fi
 exit 0
 `

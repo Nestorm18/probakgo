@@ -501,6 +501,8 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	serverURL := serverURLFor(sv.APIKeyID, sv.Name, serverURLs)
 	latestReports, _ := h.store.ListPVEReports(ctx, id, 14)
 	page := reportPageFromRequest(r)
 	totalReports, _ := h.store.CountPVEReports(ctx, id)
@@ -640,6 +642,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Username":        username,
 		"Role":            role,
 		"Server":          sv,
+		"ServerURL":       serverURL,
 		"Reports":         reports,
 		"Pagination":      pagination,
 		"Storages":        storages,

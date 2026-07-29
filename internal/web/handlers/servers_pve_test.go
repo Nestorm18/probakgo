@@ -1,12 +1,16 @@
 package webhandlers
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 
 	"probakgo/internal/service"
 	"probakgo/internal/session"
@@ -43,5 +47,44 @@ func TestPVEServersRendersServerWithoutReport(t *testing.T) {
 	}
 	if !strings.Contains(body, "pve-new") {
 		t.Fatalf("server missing from response:\n%s", body)
+	}
+}
+
+func TestPVEServerDetailLinksConfiguredProxmoxURL(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	st := openAlertsHandlerDB(t)
+	key, err := st.CreateAPIKey(t.Context(), "pve-new", "pve-new", "https://pve.example.test:8006")
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	serverID, err := st.UpsertPVEServerForAPIKey(t.Context(), key.ID, "pve-new", "10.0.0.10", "", "test", "mid-new")
+	if err != nil {
+		t.Fatalf("UpsertPVEServerForAPIKey: %v", err)
+	}
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	h := New(st, tmpl, service.NewReport(st, time.UTC))
+	req := httptest.NewRequest(http.MethodGet, "/servers/pve/"+strconv.FormatInt(serverID, 10), nil)
+	routeCtx := chi.NewRouteContext()
+	routeCtx.URLParams.Add("id", strconv.FormatInt(serverID, 10))
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx))
+	loginReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	loginRR := httptest.NewRecorder()
+	if err := session.SetUser(loginRR, loginReq, "admin", "admin"); err != nil {
+		t.Fatalf("session.SetUser: %v", err)
+	}
+	for _, cookie := range loginRR.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
+	rr := httptest.NewRecorder()
+
+	h.PVEServerDetail(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status: got %d, body:\n%s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `href="https://pve.example.test:8006"`) || !strings.Contains(body, "Abrir Proxmox") {
+		t.Fatalf("configured Proxmox link missing from response:\n%s", body)
 	}
 }
