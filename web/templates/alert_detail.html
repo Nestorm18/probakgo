@@ -45,7 +45,11 @@
       <div class="card-body">
         <div class="alert-detail-kv">
           <span>Servidor</span>
-          <strong>{{.Alert.ServerName}}</strong>
+          {{if .ServerDetailURL}}
+            <strong><a href="{{.ServerDetailURL}}" class="text-decoration-none" title="Ver servidor"><i class="bi bi-server me-1"></i>{{.Alert.ServerName}}</a></strong>
+          {{else}}
+            <strong>{{.Alert.ServerName}}</strong>
+          {{end}}
         </div>
         <div class="alert-detail-kv">
           <span>ID</span>

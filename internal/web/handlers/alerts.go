@@ -20,6 +20,7 @@ type alertGroup struct {
 	ServerName string
 	ServerType string
 	ServerID   int64
+	ServerURL  string
 	Critical   int
 	Warning    int
 	Alerts     []domain.Alert
@@ -34,6 +35,7 @@ type suppressedAlertGroup struct {
 	ServerName string
 	ServerType string
 	ServerID   int64
+	ServerURL  string
 	Rows       []suppressedAlertRow
 }
 
@@ -108,6 +110,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build suppressed list with until times for template.
+	serverNamesByID, serverURLs := h.alertServerMetadata(ctx)
 	var suppressedRows []suppressedAlertRow
 	for _, a := range suppressed {
 		suppressedRows = append(suppressedRows, suppressedAlertRow{
@@ -120,7 +123,7 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		suppressedRows = append(suppressedRows, suppressedAlertRow{
-			Alert: h.alertFromSuppressionID(ctx, alertID),
+			Alert: alertFromSuppressionIDWithServerNames(alertID, serverNamesByID),
 			Until: until,
 		})
 	}
@@ -137,12 +140,21 @@ func (h *WebH) Alerts(w http.ResponseWriter, r *http.Request) {
 	historyPagination := buildPagination(historyPage, totalEvents, alertHistoryPageSize, historyQuery)
 	events, _ := h.store.ListAlertStateEventsPage(ctx, alertHistoryPageSize, (historyPagination.Page-1)*alertHistoryPageSize)
 
+	alertGroups := groupAlertsByServer(filtered)
+	for i := range alertGroups {
+		alertGroups[i].ServerURL = serverURLs[alertServerKey(alertGroups[i].ServerType, alertGroups[i].ServerID)]
+	}
+	suppressedGroups := groupSuppressedByServer(suppressedRows)
+	for i := range suppressedGroups {
+		suppressedGroups[i].ServerURL = serverURLs[alertServerKey(suppressedGroups[i].ServerType, suppressedGroups[i].ServerID)]
+	}
+
 	h.tmpl.Render(w, r, "alerts.html", map[string]any{
 		"Username":          username,
 		"Role":              role,
-		"AlertGroups":       groupAlertsByServer(filtered),
+		"AlertGroups":       alertGroups,
 		"Suppressed":        suppressedRows,
-		"SuppressedGroups":  groupSuppressedByServer(suppressedRows),
+		"SuppressedGroups":  suppressedGroups,
 		"AlertCritical":     critical,
 		"AlertWarning":      warning,
 		"FilterSeverity":    filterSeverity,
@@ -410,6 +422,11 @@ func formAlertIDs(r *http.Request) []string {
 }
 
 func (h *WebH) alertFromSuppressionID(ctx context.Context, alertID string) domain.Alert {
+	serverNames, _ := h.alertServerMetadata(ctx)
+	return alertFromSuppressionIDWithServerNames(alertID, serverNames)
+}
+
+func alertFromSuppressionIDWithServerNames(alertID string, serverNames map[string]string) domain.Alert {
 	a := domain.Alert{
 		ID:       alertID,
 		Severity: domain.AlertSeverityWarning,
@@ -433,20 +450,7 @@ func (h *WebH) alertFromSuppressionID(ctx context.Context, alertID string) domai
 			}
 		}
 	}
-	switch a.ServerType {
-	case "pve":
-		if sv, err := h.store.GetPVEServer(ctx, a.ServerID); err == nil {
-			a.ServerName = sv.DisplayName
-		}
-	case "pbs":
-		if sv, err := h.store.GetPBSServer(ctx, a.ServerID); err == nil {
-			a.ServerName = sv.DisplayName
-		}
-	case "windows":
-		if sv, err := h.store.GetWindowsServer(ctx, a.ServerID); err == nil {
-			a.ServerName = sv.DisplayName
-		}
-	}
+	a.ServerName = serverNames[alertServerKey(a.ServerType, a.ServerID)]
 	if a.ServerName == "" {
 		a.ServerName = a.ServerType + " " + strconv.FormatInt(a.ServerID, 10)
 	}
@@ -504,6 +508,43 @@ func uniqueServerNames(alerts []domain.Alert) []string {
 		}
 	}
 	return out
+}
+
+func alertServerKey(serverType string, serverID int64) string {
+	return serverType + ":" + strconv.FormatInt(serverID, 10)
+}
+
+func (h *WebH) alertExternalServerURLs(ctx context.Context) map[string]string {
+	_, urls := h.alertServerMetadata(ctx)
+	return urls
+}
+
+func (h *WebH) alertServerMetadata(ctx context.Context) (map[string]string, map[string]string) {
+	keyURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
+	names := make(map[string]string)
+	urls := make(map[string]string)
+	pveServers, _ := h.store.ListPVEServers(ctx)
+	for _, server := range pveServers {
+		names[alertServerKey("pve", server.ID)] = server.DisplayName
+		if serverURL := serverURLFor(server.APIKeyID, server.Name, keyURLs); serverURL != "" {
+			urls[alertServerKey("pve", server.ID)] = serverURL
+		}
+	}
+	pbsServers, _ := h.store.ListPBSServers(ctx)
+	for _, server := range pbsServers {
+		names[alertServerKey("pbs", server.ID)] = server.DisplayName
+		if serverURL := serverURLFor(server.APIKeyID, server.Name, keyURLs); serverURL != "" {
+			urls[alertServerKey("pbs", server.ID)] = serverURL
+		}
+	}
+	windowsServers, _ := h.store.ListWindowsServers(ctx)
+	for _, server := range windowsServers {
+		names[alertServerKey("windows", server.ID)] = server.DisplayName
+		if serverURL := serverURLFor(server.APIKeyID, server.Name, keyURLs); serverURL != "" {
+			urls[alertServerKey("windows", server.ID)] = serverURL
+		}
+	}
+	return names, urls
 }
 
 func groupAlertsByServer(alerts []domain.Alert) []alertGroup {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"probakgo/internal/debug"
@@ -185,6 +186,42 @@ func (s *Store) GetLatestWindowsReports(ctx context.Context) (map[int64]*domain.
 		reports[r.ServerID] = &r
 	}
 	return reports, rows.Err()
+}
+
+func (s *Store) GetRecentWindowsReportsByServer(ctx context.Context, serverIDs []int64, limit int) (map[int64][]domain.WindowsReport, error) {
+	if len(serverIDs) == 0 || limit <= 0 {
+		return map[int64][]domain.WindowsReport{}, nil
+	}
+	parts := make([]string, len(serverIDs))
+	args := make([]any, 0, len(serverIDs)*2)
+	for i, serverID := range serverIDs {
+		parts[i] = `SELECT id, server_id, reported_at, is_stale FROM (
+			SELECT id, server_id, reported_at, is_stale
+			FROM windows_reports
+			WHERE server_id = ?
+			ORDER BY reported_at DESC, id DESC
+			LIMIT ?
+		)`
+		args = append(args, serverID, limit)
+	}
+	debug.RecordQuery(ctx, `SELECT the latest N windows_reports for each requested server with UNION ALL`)
+	query := strings.Join(parts, " UNION ALL ") + ` ORDER BY server_id, reported_at DESC, id DESC`
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.WindowsReport)
+	for rows.Next() {
+		var report domain.WindowsReport
+		var isStale int
+		if err := rows.Scan(&report.ID, &report.ServerID, &report.ReportedAt, &isStale); err != nil {
+			return nil, err
+		}
+		report.IsStale = isStale != 0
+		result[report.ServerID] = append(result[report.ServerID], report)
+	}
+	return result, rows.Err()
 }
 
 func (s *Store) ListWindowsReports(ctx context.Context, serverID int64, limit int) ([]domain.WindowsReport, error) {

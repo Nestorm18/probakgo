@@ -223,4 +223,27 @@ func runHeartbeat() {
 		log.Printf("ERROR: %v", err)
 		os.Exit(1)
 	}
+	if err := retryPendingReport(pendingReportPath, func() error {
+		return sendReport(cfg, si, "")
+	}); err != nil {
+		log.Printf("WARN: pending backup report retry failed: %v", err)
+	}
+}
+
+func retryPendingReport(path string, send func() error) error {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("check pending report: %w", err)
+	}
+	log.Printf("Pending backup report found, retrying...")
+	if err := send(); err != nil {
+		return err
+	}
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clear pending report: %w", err)
+	}
+	log.Printf("Pending backup report sent successfully")
+	return nil
 }

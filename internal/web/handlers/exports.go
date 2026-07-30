@@ -202,17 +202,26 @@ func (h *WebH) exportPVERows(r *http.Request) ([]pveExportRow, error) {
 		threshold = cfg.AlertPVEHeartbeatMinutes
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
+	reports, _ := h.store.GetLatestPVEReports(ctx)
+	configsByServer, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
+	alertConfigs, _ := h.store.ListPVEAlertConfigs(ctx)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, report := range reports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	tasksByReport, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
 	rows := make([]pveExportRow, 0, len(servers))
 	for _, sv := range servers {
-		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
+		rep := reports[sv.ID]
 		state := "Sin reporte"
 		lastReport := ""
 		backupStatus := ""
 		if rep != nil {
 			lastReport = formatExportTime(rep.ReportedAt)
-			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
-			backupStatus = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
-			stale, _ := h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
+			backupStatus = domain.PVEBackupStatusSummary(tasksByReport[rep.ID], rep.BackupStatus)
+			alertCfg := alertConfigs[sv.ID]
+			alertCfg.ServerID = sv.ID
+			stale, _ := h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configsByServer[sv.ID], alertCfg)
 			if stale || rep.IsStale {
 				state = "Sin reporte"
 			} else {
@@ -237,6 +246,7 @@ func (h *WebH) alertExportRows(r *http.Request) ([]alertExportRow, error) {
 		return nil, err
 	}
 	suppressions, _ := h.store.GetActiveSuppressions(ctx)
+	serverNames, _ := h.alertServerMetadata(ctx)
 	seen := make(map[string]bool)
 	rows := make([]alertExportRow, 0, len(allAlerts)+len(suppressions))
 	for _, alert := range allAlerts {
@@ -255,7 +265,7 @@ func (h *WebH) alertExportRows(r *http.Request) ([]alertExportRow, error) {
 		rows = append(rows, alertExportRow{
 			State:           "suppressed",
 			SuppressedUntil: formatExportTime(until),
-			Alert:           h.alertFromSuppressionID(ctx, alertID),
+			Alert:           alertFromSuppressionIDWithServerNames(alertID, serverNames),
 		})
 	}
 	return rows, nil
@@ -267,9 +277,15 @@ func (h *WebH) exportPBSRows(r *http.Request) ([]pbsExportRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	reports, _ := h.store.GetLatestPBSReports(ctx)
+	reportIDs := make([]int64, 0, len(reports))
+	for _, report := range reports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	storesByReport, _ := h.store.GetPBSStoresForReports(ctx, reportIDs)
 	rows := make([]pbsExportRow, 0, len(servers))
 	for _, sv := range servers {
-		rep, _ := h.store.GetLatestPBSReport(ctx, sv.ID)
+		rep := reports[sv.ID]
 		state := "Sin reporte"
 		lastReport := ""
 		datastores := ""
@@ -278,9 +294,7 @@ func (h *WebH) exportPBSRows(r *http.Request) ([]pbsExportRow, error) {
 			if !rep.IsStale {
 				state = "Activo"
 			}
-			if stores, err := h.store.GetPBSStoresForReport(ctx, rep.ID); err == nil {
-				datastores = summarizePBSStores(stores)
-			}
+			datastores = summarizePBSStores(storesByReport[rep.ID])
 		}
 		rows = append(rows, pbsExportRow{
 			ID: strconv.FormatInt(sv.ID, 10), Name: sv.DisplayName, Hostname: sv.Name,

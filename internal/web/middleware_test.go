@@ -114,3 +114,47 @@ func TestSensitiveTOTPRecentSessionNeverAcceptsExplicitWrongCode(t *testing.T) {
 		t.Fatalf("recent session with wrong code: called=%t status=%d", called, status)
 	}
 }
+
+func TestRequireEditorRejectsReader(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	baseReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	loginRR := httptest.NewRecorder()
+	if err := session.SetUser(loginRR, baseReq, "reader", "reader"); err != nil {
+		t.Fatalf("set reader session: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/alerts/suppress", nil)
+	for _, cookie := range loginRR.Result().Cookies() {
+		req.AddCookie(cookie)
+	}
+	rr := httptest.NewRecorder()
+	called := false
+	RequireEditor(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	})).ServeHTTP(rr, req)
+
+	if called {
+		t.Fatal("reader reached editor-only handler")
+	}
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("status: got %d, want %d", rr.Code, http.StatusForbidden)
+	}
+}
+
+func TestLimitWebRequestBodyRejectsOversizedRequest(t *testing.T) {
+	called := false
+	handler := limitWebRequestBody(8)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}))
+	req := httptest.NewRequest(http.MethodPost, "/login", strings.NewReader("123456789"))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if called {
+		t.Fatal("oversized request reached handler")
+	}
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("status: got %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
+	}
+}

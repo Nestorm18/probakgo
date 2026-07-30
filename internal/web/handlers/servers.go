@@ -291,6 +291,17 @@ func alertCountsByServer(alerts []domain.Alert, serverType string) map[int64]ser
 	return counts
 }
 
+func countAlertSeverities(alerts []domain.Alert) (critical, warning int) {
+	for _, alert := range alerts {
+		if alert.Severity == domain.AlertSeverityCritical {
+			critical++
+		} else {
+			warning++
+		}
+	}
+	return critical, warning
+}
+
 func buildServerHealth(count serverHealthView) serverHealthView {
 	if count.Total <= 0 {
 		return serverHealthView{
@@ -351,20 +362,12 @@ func addServerHealthSummary(summary *serverListHealthSummary, health serverHealt
 }
 
 func (h *WebH) visibleAlertsForServerLists(ctx context.Context) []domain.Alert {
-	alerts, err := service.CurrentAlerts(ctx, h.store, h.report)
+	alerts, err := service.ActivePersistedAlerts(ctx, h.store)
 	if err != nil {
 		slog.Warn("load server list health alerts", "err", err)
 		return nil
 	}
-	suppressions, _ := h.store.GetActiveSuppressions(ctx)
-	active := make([]domain.Alert, 0, len(alerts))
-	for _, alert := range alerts {
-		if _, ok := suppressions[alert.ID]; ok {
-			continue
-		}
-		active = append(active, alert)
-	}
-	return active
+	return alerts
 }
 
 func latestPVESwapView(reports []domain.PVEReport) swapView {
@@ -407,17 +410,27 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pve")
+	alertCritical, alertWarning := countAlertSeverities(activeAlerts)
+	configsByServer, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
+	latestReports, _ := h.store.GetLatestPVEReports(ctx)
+	alertConfigs, _ := h.store.ListPVEAlertConfigs(ctx)
+	reportIDs := make([]int64, 0, len(latestReports))
+	for _, report := range latestReports {
+		reportIDs = append(reportIDs, report.ID)
+	}
+	tasksByReport, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
 	healthSummary := serverListHealthSummary{}
 	var rows []map[string]any
 	for _, sv := range servers {
-		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		configs := configsByServer[sv.ID]
 		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
-		rep, _ := h.store.GetLatestPVEReport(ctx, sv.ID)
+		rep := latestReports[sv.ID]
 		stale := rep == nil && !ignoreStale
+		alertCfg := alertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
 		if rep != nil {
-			stale, _ = h.report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
+			stale, _ = h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg)
 		}
-		alertCfg, _ := h.store.GetPVEAlertConfig(ctx, sv.ID)
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
 		if maint.Active {
@@ -447,7 +460,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 				swapSuppressed(suppressions, "pve", sv.ID),
 			)
 
-			tasks, _ := h.store.GetPVEBackupTasksForReport(ctx, rep.ID)
+			tasks := tasksByReport[rep.ID]
 			r2["BackupStatus"] = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
 			if len(tasks) > 0 {
 				if len(configs) > 0 {
@@ -483,6 +496,8 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		"Role":          role,
 		"Rows":          rows,
 		"HealthSummary": healthSummary,
+		"AlertCritical": alertCritical,
+		"AlertWarning":  alertWarning,
 		"Flash":         r.URL.Query().Get("flash"),
 		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
@@ -508,9 +523,16 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	totalReports, _ := h.store.CountPVEReports(ctx, id)
 	pagination := buildPagination(page, totalReports, reportHistoryPageSize, "")
 	reports, _ := h.store.ListPVEReportsPage(ctx, id, reportHistoryPageSize, (pagination.Page-1)*reportHistoryPageSize)
-	reportIDs := make([]int64, 0, len(reports))
+	reportIDs := make([]int64, 0, len(reports)+len(latestReports))
+	seenReportIDs := make(map[int64]bool, cap(reportIDs))
 	for _, report := range reports {
 		reportIDs = append(reportIDs, report.ID)
+		seenReportIDs[report.ID] = true
+	}
+	for _, report := range latestReports {
+		if !seenReportIDs[report.ID] {
+			reportIDs = append(reportIDs, report.ID)
+		}
 	}
 	reportTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, reportIDs)
 	normalizePVEReportBackupStatuses(reports, reportTasks)
@@ -532,7 +554,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	backupTasks, _ := h.store.GetPVEBackupTasksForReport(ctx, latestReportID)
+	backupTasks := reportTasks[latestReportID]
 	emailCfg, _ := h.store.GetEmailConfig(ctx)
 	heartbeatThreshold := 15
 	if emailCfg != nil {
@@ -597,14 +619,9 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Job history: up to 6 previous reports with tasks (reports[0] is already the latest)
-	var historyIDs []int64
-	for i := 1; i < len(latestReports); i++ {
-		historyIDs = append(historyIDs, latestReports[i].ID)
-	}
-	historyTasks, _ := h.store.GetPVEBackupTasksForReports(ctx, historyIDs)
 	var jobHistory []map[string]any
 	for i := 1; i < len(latestReports) && len(jobHistory) < 6; i++ {
-		tasks := historyTasks[latestReports[i].ID]
+		tasks := reportTasks[latestReports[i].ID]
 		if len(tasks) == 0 {
 			continue
 		}
@@ -790,17 +807,21 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "pbs")
+	alertCritical, alertWarning := countAlertSeverities(activeAlerts)
 	latestReports, _ := h.store.GetLatestPBSReports(ctx)
 	reportIDs := make([]int64, 0, len(latestReports))
 	for _, report := range latestReports {
 		reportIDs = append(reportIDs, report.ID)
 	}
 	tasksByReport, _ := h.store.GetPBSTasksForReports(ctx, reportIDs)
+	storesByReport, _ := h.store.GetPBSStoresForReports(ctx, reportIDs)
+	alertConfigs, _ := h.store.ListPBSAlertConfigs(ctx)
 	healthSummary := serverListHealthSummary{}
 	var rows []map[string]any
 	for _, sv := range servers {
 		rep := latestReports[sv.ID]
-		alertCfg, _ := h.store.GetPBSAlertConfig(ctx, sv.ID)
+		alertCfg := alertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
 		maint := maintenanceByServer(maintenance, "pbs", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])
 		if maint.Active {
@@ -820,8 +841,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
 			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
-			stores, _ := h.store.GetPBSStoresForReport(ctx, rep.ID)
-			r2["Stores"] = pbsStoreDisplays(stores)
+			r2["Stores"] = pbsStoreDisplays(storesByReport[rep.ID])
 			r2["Tasks"] = pbsTaskDisplays(tasksByReport[rep.ID])
 		}
 		rows = append(rows, r2)
@@ -831,6 +851,8 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		"Role":          role,
 		"Rows":          rows,
 		"HealthSummary": healthSummary,
+		"AlertCritical": alertCritical,
+		"AlertWarning":  alertWarning,
 		"Flash":         r.URL.Query().Get("flash"),
 		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
@@ -859,15 +881,19 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 	var taskDetails []pbsTaskDisplay
 	if len(latestReports) > 0 {
 		stores, _ := h.store.GetPBSStoresForReport(ctx, latestReports[0].ID)
+		storeIDs := make([]int64, 0, len(stores))
+		for _, pbsStore := range stores {
+			storeIDs = append(storeIDs, pbsStore.ID)
+		}
+		gcByStore, _ := h.store.GetPBSGCStatusForStores(ctx, storeIDs)
+		historyByStore, _ := h.store.GetPBSHistoryForStores(ctx, storeIDs)
+		snapshotsByStore, _ := h.store.GetPBSSnapshotsForStores(ctx, storeIDs)
 		for _, st := range stores {
-			gc, _ := h.store.GetPBSGCStatus(ctx, st.ID)
-			history, _ := h.store.GetPBSHistory(ctx, st.ID)
-			snapshots, _ := h.store.GetPBSSnapshotsForStore(ctx, st.ID)
 			storeDetails = append(storeDetails, map[string]any{
 				"Store":     st,
-				"GC":        gc,
-				"History":   history,
-				"Snapshots": snapshots,
+				"GC":        gcByStore[st.ID],
+				"History":   historyByStore[st.ID],
+				"Snapshots": snapshotsByStore[st.ID],
 			})
 		}
 		tasks, _ := h.store.GetPBSTasksForReport(ctx, latestReports[0].ID)
@@ -919,6 +945,7 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
 	activeAlerts := h.visibleAlertsForServerLists(ctx)
 	alertCounts := alertCountsByServer(activeAlerts, "windows")
+	alertCritical, alertWarning := countAlertSeverities(activeAlerts)
 	healthSummary := serverListHealthSummary{}
 
 	var rows []map[string]any
@@ -959,6 +986,8 @@ func (h *WebH) WindowsServers(w http.ResponseWriter, r *http.Request) {
 		"Role":          role,
 		"Rows":          rows,
 		"HealthSummary": healthSummary,
+		"AlertCritical": alertCritical,
+		"AlertWarning":  alertWarning,
 		"Flash":         r.URL.Query().Get("flash"),
 		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
@@ -1008,7 +1037,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 	backURL := fmt.Sprintf("/servers/windows/%d", sv.ID)
 	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 	alertControls := windowsAlertControls(sv.ID, diskRows, suppressions)
-	if activeAlerts, err := service.CurrentAlerts(ctx, h.store, h.report); err == nil {
+	if activeAlerts, err := service.ActivePersistedAlerts(ctx, h.store); err == nil {
 		alertControls = append(alertControls, windowsMissingVolumeAlertControls(sv.ID, activeAlerts, suppressions)...)
 	}
 	h.tmpl.Render(w, r, "server_windows_detail.html", map[string]any{

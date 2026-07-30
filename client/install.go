@@ -24,6 +24,7 @@ const (
 	heartbeatTimerPath   = "/etc/systemd/system/probakgo-client-heartbeat.timer"
 	vzdumpConfPath       = "/etc/vzdump.conf"
 	hookPath             = installDir + "/vzdump_client.sh"
+	pendingReportPath    = installDir + "/.report_pending"
 	envPath              = installDir + "/.env"
 	binaryPath           = installDir + "/probakgo-client"
 	binaryLinkPath       = "/usr/local/bin/probakgo-client"
@@ -62,6 +63,7 @@ fi
 
 if [ "$1" = "job-end" ]; then
     log_msg "INFO: Backup completed, scheduling report..."
+    echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
     touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
     # A transient systemd timer escapes the vzdump task scope. PVE 6 kills
     # ordinary background children when the backup job finishes.

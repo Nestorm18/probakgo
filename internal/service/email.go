@@ -183,10 +183,12 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 			return err
 		}
 
-		for _, a := range selected {
-			if err := st.MarkAlertCriticalEmailSent(ctx, a.ID, now); err != nil {
-				return fmt.Errorf("mark critical email sent: %w", err)
-			}
+		alertIDs := make([]string, 0, len(selected))
+		for _, alert := range selected {
+			alertIDs = append(alertIDs, alert.ID)
+		}
+		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs, now); err != nil {
+			return fmt.Errorf("mark critical email sent: %w", err)
 		}
 	}
 
@@ -202,16 +204,19 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
 		return err
 	}
-	for _, a := range resolved {
-		if err := st.MarkAlertResolutionEmailSent(ctx, a.ID, now); err != nil {
-			return fmt.Errorf("mark resolution email sent: %w", err)
-		}
+	alertIDs := make([]string, 0, len(resolved))
+	for _, alert := range resolved {
+		alertIDs = append(alertIDs, alert.ID)
+	}
+	if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs, now); err != nil {
+		return fmt.Errorf("mark resolution email sent: %w", err)
 	}
 	return nil
 }
 
 func criticalAlertsPendingEmail(ctx context.Context, st *store.Store, alerts []domain.Alert, suppressed map[string]time.Time) ([]domain.Alert, error) {
-	var selected []domain.Alert
+	var candidates []domain.Alert
+	var alertIDs []string
 	for _, a := range alerts {
 		if !shouldSendImmediateCriticalEmail(a) {
 			continue
@@ -219,14 +224,18 @@ func criticalAlertsPendingEmail(ctx context.Context, st *store.Store, alerts []d
 		if _, ok := suppressed[a.ID]; ok {
 			continue
 		}
-		_, sent, err := st.GetAlertCriticalEmailSentAt(ctx, a.ID)
-		if err != nil {
-			return nil, fmt.Errorf("get critical email state: %w", err)
+		candidates = append(candidates, a)
+		alertIDs = append(alertIDs, a.ID)
+	}
+	sent, err := st.ListCriticalEmailSentAlertIDs(ctx, alertIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get critical email state: %w", err)
+	}
+	selected := make([]domain.Alert, 0, len(candidates))
+	for _, alert := range candidates {
+		if !sent[alert.ID] {
+			selected = append(selected, alert)
 		}
-		if sent {
-			continue
-		}
-		selected = append(selected, a)
 	}
 	return selected, nil
 }
@@ -400,6 +409,29 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	if err != nil {
 		return emailData{}, err
 	}
+	pveConfigs, _ := st.ListPVEVMBackupConfigsByServer(ctx)
+	pveAlertConfigs, _ := st.ListPVEAlertConfigs(ctx)
+	pveReports, _ := st.GetLatestPVEReports(ctx)
+	pveReportIDs := make([]int64, 0, len(pveReports))
+	for _, report := range pveReports {
+		pveReportIDs = append(pveReportIDs, report.ID)
+	}
+	pveTasks, _ := st.GetPVEBackupTasksForReports(ctx, pveReportIDs)
+
+	pbsReports, _ := st.GetLatestPBSReports(ctx)
+	pbsReportIDs := make([]int64, 0, len(pbsReports))
+	for _, report := range pbsReports {
+		pbsReportIDs = append(pbsReportIDs, report.ID)
+	}
+	pbsStores, _ := st.GetPBSStoresForReports(ctx, pbsReportIDs)
+	pbsTasks, _ := st.GetPBSTasksForReports(ctx, pbsReportIDs)
+
+	windowsReports, _ := st.GetLatestWindowsReports(ctx)
+	windowsReportIDs := make([]int64, 0, len(windowsReports))
+	for _, report := range windowsReports {
+		windowsReportIDs = append(windowsReportIDs, report.ID)
+	}
+	windowsDisks, _ := st.GetWindowsDisksForReports(ctx, windowsReportIDs)
 
 	var pveIssues, pveOk []serverRow
 	for _, sv := range pveServers {
@@ -407,21 +439,23 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			continue
 		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
-		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		configs := pveConfigs[sv.ID]
 		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
 			continue
 		}
-		r, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+		r := pveReports[sv.ID]
+		if r == nil {
 			row.StaleReason = "no se han recibido reportes"
 			pveIssues = append(pveIssues, row)
 			continue
 		}
 
-		tasks, _ := st.GetPVEBackupTasksForReport(ctx, r.ID)
+		tasks := pveTasks[r.ID]
 		isStale := false
 		staleReason := ""
-		if stale, reason := rep.IsStaleForServerID(ctx, r.ReportedAt, sv.ID); stale {
+		alertCfg := pveAlertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
+		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg); stale {
 			isStale = true
 			staleReason = reason
 		} else if r.IsStale {
@@ -469,28 +503,26 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			continue
 		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
-		r, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+		r := pbsReports[sv.ID]
+		if r == nil {
 			row.StaleReason = "no se han recibido reportes"
 			pbsIssues = append(pbsIssues, row)
 			continue
 		}
-		if stores, err := st.GetPBSStoresForReport(ctx, r.ID); err == nil {
-			for _, ds := range stores {
-				usedPct := 0
-				if ds.Total > 0 {
-					usedPct = int(ds.Used * 100 / ds.Total)
-				}
-				row.Datastores = append(row.Datastores, datastoreRow{
-					Name:        ds.Store,
-					Used:        emailFmtBytes(ds.Used),
-					Total:       emailFmtBytes(ds.Total),
-					UsedPct:     usedPct,
-					MountStatus: ds.MountStatus,
-				})
+		for _, ds := range pbsStores[r.ID] {
+			usedPct := 0
+			if ds.Total > 0 {
+				usedPct = int(ds.Used * 100 / ds.Total)
 			}
+			row.Datastores = append(row.Datastores, datastoreRow{
+				Name:        ds.Store,
+				Used:        emailFmtBytes(ds.Used),
+				Total:       emailFmtBytes(ds.Total),
+				UsedPct:     usedPct,
+				MountStatus: ds.MountStatus,
+			})
 		}
-		tasks, _ := st.GetPBSTasksForReport(ctx, r.ID)
+		tasks := pbsTasks[r.ID]
 		var taskFailures []string
 		for _, task := range tasks {
 			row.PBSTasks = append(row.PBSTasks, emailPBSTaskRow(task))
@@ -553,29 +585,27 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			continue
 		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
-		r, err := st.GetLatestWindowsReport(ctx, sv.ID)
-		if err != nil {
+		r := windowsReports[sv.ID]
+		if r == nil {
 			row.StaleReason = "no se han recibido reportes"
 			windowsIssues = append(windowsIssues, row)
 			continue
 		}
-		if disks, err := st.GetWindowsDisksForReport(ctx, r.ID); err == nil {
-			for _, disk := range disks {
-				if !isWindowsLogicalAlertDisk(disk) {
-					continue
-				}
-				usedPct := 0
-				if disk.Total > 0 {
-					usedPct = int(disk.Used * 100 / disk.Total)
-				}
-				row.Datastores = append(row.Datastores, datastoreRow{
-					Name:        disk.Name,
-					Used:        emailFmtBytes(disk.Used),
-					Total:       emailFmtBytes(disk.Total),
-					UsedPct:     usedPct,
-					MountStatus: emailWindowsDiskStatus(disk),
-				})
+		for _, disk := range windowsDisks[r.ID] {
+			if !isWindowsLogicalAlertDisk(disk) {
+				continue
 			}
+			usedPct := 0
+			if disk.Total > 0 {
+				usedPct = int(disk.Used * 100 / disk.Total)
+			}
+			row.Datastores = append(row.Datastores, datastoreRow{
+				Name:        disk.Name,
+				Used:        emailFmtBytes(disk.Used),
+				Total:       emailFmtBytes(disk.Total),
+				UsedPct:     usedPct,
+				MountStatus: emailWindowsDiskStatus(disk),
+			})
 		}
 		if r.IsStale {
 			row.StaleReason = "reporte Windows marcado como obsoleto"

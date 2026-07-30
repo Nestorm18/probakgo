@@ -209,7 +209,20 @@ func (r *ReportService) IsStaleForServerID(ctx context.Context, reportedAt time.
 	return r.isStaleForConfigs(ctx, reportedAt, configs, serverID)
 }
 
+func (r *ReportService) IsStaleForLoadedPVEConfig(reportedAt time.Time, configs []domain.VMBackupConfig, alertCfg domain.PVEAlertConfig) (bool, string) {
+	if len(configs) == 0 {
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+	}
+	finishHour, finishMinute := expectedFinishFromAlertConfig(alertCfg)
+	return r.isStaleForConfigsAt(reportedAt, configs, finishHour, finishMinute)
+}
+
 func (r *ReportService) isStaleForConfigs(ctx context.Context, reportedAt time.Time, configs []domain.VMBackupConfig, serverID int64) (bool, string) {
+	finishHour, finishMinute := r.expectedFinishTimeByServerID(ctx, serverID)
+	return r.isStaleForConfigsAt(reportedAt, configs, finishHour, finishMinute)
+}
+
+func (r *ReportService) isStaleForConfigsAt(reportedAt time.Time, configs []domain.VMBackupConfig, finishHour, finishMinute int) (bool, string) {
 	expected := make(map[time.Weekday]bool)
 	for _, c := range configs {
 		if c.IsExcluded {
@@ -242,7 +255,6 @@ func (r *ReportService) isStaleForConfigs(ctx context.Context, reportedAt time.T
 	}
 
 	now := r.now().In(r.tz)
-	finishHour, finishMinute := r.expectedFinishTimeByServerID(ctx, serverID)
 	for i := 1; i <= 14; i++ {
 		candidate := now.AddDate(0, 0, -i)
 		if !expected[candidate.Weekday()] {
@@ -256,6 +268,18 @@ func (r *ReportService) isStaleForConfigs(ctx context.Context, reportedAt time.T
 		return reportedAt.Before(dayStart), "no se ha recibido reporte del ultimo dia de backup"
 	}
 	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+}
+
+func expectedFinishFromAlertConfig(cfg domain.PVEAlertConfig) (int, int) {
+	const defaultHour, defaultMinute = 9, 0
+	if cfg.ExpectedFinishTime == nil {
+		return defaultHour, defaultMinute
+	}
+	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
+	if err != nil {
+		return defaultHour, defaultMinute
+	}
+	return t.Hour(), t.Minute()
 }
 
 func (r *ReportService) expectedFinishTime(ctx context.Context, serverName string) (int, int) {
@@ -276,16 +300,11 @@ func (r *ReportService) expectedFinishTime(ctx context.Context, serverName strin
 }
 
 func (r *ReportService) expectedFinishTimeByServerID(ctx context.Context, serverID int64) (int, int) {
-	const defaultHour, defaultMinute = 9, 0
 	cfg, err := r.store.GetPVEAlertConfig(ctx, serverID)
-	if err != nil || cfg.ExpectedFinishTime == nil {
-		return defaultHour, defaultMinute
-	}
-	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
 	if err != nil {
-		return defaultHour, defaultMinute
+		return 9, 0
 	}
-	return t.Hour(), t.Minute()
+	return expectedFinishFromAlertConfig(cfg)
 }
 
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.

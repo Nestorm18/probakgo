@@ -169,6 +169,44 @@ func TestGetPBSHistory(t *testing.T) {
 	}
 }
 
+func TestPBSStoreChildrenBatchLoads(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-batch", "10.0.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	firstID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "first", Total: 1000})
+	secondID, _ := st.InsertPBSStore(ctx, reportID, domain.PBSDatastorePayload{Store: "second", Total: 2000})
+	if err := st.InsertPBSGCStatus(ctx, firstID, &domain.GCStatusPayload{DiskBytes: 123}); err != nil {
+		t.Fatalf("InsertPBSGCStatus: %v", err)
+	}
+	firstValue, secondValue := 10.0, 20.0
+	if err := st.InsertPBSStoreHistory(ctx, firstID, []*float64{&firstValue}); err != nil {
+		t.Fatalf("InsertPBSStoreHistory first: %v", err)
+	}
+	if err := st.InsertPBSStoreHistory(ctx, secondID, []*float64{&secondValue}); err != nil {
+		t.Fatalf("InsertPBSStoreHistory second: %v", err)
+	}
+	if err := st.InsertPBSSnapshot(ctx, secondID, domain.PBSGroupPayload{BackupType: "vm", BackupID: "100"}); err != nil {
+		t.Fatalf("InsertPBSSnapshot: %v", err)
+	}
+	storeIDs := []int64{firstID, secondID}
+
+	gc, err := st.GetPBSGCStatusForStores(ctx, storeIDs)
+	if err != nil || gc[firstID] == nil || gc[firstID].DiskBytes != 123 || gc[secondID] != nil {
+		t.Fatalf("batch GC: err=%v values=%+v", err, gc)
+	}
+	history, err := st.GetPBSHistoryForStores(ctx, storeIDs)
+	if err != nil || len(history[firstID]) != 1 || len(history[secondID]) != 1 ||
+		*history[firstID][0] != firstValue || *history[secondID][0] != secondValue {
+		t.Fatalf("batch history: err=%v values=%+v", err, history)
+	}
+	snapshots, err := st.GetPBSSnapshotsForStores(ctx, storeIDs)
+	if err != nil || len(snapshots[firstID]) != 0 || len(snapshots[secondID]) != 1 ||
+		snapshots[secondID][0].BackupID != "100" {
+		t.Fatalf("batch snapshots: err=%v values=%+v", err, snapshots)
+	}
+}
+
 func TestListPBSReports_LimitAndOrder(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)

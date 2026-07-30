@@ -138,3 +138,33 @@ func TestToggleVMExclude(t *testing.T) {
 		t.Error("want IsExcluded=false after second toggle")
 	}
 }
+
+func TestListPVEVMBackupConfigsByServer(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	firstID, err := st.UpsertPVEServer(ctx, "pve-batch-1", "", "", "", "")
+	if err != nil {
+		t.Fatalf("create first server: %v", err)
+	}
+	secondID, err := st.UpsertPVEServer(ctx, "pve-batch-2", "", "", "", "")
+	if err != nil {
+		t.Fatalf("create second server: %v", err)
+	}
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", firstID, "pve-batch-1", domain.CreateVMBackupConfigRequest{VMID: "100", Monday: true}); err != nil {
+		t.Fatalf("create bound config: %v", err)
+	}
+	if _, err := st.CreateVMBackupConfig(ctx, "pve-batch-2", domain.CreateVMBackupConfigRequest{VMID: "200", Tuesday: true}); err != nil {
+		t.Fatalf("create legacy config: %v", err)
+	}
+
+	configs, err := st.ListPVEVMBackupConfigsByServer(ctx)
+	if err != nil {
+		t.Fatalf("ListPVEVMBackupConfigsByServer: %v", err)
+	}
+	if len(configs[firstID]) != 1 || configs[firstID][0].VMID != "100" {
+		t.Fatalf("first configs: %+v", configs[firstID])
+	}
+	if len(configs[secondID]) != 1 || configs[secondID][0].VMID != "200" {
+		t.Fatalf("second configs: %+v", configs[secondID])
+	}
+}

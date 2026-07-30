@@ -90,7 +90,28 @@ func TestTemplatesApplyRequestCSPNonce(t *testing.T) {
 	}
 }
 
-func TestAboutUpdateCheckSkipsSensitiveTOTPPrompt(t *testing.T) {
+func TestTemplateDebugDataRedactsSecrets(t *testing.T) {
+	got := safeTemplateDebugData(map[string]any{
+		"Key":         "pbk-secret",
+		"GitHubToken": "github-secret",
+		"Config": domain.EmailConfig{
+			SMTPHost: "smtp.example.test",
+			SMTPPass: "smtp-secret",
+		},
+		"Safe": "visible",
+	})
+
+	for _, secret := range []string{"pbk-secret", "github-secret", "smtp-secret"} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("debug data contains secret %q: %s", secret, got)
+		}
+	}
+	if !strings.Contains(got, `"Safe": "visible"`) || !strings.Contains(got, "[REDACTED]") {
+		t.Fatalf("debug data lost safe fields or redaction marker: %s", got)
+	}
+}
+
+func TestAboutUpdateSkipsSensitiveTOTPPrompt(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
 	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
@@ -100,11 +121,47 @@ func TestAboutUpdateCheckSkipsSensitiveTOTPPrompt(t *testing.T) {
 	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
 
 	body := rr.Body.String()
-	if !strings.Contains(body, `action="/about/update" data-totp-skip`) {
-		t.Fatalf("update check form must bypass the client-side sensitive TOTP prompt:\n%s", body)
+	if !strings.Contains(body, `action="/about/update"`) {
+		t.Fatalf("update form is missing:\n%s", body)
 	}
-	if !strings.Contains(body, `form.hasAttribute('data-totp-skip')`) {
-		t.Fatalf("base template does not honor the TOTP bypass marker:\n%s", body)
+	if !strings.Contains(body, `action="/about/update" data-totp-skip`) {
+		t.Fatalf("update form does not bypass the sensitive TOTP prompt:\n%s", body)
+	}
+}
+
+func TestAlertNotificationsLinkDirectlyToServer(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	req := httptest.NewRequest(http.MethodGet, "/about", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "about.html", templateFixtures(time.Now())["about.html"])
+
+	body := rr.Body.String()
+	for _, want := range []string{
+		`function alertServerURL(alert)`,
+		`el.querySelector('.alert-toast-server').href = alertServerURL(alert)`,
+		`window.location.href = alertServerURL(alert)`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("alert notification missing direct server navigation %q", want)
+		}
+	}
+}
+
+func TestAlertsShowExternalProxmoxLink(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	req := httptest.NewRequest(http.MethodGet, "/alerts", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "alerts.html", templateFixtures(time.Now())["alerts.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `href="https://pve.example.test:8006"`) || !strings.Contains(body, "Abrir Proxmox") {
+		t.Fatalf("alerts page missing external Proxmox link:\n%s", body)
 	}
 }
 
@@ -243,6 +300,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 				ServerName: "pve-1",
 				ServerType: "pve",
 				ServerID:   1,
+				ServerURL:  "https://pve.example.test:8006",
 				Warning:    1,
 				Alerts: []domain.Alert{{
 					ID:         "disk:pve:1:local",
@@ -262,7 +320,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"ServerNames":       []string{"pve-1"},
 			"FilterSeverity":    "",
 			"FilterServer":      "",
-			"AlertEvents":       []domain.AlertStateEvent{{EventType: "appeared", ServerName: "pve-1", Title: "Sin reporte", Message: "test", CreatedAt: now}},
+			"AlertEvents":       []domain.AlertStateEvent{{EventType: "appeared", ServerName: "pve-1", ServerType: "pve", ServerID: 1, Title: "Sin reporte", Message: "test", CreatedAt: now}},
 			"HistoryPage":       1,
 			"HistoryPrevPage":   0,
 			"HistoryNextPage":   2,

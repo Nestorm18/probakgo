@@ -3,12 +3,82 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"probakgo/internal/debug"
 	"probakgo/internal/domain"
+	"probakgo/internal/store"
 )
+
+func TestRunAllReturnsEvaluatorErrorsWithPartialResults(t *testing.T) {
+	_, st := openTestStore(t)
+	original := evaluators
+	t.Cleanup(func() { evaluators = original })
+	evaluators = []AlertEvaluator{
+		func(*store.Store, AlertConfigs) ([]domain.Alert, error) {
+			return []domain.Alert{{ID: "partial"}}, nil
+		},
+		func(*store.Store, AlertConfigs) ([]domain.Alert, error) {
+			return nil, errors.New("evaluator failed")
+		},
+	}
+
+	alerts, err := RunAll(st, defaultCfg())
+	if err == nil || !strings.Contains(err.Error(), "evaluator failed") {
+		t.Fatalf("RunAll error: got %v", err)
+	}
+	if len(alerts) != 1 || alerts[0].ID != "partial" {
+		t.Fatalf("partial alerts: got %+v", alerts)
+	}
+}
+
+func TestRunAllQueryCountDoesNotGrowWithServerCount(t *testing.T) {
+	_, st := openTestStore(t)
+	ctx := context.Background()
+	firstID, err := st.UpsertPVEServer(ctx, "pve-query-1", "10.0.0.1", "", "1.0", "query-1")
+	if err != nil {
+		t.Fatalf("insert first server: %v", err)
+	}
+	if _, err := st.InsertPVEReport(ctx, firstID, nil); err != nil {
+		t.Fatalf("insert first report: %v", err)
+	}
+	firstCount := alertRunQueryCount(t, st)
+
+	for i := 2; i <= 8; i++ {
+		serverID, err := st.UpsertPVEServer(ctx, fmt.Sprintf("pve-query-%d", i), fmt.Sprintf("10.0.0.%d", i), "", "1.0", fmt.Sprintf("query-%d", i))
+		if err != nil {
+			t.Fatalf("insert server %d: %v", i, err)
+		}
+		if _, err := st.InsertPVEReport(ctx, serverID, nil); err != nil {
+			t.Fatalf("insert report %d: %v", i, err)
+		}
+	}
+	manyCount := alertRunQueryCount(t, st)
+
+	if manyCount != firstCount {
+		t.Fatalf("alert query count grew with server count: one=%d many=%d", firstCount, manyCount)
+	}
+}
+
+func alertRunQueryCount(t *testing.T, st *store.Store) int {
+	t.Helper()
+	ctx := debug.NewContext(context.Background())
+	cfg, err := LoadAlertConfigs(ctx, st)
+	if err != nil {
+		t.Fatalf("LoadAlertConfigs: %v", err)
+	}
+	if _, err := RunAll(st, cfg); err != nil {
+		t.Fatalf("RunAll: %v", err)
+	}
+	info := debug.FromContext(ctx)
+	info.Mu.Lock()
+	defer info.Mu.Unlock()
+	return len(info.Queries)
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 

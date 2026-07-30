@@ -66,6 +66,53 @@ func TestListAlertStateEventsForAlert(t *testing.T) {
 	}
 }
 
+func TestListPresentAlertsReturnsOnlyActiveStates(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	active := domain.Alert{
+		ID:         "backup_error:pve:7:100",
+		Type:       domain.AlertTypeBackupError,
+		Severity:   domain.AlertSeverityCritical,
+		Title:      "Backup fallido",
+		Message:    "VM 100",
+		ServerName: "pve-7",
+		ServerType: "pve",
+		ServerID:   7,
+		VMID:       100,
+		VMName:     "vm-100",
+	}
+	resolved := domain.Alert{
+		ID:         "disk:windows:8:C:",
+		Type:       domain.AlertTypeDisk,
+		Severity:   domain.AlertSeverityWarning,
+		Title:      "Disco casi lleno",
+		ServerName: "windows-8",
+		ServerType: "windows",
+		ServerID:   8,
+		StoreName:  "C:",
+	}
+
+	if err := st.SyncAlertStates(ctx, []domain.Alert{active, resolved}); err != nil {
+		t.Fatalf("initial sync: %v", err)
+	}
+	if err := st.SyncAlertStates(ctx, []domain.Alert{active}); err != nil {
+		t.Fatalf("resolve one alert: %v", err)
+	}
+
+	alerts, err := st.ListPresentAlerts(ctx)
+	if err != nil {
+		t.Fatalf("ListPresentAlerts: %v", err)
+	}
+	if len(alerts) != 1 {
+		t.Fatalf("got %d active alerts, want 1: %+v", len(alerts), alerts)
+	}
+	got := alerts[0]
+	if got.ID != active.ID || got.Type != domain.AlertTypeBackupError ||
+		got.ServerID != active.ServerID || got.VMID != active.VMID || got.DetectedAt.IsZero() {
+		t.Fatalf("unexpected active alert: %+v", got)
+	}
+}
+
 func TestAlertCriticalEmailSentResetsWhenResolved(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)

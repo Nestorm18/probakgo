@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -85,6 +86,38 @@ func TestListWindowsReportsPageAndCount(t *testing.T) {
 	}
 	if len(reports) != 2 {
 		t.Fatalf("reports: got %d, want 2", len(reports))
+	}
+}
+
+func TestGetRecentWindowsReportsByServer(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverIDs := make([]int64, 2)
+	for i := range serverIDs {
+		serverID, err := st.UpsertWindowsServer(ctx, fmt.Sprintf("win-recent-%d", i), "1.1.1.1", "", "1.0", fmt.Sprintf("machine-%d", i))
+		if err != nil {
+			t.Fatalf("UpsertWindowsServer %d: %v", i, err)
+		}
+		serverIDs[i] = serverID
+		for j := 0; j < 3; j++ {
+			if _, err := st.InsertWindowsReport(ctx, serverID); err != nil {
+				t.Fatalf("InsertWindowsReport %d/%d: %v", i, j, err)
+			}
+		}
+	}
+
+	reports, err := st.GetRecentWindowsReportsByServer(ctx, serverIDs, 2)
+	if err != nil {
+		t.Fatalf("GetRecentWindowsReportsByServer: %v", err)
+	}
+	for _, serverID := range serverIDs {
+		got := reports[serverID]
+		if len(got) != 2 {
+			t.Fatalf("server %d: got %d reports, want 2", serverID, len(got))
+		}
+		if got[0].ID <= got[1].ID {
+			t.Fatalf("server %d reports are not newest first: %+v", serverID, got)
+		}
 	}
 }
 

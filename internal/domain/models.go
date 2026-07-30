@@ -276,7 +276,7 @@ type ServerHeartbeat struct {
 
 type APIKey struct {
 	ID         int64      `db:"id"`
-	Key        string     `db:"key"`
+	Key        string     `db:"key" json:"-"`
 	Name       string     `db:"name"`
 	KeyType    string     `db:"key_type"`
 	IsActive   bool       `db:"is_active"`
@@ -349,7 +349,7 @@ type EmailConfig struct {
 	SMTPHost                    string `db:"smtp_host"`
 	SMTPPort                    int    `db:"smtp_port"`
 	SMTPUser                    string `db:"smtp_user"`
-	SMTPPass                    string `db:"smtp_password"`
+	SMTPPass                    string `db:"smtp_password" json:"-"`
 	Recipients                  string `db:"recipients"`
 	IsEnabled                   bool   `db:"is_enabled"`
 	SendTime                    string `db:"send_time"`

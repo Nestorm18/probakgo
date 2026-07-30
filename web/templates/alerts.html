@@ -74,6 +74,11 @@
         {{end}}
       </div>
       <div class="d-flex align-items-center gap-1">
+        {{if .ServerURL}}
+        <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary me-1" title="{{if eq .ServerType "windows"}}Abrir servidor{{else}}Abrir Proxmox{{end}}">
+          <i class="bi bi-box-arrow-up-right me-sm-1"></i><span class="d-none d-sm-inline">{{if eq .ServerType "windows"}}Abrir servidor{{else}}Abrir Proxmox{{end}}</span>
+        </a>
+        {{end}}
         {{if gt .Critical 0}}<span class="badge compact-badge critical">{{.Critical}} crítica{{if gt .Critical 1}}s{{end}}</span>{{end}}
         {{if gt .Warning 0}}<span class="badge compact-badge warning">{{.Warning}} advertencia{{if gt .Warning 1}}s{{end}}</span>{{end}}
         {{if $.Role}}{{if canEdit $.Role}}
@@ -171,6 +176,11 @@
           {{end}}
           <span class="badge compact-badge pbs">{{len .Rows}} suprimida{{if gt (len .Rows) 1}}s{{end}}</span>
         </div>
+        {{if .ServerURL}}
+        <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary ms-auto me-1" title="{{if eq .ServerType "windows"}}Abrir servidor{{else}}Abrir Proxmox{{end}}">
+          <i class="bi bi-box-arrow-up-right me-sm-1"></i><span class="d-none d-sm-inline">{{if eq .ServerType "windows"}}Abrir servidor{{else}}Abrir Proxmox{{end}}</span>
+        </a>
+        {{end}}
         {{if $.Role}}{{if canEdit $.Role}}
         <form method="post" action="/alerts/unsuppress" class="m-0">
           {{$.CSRFField}}
@@ -187,7 +197,12 @@
           <a href="/alerts/detail?alert_id={{.Alert.ID | urlquery}}" class="text-decoration-none" style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</a>
           <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);margin-top:.25rem">
-            <i class="bi bi-server me-1"></i>{{.Alert.ServerName}}
+            <i class="bi bi-server me-1"></i>
+            {{if and .Alert.ServerType (gt .Alert.ServerID 0)}}
+              <a href="/servers/{{.Alert.ServerType}}/{{.Alert.ServerID}}" class="text-decoration-none" title="Ver servidor">{{.Alert.ServerName}}</a>
+            {{else}}
+              {{.Alert.ServerName}}
+            {{end}}
             · Suprimida hasta {{formatTime .Until}}
           </div>
         </div>
@@ -235,7 +250,13 @@
           {{else if eq .EventType "unsuppressed"}}<span class="status-pill warn">Reactivada</span>
           {{else}}<span class="status-pill muted">{{.EventType}}</span>{{end}}
         </td>
-        <td style="font-size:.82rem">{{.ServerName}}</td>
+        <td style="font-size:.82rem">
+          {{if and .ServerType (gt .ServerID 0)}}
+            <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="text-decoration-none" title="Ver servidor"><i class="bi bi-server me-1"></i>{{.ServerName}}</a>
+          {{else}}
+            {{.ServerName}}
+          {{end}}
+        </td>
         <td style="font-size:.82rem"><a href="/alerts/detail?alert_id={{.AlertID | urlquery}}" class="text-decoration-none">{{.Title}}</a></td>
         <td class="text-truncate" style="max-width:480px;font-size:.78rem;color:var(--txt-muted)" title="{{if .Note}}{{.Note}} · {{end}}{{.Message}}">
           {{if .Note}}{{.Note}} · {{end}}{{.Message}}

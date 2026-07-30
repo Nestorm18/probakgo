@@ -255,17 +255,7 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 			di.Mu.Unlock()
 		}
 
-		jsonBytes, err := json.MarshalIndent(m, "", "  ")
-		var jsonStr string
-		if err != nil {
-			jsonStr = "marshal error: " + err.Error()
-		} else {
-			jsonStr = string(jsonBytes)
-			if len(jsonStr) > 8000 {
-				jsonStr = jsonStr[:8000] + "\n... (truncated)"
-			}
-		}
-		debug.RecordTemplateData(r.Context(), jsonStr)
+		debug.RecordTemplateData(r.Context(), safeTemplateDebugData(m))
 	}
 
 	var tmpl *template.Template
@@ -301,6 +291,55 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(buf.Bytes())
+}
+
+func safeTemplateDebugData(data any) string {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		return "marshal error: " + err.Error()
+	}
+	var safe any
+	if err := json.Unmarshal(jsonBytes, &safe); err != nil {
+		return "marshal error: " + err.Error()
+	}
+	redactTemplateDebugValue(safe)
+	jsonBytes, err = json.MarshalIndent(safe, "", "  ")
+	if err != nil {
+		return "marshal error: " + err.Error()
+	}
+	jsonStr := string(jsonBytes)
+	if len(jsonStr) > 8000 {
+		jsonStr = jsonStr[:8000] + "\n... (truncated)"
+	}
+	return jsonStr
+}
+
+func redactTemplateDebugValue(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if sensitiveTemplateDebugKey(key) {
+				typed[key] = "[REDACTED]"
+				continue
+			}
+			redactTemplateDebugValue(child)
+		}
+	case []any:
+		for _, child := range typed {
+			redactTemplateDebugValue(child)
+		}
+	}
+}
+
+func sensitiveTemplateDebugKey(key string) bool {
+	normalized := strings.NewReplacer("_", "", "-", "", " ", "").Replace(strings.ToLower(key))
+	switch normalized {
+	case "key", "githubtoken", "smtppass", "smtppassword", "password", "passwordhash",
+		"totpsecret", "secret", "uri", "qrdatauri":
+		return true
+	default:
+		return false
+	}
 }
 
 func requestLooksPublicHTTPS(r *http.Request) bool {

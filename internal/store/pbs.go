@@ -177,6 +177,31 @@ func (s *Store) GetPBSSnapshotsForStore(ctx context.Context, storeID int64) ([]d
 	return snapshots, rows.Err()
 }
 
+func (s *Store) GetPBSSnapshotsForStores(ctx context.Context, storeIDs []int64) (map[int64][]domain.PBSSnapshot, error) {
+	if len(storeIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(storeIDs)
+	debug.RecordQuery(ctx, `SELECT id, store_id, backup_type, backup_id, last_backup, backup_count, owner, comment, verification_state, size FROM pbs_snapshots WHERE store_id IN (...) ORDER BY store_id, backup_type, backup_id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, store_id, backup_type, backup_id, last_backup, backup_count,
+		owner, comment, verification_state, size
+		FROM pbs_snapshots WHERE store_id IN (`+ph+`) ORDER BY store_id, backup_type, backup_id`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.PBSSnapshot)
+	for rows.Next() {
+		var sn domain.PBSSnapshot
+		if err := rows.Scan(&sn.ID, &sn.StoreID, &sn.BackupType, &sn.BackupID, &sn.LastBackup,
+			&sn.BackupCount, &sn.Owner, &sn.Comment, &sn.VerificationState, &sn.Size); err != nil {
+			return nil, err
+		}
+		result[sn.StoreID] = append(result[sn.StoreID], sn)
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) InsertPBSGCStatus(ctx context.Context, storeID int64, gc *domain.GCStatusPayload) error {
 	return insertPBSGCStatus(ctx, s.db, storeID, gc)
 }
@@ -520,6 +545,32 @@ func (s *Store) GetPBSGCStatus(ctx context.Context, storeID int64) (*domain.PBSG
 	return &gc, err
 }
 
+func (s *Store) GetPBSGCStatusForStores(ctx context.Context, storeIDs []int64) (map[int64]*domain.PBSGCStatus, error) {
+	if len(storeIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(storeIDs)
+	debug.RecordQuery(ctx, `SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count, pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid FROM pbs_gc_status WHERE store_id IN (...)`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, store_id, disk_bytes, disk_chunks, index_data_bytes, index_file_count,
+		pending_bytes, pending_chunks, removed_bad, removed_bytes, removed_chunks, still_bad, upid
+		FROM pbs_gc_status WHERE store_id IN (`+ph+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64]*domain.PBSGCStatus)
+	for rows.Next() {
+		var gc domain.PBSGCStatus
+		if err := rows.Scan(&gc.ID, &gc.StoreID, &gc.DiskBytes, &gc.DiskChunks, &gc.IndexDataBytes,
+			&gc.IndexFileCount, &gc.PendingBytes, &gc.PendingChunks, &gc.RemovedBad,
+			&gc.RemovedBytes, &gc.RemovedChunks, &gc.StillBad, &gc.UPID); err != nil {
+			return nil, err
+		}
+		result[gc.StoreID] = &gc
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) GetPBSHistory(ctx context.Context, storeID int64) ([]*float64, error) {
 	debug.RecordQuery(ctx, `SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`)
 	rows, err := s.db.QueryContext(ctx, `SELECT value FROM pbs_store_history WHERE store_id = ? ORDER BY position`, storeID)
@@ -536,6 +587,30 @@ func (s *Store) GetPBSHistory(ctx context.Context, storeID int64) ([]*float64, e
 		history = append(history, v)
 	}
 	return history, rows.Err()
+}
+
+func (s *Store) GetPBSHistoryForStores(ctx context.Context, storeIDs []int64) (map[int64][]*float64, error) {
+	if len(storeIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(storeIDs)
+	debug.RecordQuery(ctx, `SELECT store_id, value FROM pbs_store_history WHERE store_id IN (...) ORDER BY store_id, position`)
+	rows, err := s.db.QueryContext(ctx, `SELECT store_id, value
+		FROM pbs_store_history WHERE store_id IN (`+ph+`) ORDER BY store_id, position`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]*float64)
+	for rows.Next() {
+		var storeID int64
+		var value *float64
+		if err := rows.Scan(&storeID, &value); err != nil {
+			return nil, err
+		}
+		result[storeID] = append(result[storeID], value)
+	}
+	return result, rows.Err()
 }
 
 func (s *Store) DeletePBSServer(ctx context.Context, id int64) error {

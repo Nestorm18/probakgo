@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -12,7 +13,10 @@ import (
 
 	"probakgo/internal/debug"
 	"probakgo/internal/session"
+	"probakgo/internal/web/csp"
 )
+
+const maxDebugResponseBytes = 1 << 20
 
 // DebugBarMiddleware injects an HTML debug bar at the bottom of every HTML response.
 // Returns a no-op middleware when dev is false.
@@ -22,10 +26,14 @@ func DebugBarMiddleware(dev bool) func(http.Handler) http.Handler {
 	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if debugBarBypassRequest(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
 			start := time.Now()
 			ctx := debug.NewContext(r.Context())
 
-			bw := &bufferedWriter{ResponseWriter: w, status: http.StatusOK}
+			bw := &bufferedWriter{ResponseWriter: w, status: http.StatusOK, limit: maxDebugResponseBytes}
 			next.ServeHTTP(bw, r.WithContext(ctx))
 
 			elapsed := time.Since(start)
@@ -70,6 +78,7 @@ func DebugBarMiddleware(dev bool) func(http.Handler) http.Handler {
 				vars:      vars,
 				tmplData:  tmplData,
 				userAgent: r.UserAgent(),
+				nonce:     csp.Nonce(r),
 			})
 			bw.flush([]byte(bar))
 		})
@@ -79,15 +88,49 @@ func DebugBarMiddleware(dev bool) func(http.Handler) http.Handler {
 // bufferedWriter captures the response body so the middleware can inject HTML before flushing.
 type bufferedWriter struct {
 	http.ResponseWriter
-	buf    bytes.Buffer
-	status int
+	buf         bytes.Buffer
+	status      int
+	limit       int
+	wroteHeader bool
+	passthrough bool
 }
 
-func (bw *bufferedWriter) WriteHeader(code int)        { bw.status = code }
-func (bw *bufferedWriter) Write(b []byte) (int, error) { return bw.buf.Write(b) }
+func (bw *bufferedWriter) WriteHeader(code int) {
+	if bw.wroteHeader {
+		return
+	}
+	bw.wroteHeader = true
+	bw.status = code
+	if bw.passthrough {
+		bw.ResponseWriter.WriteHeader(code)
+	}
+}
+
+func (bw *bufferedWriter) Write(b []byte) (int, error) {
+	if !bw.wroteHeader {
+		bw.WriteHeader(http.StatusOK)
+	}
+	if bw.passthrough {
+		return bw.ResponseWriter.Write(b)
+	}
+	if bw.limit > 0 && bw.buf.Len()+len(b) > bw.limit {
+		bw.passthrough = true
+		bw.ResponseWriter.WriteHeader(bw.status)
+		if _, err := bw.ResponseWriter.Write(bw.buf.Bytes()); err != nil {
+			return 0, err
+		}
+		bw.buf.Reset()
+		return bw.ResponseWriter.Write(b)
+	}
+	return bw.buf.Write(b)
+}
+
 func (bw *bufferedWriter) Unwrap() http.ResponseWriter { return bw.ResponseWriter }
 
 func (bw *bufferedWriter) flush(injection []byte) {
+	if bw.passthrough {
+		return
+	}
 	ct := bw.Header().Get("Content-Type")
 	bw.ResponseWriter.WriteHeader(bw.status)
 	body := bw.buf.Bytes()
@@ -103,6 +146,18 @@ func (bw *bufferedWriter) flush(injection []byte) {
 		}
 	}
 	_, _ = bw.ResponseWriter.Write(body)
+}
+
+func debugBarBypassRequest(r *http.Request) bool {
+	if strings.HasPrefix(r.URL.Path, "/static/") || strings.HasPrefix(r.URL.Path, "/download/") {
+		return true
+	}
+	switch strings.ToLower(path.Ext(r.URL.Path)) {
+	case ".csv", ".json":
+		return true
+	default:
+		return false
+	}
 }
 
 type debugBarParams struct {
@@ -122,6 +177,7 @@ type debugBarParams struct {
 	vars      []debug.DebugVar
 	tmplData  string
 	userAgent string
+	nonce     string
 }
 
 func debugBarHTML(p debugBarParams) string {
@@ -261,10 +317,16 @@ func debugBarHTML(p debugBarParams) string {
 
 	detSummaryStyle := `padding:4px 16px;cursor:pointer;color:#94a3b8;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;border-top:1px solid #e2e8f0;outline:none`
 
-	return fmt.Sprintf(`<style>
+	nonceAttr := ""
+	if p.nonce != "" {
+		nonceAttr = ` nonce="` + htmlEscape(p.nonce) + `"`
+	}
+
+	return fmt.Sprintf(`<style%s>
 #pbk-dbg,#pbk-dbg *{box-sizing:border-box}
 #pbk-dbg{position:fixed;bottom:0;left:0;right:0;background:#f8fafc;color:#475569;font:11px/1.25 'Courier New',monospace;z-index:2147483647;border-top:2px solid #cbd5e1;box-shadow:0 -2px 8px rgba(15,23,42,.12)}
-#pbk-dbg-bar{display:flex;align-items:center;width:100%%;min-height:29px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;user-select:none;overflow-x:auto;scrollbar-width:thin}
+#pbk-dbg-bar{display:flex;align-items:center;justify-content:safe flex-end;width:100%%;min-height:29px;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;user-select:none;overflow-x:auto;scrollbar-width:thin}
+#pbk-dbg .pbk-dbg-items{display:flex;align-items:center;min-width:max-content;margin-left:auto}
 #pbk-dbg-bar:focus-visible{outline:2px solid #3b82f6;outline-offset:-2px}
 #pbk-dbg .pd{flex:0 0 auto;padding:7px 10px;border-right:1px solid #e2e8f0;white-space:nowrap}
 #pbk-dbg .pbk-dbg-grow{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -278,6 +340,7 @@ func debugBarHTML(p debugBarParams) string {
 </style>
 <div id="pbk-dbg">
 <button type="button" id="pbk-dbg-bar" aria-controls="pbk-dbg-body" aria-expanded="false">
+<span class="pbk-dbg-items">
 <span class="pd" style="color:#3b82f6;font-weight:bold">◈ dev</span>
 <span class="pd" style="color:%s;font-weight:bold">%d</span>
 <span class="pd" style="color:%s">⏱ %s</span>
@@ -290,6 +353,7 @@ func debugBarHTML(p debugBarParams) string {
 %s
 <span class="pd pbk-dbg-hide-sm" style="margin-left:auto;border-left:1px solid #e2e8f0;border-right:none">👤 %s</span>
 <span class="pd" id="pbk-dbg-arrow" style="border-right:none">▲</span>
+</span>
 </button>
 <div id="pbk-dbg-body">
 <details open><summary style="%s"><span style="color:#475569;font-weight:600">request &amp; runtime</span> <span>%s %s · %s · %s heap</span></summary>
@@ -322,7 +386,7 @@ func debugBarHTML(p debugBarParams) string {
 %s
 </div>
 </div>
-<script>
+<script%s>
 (function(){
   var dbg=document.getElementById('pbk-dbg');
   var body=document.getElementById('pbk-dbg-body');
@@ -350,6 +414,7 @@ func debugBarHTML(p debugBarParams) string {
   syncPad();
 })();
 </script>`,
+		nonceAttr,
 		// bar
 		statusColor, p.status,
 		dColor, dStr,
@@ -374,7 +439,8 @@ func debugBarHTML(p debugBarParams) string {
 		queriesHTML,
 		goVersion, maxProcs, numCPU,
 		uaDisp,
-		queriesDetail, varsDetail, tmplDataDetail)
+		queriesDetail, varsDetail, tmplDataDetail,
+		nonceAttr)
 }
 
 func htmlEscape(s string) string {

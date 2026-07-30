@@ -41,6 +41,52 @@ func (s *Store) ListVMBackupConfigsForServerOrName(ctx context.Context, serverTy
 	return s.ListVMBackupConfigs(ctx, serverName)
 }
 
+func (s *Store) ListPVEVMBackupConfigsByServer(ctx context.Context) (map[int64][]domain.VMBackupConfig, error) {
+	debug.RecordQuery(ctx, `SELECT pve_server_id, vm backup config fields FROM vm_backup_configs JOIN pve_servers`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT s.id, c.id, c.server_name, c.vm_id, c.vm_name,
+		       c.monday, c.tuesday, c.wednesday, c.thursday, c.friday, c.saturday, c.sunday,
+		       c.is_excluded, c.is_deleted, c.deleted_at, c.created_at
+		FROM vm_backup_configs c
+		JOIN pve_servers s ON (
+			(c.server_id > 0 AND c.server_type = 'pve' AND c.server_id = s.id)
+			OR (c.server_id = 0 AND c.server_name = s.name)
+		)
+		WHERE c.is_deleted = 0 AND s.is_deleted = 0
+		ORDER BY s.id, c.vm_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	configs := make(map[int64][]domain.VMBackupConfig)
+	for rows.Next() {
+		var serverID int64
+		var c domain.VMBackupConfig
+		var mon, tue, wed, thu, fri, sat, sun, excl, del int
+		var deletedAt sql.NullTime
+		if err := rows.Scan(&serverID, &c.ID, &c.ServerName, &c.VMID, &c.VMName,
+			&mon, &tue, &wed, &thu, &fri, &sat, &sun,
+			&excl, &del, &deletedAt, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		c.Monday = mon != 0
+		c.Tuesday = tue != 0
+		c.Wednesday = wed != 0
+		c.Thursday = thu != 0
+		c.Friday = fri != 0
+		c.Saturday = sat != 0
+		c.Sunday = sun != 0
+		c.IsExcluded = excl != 0
+		c.IsDeleted = del != 0
+		if deletedAt.Valid {
+			c.DeletedAt = &deletedAt.Time
+		}
+		configs[serverID] = append(configs[serverID], c)
+	}
+	return configs, rows.Err()
+}
+
 func (s *Store) CreateVMBackupConfig(ctx context.Context, serverName string, req domain.CreateVMBackupConfigRequest) (int64, error) {
 	debug.RecordQuery(ctx, `INSERT INTO vm_backup_configs (server_name, vm_id, vm_name, monday, tuesday, wednesday, thursday, friday, saturday, sunday) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	res, err := s.db.ExecContext(ctx,

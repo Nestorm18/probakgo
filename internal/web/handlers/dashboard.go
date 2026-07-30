@@ -1,15 +1,12 @@
 package webhandlers
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"probakgo/internal/domain"
-	"probakgo/internal/service"
 	"probakgo/internal/session"
 )
 
@@ -36,6 +33,9 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
+	presentAlerts, _ := h.store.ListPresentAlerts(ctx)
+	suppressed, _ := h.store.GetActiveSuppressions(ctx)
+	alertSummary := summarizeDashboardAlerts(presentAlerts, suppressed, maintenance)
 
 	pveReports, err := h.store.GetLatestPVEReports(ctx)
 	if err != nil {
@@ -43,26 +43,16 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
-	pveReportIDs := make([]int64, 0, len(pveReports))
-	for _, rep := range pveReports {
-		pveReportIDs = append(pveReportIDs, rep.ID)
-	}
-	pveTasks, err := h.store.GetPVEBackupTasksForReports(ctx, pveReportIDs)
-	if err != nil {
-		slog.Error("list pve backup tasks", "err", err)
-		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
-		return
-	}
+	pveConfigs, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
 
-	pveBackupAlerts := h.activePVEBackupAlertServers(ctx, pveServers, pveReports, pveTasks)
 	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
 		rep := pveReports[sv.ID]
-		configs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+		configs := pveConfigs[sv.ID]
 		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
 		isStale := (rep == nil || rep.IsStale) && !ignoreStale
-		backupSeverity := pveBackupAlerts[sv.ID]
+		backupSeverity := alertSummary.PVEBackupSeverity[sv.ID]
 		hasBackupError := backupSeverity == domain.AlertSeverityCritical
 		hasBackupWarning := backupSeverity == domain.AlertSeverityWarning
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
@@ -169,19 +159,6 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	windowsHeartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
-	windowsMissingVolumeAlerts := map[int64]bool{}
-	if activeAlerts, err := service.CurrentAlerts(ctx, h.store, h.report); err == nil {
-		suppressed, _ := h.store.GetActiveSuppressions(ctx)
-		for _, alert := range activeAlerts {
-			if alert.ServerType != "windows" || alert.Type != domain.AlertTypeWindowsVolumeGone {
-				continue
-			}
-			if _, ok := suppressed[alert.ID]; ok {
-				continue
-			}
-			windowsMissingVolumeAlerts[alert.ServerID] = true
-		}
-	}
 	var windowsOK, windowsOffline, windowsDiskAlerts int
 	var windowsMaintenance int
 	var windowsRows []map[string]any
@@ -197,7 +174,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			serverDiskThreshold = *alertCfg.DiskPct
 		}
 		diskAlert := windowsHasDiskAlert(disks, serverDiskThreshold)
-		missingVolumeAlert := windowsMissingVolumeAlerts[sv.ID]
+		missingVolumeAlert := alertSummary.WindowsMissingVolume[sv.ID]
 		maint := maintenanceByServer(maintenance, "windows", sv.ID)
 		if maint.Active {
 			windowsMaintenance++
@@ -225,12 +202,11 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		windowsRows = append(windowsRows, row)
 	}
 
-	alertCritical, alertWarning := service.ActiveAlertCounts(ctx, h.store, h.report)
 	h.tmpl.Render(w, r, "dashboard.html", map[string]any{
 		"Username":           username,
 		"Role":               role,
-		"AlertCritical":      alertCritical,
-		"AlertWarning":       alertWarning,
+		"AlertCritical":      alertSummary.Critical,
+		"AlertWarning":       alertSummary.Warning,
 		"PVERows":            pveRows,
 		"PBSRows":            pbsRows,
 		"WindowsRows":        windowsRows,
@@ -249,79 +225,38 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *WebH) activePVEBackupAlertServers(ctx context.Context, servers []domain.PVEServer, reports map[int64]*domain.PVEReport, tasksByReport map[int64][]domain.PVEBackupTask) map[int64]string {
-	result := make(map[int64]string)
-	cfg, err := service.LoadAlertConfigs(ctx, h.store)
-	if err != nil {
-		return result
-	}
-	suppressed, _ := h.store.GetActiveSuppressions(ctx)
-	for _, sv := range servers {
-		rep := reports[sv.ID]
-		if rep == nil {
-			continue
-		}
-		svCfg := cfg.PVEConfigs[sv.ID]
-		tasks := tasksByReport[rep.ID]
-		if len(tasks) == 0 {
-			status := strings.TrimSpace(rep.BackupStatus)
-			if status == "" || domain.PVEBackupStatusOK(status) {
-				continue
-			}
-			if !dashboardBackupErrEnabled(svCfg, nil, cfg.GlobalBackupErr) {
-				continue
-			}
-			if _, ok := suppressed[fmt.Sprintf("backup_error:pve:%d", sv.ID)]; ok {
-				continue
-			}
-			if domain.PVEBackupStatusWarning(status) {
-				result[sv.ID] = domain.AlertSeverityWarning
-			} else {
-				result[sv.ID] = domain.AlertSeverityCritical
-			}
-			continue
-		}
-		for _, task := range tasks {
-			if domain.PVEBackupStatusOK(task.Status) {
-				continue
-			}
-			vmCfg := dashboardFindVMConfig(cfg.PVEVMConfigs[sv.ID], task.VMID)
-			if !dashboardBackupErrEnabled(svCfg, vmCfg, cfg.GlobalBackupErr) {
-				continue
-			}
-			if _, ok := suppressed[fmt.Sprintf("backup_error:pve:%d:%d", sv.ID, task.VMID)]; ok {
-				continue
-			}
-			if domain.PVEBackupStatusWarning(task.Status) {
-				if result[sv.ID] == "" {
-					result[sv.ID] = domain.AlertSeverityWarning
-				}
-				continue
-			}
-			result[sv.ID] = domain.AlertSeverityCritical
-			break
-		}
-	}
-	return result
+type dashboardAlertSummary struct {
+	PVEBackupSeverity    map[int64]string
+	WindowsMissingVolume map[int64]bool
+	Critical             int
+	Warning              int
 }
 
-func dashboardBackupErrEnabled(svCfg domain.PVEAlertConfig, vmCfg *domain.PVEVMAlertConfig, global bool) bool {
-	if vmCfg != nil && vmCfg.BackupErr != nil {
-		return *vmCfg.BackupErr != 0
+func summarizeDashboardAlerts(alerts []domain.Alert, suppressed map[string]time.Time, maintenance map[string]domain.ServerMaintenance) dashboardAlertSummary {
+	summary := dashboardAlertSummary{
+		PVEBackupSeverity:    make(map[int64]string),
+		WindowsMissingVolume: make(map[int64]bool),
 	}
-	if svCfg.BackupErr != nil {
-		return *svCfg.BackupErr != 0
-	}
-	return global
-}
-
-func dashboardFindVMConfig(configs []domain.PVEVMAlertConfig, vmid int64) *domain.PVEVMAlertConfig {
-	for i := range configs {
-		if configs[i].VMID == vmid {
-			return &configs[i]
+	for _, alert := range alerts {
+		if _, ok := suppressed[alert.ID]; ok || maintenanceByServer(maintenance, alert.ServerType, alert.ServerID).Active {
+			continue
+		}
+		if alert.Severity == domain.AlertSeverityCritical {
+			summary.Critical++
+		} else {
+			summary.Warning++
+		}
+		if alert.ServerType == "pve" && alert.Type == domain.AlertTypeBackupError {
+			current := summary.PVEBackupSeverity[alert.ServerID]
+			if alert.Severity == domain.AlertSeverityCritical || current == "" {
+				summary.PVEBackupSeverity[alert.ServerID] = alert.Severity
+			}
+		}
+		if alert.ServerType == "windows" && alert.Type == domain.AlertTypeWindowsVolumeGone {
+			summary.WindowsMissingVolume[alert.ServerID] = true
 		}
 	}
-	return nil
+	return summary
 }
 
 func pbsFillBadge(stores []domain.PBSStore) (label, class string) {

@@ -72,4 +72,9 @@ func TestHookScriptDefersReportUntilAfterJobEnd(t *testing.T) {
 	if !strings.Contains(hookScript, `2>&1 &`) {
 		t.Fatal("hook must retain a background fallback when systemd scheduling is unavailable")
 	}
+	pendingWrite := strings.Index(hookScript, `echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"`)
+	schedule := strings.Index(hookScript, "systemd-run --quiet")
+	if pendingWrite < 0 || schedule < 0 || pendingWrite > schedule {
+		t.Fatal("hook must persist the pending marker before scheduling the detached report")
+	}
 }

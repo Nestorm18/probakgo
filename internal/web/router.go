@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -18,6 +19,8 @@ import (
 	"probakgo/internal/web/csp"
 	webhandlers "probakgo/internal/web/handlers"
 )
+
+const maxWebRequestBodyBytes int64 = 1 << 20
 
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
@@ -48,6 +51,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r := chi.NewRouter()
 	r.Use(netutil.TrustedProxyRealIP(trustedProxies))
 	r.Use(middleware.Recoverer)
+	r.Use(limitWebRequestBody(maxWebRequestBodyBytes))
 	r.Use(securityHeaders)
 	r.Use(webhandlers.DebugBarMiddleware(dev))
 
@@ -73,8 +77,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Get("/alerts.csv", h.AlertsCSV)
 		r.Get("/alerts.json", h.AlertsJSON)
 		r.Get("/alerts/status.json", h.AlertsStatus)
-		r.Post("/alerts/suppress", h.AlertSuppressPost)
-		r.Post("/alerts/unsuppress", h.AlertUnsuppressPost)
+		r.With(RequireEditor, sensitive).Post("/alerts/suppress", h.AlertSuppressPost)
+		r.With(RequireEditor, sensitive).Post("/alerts/unsuppress", h.AlertUnsuppressPost)
 		r.Get("/servers/pve", h.PVEServers)
 		r.Get("/servers/pve.csv", h.PVEServersCSV)
 		r.Get("/servers/pve.json", h.PVEServersJSON)
@@ -161,6 +165,21 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		return nil, err
 	}
 	return protection.Handler(r), nil
+}
+
+func limitWebRequestBody(maxBytes int64) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength > maxBytes {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusRequestEntityTooLarge)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "request body too large"})
+				return
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func newCrossOriginProtection(trustedOrigins []string) (*http.CrossOriginProtection, error) {

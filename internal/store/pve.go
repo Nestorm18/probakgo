@@ -386,6 +386,32 @@ func (s *Store) GetPVEStoragesForReport(ctx context.Context, reportID int64) ([]
 	return storages, rows.Err()
 }
 
+func (s *Store) GetPVEStoragesForReports(ctx context.Context, reportIDs []int64) (map[int64][]domain.PVEStorage, error) {
+	if len(reportIDs) == 0 {
+		return nil, nil
+	}
+	ph, args := int64InArgs(reportIDs)
+	debug.RecordQuery(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups FROM pve_storages WHERE report_id IN (...) ORDER BY report_id, storage`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, report_id, storage, path, content, type, status, shared, server, digest, prune_backups
+		FROM pve_storages WHERE report_id IN (`+ph+`) ORDER BY report_id, storage`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[int64][]domain.PVEStorage)
+	for rows.Next() {
+		var st domain.PVEStorage
+		var shared int
+		if err := rows.Scan(&st.ID, &st.ReportID, &st.Storage, &st.Path, &st.Content,
+			&st.Type, &st.Status, &shared, &st.Server, &st.Digest, &st.PruneBackups); err != nil {
+			return nil, err
+		}
+		st.Shared = shared != 0
+		result[st.ReportID] = append(result[st.ReportID], st)
+	}
+	return result, rows.Err()
+}
+
 func (s *Store) GetPVEStorageContent(ctx context.Context, storageID int64) ([]domain.PVEStorageContent, error) {
 	debug.RecordQuery(ctx, `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification FROM pve_storage_content WHERE storage_id = ? ORDER BY ctime DESC`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
@@ -549,6 +575,7 @@ func (s *Store) GetPVEStorageContentForStorages(ctx context.Context, storageIDs 
 		return nil, nil
 	}
 	ph, args := int64InArgs(storageIDs)
+	debug.RecordQuery(ctx, `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification FROM pve_storage_content WHERE storage_id IN (...) ORDER BY storage_id, ctime DESC`)
 	q := `SELECT id, storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification
 		FROM pve_storage_content WHERE storage_id IN (` + ph + `) ORDER BY storage_id, ctime DESC`
 	rows, err := s.db.QueryContext(ctx, q, args...)
@@ -573,6 +600,7 @@ func (s *Store) GetPVEStorageInfoForStorages(ctx context.Context, storageIDs []i
 		return nil, nil
 	}
 	ph, args := int64InArgs(storageIDs)
+	debug.RecordQuery(ctx, `SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl FROM pve_storage_info WHERE storage_id IN (...)`)
 	q := `SELECT id, storage_id, total, used, avail, used_percent, active, enabled, lvl
 		FROM pve_storage_info WHERE storage_id IN (` + ph + `)`
 	rows, err := s.db.QueryContext(ctx, q, args...)

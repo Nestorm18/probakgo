@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -26,6 +27,29 @@ type AlertConfigs struct {
 	PVEVMConfigs   map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
 	PBSConfigs     map[int64]domain.PBSAlertConfig
 	WindowsConfigs map[int64]domain.WindowsAlertConfig
+	Data           *AlertData
+}
+
+// AlertData is a point-in-time, batched view shared by every evaluator in one run.
+type AlertData struct {
+	PVEServers       []domain.PVEServer
+	PVEReports       map[int64]*domain.PVEReport
+	PVEStorages      map[int64][]domain.PVEStorage
+	PVEStorageInfo   map[int64]*domain.PVEStorageInfo
+	PVETasks         map[int64][]domain.PVEBackupTask
+	PVEBackupConfigs map[int64][]domain.VMBackupConfig
+	PVEHeartbeats    map[int64]domain.ServerHeartbeat
+
+	PBSServers   []domain.PBSServer
+	PBSReports   map[int64]*domain.PBSReport
+	PBSStores    map[int64][]domain.PBSStore
+	PBSSnapshots map[int64][]domain.PBSSnapshot
+	PBSTasks     map[int64][]domain.PBSTask
+
+	WindowsServers    []domain.WindowsServer
+	WindowsReports    map[int64][]domain.WindowsReport
+	WindowsDisks      map[int64][]domain.WindowsDisk
+	WindowsHeartbeats map[int64]domain.ServerHeartbeat
 }
 
 // AlertEvaluator is the function signature every alert type must implement.
@@ -56,16 +80,122 @@ var evaluators = []AlertEvaluator{
 // RunAll executes all registered evaluators. Individual errors are logged but do not
 // stop execution - partial alerts are better than none.
 func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	var err error
+	cfg, err = ensureAlertData(st, cfg)
+	if err != nil {
+		return nil, err
+	}
 	var all []domain.Alert
+	var evaluatorErrors []error
 	for _, eval := range evaluators {
 		alerts, err := eval(st, cfg)
 		if err != nil {
 			slog.Warn("alert evaluator error", "err", err)
+			evaluatorErrors = append(evaluatorErrors, err)
 			continue
 		}
 		all = append(all, alerts...)
 	}
-	return all, nil
+	return all, errors.Join(evaluatorErrors...)
+}
+
+func ensureAlertData(st *store.Store, cfg AlertConfigs) (AlertConfigs, error) {
+	if cfg.Data != nil {
+		return cfg, nil
+	}
+	data, err := loadAlertData(context.Background(), st)
+	if err != nil {
+		return cfg, err
+	}
+	cfg.Data = data
+	return cfg, nil
+}
+
+func loadAlertData(ctx context.Context, st *store.Store) (*AlertData, error) {
+	data := &AlertData{}
+	var err error
+	if data.PVEServers, err = st.ListPVEServers(ctx); err != nil {
+		return nil, err
+	}
+	if data.PBSServers, err = st.ListPBSServers(ctx); err != nil {
+		return nil, err
+	}
+	if data.WindowsServers, err = st.ListWindowsServers(ctx); err != nil {
+		return nil, err
+	}
+	if data.PVEReports, err = st.GetLatestPVEReports(ctx); err != nil {
+		return nil, err
+	}
+	if data.PBSReports, err = st.GetLatestPBSReports(ctx); err != nil {
+		return nil, err
+	}
+	windowsServerIDs := make([]int64, 0, len(data.WindowsServers))
+	for _, server := range data.WindowsServers {
+		windowsServerIDs = append(windowsServerIDs, server.ID)
+	}
+	if data.WindowsReports, err = st.GetRecentWindowsReportsByServer(ctx, windowsServerIDs, 2); err != nil {
+		return nil, err
+	}
+	if data.PVEBackupConfigs, err = st.ListPVEVMBackupConfigsByServer(ctx); err != nil {
+		return nil, err
+	}
+	if data.PVEHeartbeats, err = st.ListServerHeartbeatsByType(ctx, "pve"); err != nil {
+		return nil, err
+	}
+	if data.WindowsHeartbeats, err = st.ListServerHeartbeatsByType(ctx, "windows"); err != nil {
+		return nil, err
+	}
+
+	pveReportIDs := make([]int64, 0, len(data.PVEReports))
+	for _, report := range data.PVEReports {
+		pveReportIDs = append(pveReportIDs, report.ID)
+	}
+	if data.PVETasks, err = st.GetPVEBackupTasksForReports(ctx, pveReportIDs); err != nil {
+		return nil, err
+	}
+	if data.PVEStorages, err = st.GetPVEStoragesForReports(ctx, pveReportIDs); err != nil {
+		return nil, err
+	}
+	var pveStorageIDs []int64
+	for _, storages := range data.PVEStorages {
+		for _, storage := range storages {
+			pveStorageIDs = append(pveStorageIDs, storage.ID)
+		}
+	}
+	if data.PVEStorageInfo, err = st.GetPVEStorageInfoForStorages(ctx, pveStorageIDs); err != nil {
+		return nil, err
+	}
+
+	pbsReportIDs := make([]int64, 0, len(data.PBSReports))
+	for _, report := range data.PBSReports {
+		pbsReportIDs = append(pbsReportIDs, report.ID)
+	}
+	if data.PBSStores, err = st.GetPBSStoresForReports(ctx, pbsReportIDs); err != nil {
+		return nil, err
+	}
+	if data.PBSTasks, err = st.GetPBSTasksForReports(ctx, pbsReportIDs); err != nil {
+		return nil, err
+	}
+	var pbsStoreIDs []int64
+	for _, stores := range data.PBSStores {
+		for _, pbsStore := range stores {
+			pbsStoreIDs = append(pbsStoreIDs, pbsStore.ID)
+		}
+	}
+	if data.PBSSnapshots, err = st.GetPBSSnapshotsForStores(ctx, pbsStoreIDs); err != nil {
+		return nil, err
+	}
+
+	var windowsReportIDs []int64
+	for _, reports := range data.WindowsReports {
+		for _, report := range reports {
+			windowsReportIDs = append(windowsReportIDs, report.ID)
+		}
+	}
+	if data.WindowsDisks, err = st.GetWindowsDisksForReports(ctx, windowsReportIDs); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func FilterMaintenanceAlerts(ctx context.Context, st *store.Store, alerts []domain.Alert) []domain.Alert {
@@ -120,11 +250,11 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
 		WindowsConfigs:            make(map[int64]domain.WindowsAlertConfig),
 	}
-
-	pveServers, err := st.ListPVEServers(ctx)
+	cfg.Data, err = loadAlertData(ctx, st)
 	if err != nil {
 		return cfg, err
 	}
+
 	pveConfigs, err := st.ListPVEAlertConfigs(ctx)
 	if err != nil {
 		return cfg, err
@@ -133,22 +263,18 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 	if err != nil {
 		return cfg, err
 	}
-	for _, sv := range pveServers {
+	for _, sv := range cfg.Data.PVEServers {
 		svCfg := pveConfigs[sv.ID]
 		svCfg.ServerID = sv.ID
 		cfg.PVEConfigs[sv.ID] = svCfg
 		cfg.PVEVMConfigs[sv.ID] = pveVMConfigs[sv.ID]
 	}
 
-	pbsServers, err := st.ListPBSServers(ctx)
-	if err != nil {
-		return cfg, err
-	}
 	pbsConfigs, err := st.ListPBSAlertConfigs(ctx)
 	if err != nil {
 		return cfg, err
 	}
-	for _, sv := range pbsServers {
+	for _, sv := range cfg.Data.PBSServers {
 		svCfg, ok := pbsConfigs[sv.ID]
 		if !ok {
 			svCfg.VerifyAlert = true
@@ -157,15 +283,11 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 		cfg.PBSConfigs[sv.ID] = svCfg
 	}
 
-	windowsServers, err := st.ListWindowsServers(ctx)
-	if err != nil {
-		return cfg, err
-	}
 	windowsConfigs, err := st.ListWindowsAlertConfigs(ctx)
 	if err != nil {
 		return cfg, err
 	}
-	for _, sv := range windowsServers {
+	for _, sv := range cfg.Data.WindowsServers {
 		svCfg := windowsConfigs[sv.ID]
 		svCfg.ServerID = sv.ID
 		cfg.WindowsConfigs[sv.ID] = svCfg
@@ -177,13 +299,12 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 // ── Evaluators ────────────────────────────────────────────────────────────────
 
 func evalPVEDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PVEServers {
 		svCfg := cfg.PVEConfigs[sv.ID]
 		threshold := cfg.GlobalDiskPct
 		if svCfg.DiskPct != nil {
@@ -193,20 +314,16 @@ func evalPVEDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			continue
 		}
 
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		storages, err := st.GetPVEStoragesForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, stg := range storages {
+		for _, stg := range cfg.Data.PVEStorages[rep.ID] {
 			if !strings.Contains(stg.Content, "backup") {
 				continue
 			}
-			info, err := st.GetPVEStorageInfo(ctx, stg.ID)
-			if err != nil || info.Total == 0 {
+			info := cfg.Data.PVEStorageInfo[stg.ID]
+			if info == nil || info.Total == 0 {
 				continue
 			}
 			pct := int(float64(info.Used) / float64(info.Total) * 100)
@@ -231,24 +348,20 @@ func evalPVEDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PVEServers {
 		svCfg := cfg.PVEConfigs[sv.ID]
 		vmCfgs := cfg.PVEVMConfigs[sv.ID]
 
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		tasks, err := st.GetPVEBackupTasksForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
+		tasks := cfg.Data.PVETasks[rep.ID]
 		if len(tasks) == 0 {
 			status := strings.TrimSpace(rep.BackupStatus)
 			if status == "" || domain.PVEBackupStatusOK(status) {
@@ -305,9 +418,14 @@ func pveBackupAlertPresentation(status string) (severity, title string) {
 }
 
 func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
+	cfg, err := ensureAlertData(st, cfg)
+	if err != nil {
+		return nil, err
+	}
 	var alerts []domain.Alert
-	for serverID, vmCfgs := range cfg.PVEVMConfigs {
+	for _, sv := range cfg.Data.PVEServers {
+		serverID := sv.ID
+		vmCfgs := cfg.PVEVMConfigs[serverID]
 		hasMinSize := false
 		for _, vc := range vmCfgs {
 			if vc.MinSizeMB != nil {
@@ -319,19 +437,11 @@ func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error
 			continue
 		}
 
-		sv, err := st.GetPVEServer(ctx, serverID)
-		if err != nil {
+		rep := cfg.Data.PVEReports[serverID]
+		if rep == nil {
 			continue
 		}
-		rep, err := st.GetLatestPVEReport(ctx, serverID)
-		if err != nil {
-			continue
-		}
-		tasks, err := st.GetPVEBackupTasksForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, t := range tasks {
+		for _, t := range cfg.Data.PVETasks[rep.ID] {
 			vmCfg := findVMConfig(vmCfgs, t.VMID)
 			if vmCfg == nil || vmCfg.MinSizeMB == nil {
 				continue
@@ -362,19 +472,18 @@ func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error
 }
 
 func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		configs, _ := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+	for _, sv := range cfg.Data.PVEServers {
+		configs := cfg.Data.PVEBackupConfigs[sv.ID]
 		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
 			continue
 		}
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil {
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pve_stale:pve:%d", sv.ID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
@@ -389,7 +498,9 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		stale := rep.IsStale
 		reason := rep.StaleReason
 		if cfg.Report != nil {
-			stale, reason = cfg.Report.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
+			svCfg := cfg.PVEConfigs[sv.ID]
+			svCfg.ServerID = sv.ID
+			stale, reason = cfg.Report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, svCfg)
 		}
 		if !stale {
 			continue
@@ -414,20 +525,15 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 	if cfg.GlobalPVEHeartbeatMinutes <= 0 {
 		return nil, nil
 	}
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	heartbeats, err := st.ListServerHeartbeatsByType(ctx, "pve")
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	threshold := time.Duration(cfg.GlobalPVEHeartbeatMinutes) * time.Minute
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		hb, ok := heartbeats[sv.ID]
+	for _, sv := range cfg.Data.PVEServers {
+		hb, ok := cfg.Data.PVEHeartbeats[sv.ID]
 		if !ok {
 			continue
 		}
@@ -452,20 +558,19 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 }
 
 func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	var alerts []domain.Alert
-	now := time.Now()
-
-	pveServers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
-	for _, sv := range pveServers {
+	var alerts []domain.Alert
+	now := time.Now()
+
+	for _, sv := range cfg.Data.PVEServers {
 		if svCfg, ok := cfg.PVEConfigs[sv.ID]; ok && svCfg.SwapAlert != nil && *svCfg.SwapAlert == 0 {
 			continue
 		}
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil || !rep.SwapEnabled {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil || !rep.SwapEnabled {
 			continue
 		}
 		alerts = append(alerts, domain.Alert{
@@ -481,16 +586,12 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		})
 	}
 
-	pbsServers, err := st.ListPBSServers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, sv := range pbsServers {
+	for _, sv := range cfg.Data.PBSServers {
 		if svCfg, ok := cfg.PBSConfigs[sv.ID]; ok && svCfg.SwapAlert != nil && *svCfg.SwapAlert == 0 {
 			continue
 		}
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil || !rep.SwapEnabled {
+		rep := cfg.Data.PBSReports[sv.ID]
+		if rep == nil || !rep.SwapEnabled {
 			continue
 		}
 		alerts = append(alerts, domain.Alert{
@@ -509,13 +610,12 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PBSServers {
 		staleHours := cfg.GlobalStaleHours
 		if svCfg, ok := cfg.PBSConfigs[sv.ID]; ok && svCfg.StaleHours != nil {
 			staleHours = *svCfg.StaleHours
@@ -523,8 +623,8 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 		if staleHours == 0 {
 			continue
 		}
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PBSReports[sv.ID]
+		if rep == nil {
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
@@ -556,13 +656,12 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 }
 
 func evalPBSDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PBSServers {
 		svCfg := cfg.PBSConfigs[sv.ID]
 		threshold := cfg.GlobalDiskPct
 		if svCfg.DiskPct != nil {
@@ -572,15 +671,11 @@ func evalPBSDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			continue
 		}
 
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PBSReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		stores, err := st.GetPBSStoresForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, ds := range stores {
+		for _, ds := range cfg.Data.PBSStores[rep.ID] {
 			if ds.Total == 0 {
 				continue
 			}
@@ -606,14 +701,13 @@ func evalPBSDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 func evalPBSFill(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
 	now := time.Now()
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PBSServers {
 		svCfg := cfg.PBSConfigs[sv.ID]
 		if svCfg.DaysUntilFull == nil {
 			continue
@@ -623,15 +717,11 @@ func evalPBSFill(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			continue
 		}
 
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PBSReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		stores, err := st.GetPBSStoresForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, ds := range stores {
+		for _, ds := range cfg.Data.PBSStores[rep.ID] {
 			if ds.EstimatedFullDate == 0 {
 				continue
 			}
@@ -671,32 +761,23 @@ func evalPBSStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 }
 
 func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.PBSServers {
 		svCfg := cfg.PBSConfigs[sv.ID]
 		if !svCfg.VerifyAlert {
 			continue
 		}
 
-		rep, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+		rep := cfg.Data.PBSReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		stores, err := st.GetPBSStoresForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, ds := range stores {
-			snaps, err := st.GetPBSSnapshotsForStore(ctx, ds.ID)
-			if err != nil {
-				continue
-			}
-			for _, sn := range snaps {
+		for _, ds := range cfg.Data.PBSStores[rep.ID] {
+			for _, sn := range cfg.Data.PBSSnapshots[ds.ID] {
 				if sn.VerificationState == "" || sn.VerificationState == "ok" {
 					continue
 				}
@@ -717,23 +798,18 @@ func evalPBSVerify(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	return alerts, nil
 }
 
-func evalPBSTaskFailures(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPBSServers(ctx)
+func evalPBSTaskFailures(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		report, err := st.GetLatestPBSReport(ctx, sv.ID)
-		if err != nil {
+	for _, sv := range cfg.Data.PBSServers {
+		report := cfg.Data.PBSReports[sv.ID]
+		if report == nil {
 			continue
 		}
-		tasks, err := st.GetPBSTasksForReport(ctx, report.ID)
-		if err != nil {
-			continue
-		}
-		for _, task := range tasks {
+		for _, task := range cfg.Data.PBSTasks[report.ID] {
 			if !domain.PBSTaskFailed(task) {
 				continue
 			}
@@ -789,13 +865,12 @@ func pbsTaskAlertKey(task domain.PBSTask) string {
 }
 
 func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListWindowsServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.WindowsServers {
 		threshold := cfg.GlobalWindowsDiskPct
 		if svCfg, ok := cfg.WindowsConfigs[sv.ID]; ok && svCfg.DiskPct != nil {
 			threshold = *svCfg.DiskPct
@@ -803,15 +878,11 @@ func evalWindowsDisk(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) 
 		if threshold <= 0 {
 			continue
 		}
-		rep, err := st.GetLatestWindowsReport(ctx, sv.ID)
-		if err != nil {
+		reports := cfg.Data.WindowsReports[sv.ID]
+		if len(reports) == 0 {
 			continue
 		}
-		disks, err := st.GetWindowsDisksForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, disk := range disks {
+		for _, disk := range cfg.Data.WindowsDisks[reports[0].ID] {
 			if !isWindowsLogicalAlertDisk(disk) {
 				continue
 			}
@@ -843,26 +914,21 @@ func evalWindowsHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, er
 	if cfg.GlobalPVEHeartbeatMinutes <= 0 {
 		return nil, nil
 	}
-	ctx := context.Background()
-	servers, err := st.ListWindowsServers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	heartbeats, err := st.ListServerHeartbeatsByType(ctx, "windows")
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	now := time.Now()
 	threshold := time.Duration(cfg.GlobalPVEHeartbeatMinutes) * time.Minute
 	var alerts []domain.Alert
-	for _, sv := range servers {
+	for _, sv := range cfg.Data.WindowsServers {
 		lastSeen := time.Time{}
-		if hb, ok := heartbeats[sv.ID]; ok {
+		if hb, ok := cfg.Data.WindowsHeartbeats[sv.ID]; ok {
 			lastSeen = hb.LastSeenAt
 		}
 		if lastSeen.IsZero() {
-			if rep, err := st.GetLatestWindowsReport(ctx, sv.ID); err == nil {
-				lastSeen = rep.ReportedAt
+			if reports := cfg.Data.WindowsReports[sv.ID]; len(reports) > 0 {
+				lastSeen = reports[0].ReportedAt
 			}
 		}
 		if lastSeen.IsZero() {
@@ -888,23 +954,18 @@ func evalWindowsHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, er
 	return alerts, nil
 }
 
-func evalWindowsDiskHealth(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListWindowsServers(ctx)
+func evalWindowsDiskHealth(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		rep, err := st.GetLatestWindowsReport(ctx, sv.ID)
-		if err != nil {
+	for _, sv := range cfg.Data.WindowsServers {
+		reports := cfg.Data.WindowsReports[sv.ID]
+		if len(reports) == 0 {
 			continue
 		}
-		disks, err := st.GetWindowsDisksForReport(ctx, rep.ID)
-		if err != nil {
-			continue
-		}
-		for _, disk := range disks {
+		for _, disk := range cfg.Data.WindowsDisks[reports[0].ID] {
 			if !isWindowsLogicalAlertDisk(disk) {
 				continue
 			}
@@ -928,26 +989,19 @@ func evalWindowsDiskHealth(st *store.Store, _ AlertConfigs) ([]domain.Alert, err
 	return alerts, nil
 }
 
-func evalWindowsMissingVolume(st *store.Store, _ AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListWindowsServers(ctx)
+func evalWindowsMissingVolume(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		reports, err := st.ListWindowsReports(ctx, sv.ID, 2)
-		if err != nil || len(reports) < 2 {
+	for _, sv := range cfg.Data.WindowsServers {
+		reports := cfg.Data.WindowsReports[sv.ID]
+		if len(reports) < 2 {
 			continue
 		}
-		current, err := st.GetWindowsDisksForReport(ctx, reports[0].ID)
-		if err != nil {
-			continue
-		}
-		previous, err := st.GetWindowsDisksForReport(ctx, reports[1].ID)
-		if err != nil {
-			continue
-		}
+		current := cfg.Data.WindowsDisks[reports[0].ID]
+		previous := cfg.Data.WindowsDisks[reports[1].ID]
 		currentNames := make(map[string]bool, len(current))
 		for _, disk := range current {
 			if !isWindowsLogicalAlertDisk(disk) {
@@ -988,21 +1042,33 @@ func isWindowsLogicalAlertDisk(disk domain.WindowsDisk) bool {
 	return len(name) == 2 && name[1] == ':' && ((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z'))
 }
 
-// ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.
-// Used by the web UI to show the sidebar badge on every page.
-func ActiveAlertCounts(ctx context.Context, st *store.Store, rep *ReportService) (critical, warning int) {
-	cfg, err := LoadAlertConfigs(ctx, st)
+// ActivePersistedAlerts returns the current alert snapshot maintained by the
+// report/heartbeat worker, excluding maintenance and suppressed alerts.
+func ActivePersistedAlerts(ctx context.Context, st *store.Store) ([]domain.Alert, error) {
+	all, err := st.ListPresentAlerts(ctx)
 	if err != nil {
-		return
+		return nil, err
 	}
-	cfg.Report = rep
-	all, _ := RunAll(st, cfg)
 	all = FilterMaintenanceAlerts(ctx, st, all)
 	supps, _ := st.GetActiveSuppressions(ctx)
+	active := make([]domain.Alert, 0, len(all))
 	for _, a := range all {
 		if _, suppressed := supps[a.ID]; suppressed {
 			continue
 		}
+		active = append(active, a)
+	}
+	return active, nil
+}
+
+// ActiveAlertCounts returns the number of non-suppressed critical and warning alerts.
+// Used by the web UI to show the sidebar badge on every page.
+func ActiveAlertCounts(ctx context.Context, st *store.Store, _ *ReportService) (critical, warning int) {
+	all, err := ActivePersistedAlerts(ctx, st)
+	if err != nil {
+		return
+	}
+	for _, a := range all {
 		if a.Severity == domain.AlertSeverityCritical {
 			critical++
 		} else {
@@ -1013,23 +1079,22 @@ func ActiveAlertCounts(ctx context.Context, st *store.Store, rep *ReportService)
 }
 
 func evalPVEMissingVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+	for _, sv := range cfg.Data.PVEServers {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		tasks, err := st.GetPVEBackupTasksForReport(ctx, rep.ID)
-		if err != nil || len(tasks) == 0 {
+		tasks := cfg.Data.PVETasks[rep.ID]
+		if len(tasks) == 0 {
 			continue
 		}
-		configs, err := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
-		if err != nil || len(configs) == 0 {
+		configs := cfg.Data.PVEBackupConfigs[sv.ID]
+		if len(configs) == 0 {
 			continue
 		}
 		jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()
@@ -1062,23 +1127,22 @@ func evalPVEMissingVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 }
 
 func evalPVEUnknownVM(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
-	ctx := context.Background()
-	servers, err := st.ListPVEServers(ctx)
+	cfg, err := ensureAlertData(st, cfg)
 	if err != nil {
 		return nil, err
 	}
 	var alerts []domain.Alert
-	for _, sv := range servers {
-		rep, err := st.GetLatestPVEReport(ctx, sv.ID)
-		if err != nil {
+	for _, sv := range cfg.Data.PVEServers {
+		rep := cfg.Data.PVEReports[sv.ID]
+		if rep == nil {
 			continue
 		}
-		tasks, err := st.GetPVEBackupTasksForReport(ctx, rep.ID)
-		if err != nil || len(tasks) == 0 {
+		tasks := cfg.Data.PVETasks[rep.ID]
+		if len(tasks) == 0 {
 			continue
 		}
-		configs, err := st.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
-		if err != nil || len(configs) == 0 {
+		configs := cfg.Data.PVEBackupConfigs[sv.ID]
+		if len(configs) == 0 {
 			continue
 		}
 		configured := make(map[string]bool, len(configs))

@@ -68,6 +68,24 @@ func TestGroupSuppressedByServer(t *testing.T) {
 	}
 }
 
+func TestAlertExternalServerURLsUsesAPIKeyConfiguration(t *testing.T) {
+	st := openAlertsHandlerDB(t)
+	key, err := st.CreateAPIKey(t.Context(), "pve-alerts", "pve-alerts", "https://pve.example.test:8006")
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	serverID, err := st.UpsertPVEServerForAPIKey(t.Context(), key.ID, "pve-alerts", "10.0.0.10", "", "test", "mid-alerts")
+	if err != nil {
+		t.Fatalf("UpsertPVEServerForAPIKey: %v", err)
+	}
+
+	h := New(st, nil, nil)
+	urls := h.alertExternalServerURLs(t.Context())
+	if got := urls[alertServerKey("pve", serverID)]; got != "https://pve.example.test:8006" {
+		t.Fatalf("external PVE URL: got %q", got)
+	}
+}
+
 func TestFormAlertIDs(t *testing.T) {
 	req := httptest.NewRequest("POST", "/alerts/suppress", strings.NewReader("alert_id=a1,a2&alert_id=a2&alert_id=a3"))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")

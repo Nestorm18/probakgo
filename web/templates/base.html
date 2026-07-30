@@ -408,6 +408,15 @@
       });
     }
 
+    function alertServerURL(alert) {
+      const serverType = String(alert?.server_type || '').toLowerCase();
+      const serverID = Number(alert?.server_id);
+      if (!['pve', 'pbs', 'windows'].includes(serverType) || !Number.isSafeInteger(serverID) || serverID <= 0) {
+        return '/alerts';
+      }
+      return '/servers/' + serverType + '/' + serverID;
+    }
+
     function showToast(alert) {
       if (!toastContainer) return;
       const el = document.createElement('div');
@@ -415,8 +424,9 @@
       el.setAttribute('role', 'alert');
       el.setAttribute('aria-live', 'assertive');
       el.setAttribute('aria-atomic', 'true');
-      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><a class="alert-toast-server d-inline-flex align-items-center text-white text-decoration-none" title="Ver servidor"><i class="bi bi-server me-1"></i><strong></strong></a><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
       el.querySelector('strong').textContent = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
+      el.querySelector('.alert-toast-server').href = alertServerURL(alert);
       el.querySelector('.toast-body div').textContent = alert.message || 'Nueva alerta critica';
       toastContainer.appendChild(el);
       const toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 12000 });
@@ -450,7 +460,7 @@
       });
       n.onclick = () => {
         window.focus();
-        window.location.href = '/alerts';
+        window.location.href = alertServerURL(alert);
         n.close();
       };
     }
