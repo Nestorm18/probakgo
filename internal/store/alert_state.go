@@ -126,9 +126,14 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 			        WHEN last_critical_email_at IS NOT NULL AND severity = ? THEN 1
 			        ELSE resolution_email_pending
 			    END,
+			    resolution_push_pending = CASE
+			        WHEN last_critical_push_at IS NOT NULL AND severity = ? THEN 1
+			        ELSE resolution_push_pending
+			    END,
 			    last_critical_email_at = NULL,
+			    last_critical_push_at = NULL,
 			    updated_at = ?
-			WHERE alert_id = ?`, domain.AlertSeverityCritical, now, alertID); err != nil {
+			WHERE alert_id = ?`, domain.AlertSeverityCritical, domain.AlertSeverityCritical, now, alertID); err != nil {
 			return err
 		}
 		if err := insertAlertEvent(ctx, tx, alertEventFromState(state, "resolved", "")); err != nil {
@@ -137,6 +142,44 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 	}
 
 	return tx.Commit()
+}
+
+func (s *Store) ListCriticalPushSentAlertIDs(ctx context.Context, alertIDs []string) (map[string]bool, error) {
+	if len(alertIDs) == 0 {
+		return map[string]bool{}, nil
+	}
+	placeholders, args := stringInArgs(alertIDs)
+	debug.RecordQuery(ctx, `SELECT alert_id FROM alert_states WHERE alert_id IN (...) AND is_present = 1 AND last_critical_push_at IS NOT NULL`)
+	rows, err := s.db.QueryContext(ctx, `SELECT alert_id FROM alert_states
+		WHERE alert_id IN (`+placeholders+`)
+		  AND is_present = 1
+		  AND last_critical_push_at IS NOT NULL`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]bool)
+	for rows.Next() {
+		var alertID string
+		if err := rows.Scan(&alertID); err != nil {
+			return nil, err
+		}
+		result[alertID] = true
+	}
+	return result, rows.Err()
+}
+
+func (s *Store) MarkAlertCriticalPushesSent(ctx context.Context, alertIDs []string, sentAt time.Time) error {
+	if len(alertIDs) == 0 {
+		return nil
+	}
+	placeholders, args := stringInArgs(alertIDs)
+	args = append([]any{sentAt, sentAt}, args...)
+	debug.RecordQuery(ctx, `UPDATE alert_states SET last_critical_push_at = ?, updated_at = ? WHERE alert_id IN (...)`)
+	_, err := s.db.ExecContext(ctx, `UPDATE alert_states
+		SET last_critical_push_at = ?, updated_at = ?
+		WHERE is_present = 1 AND alert_id IN (`+placeholders+`)`, args...)
+	return err
 }
 
 func (s *Store) GetAlertCriticalEmailSentAt(ctx context.Context, alertID string) (time.Time, bool, error) {
@@ -246,6 +289,44 @@ func (s *Store) MarkAlertResolutionEmailsSent(ctx context.Context, alertIDs []st
 	_, err := s.db.ExecContext(ctx, `UPDATE alert_states
 		SET resolution_email_pending = 0, updated_at = ?
 		WHERE alert_id IN (`+placeholders+`)`, args...)
+	return err
+}
+
+func (s *Store) ListPendingAlertResolutionPushes(ctx context.Context) ([]domain.Alert, error) {
+	debug.RecordQuery(ctx, `SELECT alert_id, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name FROM alert_states WHERE resolution_push_pending = 1 AND is_present = 0`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT alert_id, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name
+		FROM alert_states
+		WHERE resolution_push_pending = 1 AND is_present = 0
+		ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var alerts []domain.Alert
+	for rows.Next() {
+		var alert domain.Alert
+		if err := rows.Scan(&alert.ID, &alert.Severity, &alert.Title, &alert.Message, &alert.ServerName,
+			&alert.ServerType, &alert.ServerID, &alert.StoreName, &alert.VMID, &alert.VMName); err != nil {
+			return nil, err
+		}
+		alert.Type = strings.Split(alert.ID, ":")[0]
+		alerts = append(alerts, alert)
+	}
+	return alerts, rows.Err()
+}
+
+func (s *Store) MarkAlertResolutionPushesSent(ctx context.Context, alertIDs []string, sentAt time.Time) error {
+	if len(alertIDs) == 0 {
+		return nil
+	}
+	placeholders, args := stringInArgs(alertIDs)
+	args = append([]any{sentAt}, args...)
+	debug.RecordQuery(ctx, `UPDATE alert_states SET resolution_push_pending = 0, updated_at = ? WHERE alert_id IN (...)`)
+	_, err := s.db.ExecContext(ctx, `UPDATE alert_states
+		SET resolution_push_pending = 0, updated_at = ?
+		WHERE is_present = 0 AND alert_id IN (`+placeholders+`)`, args...)
 	return err
 }
 
@@ -373,6 +454,7 @@ func updateAlertState(ctx context.Context, tx *sql.Tx, alert domain.Alert, now t
 		UPDATE alert_states
 		SET is_present = 1, severity = ?, title = ?, message = ?, server_name = ?, server_type = ?,
 		    server_id = ?, store_name = ?, vmid = ?, vm_name = ?, resolution_email_pending = 0,
+		    resolution_push_pending = 0,
 		    last_seen_at = ?, updated_at = ?
 		WHERE alert_id = ?`,
 		alert.Severity, alert.Title, alert.Message, alert.ServerName, alert.ServerType,

@@ -222,7 +222,10 @@ func (h *WebH) ToggleUserPost(w http.ResponseWriter, r *http.Request) {
 		redirectWithFlash(w, r, back, "No puedes desactivarte a ti mismo", false)
 		return
 	}
-	_ = h.store.ToggleUser(ctx, id)
+	if err := h.store.ToggleUser(ctx, id); err != nil {
+		redirectWithFlash(w, r, back, "No se pudo actualizar el estado", false)
+		return
+	}
 	h.audit(r, "user.toggle", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"was_active": u.IsActive, "new_active": !u.IsActive})
 	redirectWithFlash(w, r, back, "Estado actualizado", true)
 }

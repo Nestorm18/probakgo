@@ -11,6 +11,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><path fill='%233b82f6' d='M2 2a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zm10.5 3a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m1.5 0a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1M2 9a2 2 0 0 0-2 2v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2zm10.5 3a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1m1.5 0a.5.5 0 1 1 0-1 .5.5 0 0 1 0 1'/></svg>">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#1e3a8a">
 </head>
 <body>
 <div id="wrapper">
@@ -553,6 +556,264 @@
 
     pollAlerts();
     setInterval(pollAlerts, pollMs);
+  })();
+
+  // PWA: register the service worker as soon as the page is interactive, then
+  // wire up the desktop-push toggle(s) the page may have rendered. The push
+  // helpers are no-ops if the browser does not support PushManager.
+  (function () {
+    if (!('serviceWorker' in navigator)) return;
+    const pushBtn = document.getElementById('pushNotifyBtn');
+    const pushStatus = document.getElementById('pushStatus');
+    const pushList = document.getElementById('pushSubscriptionList');
+    const subKey = 'probakgo.push.endpoint';
+    const unsupported = !('PushManager' in window) || !('Notification' in window);
+    let pushLinked = false;
+
+    function showPushToast(title, message, variant) {
+      const toastContainer = document.getElementById('alertToastContainer');
+      if (!toastContainer) return;
+      const el = document.createElement('div');
+      el.className = 'toast align-items-center border-0 text-bg-' + (variant || 'primary');
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-atomic', 'true');
+      el.innerHTML = '<div class="d-flex"><div class="toast-body"><strong></strong><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
+      el.querySelector('strong').textContent = title;
+      el.querySelector('.toast-body div').textContent = message;
+      toastContainer.appendChild(el);
+      const t = bootstrap.Toast.getOrCreateInstance(el, { delay: variant === 'danger' ? 12000 : 7000 });
+      el.addEventListener('hidden.bs.toast', () => el.remove());
+      t.show();
+    }
+
+    function setPushButtonState(state, label) {
+      if (!pushBtn) return;
+      const icon = pushBtn.querySelector('i');
+      if (icon) {
+        icon.className = state === 'on' ? 'bi bi-bell-fill'
+                       : state === 'off' ? 'bi bi-bell-slash'
+                       : 'bi bi-bell';
+      }
+      pushBtn.classList.toggle('btn-primary', state === 'on');
+      pushBtn.classList.toggle('btn-secondary', state !== 'on');
+      if (pushStatus) {
+        pushStatus.textContent = label || '';
+      }
+    }
+
+    function pushAvailable() {
+      if (unsupported) {
+        if (pushBtn) pushBtn.classList.add('d-none');
+        return false;
+      }
+      if (!window.isSecureContext) {
+        if (pushBtn) {
+          pushBtn.title = 'PWA push requiere HTTPS o localhost';
+        }
+        return false;
+      }
+      return true;
+    }
+
+    async function loadSubscriptions(endpoint) {
+      if (!pushList) return false;
+      try {
+        const res = await fetch('/push/subscriptions', { credentials: 'same-origin' });
+        if (!res.ok) {
+          pushList.textContent = 'No se pudo cargar la lista de dispositivos.';
+          return false;
+        }
+        const data = await res.json();
+        const currentEndpoint = endpoint || localStorage.getItem(subKey);
+        const subs = (data.subscriptions || []).filter(s => s.endpoint === currentEndpoint);
+        if (subs.length === 0) {
+          pushList.textContent = 'Este navegador no esta suscrito.';
+          return false;
+        }
+        pushList.innerHTML = '';
+        subs.forEach(s => {
+          const row = document.createElement('div');
+          row.className = 'd-flex align-items-center gap-2';
+          const ua = document.createElement('span');
+          ua.className = 'text-secondary small flex-grow-1';
+          ua.textContent = s.user_agent || 'Este navegador';
+          const ping = document.createElement('button');
+          ping.type = 'button';
+          ping.className = 'btn btn-sm btn-outline-primary';
+          ping.textContent = 'Probar';
+          ping.addEventListener('click', () => testPush(s.endpoint));
+          row.appendChild(ua);
+          row.appendChild(ping);
+          pushList.appendChild(row);
+        });
+        return true;
+      } catch (err) {
+        if (pushList) pushList.textContent = 'Error al listar: ' + err.message;
+        return false;
+      }
+    }
+
+    async function registerSW() {
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        // Refresh subscription list whenever a new SW takes over so the
+        // user always sees the right endpoint.
+        reg.addEventListener('updatefound', () => loadSubscriptions());
+        if (unsupported) {
+          pushAvailable();
+          return;
+        }
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) {
+          localStorage.setItem(subKey, sub.endpoint);
+          pushLinked = await loadSubscriptions(sub.endpoint);
+          setPushButtonState(pushLinked ? 'on' : 'off', pushLinked
+            ? 'Notificaciones activas en este navegador'
+            : 'Activar notificaciones para esta cuenta');
+        } else {
+          pushLinked = false;
+          localStorage.removeItem(subKey);
+          await loadSubscriptions();
+          setPushButtonState('off', 'Activar para recibir alertas en el escritorio');
+        }
+      } catch (err) {
+        console.warn('SW registration failed', err);
+        setPushButtonState('error', 'Service worker no disponible');
+      }
+    }
+
+    function urlBase64ToUint8Array(base64String) {
+      const padding = '='.repeat((4 - base64String.length % 4) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = atob(base64);
+      const out = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) out[i] = rawData.charCodeAt(i);
+      return out;
+    }
+
+    function arraysEqual(left, right) {
+      if (!left || !right) return false;
+      const a = new Uint8Array(left);
+      const b = new Uint8Array(right);
+      return a.length === b.length && a.every((value, index) => value === b[index]);
+    }
+
+    async function ensurePermission() {
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') {
+        showPushToast('Notificaciones bloqueadas', 'Activalas desde los permisos del sitio en el navegador.', 'danger');
+        return false;
+      }
+      const result = await Notification.requestPermission();
+      return result === 'granted';
+    }
+
+    async function subscribePush() {
+      if (!pushAvailable()) return;
+      if (!await ensurePermission()) return;
+      const reg = await navigator.serviceWorker.ready;
+      const keyRes = await fetch('/push/vapid-public-key', { credentials: 'same-origin' });
+      if (!keyRes.ok) {
+        showPushToast('Push no configurado', 'El servidor todavia no tiene claves VAPID. Intentalo mas tarde.', 'danger');
+        return;
+      }
+      const { vapid_public_key } = await keyRes.json();
+      const applicationServerKey = urlBase64ToUint8Array(vapid_public_key);
+      let sub = await reg.pushManager.getSubscription();
+      if (sub && sub.options && sub.options.applicationServerKey &&
+          !arraysEqual(sub.options.applicationServerKey, applicationServerKey)) {
+        await sub.unsubscribe();
+        sub = null;
+      }
+      sub = sub || await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey,
+        });
+      const res = await fetch('/push/subscribe', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub.toJSON()),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showPushToast('No se pudo suscribir', err.error || 'Error desconocido', 'danger');
+        return;
+      }
+      localStorage.setItem(subKey, sub.endpoint);
+      pushLinked = true;
+      setPushButtonState('on', 'Notificaciones activas en este navegador');
+      await loadSubscriptions();
+      showPushToast('Push activado', 'Enviando notificacion de prueba...', 'primary');
+      // Fire a test notification so the user sees the toast right away.
+      try { await testPush(sub.endpoint, true); } catch (_) { /* best effort */ }
+    }
+
+    async function unsubscribePush() {
+      if (!('serviceWorker' in navigator)) return;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        setPushButtonState('off', 'Activar para recibir alertas en el escritorio');
+        return;
+      }
+      const endpoint = sub.endpoint;
+      await sub.unsubscribe();
+      await fetch('/push/unsubscribe', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint }),
+      }).catch(() => {});
+      localStorage.removeItem(subKey);
+      pushLinked = false;
+      setPushButtonState('off', 'Activar para recibir alertas en el escritorio');
+      await loadSubscriptions();
+      showPushToast('Push desactivado', 'Este navegador dejara de recibir alertas.', 'primary');
+    }
+
+    async function testPush(endpoint, silent) {
+      try {
+        const res = await fetch('/push/test', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ endpoint }),
+        });
+        if (!res.ok && !silent) {
+          const err = await res.json().catch(() => ({}));
+          showPushToast('No se pudo enviar la prueba', err.error || 'Error desconocido', 'danger');
+        }
+      } catch (err) {
+        if (!silent) showPushToast('Error de red', err.message, 'danger');
+      }
+    }
+
+    if (pushBtn) {
+      pushBtn.addEventListener('click', async () => {
+        pushBtn.disabled = true;
+        try {
+          const reg = await navigator.serviceWorker.getRegistration();
+          const sub = reg ? await reg.pushManager.getSubscription() : null;
+          if (sub && pushLinked) {
+            await unsubscribePush();
+          } else {
+            await subscribePush();
+          }
+        } catch (err) {
+          showPushToast('No se pudo cambiar la suscripcion', err.message || 'Error desconocido', 'danger');
+        } finally {
+          pushBtn.disabled = false;
+        }
+      });
+    }
+
+    if (window.isSecureContext) {
+      registerSW();
+    } else if (pushBtn) {
+      setPushButtonState('error', 'PWA push requiere HTTPS o localhost');
+    }
   })();
 
 </script>

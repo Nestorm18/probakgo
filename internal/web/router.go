@@ -59,7 +59,15 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.Get("/download/client/linux-amd64", h.DownloadClientLinuxAMD64)
 	r.Get("/download/client/windows-amd64", h.DownloadClientWindowsAMD64)
 
+	// PWA: service worker and web manifest. They live at the site root so
+	// the manifest can declare a scope of "/" and the SW can claim the
+	// whole origin.
+	r.Get("/sw.js", serveServiceWorker(staticFS))
+	r.Get("/manifest.webmanifest", serveManifest(staticFS))
+
 	loginLimiter := ratelimit.New(10, time.Minute)
+	pushMutationLimiter := ratelimit.New(20, time.Minute)
+	pushTestLimiter := ratelimit.New(10, time.Minute)
 	sensitive := RequireTOTPForSensitiveAction(st)
 
 	r.Get("/login", h.LoginPage)
@@ -127,6 +135,14 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.Post("/profile/2fa/setup", h.Profile2FASetup)
 		r.Post("/profile/2fa/confirm", h.Profile2FAConfirm)
 		r.With(sensitive).Post("/profile/2fa/disable", h.Profile2FADisable)
+
+		// PWA Web Push. Every endpoint is scoped to the logged-in user; the
+		// VAPID key itself is public, but generating it mutates server state.
+		r.Get("/push/vapid-public-key", h.VAPIDPublicKey)
+		r.With(pushMutationLimiter.Middleware).Post("/push/subscribe", h.PushSubscribe)
+		r.With(pushMutationLimiter.Middleware).Post("/push/unsubscribe", h.PushUnsubscribe)
+		r.Get("/push/subscriptions", h.PushSubscriptions)
+		r.With(pushTestLimiter.Middleware).Post("/push/test", h.PushTest)
 
 		// Backup config - editor + admin
 		r.With(RequireEditor).Get("/backup-config/{server}", h.BackupConfig)

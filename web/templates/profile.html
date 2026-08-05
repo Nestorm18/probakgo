@@ -107,6 +107,36 @@
     </div>
 
   </div>
+
+  <div class="col-lg-7">
+
+    <div class="card mb-3">
+      <div class="card-header">
+        <i class="bi bi-bell-fill me-2" style="color:var(--clr-accent)"></i>Notificaciones en el escritorio (PWA)
+      </div>
+      <div class="card-body">
+        <p class="text-secondary" style="font-size:.85rem;margin-bottom:1rem">
+          Activa las notificaciones del navegador para recibir las alertas criticas aunque no tengas la pestana abierta.
+          Probakgo funciona como una aplicacion instalable: anadela a tu escritorio o menu de inicio desde el boton del navegador.
+        </p>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <button type="button" class="btn btn-primary" id="pushNotifyBtn" title="Activar o desactivar notificaciones del escritorio">
+            <i class="bi bi-bell"></i><span class="ms-1">Notificaciones del escritorio</span>
+          </button>
+          <span class="small text-secondary" id="pushStatus">Comprobando soporte...</span>
+        </div>
+        <div id="pushSubscriptionList" class="small text-secondary">
+          Tu navegador todavia no esta suscrito. Pulsa el boton para empezar.
+        </div>
+        <div class="mt-3" style="font-size:.75rem;color:var(--txt-muted)">
+          <i class="bi bi-shield-lock me-1"></i>
+          Las claves VAPID se generan en el servidor y la suscripcion queda asociada a este usuario.
+          Si borras al usuario o desactivas la cuenta, las suscripciones se eliminan automaticamente.
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 {{end}}

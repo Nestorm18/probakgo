@@ -164,6 +164,21 @@ Si el panel solo es accesible mediante NetBird, WireGuard u otra VPN cifrada y n
 
 La casilla informa al checklist; no crea reglas de firewall ni cifra por sí sola el tráfico. Con HTTP, `SESSION_SECURE=false` es necesario para que el navegador envíe la cookie. Con HTTPS debe ser `true`.
 
+### PWA y notificaciones push
+
+Probakgo se puede instalar como PWA desde Chrome, Edge y otros navegadores compatibles. Esto crea un acceso en el escritorio, el menú Inicio o la pantalla principal y permite abrir el panel en una ventana independiente. No instala otro binario ni duplica el servidor.
+
+Para activar las notificaciones:
+
+1. Publica Probakgo mediante HTTPS; los navegadores solo permiten service workers y Web Push en contextos seguros, con la excepción de `localhost`.
+2. Inicia sesión y abre **Perfil → Notificaciones en el escritorio**.
+3. Pulsa **Notificaciones del escritorio** y acepta el permiso del navegador.
+4. Usa la opción **Instalar aplicación** del navegador si quieres un acceso independiente.
+
+Cada suscripción queda vinculada al usuario y al navegador que la creó. Las claves VAPID se generan al activar la primera suscripción y la clave privada se cifra con `DATA_ENCRYPTION_KEY`. Al desactivar o eliminar un usuario se eliminan sus suscripciones.
+
+Las notificaciones informan de alertas críticas y de su resolución; al pulsarlas se abre el servidor o la vista de alertas correspondiente. La PWA no ofrece funcionamiento offline ni cachea informes, porque Probakgo debe mostrar siempre el estado actual del servidor.
+
 ## 3. Usuarios, 2FA y claves
 
 ### Roles

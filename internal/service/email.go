@@ -138,6 +138,10 @@ func sendDailyReportWithConfig(ctx context.Context, st *store.Store, rep *Report
 }
 
 // SendImmediateCriticalAlerts sends one optional email when a critical alert first appears.
+// When a PushSender is registered with SetPushSender, the same alerts are also
+// fanned out to every Web Push subscription in the background. Push delivery
+// is best-effort: a failed push never blocks the email transport or the
+// return value, so a flaky push service cannot stall alert delivery.
 func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -146,15 +150,28 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	if err != nil {
 		return fmt.Errorf("get email config: %w", err)
 	}
-	if !cfg.CriticalAlertsEnabled {
+	emailEnabled := cfg.CriticalAlertsEnabled
+	push := GetPushSender()
+	if push != nil && !push.Ready(ctx) {
+		push = nil
+	}
+	if !emailEnabled && push == nil {
 		return nil
 	}
-	if cfg.SMTPUser == "" || cfg.SMTPPass == "" {
-		return fmt.Errorf("SMTP credentials not configured")
+	var recipients []string
+	var emailConfigErr error
+	if emailEnabled {
+		if cfg.SMTPUser == "" || cfg.SMTPPass == "" {
+			emailConfigErr = fmt.Errorf("SMTP credentials not configured")
+		} else {
+			recipients = parseRecipients(cfg.Recipients)
+			if len(recipients) == 0 {
+				emailConfigErr = fmt.Errorf("no email recipients configured")
+			}
+		}
 	}
-	recipients := parseRecipients(cfg.Recipients)
-	if len(recipients) == 0 {
-		return fmt.Errorf("no email recipients configured")
+	if emailConfigErr != nil && push == nil {
+		return emailConfigErr
 	}
 
 	alertCfg, err := LoadAlertConfigs(ctx, st)
@@ -173,45 +190,107 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	suppressed, _ := st.GetActiveSuppressions(ctx)
 
 	now := time.Now()
-	selected, err := criticalAlertsPendingEmail(ctx, st, alerts, suppressed)
-	if err != nil {
-		return err
+	if push != nil {
+		selected, err := criticalAlertsPendingPush(ctx, st, alerts, suppressed)
+		if err != nil {
+			slog.Warn("get critical push state", "err", err)
+		} else if len(selected) > 0 {
+			dispatchPush(st, push, selected, alertLink(selected), false)
+		}
+		resolved, err := st.ListPendingAlertResolutionPushes(ctx)
+		if err != nil {
+			slog.Warn("list resolved critical push alerts", "err", err)
+		} else if len(resolved) > 0 {
+			dispatchPush(st, push, resolved, "/alerts", true)
+		}
 	}
-	if len(selected) > 0 {
-		subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
-		if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+	if emailConfigErr != nil {
+		return emailConfigErr
+	}
+
+	if emailEnabled {
+		selected, err := criticalAlertsPendingEmail(ctx, st, alerts, suppressed)
+		if err != nil {
 			return err
 		}
+		if len(selected) > 0 {
+			subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
+			if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+				return err
+			}
 
-		alertIDs := make([]string, 0, len(selected))
-		for _, alert := range selected {
-			alertIDs = append(alertIDs, alert.ID)
+			alertIDs := alertIDs(selected)
+			if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs, now); err != nil {
+				return fmt.Errorf("mark critical email sent: %w", err)
+			}
 		}
-		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs, now); err != nil {
-			return fmt.Errorf("mark critical email sent: %w", err)
+
+		resolved, err := st.ListPendingAlertResolutionEmails(ctx)
+		if err != nil {
+			return fmt.Errorf("list resolved critical alerts: %w", err)
 		}
-	}
-
-	resolved, err := st.ListPendingAlertResolutionEmails(ctx)
-	if err != nil {
-		return fmt.Errorf("list resolved critical alerts: %w", err)
-	}
-	if len(resolved) == 0 {
-		return nil
-	}
-
-	subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
-	if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
-		return err
-	}
-	alertIDs := make([]string, 0, len(resolved))
-	for _, alert := range resolved {
-		alertIDs = append(alertIDs, alert.ID)
-	}
-	if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs, now); err != nil {
-		return fmt.Errorf("mark resolution email sent: %w", err)
+		if len(resolved) > 0 {
+			subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
+			if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+				return err
+			}
+			if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs(resolved), now); err != nil {
+				return fmt.Errorf("mark resolution email sent: %w", err)
+			}
+		}
 	}
 	return nil
+}
+
+func dispatchPush(st *store.Store, sender *PushSender, alerts []domain.Alert, linkURL string, resolved bool) {
+	batch := append([]domain.Alert(nil), alerts...)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		var delivered int
+		if resolved {
+			delivered = sender.SendResolutions(ctx, batch, linkURL)
+		} else {
+			delivered = sender.SendAlerts(ctx, batch, linkURL)
+		}
+		if delivered == 0 {
+			return
+		}
+		now := time.Now()
+		var err error
+		if resolved {
+			err = st.MarkAlertResolutionPushesSent(ctx, alertIDs(batch), now)
+		} else {
+			err = st.MarkAlertCriticalPushesSent(ctx, alertIDs(batch), now)
+		}
+		if err != nil {
+			slog.Warn("mark push notification sent", "resolved", resolved, "err", err)
+		}
+	}()
+}
+
+func alertIDs(alerts []domain.Alert) []string {
+	ids := make([]string, 0, len(alerts))
+	for _, alert := range alerts {
+		ids = append(ids, alert.ID)
+	}
+	return ids
+}
+
+// alertLink returns the deepest URL the dashboard can build for a single
+// alert so the browser-side click-through lands on the relevant server page.
+func alertLink(alerts []domain.Alert) string {
+	if len(alerts) != 1 {
+		return "/alerts"
+	}
+	a := alerts[0]
+	switch a.ServerType {
+	case "pve", "pbs", "windows":
+		if a.ServerID > 0 {
+			return "/servers/" + a.ServerType + "/" + strconv.FormatInt(a.ServerID, 10)
+		}
+	}
+	return "/alerts"
 }
 
 func criticalAlertsPendingEmail(ctx context.Context, st *store.Store, alerts []domain.Alert, suppressed map[string]time.Time) ([]domain.Alert, error) {
@@ -230,6 +309,30 @@ func criticalAlertsPendingEmail(ctx context.Context, st *store.Store, alerts []d
 	sent, err := st.ListCriticalEmailSentAlertIDs(ctx, alertIDs)
 	if err != nil {
 		return nil, fmt.Errorf("get critical email state: %w", err)
+	}
+	selected := make([]domain.Alert, 0, len(candidates))
+	for _, alert := range candidates {
+		if !sent[alert.ID] {
+			selected = append(selected, alert)
+		}
+	}
+	return selected, nil
+}
+
+func criticalAlertsPendingPush(ctx context.Context, st *store.Store, alerts []domain.Alert, suppressed map[string]time.Time) ([]domain.Alert, error) {
+	var candidates []domain.Alert
+	for _, alert := range alerts {
+		if !shouldSendImmediateCriticalEmail(alert) {
+			continue
+		}
+		if _, ok := suppressed[alert.ID]; ok {
+			continue
+		}
+		candidates = append(candidates, alert)
+	}
+	sent, err := st.ListCriticalPushSentAlertIDs(ctx, alertIDs(candidates))
+	if err != nil {
+		return nil, fmt.Errorf("get critical push state: %w", err)
 	}
 	selected := make([]domain.Alert, 0, len(candidates))
 	for _, alert := range candidates {

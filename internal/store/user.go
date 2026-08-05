@@ -142,8 +142,20 @@ func (s *Store) ClearUserTOTPGrace(ctx context.Context) error {
 
 func (s *Store) SetUserActive(ctx context.Context, id int64, active bool) error {
 	debug.RecordQuery(ctx, `UPDATE users SET is_active=?, session_version=session_version+1 WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET is_active=?, session_version=session_version+1 WHERE id=?`, boolToInt(active), id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET is_active=?, session_version=session_version+1 WHERE id=?`, boolToInt(active), id); err != nil {
+		return err
+	}
+	if !active {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM push_subscriptions WHERE user_id=?`, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) UpdateUserRole(ctx context.Context, id int64, role string) error {
@@ -154,8 +166,19 @@ func (s *Store) UpdateUserRole(ctx context.Context, id int64, role string) error
 
 func (s *Store) ToggleUser(ctx context.Context, id int64) error {
 	debug.RecordQuery(ctx, `UPDATE users SET is_active = NOT is_active, session_version=session_version+1 WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET is_active = NOT is_active, session_version=session_version+1 WHERE id=?`, id)
-	return err
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE users SET is_active = NOT is_active, session_version=session_version+1 WHERE id=?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM push_subscriptions
+		WHERE user_id=? AND EXISTS (SELECT 1 FROM users WHERE id=? AND is_active=0)`, id, id); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *Store) DeleteUser(ctx context.Context, id int64) error {

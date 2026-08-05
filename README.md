@@ -28,6 +28,18 @@ El servidor se distribuye como un único binario con la web y las migraciones em
 - Estado e historial de alertas, badges en vivo, sonido/notificaciones opcionales del navegador.
 - Informe diario por SMTP y, opcionalmente, emails inmediatos al aparecer o resolverse alertas críticas.
 
+### Aplicación web instalable (PWA)
+
+Probakgo se puede instalar desde un navegador compatible para abrirlo desde el escritorio, el menú Inicio o la pantalla principal del móvil con una ventana independiente. No es un cliente nativo separado: sigue utilizando la misma web y el mismo servidor.
+
+La PWA se utiliza principalmente para:
+
+- abrir Probakgo como una aplicación instalada, sin la interfaz habitual del navegador;
+- recibir notificaciones del sistema cuando aparece o se resuelve una alerta crítica, aunque la pestaña esté cerrada;
+- entrar directamente en la alerta o el servidor correspondiente al pulsar la notificación.
+
+Las notificaciones se activan por usuario y navegador desde **Perfil → Notificaciones en el escritorio**. Requieren HTTPS, salvo en `localhost`, y cada dispositivo debe aceptar el permiso del navegador. La aplicación no cachea informes ni ofrece un modo offline: el service worker evita almacenar la interfaz para que el estado mostrado proceda siempre del servidor.
+
 ### Administración y seguridad
 
 - Roles `reader`, `editor` y `admin`.

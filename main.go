@@ -135,6 +135,12 @@ func main() {
 	authSvc := service.NewAuth(st)
 	reportSvc := service.NewReport(st, loc)
 
+	// Web Push (PWA) sender. It boots lazily on the first subscription, but
+	// we register it eagerly so the alert engine can fan critical alerts out
+	// to subscribed browsers in parallel with email.
+	pushSender := service.NewPushSender(st)
+	service.SetPushSender(pushSender)
+
 	// Static sub-FS so /static/... maps to web/static/...
 	staticSub, err := fs.Sub(webFS, "web/static")
 	if err != nil {
