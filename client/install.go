@@ -242,6 +242,14 @@ func runInstall(args []string) {
 		}
 	}
 	installHeartbeatTimer()
+	if isPBS {
+		fmt.Println("Sending initial PBS report...")
+		if err := sendInitialPBSReport(runInstallCommand); err != nil {
+			fmt.Printf("WARN: could not send initial PBS report: %v\n", err)
+		} else {
+			fmt.Println("Initial report sent: server should now appear in /servers/pbs")
+		}
+	}
 
 	fmt.Println("\nInstallation complete!")
 	if *apiKey == "" {
@@ -250,6 +258,19 @@ func runInstall(args []string) {
 	fmt.Printf("  Test:   %s\n", binaryLinkPath)
 	fmt.Printf("  Heartbeat: %s heartbeat\n", binaryLinkPath)
 	fmt.Printf("  Update: %s update\n", binaryLinkPath)
+}
+
+type installCommandRunner func(name string, args ...string) error
+
+func runInstallCommand(name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func sendInitialPBSReport(run installCommandRunner) error {
+	return run(binaryPath, "--server-type", "pbs")
 }
 
 func autoConfigureBackupConfig(apiURL, apiKey, proxmoxToken, proxmoxSecret string) {
