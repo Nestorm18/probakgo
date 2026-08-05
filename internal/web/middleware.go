@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -98,9 +99,51 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 				_ = json.NewEncoder(w).Encode(map[string]string{"error": "Esta operacion requiere un codigo 2FA valido"})
 				return
 			}
-			http.Redirect(w, r, r.URL.Path+"?flash=Codigo+2FA+requerido+para+esta+operacion", http.StatusSeeOther)
+			http.Redirect(w, r, sensitiveActionFailureURL(r), http.StatusSeeOther)
 		})
 	}
+}
+
+func sensitiveActionFailureURL(r *http.Request) string {
+	const message = "Codigo 2FA requerido para esta operacion"
+
+	target := localRedirectTarget(r.FormValue("back"))
+	if target == "" {
+		target = localRefererTarget(r)
+	}
+	if target == "" {
+		target = "/"
+	}
+
+	u, err := url.Parse(target)
+	if err != nil {
+		u = &url.URL{Path: "/"}
+	}
+	query := u.Query()
+	query.Set("flash", message)
+	u.RawQuery = query.Encode()
+	return u.String()
+}
+
+func localRedirectTarget(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" || strings.ContainsAny(raw, "\r\n") {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.IsAbs() || u.Host != "" || !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") {
+		return ""
+	}
+	u.Fragment = ""
+	return u.String()
+}
+
+func localRefererTarget(r *http.Request) string {
+	u, err := url.Parse(strings.TrimSpace(r.Referer()))
+	if err != nil || u.Host == "" || !strings.EqualFold(u.Host, r.Host) || !strings.HasPrefix(u.Path, "/") {
+		return ""
+	}
+	return (&url.URL{Path: u.Path, RawPath: u.RawPath, RawQuery: u.RawQuery}).String()
 }
 
 func wantsJSON(r *http.Request) bool {

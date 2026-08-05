@@ -115,6 +115,28 @@ func TestSensitiveTOTPRecentSessionNeverAcceptsExplicitWrongCode(t *testing.T) {
 	}
 }
 
+func TestSensitiveActionFailureURLReturnsToAlertPage(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/alerts/suppress", strings.NewReader("back=%2Falerts&alert_id=a1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	got := sensitiveActionFailureURL(req)
+	want := "/alerts?flash=Codigo+2FA+requerido+para+esta+operacion"
+	if got != want {
+		t.Fatalf("redirect URL = %q, want %q", got, want)
+	}
+}
+
+func TestSensitiveActionFailureURLUsesSameOriginReferer(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "https://probakgo.test/settings/system", nil)
+	req.Header.Set("Referer", "https://probakgo.test/settings/system?section=security")
+
+	got := sensitiveActionFailureURL(req)
+	want := "/settings/system?flash=Codigo+2FA+requerido+para+esta+operacion&section=security"
+	if got != want {
+		t.Fatalf("redirect URL = %q, want %q", got, want)
+	}
+}
+
 func TestRequireEditorRejectsReader(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	baseReq := httptest.NewRequest(http.MethodGet, "/", nil)

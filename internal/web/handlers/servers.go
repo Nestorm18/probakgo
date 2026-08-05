@@ -513,7 +513,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	sv, err := h.store.GetPVEServer(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
@@ -715,7 +715,7 @@ func (h *WebH) PVEServerReports(w http.ResponseWriter, r *http.Request) {
 	}
 	sv, err := h.store.GetPVEServer(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 
@@ -868,7 +868,7 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	sv, err := h.store.GetPBSServer(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 	latestReports, _ := h.store.ListPBSReports(ctx, id, 14)
@@ -1003,7 +1003,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	sv, err := h.store.GetWindowsServer(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 	page := reportPageFromRequest(r)
@@ -1317,9 +1317,7 @@ func buildServerURLMap(keys []domain.APIKey, _ error) map[string]string {
 
 func serverURLFor(apiKeyID int64, hostname string, urls map[string]string) string {
 	if apiKeyID > 0 {
-		if u := urls["id:"+strconv.FormatInt(apiKeyID, 10)]; u != "" {
-			return u
-		}
+		return urls["id:"+strconv.FormatInt(apiKeyID, 10)]
 	}
 	return urls["name:"+hostname]
 }

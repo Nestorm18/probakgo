@@ -221,7 +221,7 @@ func (h *WebH) EditAPIKeyPage(w http.ResponseWriter, r *http.Request) {
 	}
 	k, err := h.store.GetAPIKey(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 	h.tmpl.Render(w, r, "api_key_edit.html", map[string]any{

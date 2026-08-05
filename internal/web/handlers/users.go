@@ -52,7 +52,7 @@ func (h *WebH) UserEditPage(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := h.store.GetUser(ctx, id)
 	if err != nil {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 	h.tmpl.Render(w, r, "user_edit.html", map[string]any{

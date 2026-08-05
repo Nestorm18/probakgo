@@ -129,6 +129,24 @@ func TestAboutUpdateSkipsSensitiveTOTPPrompt(t *testing.T) {
 	}
 }
 
+func TestAlertSuppressionUsesSensitiveTOTPPrompt(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/alerts", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "alerts.html", templateFixtures(time.Now())["alerts.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `action="/alerts/suppress"`) {
+		t.Fatalf("suppression form is missing:\n%s", body)
+	}
+	if strings.Contains(body, `action.includes('/alerts/suppress')`) || strings.Contains(body, `action.includes('/alerts/unsuppress')`) {
+		t.Fatalf("alert suppression still bypasses the sensitive TOTP prompt:\n%s", body)
+	}
+}
+
 func TestAlertNotificationsLinkDirectlyToServer(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
@@ -441,6 +459,10 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Reports":    []domain.PBSReport{},
 			"Pagination": pagination,
 		}),
+		"not_found.html": map[string]any{
+			"Path":     "/ruta-inexistente",
+			"LoggedIn": true,
+		},
 		"server_pve_detail.html": base(map[string]any{
 			"Server":          pveServer,
 			"ServerURL":       "https://pve.example.test:8006",

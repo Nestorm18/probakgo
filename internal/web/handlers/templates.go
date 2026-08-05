@@ -21,6 +21,7 @@ import (
 var standaloneTemplates = map[string]bool{
 	"login.html":     true,
 	"login_2fa.html": true,
+	"not_found.html": true,
 }
 
 // templateActive maps template name → sidebar active key
@@ -55,6 +56,7 @@ var templateActive = map[string]string{
 	"api_key_edit.html":          "keys",
 	"reports_pve.html":           "pve",
 	"about.html":                 "about",
+	"not_found.html":             "",
 }
 
 type Templates struct {

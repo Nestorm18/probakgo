@@ -241,7 +241,7 @@ func (h *WebH) AlertDetail(w http.ResponseWriter, r *http.Request) {
 
 	events, _ := h.store.ListAlertStateEventsForAlert(ctx, alertID, 100)
 	if !isPresent && !isSuppressed && len(events) == 0 {
-		http.NotFound(w, r)
+		h.NotFound(w, r)
 		return
 	}
 

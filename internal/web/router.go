@@ -159,6 +159,7 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Get("/about", h.About)
 		r.With(RequireAdmin).Post("/about/update", h.AboutUpdatePost)
 	})
+	r.NotFound(h.NotFound)
 
 	protection, err := newCrossOriginProtection(trustedOrigins)
 	if err != nil {
