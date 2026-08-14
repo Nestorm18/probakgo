@@ -356,6 +356,10 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 	for _, sv := range cfg.Data.PVEServers {
 		svCfg := cfg.PVEConfigs[sv.ID]
 		vmCfgs := cfg.PVEVMConfigs[sv.ID]
+		backupCfgs := cfg.Data.PVEBackupConfigs[sv.ID]
+		if len(backupCfgs) > 0 && !domain.HasActiveVMBackupConfigs(backupCfgs) {
+			continue
+		}
 
 		rep := cfg.Data.PVEReports[sv.ID]
 		if rep == nil {
@@ -384,6 +388,9 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 		}
 		for _, t := range tasks {
 			if domain.PVEBackupStatusOK(t.Status) {
+				continue
+			}
+			if pveVMBackupExcluded(backupCfgs, t.VMID) {
 				continue
 			}
 			vmCfg := findVMConfig(vmCfgs, t.VMID)
@@ -426,6 +433,10 @@ func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error
 	for _, sv := range cfg.Data.PVEServers {
 		serverID := sv.ID
 		vmCfgs := cfg.PVEVMConfigs[serverID]
+		backupCfgs := cfg.Data.PVEBackupConfigs[serverID]
+		if len(backupCfgs) > 0 && !domain.HasActiveVMBackupConfigs(backupCfgs) {
+			continue
+		}
 		hasMinSize := false
 		for _, vc := range vmCfgs {
 			if vc.MinSizeMB != nil {
@@ -442,6 +453,9 @@ func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error
 			continue
 		}
 		for _, t := range cfg.Data.PVETasks[rep.ID] {
+			if pveVMBackupExcluded(backupCfgs, t.VMID) {
+				continue
+			}
 			vmCfg := findVMConfig(vmCfgs, t.VMID)
 			if vmCfg == nil || vmCfg.MinSizeMB == nil {
 				continue
@@ -1192,6 +1206,16 @@ func findVMConfig(configs []domain.PVEVMAlertConfig, vmid int64) *domain.PVEVMAl
 		}
 	}
 	return nil
+}
+
+func pveVMBackupExcluded(configs []domain.VMBackupConfig, vmid int64) bool {
+	want := strconv.FormatInt(vmid, 10)
+	for _, config := range configs {
+		if config.VMID == want {
+			return config.IsExcluded
+		}
+	}
+	return false
 }
 
 func alertDiskSeverity(pct int) string {

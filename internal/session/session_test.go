@@ -23,6 +23,10 @@ func TestSensitiveTOTPFresh(t *testing.T) {
 	if !SensitiveTOTPFresh(req2, now.Add(4*time.Minute)) {
 		t.Fatal("fresh TOTP window should be valid before expiry")
 	}
+	until, ok := SensitiveTOTPUntil(req2)
+	if !ok || !until.Equal(now.Add(5*time.Minute)) {
+		t.Fatalf("SensitiveTOTPUntil: got (%v, %t)", until, ok)
+	}
 	if SensitiveTOTPFresh(req2, now.Add(6*time.Minute)) {
 		t.Fatal("fresh TOTP window should expire")
 	}

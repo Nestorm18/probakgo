@@ -102,16 +102,17 @@
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
     <span><i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas Windows</span>
-    <form method="post" action="/alerts/suppress" class="d-flex align-items-center gap-2 flex-wrap m-0">
+    <form method="post" action="/alerts/suppress" class="d-flex align-items-center gap-2 flex-wrap m-0" data-totp-skip>
       {{.CSRFField}}
       <input type="hidden" name="alert_id" value="{{.AllAlertIDs}}">
       <input type="hidden" name="back" value="{{.BackURL}}">
       <input type="hidden" name="reason" value="Silenciado desde Windows">
-      <select name="days" class="form-select form-select-sm" style="width:auto">
-        <option value="1" selected>1 dia</option>
-        <option value="3">3 dias</option>
-        <option value="7">7 dias</option>
-        <option value="30">30 dias</option>
+      <select name="hours" class="form-select form-select-sm" style="width:auto">
+        <option value="12" selected>12 horas</option>
+        <option value="24">1 dia</option>
+        <option value="72">3 dias</option>
+        <option value="168">7 dias</option>
+        <option value="720">30 dias</option>
       </select>
       <button type="submit" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-bell-slash me-1"></i>Silenciar todas
@@ -143,7 +144,7 @@
         </td>
         <td class="text-end" style="white-space:nowrap">
           {{if .Suppressed}}
-          <form method="post" action="/alerts/unsuppress" class="m-0">
+          <form method="post" action="/alerts/unsuppress" class="m-0" data-totp-skip>
             {{$.CSRFField}}
             <input type="hidden" name="alert_id" value="{{.ID}}">
             <input type="hidden" name="back" value="{{$.BackURL}}">
@@ -152,16 +153,17 @@
             </button>
           </form>
           {{else}}
-          <form method="post" action="/alerts/suppress" class="d-inline-flex gap-2 align-items-center m-0">
+          <form method="post" action="/alerts/suppress" class="d-inline-flex gap-2 align-items-center m-0" data-totp-skip>
             {{$.CSRFField}}
             <input type="hidden" name="alert_id" value="{{.ID}}">
             <input type="hidden" name="back" value="{{$.BackURL}}">
             <input type="hidden" name="reason" value="Silenciado desde Windows">
-            <select name="days" class="form-select form-select-sm" style="width:auto">
-              <option value="1" selected>1 dia</option>
-              <option value="3">3 dias</option>
-              <option value="7">7 dias</option>
-              <option value="30">30 dias</option>
+            <select name="hours" class="form-select form-select-sm" style="width:auto">
+              <option value="12" selected>12 horas</option>
+              <option value="24">1 dia</option>
+              <option value="72">3 dias</option>
+              <option value="168">7 dias</option>
+              <option value="720">30 dias</option>
             </select>
             <button type="submit" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-bell-slash me-1"></i>Silenciar

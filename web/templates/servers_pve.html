@@ -86,7 +86,8 @@
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
         <td>
-          {{if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
+          {{if .BackupsDisabled}}<span class="status-pill muted" title="Todas las VM están excluidas de Backup Config">No requerido</span>
+          {{else if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
           {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
           {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}

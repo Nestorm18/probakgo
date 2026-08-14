@@ -243,6 +243,13 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		if _, has := m["SensitiveTOTPFresh"]; !has {
 			m["SensitiveTOTPFresh"] = session.SensitiveTOTPFresh(r, time.Now())
 		}
+		if _, has := m["SensitiveTOTPUntilUnix"]; !has {
+			var untilUnix int64
+			if until, ok := session.SensitiveTOTPUntil(r); ok {
+				untilUnix = until.Unix()
+			}
+			m["SensitiveTOTPUntilUnix"] = untilUnix
+		}
 		if _, has := m["Active"]; !has {
 			m["Active"] = templateActive[name]
 		}

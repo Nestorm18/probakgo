@@ -258,6 +258,28 @@ func TestEvalHostSwap_PVEAlertDisabledPerServer(t *testing.T) {
 	}
 }
 
+func TestRunAll_DisablingPVESwapKeepsBackupErrors(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-swap-off-backup-error", "1.1.1.1", "", "1.0", "")
+	reportID, _ := st.InsertPVEReportWithSwap(ctx, serverID, nil, domain.HostSwap{Total: 1024, Enabled: true})
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 101, VMName: "vm", Status: "ERROR"})
+
+	cfg := defaultCfg()
+	disabled := 0
+	cfg.PVEConfigs[serverID] = domain.PVEAlertConfig{ServerID: serverID, SwapAlert: &disabled}
+	alerts, err := RunAll(st, cfg)
+	if err != nil {
+		t.Fatalf("RunAll: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeSwap, "pve-swap-off-backup-error") {
+		t.Fatal("unexpected swap alert")
+	}
+	if !hasAlertForVM(alerts, domain.AlertTypeBackupError, 101) {
+		t.Fatal("backup error disappeared when only swap was disabled")
+	}
+}
+
 func TestEvalHostSwap_PBSAlertDisabledPerServer(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
@@ -348,6 +370,31 @@ func TestEvalPVEBackupErrors_ReportStatusFallbackForOldClients(t *testing.T) {
 
 	if !hasAlert(alerts, domain.AlertTypeBackupError, "pve-old-client") {
 		t.Error("expected backup_error alert from report backup_status when no tasks exist")
+	}
+}
+
+func TestEvalPVEBackupErrors_AllVMsExcluded_NoAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-no-backups", "1.1.1.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-no-backups", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
+	if err := st.ToggleVMExcludeForServer(ctx, "pve", serverID, "100"); err != nil {
+		t.Fatalf("exclude VM: %v", err)
+	}
+	bs := &domain.BackupStatus{Status: json.RawMessage(`"ERROR"`)}
+	reportID, _ := st.InsertPVEReport(ctx, serverID, bs)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 100, VMName: "vm", Status: "ERROR"})
+
+	alerts, err := evalPVEBackupErrors(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("evalPVEBackupErrors: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeBackupError, "pve-no-backups") {
+		t.Fatal("unexpected backup error when every configured VM is excluded")
 	}
 }
 

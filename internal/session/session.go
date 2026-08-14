@@ -151,12 +151,19 @@ func ClearPendingTOTPSetup(w http.ResponseWriter, r *http.Request) error {
 }
 
 func SensitiveTOTPFresh(r *http.Request, now time.Time) bool {
+	until, ok := SensitiveTOTPUntil(r)
+	return ok && until.After(now)
+}
+
+// SensitiveTOTPUntil returns the expiry of the recent sensitive-action TOTP
+// validation stored in the session.
+func SensitiveTOTPUntil(r *http.Request) (time.Time, bool) {
 	if store == nil {
-		return false
+		return time.Time{}, false
 	}
 	sess, err := getSession(r)
 	if err != nil {
-		return false
+		return time.Time{}, false
 	}
 	var unix int64
 	switch v := sess.Values["sensitive_totp_until"].(type) {
@@ -169,9 +176,9 @@ func SensitiveTOTPFresh(r *http.Request, now time.Time) bool {
 	case time.Time:
 		unix = v.Unix()
 	default:
-		return false
+		return time.Time{}, false
 	}
-	return time.Unix(unix, 0).After(now)
+	return time.Unix(unix, 0), true
 }
 
 func SetSensitiveTOTPFresh(w http.ResponseWriter, r *http.Request, until time.Time) error {

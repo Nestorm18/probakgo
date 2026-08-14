@@ -25,6 +25,22 @@ func openAlertsHandlerDB(t *testing.T) *store.Store {
 	return store.New(db)
 }
 
+func TestAlertSuppressionDurationUsesHours(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/alerts/suppress", strings.NewReader("hours=12"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if got := alertSuppressionDuration(req); got != 12*time.Hour {
+		t.Fatalf("duration: got %v, want 12h", got)
+	}
+}
+
+func TestAlertSuppressionDurationAcceptsLegacyDays(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/alerts/suppress", strings.NewReader("days=3"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if got := alertSuppressionDuration(req); got != 72*time.Hour {
+		t.Fatalf("duration: got %v, want 72h", got)
+	}
+}
+
 func TestGroupAlertsByServer(t *testing.T) {
 	alerts := []domain.Alert{
 		{ID: "a1", ServerName: "soporte1", ServerType: "pve", ServerID: 1, Severity: domain.AlertSeverityWarning},

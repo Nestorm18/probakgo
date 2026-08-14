@@ -423,7 +423,8 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	var rows []map[string]any
 	for _, sv := range servers {
 		configs := configsByServer[sv.ID]
-		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
+		backupsDisabled := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
+		ignoreStale := backupsDisabled
 		rep := latestReports[sv.ID]
 		stale := rep == nil && !ignoreStale
 		alertCfg := alertConfigs[sv.ID]
@@ -438,18 +439,19 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		}
 		addServerHealthSummary(&healthSummary, health)
 		r2 := map[string]any{
-			"Server":         sv,
-			"IsStale":        stale,
-			"TaskMissing":    0,
-			"TaskUnknown":    0,
-			"BackupStatus":   "",
-			"AlertConfig":    alertCfg,
-			"AlertOverrides": buildPVEAlertOverrideView(alertCfg),
-			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
-			"Heartbeat":      buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
-			"Swap":           buildSwapView(false, 0, 0),
-			"Health":         health,
-			"Maintenance":    maint,
+			"Server":          sv,
+			"IsStale":         stale,
+			"TaskMissing":     0,
+			"TaskUnknown":     0,
+			"BackupStatus":    "",
+			"BackupsDisabled": backupsDisabled,
+			"AlertConfig":     alertCfg,
+			"AlertOverrides":  buildPVEAlertOverrideView(alertCfg),
+			"ServerURL":       serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
+			"Heartbeat":       buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
+			"Swap":            buildSwapView(false, 0, 0),
+			"Health":          health,
+			"Maintenance":     maint,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
@@ -461,7 +463,9 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			)
 
 			tasks := tasksByReport[rep.ID]
-			r2["BackupStatus"] = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
+			if !backupsDisabled {
+				r2["BackupStatus"] = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
+			}
 			if len(tasks) > 0 {
 				if len(configs) > 0 {
 					jobDay := time.Unix(tasks[0].StartTime, 0).Weekday()

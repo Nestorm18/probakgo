@@ -129,7 +129,7 @@ func TestAboutUpdateSkipsSensitiveTOTPPrompt(t *testing.T) {
 	}
 }
 
-func TestAlertSuppressionUsesSensitiveTOTPPrompt(t *testing.T) {
+func TestAlertSuppressionSkipsSensitiveTOTPPrompt(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 
 	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
@@ -139,11 +139,30 @@ func TestAlertSuppressionUsesSensitiveTOTPPrompt(t *testing.T) {
 	tmpl.Render(rr, req, "alerts.html", templateFixtures(time.Now())["alerts.html"])
 
 	body := rr.Body.String()
-	if !strings.Contains(body, `action="/alerts/suppress"`) {
+	if !strings.Contains(body, `action="/alerts/suppress" data-totp-skip`) {
 		t.Fatalf("suppression form is missing:\n%s", body)
 	}
-	if strings.Contains(body, `action.includes('/alerts/suppress')`) || strings.Contains(body, `action.includes('/alerts/unsuppress')`) {
-		t.Fatalf("alert suppression still bypasses the sensitive TOTP prompt:\n%s", body)
+	if !strings.Contains(body, `<option value="12" selected>12 horas</option>`) {
+		t.Fatalf("12-hour suppression is not the default:\n%s", body)
+	}
+	if !strings.Contains(body, "Suprimir todas las alertas de este servidor") {
+		t.Fatalf("server-wide suppression action is missing:\n%s", body)
+	}
+}
+
+func TestSensitiveTOTPPromptChecksExpiryAtSubmitTime(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
+	rr := httptest.NewRecorder()
+	tmpl.Render(rr, req, "servers_pve.html", templateFixtures(time.Now())["servers_pve.html"])
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "const sensitiveTOTPValidUntil =") || !strings.Contains(body, "Date.now() < sensitiveTOTPValidUntil") {
+		t.Fatalf("sensitive-action prompt does not check live expiry:\n%s", body)
+	}
+	if strings.Contains(body, "if (true) return;") {
+		t.Fatalf("sensitive-action prompt still relies on a stale render-time boolean:\n%s", body)
 	}
 }
 

@@ -346,13 +346,13 @@ func (h *WebH) runRawAlerts(ctx context.Context, syncState bool) ([]domain.Alert
 func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	alertIDs := formAlertIDs(r)
-	days, _ := strconv.Atoi(r.FormValue("days"))
+	duration := alertSuppressionDuration(r)
 	reason := r.FormValue("reason")
-	if len(alertIDs) == 0 || days <= 0 {
+	if len(alertIDs) == 0 || duration <= 0 {
 		http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
 		return
 	}
-	until := time.Now().Add(time.Duration(days) * 24 * time.Hour)
+	until := time.Now().Add(duration)
 	current := h.alertMap(ctx)
 	for _, alertID := range alertIDs {
 		_ = h.store.UpsertAlertSuppression(ctx, alertID, until, reason)
@@ -363,6 +363,17 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "suppressed", reason))
 	}
 	http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
+}
+
+func alertSuppressionDuration(r *http.Request) time.Duration {
+	if hours, err := strconv.Atoi(r.FormValue("hours")); err == nil && hours > 0 && hours <= 24*365 {
+		return time.Duration(hours) * time.Hour
+	}
+	// Accept the previous field during rolling updates.
+	if days, err := strconv.Atoi(r.FormValue("days")); err == nil && days > 0 && days <= 365 {
+		return time.Duration(days) * 24 * time.Hour
+	}
+	return 0
 }
 
 func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
