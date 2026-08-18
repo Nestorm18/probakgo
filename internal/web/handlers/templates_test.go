@@ -285,19 +285,20 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 	windowsServer := domain.WindowsServer{ID: 3, Name: "win-1", DisplayName: "win-1", IP: "10.0.0.3", PublicIP: "203.0.113.12", ClientVersion: "test"}
 	pagination := paginationView{Page: 1, TotalPages: 1, TotalItems: 0, PageSize: reportHistoryPageSize, Pages: []int{1}}
 	emailConfig := domain.EmailConfig{
-		SMTPHost:                 "smtp.example.test",
-		SMTPPort:                 587,
-		SMTPUser:                 "admin@example.test",
-		Recipients:               "ops@example.test",
-		IsEnabled:                true,
-		SendTime:                 "09:00",
-		RetentionMonths:          6,
-		RetentionEnabled:         true,
-		AlertDiskPct:             85,
-		AlertWindowsDiskPct:      90,
-		AlertBackupErr:           true,
-		AlertPBSStaleHours:       36,
-		AlertPVEHeartbeatMinutes: 15,
+		SMTPHost:                   "smtp.example.test",
+		SMTPPort:                   587,
+		SMTPUser:                   "admin@example.test",
+		Recipients:                 "ops@example.test",
+		IsEnabled:                  true,
+		SendTime:                   "09:00",
+		RetentionMonths:            6,
+		RetentionEnabled:           true,
+		AlertDiskPct:               85,
+		AlertWindowsDiskPct:        90,
+		AlertBackupErr:             true,
+		AlertPVEExpectedFinishTime: "08:55",
+		AlertPBSStaleHours:         36,
+		AlertPVEHeartbeatMinutes:   15,
 	}
 	productionChecklist := productionChecklistView{
 		Items: []productionChecklistItem{

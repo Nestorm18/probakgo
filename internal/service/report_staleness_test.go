@@ -16,8 +16,12 @@ func newSvcAt(t *testing.T, now time.Time) (*ReportService, func(domain.CreateVM
 	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := &ReportService{store: st, tz: time.UTC, now: func() time.Time { return now }}
+	serverID, err := st.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
 	create := func(req domain.CreateVMBackupConfigRequest) int64 {
-		id, err := st.CreateVMBackupConfig(ctx, "pve-01", req)
+		id, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-01", req)
 		if err != nil {
 			t.Fatalf("create config: %v", err)
 		}
@@ -72,7 +76,7 @@ func TestIsStaleForServer_WeekendStale_NoFridayReport(t *testing.T) {
 }
 
 func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
-	// "now" = Saturday 02:00 - before the Friday backup window closes at 09:00.
+	// "now" = Saturday 02:00 - before the Friday backup window closes at the global 07:55 default.
 	earlysat := time.Date(2026, 5, 2, 2, 0, 0, 0, time.UTC)
 	svc, create := newSvcAt(t, earlysat)
 	create(domain.CreateVMBackupConfigRequest{
@@ -80,21 +84,21 @@ func TestIsStaleForServer_GracePeriod_EarlyMorning(t *testing.T) {
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
 	})
 
-	// Friday 00:00 + 33h = Saturday 09:00; now=02:00 is still inside the window.
+	// Friday 00:00 + 31h55m = Saturday 07:55; now=02:00 is still inside the window.
 	// So Friday is not yet "completed" → look further back → Thursday.
 	// Report is from Thursday 20:00. Fri not checked yet, so check Thu.
-	// Thu 00:00 + 33h = Fri 09:00 < Sat 02:00 → completed.
+	// Thu 00:00 + 31h55m = Fri 07:55 < Sat 02:00 → completed.
 	// reportedAt (Thu 20:00) >= Thu 00:00 → not stale.
 	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
 	stale, reason := svc.IsStaleForServer(context.Background(), thursdayEvening, "pve-01")
 	if stale {
-		t.Errorf("want stale=false: before 09:00 cutoff for Fri, Thu report covers Thu; got reason=%q", reason)
+		t.Errorf("want stale=false: before 07:55 cutoff for Fri, Thu report covers Thu; got reason=%q", reason)
 	}
 }
 
-func TestIsStaleForServer_StaleAtNineWhenPreviousNightReportMissing(t *testing.T) {
-	nineSat := time.Date(2026, 5, 2, 9, 0, 0, 0, time.UTC)
-	svc, create := newSvcAt(t, nineSat)
+func TestIsStaleForServer_StaleAtGlobalDefaultWhenPreviousNightReportMissing(t *testing.T) {
+	cutoffSat := time.Date(2026, 5, 2, 7, 55, 0, 0, time.UTC)
+	svc, create := newSvcAt(t, cutoffSat)
 	create(domain.CreateVMBackupConfigRequest{
 		VMID: "100", VMName: "vm",
 		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
@@ -103,7 +107,38 @@ func TestIsStaleForServer_StaleAtNineWhenPreviousNightReportMissing(t *testing.T
 	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
 	stale, _ := svc.IsStaleForServer(context.Background(), thursdayEvening, "pve-01")
 	if !stale {
-		t.Error("want stale=true: at 09:00 the previous night's Friday report is required")
+		t.Error("want stale=true: at the global 07:55 default the previous night's Friday report is required")
+	}
+}
+
+func TestIsStaleForServer_UsesGlobalExpectedFinishTime(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	tenSat := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	svc := &ReportService{store: st, tz: time.UTC, now: func() time.Time { return tenSat }}
+
+	serverID, err := st.UpsertPVEServer(ctx, "pve-01", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-01", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Friday: true,
+	}); err != nil {
+		t.Fatalf("create config: %v", err)
+	}
+	emailCfg, err := st.GetEmailConfig(ctx)
+	if err != nil {
+		t.Fatalf("get email config: %v", err)
+	}
+	emailCfg.AlertPVEExpectedFinishTime = "11:00"
+	if err := st.UpsertEmailConfig(ctx, *emailCfg); err != nil {
+		t.Fatalf("upsert global alert config: %v", err)
+	}
+
+	thursdayEvening := time.Date(2026, 4, 30, 20, 0, 0, 0, time.UTC)
+	stale, reason := svc.IsStaleForServerID(ctx, thursdayEvening, serverID)
+	if stale {
+		t.Errorf("want stale=false before global 11:00 cutoff; got reason=%q", reason)
 	}
 }
 

@@ -198,8 +198,10 @@ func (h *WebH) exportPVERows(r *http.Request) ([]pveExportRow, error) {
 	}
 	cfg, _ := h.store.GetEmailConfig(ctx)
 	threshold := 15
+	globalFinishTime := ""
 	if cfg != nil {
 		threshold = cfg.AlertPVEHeartbeatMinutes
+		globalFinishTime = cfg.AlertPVEExpectedFinishTime
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
 	reports, _ := h.store.GetLatestPVEReports(ctx)
@@ -221,7 +223,7 @@ func (h *WebH) exportPVERows(r *http.Request) ([]pveExportRow, error) {
 			backupStatus = domain.PVEBackupStatusSummary(tasksByReport[rep.ID], rep.BackupStatus)
 			alertCfg := alertConfigs[sv.ID]
 			alertCfg.ServerID = sv.ID
-			stale, _ := h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configsByServer[sv.ID], alertCfg)
+			stale, _ := h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configsByServer[sv.ID], alertCfg, globalFinishTime)
 			if stale || rep.IsStale {
 				state = "Sin reporte"
 			} else {

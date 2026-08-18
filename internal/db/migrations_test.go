@@ -216,6 +216,59 @@ func TestMigration020MergesServerIdentityAndDropsOldVMUnique(t *testing.T) {
 	}
 }
 
+func TestMigration042SetsGlobalPVEFinishTimeBeforeEmail(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "probakgo.db")
+	raw, err := sql.Open("sqlite", path+"?_foreign_keys=on&_journal_mode=WAL")
+	if err != nil {
+		t.Fatalf("open raw db: %v", err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE schema_migrations (
+		name TEXT NOT NULL PRIMARY KEY,
+		applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		t.Fatalf("create schema_migrations: %v", err)
+	}
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		t.Fatalf("read migrations: %v", err)
+	}
+	for _, e := range entries {
+		if e.Name() >= "042_global_pve_expected_finish_time.up.sql" {
+			continue
+		}
+		data, err := migrationsFS.ReadFile("migrations/" + e.Name())
+		if err != nil {
+			t.Fatalf("read migration %s: %v", e.Name(), err)
+		}
+		if _, err := raw.Exec(string(data)); err != nil {
+			t.Fatalf("apply migration %s: %v", e.Name(), err)
+		}
+		if _, err := raw.Exec(`INSERT INTO schema_migrations (name) VALUES (?)`, e.Name()); err != nil {
+			t.Fatalf("record migration %s: %v", e.Name(), err)
+		}
+	}
+	if _, err := raw.Exec(`INSERT INTO email_config (send_time) VALUES ('08:30')`); err != nil {
+		t.Fatalf("insert email config: %v", err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatalf("close raw db: %v", err)
+	}
+
+	database, err := Open(path)
+	if err != nil {
+		t.Fatalf("open migrated db: %v", err)
+	}
+	defer database.Close()
+
+	var got string
+	if err := database.QueryRow(`SELECT alert_pve_expected_finish_time FROM email_config`).Scan(&got); err != nil {
+		t.Fatalf("read global PVE finish time: %v", err)
+	}
+	if got != "08:25" {
+		t.Fatalf("global PVE finish time = %q, want five minutes before email at 08:30", got)
+	}
+}
+
 func assertDBCount(t *testing.T, db *sql.DB, query string, want int) {
 	t.Helper()
 	var got int

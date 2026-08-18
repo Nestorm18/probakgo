@@ -402,8 +402,10 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	serverURLs := buildServerURLMap(h.store.ListAPIKeys(ctx))
 	emailCfg, _ := h.store.GetEmailConfig(ctx)
 	heartbeatThreshold := 15
+	globalFinishTime := ""
 	if emailCfg != nil {
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
+		globalFinishTime = emailCfg.AlertPVEExpectedFinishTime
 	}
 	heartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "pve")
 	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
@@ -430,7 +432,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		alertCfg := alertConfigs[sv.ID]
 		alertCfg.ServerID = sv.ID
 		if rep != nil {
-			stale, _ = h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg)
+			stale, _ = h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg, globalFinishTime)
 		}
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])

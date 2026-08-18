@@ -75,6 +75,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEExpectedFinishTime = existing.AlertPVEExpectedFinishTime
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
 		cfg.EnforceTOTPNonReaders = r.FormValue("enforce_totp_non_readers") == "on"
@@ -88,6 +89,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertWindowsDiskPct = 90
 		cfg.AlertBackupErr = true
 		cfg.AlertPBSStaleHours = 48
+		cfg.AlertPVEExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(cfg.SendTime)
 		cfg.AlertPVEHeartbeatMinutes = 15
 		cfg.EnforceTOTPNonReaders = r.FormValue("enforce_totp_non_readers") == "on"
 		cfg.SensitiveActionsRequireTOTP = r.FormValue("sensitive_actions_require_totp") == "on"
@@ -160,6 +162,10 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEExpectedFinishTime = existing.AlertPVEExpectedFinishTime
+		if cfg.AlertPVEExpectedFinishTime == domain.DefaultPVEExpectedFinishTime(existing.SendTime) {
+			cfg.AlertPVEExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(sendTime)
+		}
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
@@ -229,6 +235,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertWindowsDiskPct = existing.AlertWindowsDiskPct
 		cfg.AlertBackupErr = existing.AlertBackupErr
 		cfg.AlertPBSStaleHours = existing.AlertPBSStaleHours
+		cfg.AlertPVEExpectedFinishTime = existing.AlertPVEExpectedFinishTime
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
@@ -335,13 +342,22 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	if pveHeartbeatMinutes < 0 {
 		pveHeartbeatMinutes = 0
 	}
+	pveExpectedFinishTime := r.FormValue("alert_pve_expected_finish_time")
+	if pveExpectedFinishTime == "" && existing != nil {
+		pveExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(existing.SendTime)
+	}
+	if _, err := time.Parse("15:04", pveExpectedFinishTime); err != nil {
+		http.Redirect(w, r, "/settings/alerts?flash=Hora+limite+PVE+no+valida", http.StatusSeeOther)
+		return
+	}
 
 	cfg := domain.EmailConfig{
-		AlertDiskPct:             alertDisk,
-		AlertWindowsDiskPct:      windowsDisk,
-		AlertBackupErr:           r.FormValue("alert_backup_err") == "on",
-		AlertPBSStaleHours:       pbsStaleHours,
-		AlertPVEHeartbeatMinutes: pveHeartbeatMinutes,
+		AlertDiskPct:               alertDisk,
+		AlertWindowsDiskPct:        windowsDisk,
+		AlertBackupErr:             r.FormValue("alert_backup_err") == "on",
+		AlertPBSStaleHours:         pbsStaleHours,
+		AlertPVEExpectedFinishTime: pveExpectedFinishTime,
+		AlertPVEHeartbeatMinutes:   pveHeartbeatMinutes,
 	}
 	if existing != nil {
 		cfg.SMTPHost = existing.SMTPHost
@@ -361,6 +377,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	} else {
 		cfg.SMTPPort = 587
 		cfg.SendTime = "08:00"
+		cfg.AlertPVEExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(cfg.SendTime)
 		cfg.RetentionMonths = 3
 		cfg.RetentionEnabled = true
 		cfg.AlertWindowsDiskPct = 90
@@ -370,10 +387,11 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "settings.alerts_update", "settings", "alerts", "Alertas globales", map[string]any{
-		"alert_disk_pct":              cfg.AlertDiskPct,
-		"alert_windows_disk_pct":      cfg.AlertWindowsDiskPct,
-		"alert_backup_err":            cfg.AlertBackupErr,
-		"alert_pve_heartbeat_minutes": cfg.AlertPVEHeartbeatMinutes,
+		"alert_disk_pct":                 cfg.AlertDiskPct,
+		"alert_windows_disk_pct":         cfg.AlertWindowsDiskPct,
+		"alert_backup_err":               cfg.AlertBackupErr,
+		"alert_pve_expected_finish_time": cfg.AlertPVEExpectedFinishTime,
+		"alert_pve_heartbeat_minutes":    cfg.AlertPVEHeartbeatMinutes,
 	})
 	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }

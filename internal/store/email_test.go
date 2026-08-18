@@ -19,6 +19,9 @@ func TestGetEmailConfig_Defaults(t *testing.T) {
 	if cfg.SendTime != "08:00" {
 		t.Errorf("SendTime: want 08:00, got %s", cfg.SendTime)
 	}
+	if cfg.AlertPVEExpectedFinishTime != "07:55" {
+		t.Errorf("AlertPVEExpectedFinishTime: want five minutes before email, got %s", cfg.AlertPVEExpectedFinishTime)
+	}
 	if cfg.RetentionMonths != 3 {
 		t.Errorf("RetentionMonths: want 3, got %d", cfg.RetentionMonths)
 	}
@@ -62,6 +65,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		AlertDiskPct:                90,
 		AlertWindowsDiskPct:         92,
 		AlertBackupErr:              false,
+		AlertPVEExpectedFinishTime:  "10:15",
 		PublicAPIURL:                "https://probakgo.example.com",
 		VPNOnlyAccess:               true,
 		AlertPVEHeartbeatMinutes:    10,
@@ -95,6 +99,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		{"AlertDiskPct", got.AlertDiskPct, want.AlertDiskPct},
 		{"AlertWindowsDiskPct", got.AlertWindowsDiskPct, want.AlertWindowsDiskPct},
 		{"AlertBackupErr", got.AlertBackupErr, want.AlertBackupErr},
+		{"AlertPVEExpectedFinishTime", got.AlertPVEExpectedFinishTime, want.AlertPVEExpectedFinishTime},
 		{"PublicAPIURL", got.PublicAPIURL, want.PublicAPIURL},
 		{"VPNOnlyAccess", got.VPNOnlyAccess, want.VPNOnlyAccess},
 		{"AlertPVEHeartbeatMinutes", got.AlertPVEHeartbeatMinutes, want.AlertPVEHeartbeatMinutes},

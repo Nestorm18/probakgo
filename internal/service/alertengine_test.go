@@ -84,15 +84,16 @@ func alertRunQueryCount(t *testing.T, st *store.Store) int {
 
 func defaultCfg() AlertConfigs {
 	return AlertConfigs{
-		GlobalDiskPct:             85,
-		GlobalWindowsDiskPct:      85,
-		GlobalBackupErr:           true,
-		GlobalStaleHours:          48,
-		GlobalPVEHeartbeatMinutes: 15,
-		PVEConfigs:                make(map[int64]domain.PVEAlertConfig),
-		PVEVMConfigs:              make(map[int64][]domain.PVEVMAlertConfig),
-		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
-		WindowsConfigs:            make(map[int64]domain.WindowsAlertConfig),
+		GlobalDiskPct:               85,
+		GlobalWindowsDiskPct:        85,
+		GlobalBackupErr:             true,
+		GlobalPVEExpectedFinishTime: "07:55",
+		GlobalStaleHours:            48,
+		GlobalPVEHeartbeatMinutes:   15,
+		PVEConfigs:                  make(map[int64]domain.PVEAlertConfig),
+		PVEVMConfigs:                make(map[int64][]domain.PVEVMAlertConfig),
+		PBSConfigs:                  make(map[int64]domain.PBSAlertConfig),
+		WindowsConfigs:              make(map[int64]domain.WindowsAlertConfig),
 	}
 }
 

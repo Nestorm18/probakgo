@@ -2,6 +2,18 @@ package domain
 
 import "time"
 
+const pveReportLeadTime = 5 * time.Minute
+
+// DefaultPVEExpectedFinishTime keeps the PVE report cutoff safely ahead of the
+// daily email so the email always evaluates the completed backup window.
+func DefaultPVEExpectedFinishTime(sendTime string) string {
+	t, err := time.Parse("15:04", sendTime)
+	if err != nil {
+		t, _ = time.Parse("15:04", "08:00")
+	}
+	return t.Add(-pveReportLeadTime).Format("15:04")
+}
+
 // VMScheduledForDay reports whether c has a backup scheduled on the given weekday.
 func VMScheduledForDay(c VMBackupConfig, day time.Weekday) bool {
 	switch day {

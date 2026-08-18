@@ -16,12 +16,13 @@ import (
 // AlertConfigs holds resolved thresholds for all servers.
 // Global values from email_config act as fallback when a server has no per-server config.
 type AlertConfigs struct {
-	GlobalDiskPct             int
-	GlobalWindowsDiskPct      int
-	GlobalStaleHours          int
-	GlobalBackupErr           bool
-	GlobalPVEHeartbeatMinutes int
-	Report                    *ReportService
+	GlobalDiskPct               int
+	GlobalWindowsDiskPct        int
+	GlobalStaleHours            int
+	GlobalBackupErr             bool
+	GlobalPVEExpectedFinishTime string
+	GlobalPVEHeartbeatMinutes   int
+	Report                      *ReportService
 
 	PVEConfigs     map[int64]domain.PVEAlertConfig
 	PVEVMConfigs   map[int64][]domain.PVEVMAlertConfig // server_id → vm overrides
@@ -240,15 +241,16 @@ func LoadAlertConfigs(ctx context.Context, st *store.Store) (AlertConfigs, error
 		return AlertConfigs{}, err
 	}
 	cfg := AlertConfigs{
-		GlobalDiskPct:             emailCfg.AlertDiskPct,
-		GlobalWindowsDiskPct:      emailCfg.AlertWindowsDiskPct,
-		GlobalBackupErr:           emailCfg.AlertBackupErr,
-		GlobalStaleHours:          emailCfg.AlertPBSStaleHours,
-		GlobalPVEHeartbeatMinutes: emailCfg.AlertPVEHeartbeatMinutes,
-		PVEConfigs:                make(map[int64]domain.PVEAlertConfig),
-		PVEVMConfigs:              make(map[int64][]domain.PVEVMAlertConfig),
-		PBSConfigs:                make(map[int64]domain.PBSAlertConfig),
-		WindowsConfigs:            make(map[int64]domain.WindowsAlertConfig),
+		GlobalDiskPct:               emailCfg.AlertDiskPct,
+		GlobalWindowsDiskPct:        emailCfg.AlertWindowsDiskPct,
+		GlobalBackupErr:             emailCfg.AlertBackupErr,
+		GlobalStaleHours:            emailCfg.AlertPBSStaleHours,
+		GlobalPVEExpectedFinishTime: emailCfg.AlertPVEExpectedFinishTime,
+		GlobalPVEHeartbeatMinutes:   emailCfg.AlertPVEHeartbeatMinutes,
+		PVEConfigs:                  make(map[int64]domain.PVEAlertConfig),
+		PVEVMConfigs:                make(map[int64][]domain.PVEVMAlertConfig),
+		PBSConfigs:                  make(map[int64]domain.PBSAlertConfig),
+		WindowsConfigs:              make(map[int64]domain.WindowsAlertConfig),
 	}
 	cfg.Data, err = loadAlertData(ctx, st)
 	if err != nil {
@@ -514,7 +516,7 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		if cfg.Report != nil {
 			svCfg := cfg.PVEConfigs[sv.ID]
 			svCfg.ServerID = sv.ID
-			stale, reason = cfg.Report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, svCfg)
+			stale, reason = cfg.Report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, svCfg, cfg.GlobalPVEExpectedFinishTime)
 		}
 		if !stale {
 			continue

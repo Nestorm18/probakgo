@@ -558,7 +558,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		staleReason := ""
 		alertCfg := pveAlertConfigs[sv.ID]
 		alertCfg.ServerID = sv.ID
-		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg); stale {
+		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg, cfg.AlertPVEExpectedFinishTime); stale {
 			isStale = true
 			staleReason = reason
 		} else if r.IsStale {

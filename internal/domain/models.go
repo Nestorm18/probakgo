@@ -359,6 +359,7 @@ type EmailConfig struct {
 	AlertWindowsDiskPct         int    `db:"alert_windows_disk_pct"` // 0 = disabled
 	AlertBackupErr              bool   `db:"alert_backup_err"`
 	AlertPBSStaleHours          int    `db:"alert_pbs_stale_hours"` // 0 = disabled
+	AlertPVEExpectedFinishTime  string `db:"alert_pve_expected_finish_time"`
 	PublicAPIURL                string `db:"public_api_url"`
 	VPNOnlyAccess               bool   `db:"vpn_only_access"`
 	AlertPVEHeartbeatMinutes    int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
@@ -448,7 +449,7 @@ type PVEAlertConfig struct {
 	DiskPct            *int    // nil = use global; storage usage threshold %
 	StaleHours         *int    // nil = use global; 0 = disabled
 	BackupErr          *int    // nil = use global; 0 = ignore; 1 = alert
-	ExpectedFinishTime *string // nil = 09:00; HH:MM cutoff for previous night's report
+	ExpectedFinishTime *string // nil = global setting; HH:MM cutoff for previous night's report
 	SwapAlert          *int    // nil = enabled globally; 0 = ignore; 1 = alert
 }
 

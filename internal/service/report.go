@@ -144,7 +144,7 @@ func (r *ReportService) IsStale(reportedAt time.Time) bool {
 // IsStaleForServer checks staleness considering the server's configured backup schedule.
 // Returns (isStale, reason). If no schedule is configured, falls back to IsStale.
 // A backup day is considered "completed" at the server's expected finish time
-// the next morning, defaulting to 09:00 for overnight backups.
+// the next morning, using the global cutoff unless the server overrides it.
 func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Time, serverName string) (bool, string) {
 	configs, err := r.store.ListVMBackupConfigs(ctx, serverName)
 	if err != nil || len(configs) == 0 {
@@ -209,11 +209,11 @@ func (r *ReportService) IsStaleForServerID(ctx context.Context, reportedAt time.
 	return r.isStaleForConfigs(ctx, reportedAt, configs, serverID)
 }
 
-func (r *ReportService) IsStaleForLoadedPVEConfig(reportedAt time.Time, configs []domain.VMBackupConfig, alertCfg domain.PVEAlertConfig) (bool, string) {
+func (r *ReportService) IsStaleForLoadedPVEConfig(reportedAt time.Time, configs []domain.VMBackupConfig, alertCfg domain.PVEAlertConfig, globalFinishTime string) (bool, string) {
 	if len(configs) == 0 {
 		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 	}
-	finishHour, finishMinute := expectedFinishFromAlertConfig(alertCfg)
+	finishHour, finishMinute := expectedFinishFromAlertConfig(alertCfg, globalFinishTime)
 	return r.isStaleForConfigsAt(reportedAt, configs, finishHour, finishMinute)
 }
 
@@ -270,16 +270,17 @@ func (r *ReportService) isStaleForConfigsAt(reportedAt time.Time, configs []doma
 	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 }
 
-func expectedFinishFromAlertConfig(cfg domain.PVEAlertConfig) (int, int) {
+func expectedFinishFromAlertConfig(cfg domain.PVEAlertConfig, globalFinishTime string) (int, int) {
 	const defaultHour, defaultMinute = 9, 0
-	if cfg.ExpectedFinishTime == nil {
-		return defaultHour, defaultMinute
+	if cfg.ExpectedFinishTime != nil {
+		if t, err := time.Parse("15:04", *cfg.ExpectedFinishTime); err == nil {
+			return t.Hour(), t.Minute()
+		}
 	}
-	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
-	if err != nil {
-		return defaultHour, defaultMinute
+	if t, err := time.Parse("15:04", globalFinishTime); err == nil {
+		return t.Hour(), t.Minute()
 	}
-	return t.Hour(), t.Minute()
+	return defaultHour, defaultMinute
 }
 
 func (r *ReportService) expectedFinishTime(ctx context.Context, serverName string) (int, int) {
@@ -289,14 +290,10 @@ func (r *ReportService) expectedFinishTime(ctx context.Context, serverName strin
 		return defaultHour, defaultMinute
 	}
 	cfg, err := r.store.GetPVEAlertConfig(ctx, sv.ID)
-	if err != nil || cfg.ExpectedFinishTime == nil {
-		return defaultHour, defaultMinute
-	}
-	t, err := time.Parse("15:04", *cfg.ExpectedFinishTime)
 	if err != nil {
 		return defaultHour, defaultMinute
 	}
-	return t.Hour(), t.Minute()
+	return expectedFinishFromAlertConfig(cfg, r.globalPVEExpectedFinishTime(ctx))
 }
 
 func (r *ReportService) expectedFinishTimeByServerID(ctx context.Context, serverID int64) (int, int) {
@@ -304,7 +301,15 @@ func (r *ReportService) expectedFinishTimeByServerID(ctx context.Context, server
 	if err != nil {
 		return 9, 0
 	}
-	return expectedFinishFromAlertConfig(cfg)
+	return expectedFinishFromAlertConfig(cfg, r.globalPVEExpectedFinishTime(ctx))
+}
+
+func (r *ReportService) globalPVEExpectedFinishTime(ctx context.Context) string {
+	cfg, err := r.store.GetEmailConfig(ctx)
+	if err != nil {
+		return ""
+	}
+	return cfg.AlertPVEExpectedFinishTime
 }
 
 // BuildPVEServerResponse assembles a PVEServerResponse enriched with latest report data.
