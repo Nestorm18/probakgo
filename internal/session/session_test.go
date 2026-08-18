@@ -32,6 +32,29 @@ func TestSensitiveTOTPFresh(t *testing.T) {
 	}
 }
 
+func TestTelegramPairingExpires(t *testing.T) {
+	Init("test-session-key-32-bytes-long!!", false)
+	now := time.Date(2026, 8, 18, 12, 0, 0, 0, time.UTC)
+	req := httptest.NewRequest("GET", "/profile", nil)
+	rr := httptest.NewRecorder()
+	if err := SetTelegramPairing(rr, req, 42, "pair-code", now.Add(10*time.Minute)); err != nil {
+		t.Fatalf("SetTelegramPairing: %v", err)
+	}
+	pairedReq := httptest.NewRequest("POST", "/profile/telegram/pair", nil)
+	for _, cookie := range rr.Result().Cookies() {
+		pairedReq.AddCookie(cookie)
+	}
+	if code, ok := GetTelegramPairing(pairedReq, 42, now.Add(9*time.Minute)); !ok || code != "pair-code" {
+		t.Fatalf("pairing before expiry: code=%q ok=%t", code, ok)
+	}
+	if _, ok := GetTelegramPairing(pairedReq, 7, now.Add(9*time.Minute)); ok {
+		t.Fatal("Telegram pairing was accepted for another user")
+	}
+	if _, ok := GetTelegramPairing(pairedReq, 42, now.Add(11*time.Minute)); ok {
+		t.Fatal("expired Telegram pairing remained valid")
+	}
+}
+
 func TestUserVersion(t *testing.T) {
 	Init("test-session-key-32-bytes-long!!", false)
 	req := httptest.NewRequest("GET", "/", nil)

@@ -52,8 +52,8 @@ Release assets must stay in sync with workflows and download handlers:
 - Auth uses bcrypt, sessions and RBAC: `reader`, `editor`, `admin`.
 - TOTP 2FA can be enforced for editors/admins and for sensitive actions. User security changes revoke existing sessions.
 - API keys are `pbk-` client keys, bind to the first reporting Machine ID and can be revealed only after credential checks.
-- API keys, SMTP passwords and TOTP secrets are encrypted at rest with `DATA_ENCRYPTION_KEY`; API-key authentication uses a keyed lookup hash.
-- Settings under `/settings/*` cover system/security, email, retention/database backup, alerts, IP bans, audit log and operational reset.
+- API keys, SMTP passwords, Telegram bot tokens and TOTP secrets are encrypted at rest with `DATA_ENCRYPTION_KEY`; API-key authentication uses a keyed lookup hash.
+- Settings under `/settings/*` cover system/security, email, Telegram, retention/database backup, alerts, IP bans, audit log and operational reset.
 - The UI exposes CSV/JSON exports for alerts and PVE/PBS server/report data.
 - The standard `/opt/probakgo` systemd unit runs as the dedicated `probakgo` user with filesystem and process hardening.
 - The initial admin password is stored in a `0600` one-time file and retrieved with `probakgo initial-password`; it must never be logged.
@@ -89,7 +89,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `042_global_pve_expected_finish_time.up.sql`.
+- Current latest migration: `044_telegram_user_links.up.sql`.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
 
@@ -100,6 +100,16 @@ Release assets must stay in sync with workflows and download handlers:
 - Template render fixtures in `templates_test.go` must cover every template.
 - `formatBytes` uses SI base 1000.
 - Inline scripts require the per-request CSP nonce. Pinned CDN assets require matching SRI and `crossorigin="anonymous"`.
+
+### Web UX
+
+- Cards on the same hub or page must share one anatomy: header for title/status, body for explanation or controls, and footer for navigation or secondary context.
+- Keep status indicators in the header at the upper right; do not scatter equivalent state badges through the card body.
+- Use one primary action per block. Group secondary/destructive actions together and keep them visually subordinate.
+- Group settings by user purpose instead of presenting one uninterrupted card grid.
+- Profile pages must separate account, security and personal notification channels into clearly named blocks.
+- Keep spacing and alignment consistent across peer cards, avoid nested cards, and stack columns/actions cleanly on mobile.
+- Put page-level destructive operations in a clearly separated danger zone at the bottom. Keep reversible or row-specific actions beside the resource they affect, with an explicit confirmation when data is deleted.
 
 ## PWA / Web Push
 
@@ -119,6 +129,7 @@ Release assets must stay in sync with workflows and download handlers:
 - Windows inherits the global Windows disk threshold and can override it per server; heartbeat uses the global PVE heartbeat interval.
 - Suppressions live in `alert_suppressions`; maintenance windows live in `server_maintenance`; deleting API-key-bound server data must remove related suppressions, maintenance and heartbeats.
 - Alert state/history drives immediate critical and resolution emails, plus PWA push notifications. PBS snapshot age remains informational and is not an active evaluator.
+- Telegram uses one private chat per Probakgo user. Only active users receive critical alerts and resolutions; user deletion cascades to the link, and delivery state is tracked separately per user.
 
 ## Important Behavior
 

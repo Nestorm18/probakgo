@@ -279,3 +279,84 @@ func assertDBCount(t *testing.T, db *sql.DB, query string, want int) {
 		t.Fatalf("count query %q got %d, want %d", query, got, want)
 	}
 }
+
+func TestMigration044RepairsPreviouslyRecordedTelegramMigration(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "probakgo.db")
+	raw, err := sql.Open("sqlite", path+"?_foreign_keys=on&_journal_mode=WAL")
+	if err != nil {
+		t.Fatalf("open raw db: %v", err)
+	}
+	if _, err := raw.Exec(`CREATE TABLE schema_migrations (
+		name TEXT NOT NULL PRIMARY KEY,
+		applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		t.Fatalf("create schema_migrations: %v", err)
+	}
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
+		t.Fatalf("read migrations: %v", err)
+	}
+	for _, entry := range entries {
+		if entry.Name() >= "043_telegram_notifications.up.sql" {
+			continue
+		}
+		data, err := migrationsFS.ReadFile("migrations/" + entry.Name())
+		if err != nil {
+			t.Fatalf("read migration %s: %v", entry.Name(), err)
+		}
+		if _, err := raw.Exec(string(data)); err != nil {
+			t.Fatalf("apply migration %s: %v", entry.Name(), err)
+		}
+		if _, err := raw.Exec(`INSERT INTO schema_migrations (name) VALUES (?)`, entry.Name()); err != nil {
+			t.Fatalf("record migration %s: %v", entry.Name(), err)
+		}
+	}
+	if _, err := raw.Exec(`
+		CREATE TABLE telegram_config (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			bot_token TEXT NOT NULL DEFAULT '',
+			bot_username TEXT NOT NULL DEFAULT '',
+			chat_id TEXT NOT NULL DEFAULT '',
+			chat_title TEXT NOT NULL DEFAULT '',
+			is_enabled INTEGER NOT NULL DEFAULT 0,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+		CREATE TABLE telegram_delivery_status (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			last_attempt_at DATETIME,
+			last_success_at DATETIME,
+			last_error TEXT NOT NULL DEFAULT ''
+		);
+		INSERT INTO telegram_config (id, bot_token, bot_username, chat_id, chat_title, is_enabled)
+		VALUES (1, 'legacy-token', 'legacy_bot', '123456789', 'Nestor', 1);
+		INSERT INTO schema_migrations (name) VALUES ('043_telegram_notifications.up.sql');
+	`); err != nil {
+		t.Fatalf("create legacy Telegram schema: %v", err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatalf("close raw db: %v", err)
+	}
+
+	database, err := Open(path)
+	if err != nil {
+		t.Fatalf("open repaired database: %v", err)
+	}
+	defer database.Close()
+
+	assertDBCount(t, database, `SELECT COUNT(*) FROM schema_migrations WHERE name = '044_telegram_user_links.up.sql'`, 1)
+	assertDBCount(t, database, `SELECT COUNT(*) FROM telegram_destinations`, 0)
+	var token, username string
+	if err := database.QueryRow(`SELECT bot_token, bot_username FROM telegram_config WHERE id = 1`).Scan(&token, &username); err != nil {
+		t.Fatalf("read preserved Telegram bot: %v", err)
+	}
+	if token != "legacy-token" || username != "legacy_bot" {
+		t.Fatalf("Telegram bot config changed: token=%q username=%q", token, username)
+	}
+	if _, err := database.Exec(`INSERT INTO users (username, password_hash, role) VALUES ('alice', 'hash', 'reader')`); err != nil {
+		t.Fatalf("insert user: %v", err)
+	}
+	if _, err := database.Exec(`INSERT INTO telegram_destinations (user_id, chat_id, chat_title) SELECT id, '987654321', 'Alice' FROM users WHERE username = 'alice'`); err != nil {
+		t.Fatalf("insert repaired Telegram link: %v", err)
+	}
+	assertDBCount(t, database, `SELECT COUNT(*) FROM telegram_destinations`, 1)
+}

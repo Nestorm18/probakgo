@@ -26,7 +26,7 @@ El servidor se distribuye como un único binario con la web y las migraciones em
 - Umbrales globales y overrides por servidor; PVE añade overrides por VM.
 - Supresión temporal por alerta y modo mantenimiento por servidor.
 - Estado e historial de alertas, badges en vivo, sonido/notificaciones opcionales del navegador.
-- Informe diario por SMTP y, opcionalmente, emails inmediatos al aparecer o resolverse alertas críticas.
+- Informe diario por SMTP y avisos inmediatos opcionales por email, Web Push y Telegram al aparecer o resolverse alertas críticas; Telegram vincula un chat privado por usuario activo.
 
 ### Aplicación web instalable (PWA)
 
@@ -49,7 +49,7 @@ Las notificaciones se activan por usuario y navegador desde **Perfil → Notific
 - CSP con nonce por petición para scripts y SRI en Bootstrap, Bootstrap Icons y Chart.js.
 - Bloqueo progresivo de IP tras intentos de login fallidos y gestión de baneos desde la web.
 - Audit log de cambios administrativos.
-- API keys, credenciales SMTP y secretos TOTP cifrados en SQLite mediante una clave externa.
+- API keys, credenciales SMTP, tokens de Telegram y secretos TOTP cifrados en SQLite mediante una clave externa.
 - Checklist de producción para HTTPS/VPN, cookie segura, 2FA, URL pública, email y retención.
 - Retención automática, descarga de una copia SQLite y reinicio operativo que preserva usuarios, auditoría y migraciones.
 - Servicio systemd endurecido y ejecutado como usuario dedicado `probakgo` en la instalación estándar.
@@ -90,7 +90,7 @@ cd /opt/probakgo
 En el primer arranque:
 
 - se genera y guarda `SESSION_KEY` en `.env`;
-- se genera `DATA_ENCRYPTION_KEY` y se cifran API keys, SMTP y TOTP antes de persistirlos;
+- se genera `DATA_ENCRYPTION_KEY` y se cifran API keys, SMTP, Telegram y TOTP antes de persistirlos;
 - se crea el administrador `probakgo` y su contraseña aleatoria queda en un archivo `0600`, nunca en logs;
 - si se ejecuta como `root` desde `/opt/probakgo`, se instala un servicio endurecido con usuario dedicado y un auto-update diario repartido durante la hora de la 01:00.
 
@@ -169,7 +169,7 @@ Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 | `API_PORT` | `36748` | Puerto HTTP |
 | `DATABASE_PATH` | `probakgo_data.db` | Ruta de SQLite |
 | `SESSION_KEY` | generada | Mínimo 32 bytes; se persiste en el primer arranque |
-| `DATA_ENCRYPTION_KEY` | generada | Mínimo 32 bytes; cifra API keys, SMTP y TOTP. Debe respaldarse junto a SQLite |
+| `DATA_ENCRYPTION_KEY` | generada | Mínimo 32 bytes; cifra API keys, SMTP, Telegram y TOTP. Debe respaldarse junto a SQLite |
 | `TIMEZONE` | `Europe/Madrid` | Zona horaria del scheduler de email |
 | `SESSION_SECURE` | `false` | Debe ser `true` cuando el panel se sirve por HTTPS |
 | `TRUSTED_PROXY_CIDRS` | vacío | CIDR de proxies autorizados para `X-Forwarded-*` |

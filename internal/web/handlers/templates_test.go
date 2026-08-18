@@ -150,6 +150,102 @@ func TestAlertSuppressionSkipsSensitiveTOTPPrompt(t *testing.T) {
 	}
 }
 
+func TestTelegramProfilePairingSkipsSensitiveTOTPPromptAndShowsMobileQR(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	req := httptest.NewRequest(http.MethodGet, "/profile", nil)
+	rr := httptest.NewRecorder()
+	tmpl.Render(rr, req, "profile.html", templateFixtures(time.Now())["profile.html"])
+
+	body := rr.Body.String()
+	for _, action := range []string{"/profile/telegram/pair", "/profile/telegram/test", "/profile/telegram/delete"} {
+		if strings.Contains(body, `action="`+action+`"`) && !strings.Contains(body, `action="`+action+`" data-totp-skip`) {
+			t.Fatalf("Telegram form %s does not bypass the sensitive TOTP prompt:\n%s", action, body)
+		}
+	}
+	if !strings.Contains(body, `alt="QR para abrir el bot de Telegram en el movil"`) {
+		t.Fatalf("Telegram mobile pairing QR is missing:\n%s", body)
+	}
+}
+
+func TestProfileAndSettingsUseConsistentUXStructure(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	fixtures := templateFixtures(time.Now())
+
+	profileReq := httptest.NewRequest(http.MethodGet, "/profile", nil)
+	profileRR := httptest.NewRecorder()
+	tmpl.Render(profileRR, profileReq, "profile.html", fixtures["profile.html"])
+	profileBody := profileRR.Body.String()
+	for _, want := range []string{"Cuenta", "Seguridad", "Mis notificaciones", "profile-channel-heading"} {
+		if !strings.Contains(profileBody, want) {
+			t.Fatalf("profile is missing UX block %q:\n%s", want, profileBody)
+		}
+	}
+
+	settingsReq := httptest.NewRequest(http.MethodGet, "/settings", nil)
+	settingsRR := httptest.NewRecorder()
+	tmpl.Render(settingsRR, settingsReq, "settings_hub.html", fixtures["settings_hub.html"])
+	settingsBody := settingsRR.Body.String()
+	for _, want := range []string{"General y comunicaciones", "Operación y control", "Zona peligrosa"} {
+		if !strings.Contains(settingsBody, want) {
+			t.Fatalf("settings hub is missing group %q:\n%s", want, settingsBody)
+		}
+	}
+	for className, want := range map[string]int{
+		"settings-hub-card-header": 8,
+		"settings-hub-card-body":   8,
+		"settings-hub-card-footer": 8,
+	} {
+		if got := strings.Count(settingsBody, className); got != want {
+			t.Fatalf("settings hub %s count = %d, want %d", className, got, want)
+		}
+	}
+
+	alertsReq := httptest.NewRequest(http.MethodGet, "/settings/alerts", nil)
+	alertsRR := httptest.NewRecorder()
+	tmpl.Render(alertsRR, alertsReq, "alerts_settings.html", fixtures["alerts_settings.html"])
+	alertsBody := alertsRR.Body.String()
+	for _, want := range []string{"Almacenamiento y backups", "Conexión y reportes PVE"} {
+		if !strings.Contains(alertsBody, want) {
+			t.Fatalf("alerts settings is missing card %q:\n%s", want, alertsBody)
+		}
+	}
+	if got := strings.Count(alertsBody, "alert-settings-card"); got != 2 {
+		t.Fatalf("alerts settings card count = %d, want 2", got)
+	}
+}
+
+func TestPageLevelDestructiveActionsUseDangerZones(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	fixtures := templateFixtures(time.Now())
+
+	for _, tc := range []struct {
+		name       string
+		path       string
+		template   string
+		zoneID     string
+		actionPath string
+	}{
+		{name: "Telegram configuration", path: "/settings/telegram", template: "telegram_settings.html", zoneID: "telegramDangerZoneTitle", actionPath: "/settings/telegram/delete"},
+		{name: "user account", path: "/users/1/edit", template: "user_edit.html", zoneID: "userDangerZoneTitle", actionPath: "/users/1/delete"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rr := httptest.NewRecorder()
+			tmpl.Render(rr, req, tc.template, fixtures[tc.template])
+
+			body := rr.Body.String()
+			zoneAt := strings.Index(body, `id="`+tc.zoneID+`"`)
+			actionAt := strings.Index(body, `action="`+tc.actionPath+`"`)
+			if zoneAt < 0 || actionAt < 0 || zoneAt > actionAt {
+				t.Fatalf("%s destructive action is not inside a preceding danger zone:\n%s", tc.name, body)
+			}
+		})
+	}
+}
+
 func TestSensitiveTOTPPromptChecksExpiryAtSubmitTime(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
@@ -300,6 +396,14 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		AlertPBSStaleHours:         36,
 		AlertPVEHeartbeatMinutes:   15,
 	}
+	telegramConfig := domain.TelegramConfig{
+		BotUsername: "probakgo_test_bot",
+		IsEnabled:   true,
+	}
+	telegramDestinations := []domain.TelegramDestination{
+		{ID: 1, UserID: 1, Username: "admin", UserIsActive: true, ChatID: "123456789", ChatTitle: "Nestor", ChatType: "private"},
+		{ID: 2, UserID: 2, Username: "editor", UserIsActive: false, ChatID: "987654321", ChatTitle: "Operaciones", ChatType: "private"},
+	}
 	productionChecklist := productionChecklistView{
 		Items: []productionChecklistItem{
 			{
@@ -386,6 +490,13 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Events":          []domain.AlertStateEvent{{AlertID: "disk:pve:1:local", EventType: "appeared", Message: "90% usado", CreatedAt: now}},
 		}),
 		"alerts_settings.html": base(map[string]any{"Config": emailConfig}),
+		"telegram_settings.html": base(map[string]any{
+			"Config":                 telegramConfig,
+			"Destinations":           telegramDestinations,
+			"ActiveDestinationCount": 1,
+			"Status":                 &domain.TelegramDeliveryStatus{LastSuccessAt: &now},
+			"TokenPresent":           true,
+		}),
 		"api_key_created.html": base(map[string]any{
 			"Name":        "cliente-pve",
 			"Key":         "pbk-1234567890abcdef",
@@ -456,7 +567,11 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		"login_2fa.html":            base(map[string]any{"Error": ""}),
 		"maintenance_settings.html": base(map[string]any{"Config": emailConfig}),
 		"profile.html": base(map[string]any{
-			"User": domain.User{ID: 1, Username: "admin", Role: "admin", IsActive: true, CreatedAt: now},
+			"User":                domain.User{ID: 1, Username: "admin", Role: "admin", IsActive: true, CreatedAt: now},
+			"TelegramConfig":      telegramConfig,
+			"TelegramDestination": (*domain.TelegramDestination)(nil),
+			"TelegramPairingURL":  "https://t.me/probakgo_test_bot?start=testcode",
+			"TelegramQRDataURI":   template.URL("data:image/png;base64,test"),
 		}),
 		"profile_2fa_setup.html": base(map[string]any{
 			"Secret":    "JBSWY3DPEHPK3PXP",
@@ -531,17 +646,21 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"HealthSummary": serverListHealthSummary{},
 		}),
 		"settings_hub.html": base(map[string]any{
-			"Config":              emailConfig,
-			"BanCount":            0,
-			"ProductionChecklist": productionChecklist,
+			"Config":                   emailConfig,
+			"TelegramConfig":           telegramConfig,
+			"TelegramDestinationCount": len(telegramDestinations),
+			"TelegramStatus":           &domain.TelegramDeliveryStatus{LastSuccessAt: &now},
+			"BanCount":                 0,
+			"ProductionChecklist":      productionChecklist,
 		}),
 		"system_settings.html": base(map[string]any{
 			"Config":              emailConfig,
 			"ProductionChecklist": productionChecklist,
 		}),
 		"user_edit.html": base(map[string]any{
-			"User":            &domain.User{ID: 1, Username: "editor", Role: "editor", IsActive: true, CreatedAt: now},
-			"CurrentUsername": "admin",
+			"User":                &domain.User{ID: 1, Username: "editor", Role: "editor", IsActive: true, CreatedAt: now},
+			"CurrentUsername":     "admin",
+			"TelegramDestination": &telegramDestinations[1],
 		}),
 		"user_new.html": base(map[string]any{}),
 		"users.html": base(map[string]any{

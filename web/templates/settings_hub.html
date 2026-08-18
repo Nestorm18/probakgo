@@ -2,166 +2,162 @@
 {{define "page_heading"}}Configuración{{end}}
 {{define "page_content"}}
 
-<div class="row g-3">
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/system" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-info)"><i class="bi bi-globe2"></i></div>
-          <div>
-            <div class="fw-semibold">Sistema</div>
-            <div class="text-secondary" style="font-size:.8rem">URL pública para instalar clientes</div>
-          </div>
-          <div class="mt-auto">
-            {{if and .Config .Config.PublicAPIURL}}
-              <span class="badge bg-secondary">{{.Config.PublicAPIURL}}</span>
-            {{else}}
-              <span class="badge" style="background:var(--clr-secondary)">URL actual</span>
-            {{end}}
-            {{if .ProductionChecklist.Ready}}
-              <span class="badge ms-1" style="background:var(--clr-ok)">Listo</span>
-            {{else}}
-              {{if .ProductionChecklist.Bad}}<span class="badge ms-1" style="background:var(--clr-danger)">{{.ProductionChecklist.Bad}} critico{{if gt .ProductionChecklist.Bad 1}}s{{end}}</span>{{end}}
-              {{if .ProductionChecklist.Warnings}}<span class="badge ms-1" style="background:var(--clr-warn)">{{.ProductionChecklist.Warnings}} revisar</span>{{end}}
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/email" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-accent)"><i class="bi bi-envelope-fill"></i></div>
-          <div>
-            <div class="fw-semibold">Email</div>
-            <div class="text-secondary" style="font-size:.8rem">SMTP, destinatarios y hora de envío</div>
-          </div>
-          <div class="mt-auto">
-            {{if .Config}}
-              {{if .Config.IsEnabled}}
-                <span class="badge" style="background:var(--clr-ok)">Activo</span>
-                {{if .Config.SMTPHost}}<span class="badge bg-secondary ms-1">{{.Config.SMTPHost}}</span>{{end}}
-              {{else}}
-                <span class="badge" style="background:var(--clr-secondary)">Desactivado</span>
-              {{end}}
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/maintenance" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-warn)"><i class="bi bi-trash3-fill"></i></div>
-          <div>
-            <div class="fw-semibold">Mantenimiento</div>
-            <div class="text-secondary" style="font-size:.8rem">Retención de reportes históricos</div>
-          </div>
-          <div class="mt-auto">
-            {{if .Config}}
-              {{if .Config.RetentionEnabled}}
-                <span class="badge" style="background:var(--clr-ok)">{{.Config.RetentionMonths}} meses</span>
-              {{else}}
-                <span class="badge" style="background:var(--clr-secondary)">Sin límite</span>
-              {{end}}
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/alerts" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-danger)"><i class="bi bi-bell-fill"></i></div>
-          <div>
-            <div class="fw-semibold">Alertas</div>
-            <div class="text-secondary" style="font-size:.8rem">Umbrales y avisos</div>
-          </div>
-          <div class="mt-auto">
-            {{if and .Config .Config.AlertBackupErr}}
-              <span class="badge" style="background:var(--clr-ok)">Activo</span>
-            {{else}}
-              <span class="badge" style="background:var(--clr-secondary)">Backup error off</span>
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/ip-bans" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-violet)"><i class="bi bi-shield-fill-x"></i></div>
-          <div>
-            <div class="fw-semibold">IPs Baneadas</div>
-            <div class="text-secondary" style="font-size:.8rem">Gestión de accesos bloqueados</div>
-          </div>
-          <div class="mt-auto">
-            {{if .BanCount}}
-              <span class="badge" style="background:var(--clr-danger)">{{.BanCount}} bloqueadas</span>
-            {{else}}
-              <span class="badge" style="background:var(--clr-secondary)">Sin bloqueos</span>
-            {{end}}
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/audit-log" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-info)"><i class="bi bi-journal-text"></i></div>
-          <div>
-            <div class="fw-semibold">Audit log</div>
-            <div class="text-secondary" style="font-size:.8rem">Cambios administrativos recientes</div>
-          </div>
-          <div class="mt-auto">
-            <span class="badge" style="background:var(--clr-secondary)">Solo admin</span>
-          </div>
-        </div>
-      </div>
-    </a>
-  </div>
-
-</div>
-
-<section class="danger-zone" aria-labelledby="dangerZoneTitle">
-  <div class="d-flex align-items-center gap-2 mb-3">
-    <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-danger)" aria-hidden="true"></i>
-    <h2 class="danger-zone-title mb-0" id="dangerZoneTitle">Zona peligrosa</h2>
+<section class="settings-hub-section" aria-labelledby="settingsGeneralTitle">
+  <div class="settings-hub-section-heading">
+    <div>
+      <h2 id="settingsGeneralTitle">General y comunicaciones</h2>
+      <p>Identidad del sistema y canales de salida.</p>
+    </div>
   </div>
   <div class="row g-3">
-  <div class="col-sm-6 col-xl-3">
-    <a href="/settings/reset" class="text-decoration-none">
-      <div class="card h-100 settings-hub-card">
-        <div class="card-body d-flex flex-column gap-2">
-          <div class="settings-hub-icon" style="color:var(--clr-danger)"><i class="bi bi-database-x"></i></div>
-          <div>
-            <div class="fw-semibold">Reiniciar BD</div>
-            <div class="text-secondary" style="font-size:.8rem">Eliminar todos los datos operativos</div>
+    <div class="col-md-6 col-xl-4">
+      <a href="/settings/system" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-globe2 settings-hub-icon" style="color:var(--clr-info)"></i>Sistema y seguridad</span>
+            {{if .ProductionChecklist.Ready}}<span class="status-pill ok">Listo</span>
+            {{else if .ProductionChecklist.Bad}}<span class="status-pill bad">{{.ProductionChecklist.Bad}} crítico{{if gt .ProductionChecklist.Bad 1}}s{{end}}</span>
+            {{else}}<span class="status-pill warn">{{.ProductionChecklist.Warnings}} revisar</span>{{end}}
           </div>
-          <div class="mt-auto">
-            <span class="badge" style="background:var(--clr-danger)">Destructivo</span>
+          <div class="card-body settings-hub-card-body">
+            <p>URL pública, acceso VPN, sesiones y política de verificación 2FA.</p>
           </div>
-        </div>
-      </div>
-    </a>
-  </div>
+          <div class="card-footer settings-hub-card-footer">
+            <span>{{if and .Config .Config.PublicAPIURL}}{{.Config.PublicAPIURL}}{{else}}Usando la URL actual{{end}}</span>
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </div>
+        </article>
+      </a>
+    </div>
 
+    <div class="col-md-6 col-xl-4">
+      <a href="/settings/email" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-envelope-fill settings-hub-icon" style="color:var(--clr-accent)"></i>Email</span>
+            {{if and .Config .Config.IsEnabled}}<span class="status-pill ok">Activo</span>
+            {{else}}<span class="status-pill muted">Desactivado</span>{{end}}
+          </div>
+          <div class="card-body settings-hub-card-body">
+            <p>Servidor SMTP, destinatarios e informe diario programado.</p>
+          </div>
+          <div class="card-footer settings-hub-card-footer">
+            <span>{{if and .Config .Config.SMTPHost}}{{.Config.SMTPHost}}{{else}}SMTP pendiente{{end}}</span>
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </div>
+        </article>
+      </a>
+    </div>
+
+    <div class="col-md-6 col-xl-4">
+      <a href="/settings/telegram" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-telegram settings-hub-icon" style="color:#229ED9"></i>Telegram</span>
+            {{if and .TelegramConfig .TelegramConfig.IsEnabled}}<span class="status-pill ok">Activo</span>
+            {{else}}<span class="status-pill muted">Desactivado</span>{{end}}
+          </div>
+          <div class="card-body settings-hub-card-body">
+            <p>Bot global y vinculaciones privadas de los usuarios de Probakgo.</p>
+          </div>
+          <div class="card-footer settings-hub-card-footer">
+            <span>{{.TelegramDestinationCount}} usuario{{if ne .TelegramDestinationCount 1}}s{{end}} vinculado{{if ne .TelegramDestinationCount 1}}s{{end}}{{if and .TelegramStatus .TelegramStatus.LastError}} · Error de envío{{end}}</span>
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </div>
+        </article>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="settings-hub-section" aria-labelledby="settingsOperationTitle">
+  <div class="settings-hub-section-heading">
+    <div>
+      <h2 id="settingsOperationTitle">Operación y control</h2>
+      <p>Datos, alertas, accesos y trazabilidad administrativa.</p>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6 col-xl-3">
+      <a href="/settings/maintenance" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-database-gear settings-hub-icon" style="color:var(--clr-warn)"></i>Mantenimiento</span>
+            {{if and .Config .Config.RetentionEnabled}}<span class="status-pill ok">Activo</span>
+            {{else}}<span class="status-pill muted">Sin límite</span>{{end}}
+          </div>
+          <div class="card-body settings-hub-card-body"><p>Retención, copia SQLite y mantenimiento de datos operativos.</p></div>
+          <div class="card-footer settings-hub-card-footer">
+            <span>{{if and .Config .Config.RetentionEnabled}}{{.Config.RetentionMonths}} meses de retención{{else}}Retención desactivada{{end}}</span>
+            <i class="bi bi-chevron-right" aria-hidden="true"></i>
+          </div>
+        </article>
+      </a>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <a href="/settings/alerts" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-bell-fill settings-hub-icon" style="color:var(--clr-danger)"></i>Alertas</span>
+            {{if and .Config .Config.AlertBackupErr}}<span class="status-pill ok">Activas</span>
+            {{else}}<span class="status-pill warn">Revisar</span>{{end}}
+          </div>
+          <div class="card-body settings-hub-card-body"><p>Umbrales globales y excepciones por servidor o máquina virtual.</p></div>
+          <div class="card-footer settings-hub-card-footer"><span>Configurar umbrales</span><i class="bi bi-chevron-right" aria-hidden="true"></i></div>
+        </article>
+      </a>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <a href="/settings/ip-bans" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-shield-fill-x settings-hub-icon" style="color:var(--clr-violet)"></i>IPs bloqueadas</span>
+            {{if .BanCount}}<span class="status-pill bad">{{.BanCount}}</span>
+            {{else}}<span class="status-pill ok">Sin bloqueos</span>{{end}}
+          </div>
+          <div class="card-body settings-hub-card-body"><p>Accesos bloqueados e historial reciente de intentos de inicio de sesión.</p></div>
+          <div class="card-footer settings-hub-card-footer"><span>Gestionar accesos</span><i class="bi bi-chevron-right" aria-hidden="true"></i></div>
+        </article>
+      </a>
+    </div>
+
+    <div class="col-md-6 col-xl-3">
+      <a href="/settings/audit-log" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-journal-text settings-hub-icon" style="color:var(--clr-info)"></i>Registro de actividad</span>
+            <span class="status-pill info">Solo admin</span>
+          </div>
+          <div class="card-body settings-hub-card-body"><p>Cambios administrativos, actor, fecha y contexto de cada operación.</p></div>
+          <div class="card-footer settings-hub-card-footer"><span>Consultar historial</span><i class="bi bi-chevron-right" aria-hidden="true"></i></div>
+        </article>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="danger-zone settings-hub-section" aria-labelledby="dangerZoneTitle">
+  <div class="settings-hub-section-heading">
+    <div>
+      <h2 class="danger-zone-title" id="dangerZoneTitle"><i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>Zona peligrosa</h2>
+      <p>Acciones destructivas que requieren confirmación adicional.</p>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-6 col-xl-3">
+      <a href="/settings/reset" class="settings-hub-link">
+        <article class="card h-100 settings-hub-card settings-hub-card-danger">
+          <div class="card-header settings-hub-card-header">
+            <span class="settings-hub-title"><i class="bi bi-database-x settings-hub-icon" style="color:var(--clr-danger)"></i>Reiniciar BD</span>
+            <span class="status-pill bad">Destructivo</span>
+          </div>
+          <div class="card-body settings-hub-card-body"><p>Elimina todos los datos operativos conservando usuarios y auditoría.</p></div>
+          <div class="card-footer settings-hub-card-footer"><span>Revisar operación</span><i class="bi bi-chevron-right" aria-hidden="true"></i></div>
+        </article>
+      </a>
+    </div>
   </div>
 </section>
 

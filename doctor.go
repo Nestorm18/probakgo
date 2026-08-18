@@ -73,7 +73,7 @@ func runServerDoctor() error {
 		if protected, err := st.ValidateProtectedSecrets(ctx); err != nil {
 			add("FAIL", "Cifrado", err.Error())
 		} else if protected {
-			add("OK", "Cifrado", "API keys, SMTP y TOTP protegidos y clave valida")
+			add("OK", "Cifrado", "API keys, SMTP, Telegram y TOTP protegidos y clave valida")
 		} else {
 			add("WARN", "Cifrado", "no hay secretos cifrados todavia")
 		}

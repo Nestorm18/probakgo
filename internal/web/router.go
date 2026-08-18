@@ -68,6 +68,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	loginLimiter := ratelimit.New(10, time.Minute)
 	pushMutationLimiter := ratelimit.New(20, time.Minute)
 	pushTestLimiter := ratelimit.New(10, time.Minute)
+	telegramMutationLimiter := ratelimit.New(10, time.Minute)
+	telegramTestLimiter := ratelimit.New(10, time.Minute)
 	sensitive := RequireTOTPForSensitiveAction(st)
 
 	r.Get("/login", h.LoginPage)
@@ -129,12 +131,16 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin, sensitive).Post("/users/{id}/role", h.ChangeRolePost)
 		r.With(RequireAdmin, sensitive).Post("/users/{id}/toggle", h.ToggleUserPost)
 		r.With(RequireAdmin, sensitive).Post("/users/{id}/delete", h.DeleteUserPost)
+		r.With(RequireAdmin, sensitive, telegramMutationLimiter.Middleware).Post("/users/{id}/telegram/delete", h.UserTelegramDelete)
 
 		r.Get("/profile", h.Profile)
 		r.With(sensitive).Post("/profile", h.ProfilePost)
 		r.Post("/profile/2fa/setup", h.Profile2FASetup)
 		r.Post("/profile/2fa/confirm", h.Profile2FAConfirm)
 		r.With(sensitive).Post("/profile/2fa/disable", h.Profile2FADisable)
+		r.With(telegramMutationLimiter.Middleware).Post("/profile/telegram/pair", h.ProfileTelegramPair)
+		r.With(telegramTestLimiter.Middleware).Post("/profile/telegram/test", h.ProfileTelegramTest)
+		r.With(telegramMutationLimiter.Middleware).Post("/profile/telegram/delete", h.ProfileTelegramDelete)
 
 		// PWA Web Push. Every endpoint is scoped to the logged-in user; the
 		// VAPID key itself is public, but generating it mutates server state.
@@ -161,6 +167,10 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Get("/settings/email", h.EmailSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/email", h.EmailSettingsPost)
 		r.With(RequireAdmin).Post("/settings/email/test", h.EmailTest)
+		r.With(RequireAdmin).Get("/settings/telegram", h.TelegramSettings)
+		r.With(RequireAdmin, sensitive, telegramMutationLimiter.Middleware).Post("/settings/telegram", h.TelegramSettingsPost)
+		r.With(RequireAdmin, telegramTestLimiter.Middleware).Post("/settings/telegram/test", h.TelegramTest)
+		r.With(RequireAdmin, sensitive, telegramMutationLimiter.Middleware).Post("/settings/telegram/delete", h.TelegramDelete)
 		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance", h.MaintenanceSettingsPost)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)

@@ -19,16 +19,22 @@ func (h *WebH) SettingsHub(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	username, role, _ := session.GetUser(r)
 	cfg, _ := h.store.GetEmailConfig(ctx)
+	telegramCfg, _ := h.store.GetTelegramConfig(ctx)
+	telegramStatus, _ := h.store.GetTelegramDeliveryStatus(ctx)
+	telegramDestinationCount, _ := h.store.CountTelegramDestinations(ctx)
 	banCount := 0
 	if h.ban != nil {
 		banCount = len(h.ban.ListBanned())
 	}
 	h.tmpl.Render(w, r, "settings_hub.html", map[string]any{
-		"Username":            username,
-		"Role":                role,
-		"Config":              cfg,
-		"BanCount":            banCount,
-		"ProductionChecklist": h.buildProductionChecklist(r, cfg),
+		"Username":                 username,
+		"Role":                     role,
+		"Config":                   cfg,
+		"TelegramConfig":           telegramCfg,
+		"TelegramStatus":           telegramStatus,
+		"TelegramDestinationCount": telegramDestinationCount,
+		"BanCount":                 banCount,
+		"ProductionChecklist":      h.buildProductionChecklist(r, cfg),
 	})
 }
 

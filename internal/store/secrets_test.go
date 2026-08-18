@@ -25,6 +25,11 @@ func TestProtectLegacySecretsAndEncryptedRoundTrip(t *testing.T) {
 		VALUES ('admin', 'hash', 'admin', 1, 'totp-legacy')`); err != nil {
 		t.Fatalf("insert user: %v", err)
 	}
+	if _, err := plain.db.ExecContext(ctx, `
+		INSERT INTO telegram_config (id, bot_token)
+		VALUES (1, 'telegram-legacy')`); err != nil {
+		t.Fatalf("insert Telegram config: %v", err)
+	}
 
 	encrypted, err := NewEncrypted(plain.db, "0123456789abcdef0123456789abcdef")
 	if err != nil {
@@ -34,7 +39,7 @@ func TestProtectLegacySecretsAndEncryptedRoundTrip(t *testing.T) {
 		t.Fatalf("ProtectLegacySecrets: %v", err)
 	}
 
-	var storedKey, keyHash, storedSMTP, storedTOTP string
+	var storedKey, keyHash, storedSMTP, storedTOTP, storedTelegram string
 	if err := plain.db.QueryRowContext(ctx, `SELECT key, key_hash FROM api_keys`).Scan(&storedKey, &keyHash); err != nil {
 		t.Fatalf("read stored API key: %v", err)
 	}
@@ -44,10 +49,14 @@ func TestProtectLegacySecretsAndEncryptedRoundTrip(t *testing.T) {
 	if err := plain.db.QueryRowContext(ctx, `SELECT totp_secret FROM users`).Scan(&storedTOTP); err != nil {
 		t.Fatalf("read stored TOTP secret: %v", err)
 	}
+	if err := plain.db.QueryRowContext(ctx, `SELECT bot_token FROM telegram_config`).Scan(&storedTelegram); err != nil {
+		t.Fatalf("read stored Telegram token: %v", err)
+	}
 	for name, value := range map[string]string{
-		"API key":       storedKey,
-		"SMTP password": storedSMTP,
-		"TOTP secret":   storedTOTP,
+		"API key":        storedKey,
+		"SMTP password":  storedSMTP,
+		"Telegram token": storedTelegram,
+		"TOTP secret":    storedTOTP,
 	} {
 		if !strings.HasPrefix(value, "enc:v1:") {
 			t.Errorf("%s remains plaintext: %q", name, value)
@@ -70,6 +79,13 @@ func TestProtectLegacySecretsAndEncryptedRoundTrip(t *testing.T) {
 	}
 	if emailConfig.SMTPPass != "smtp-legacy" {
 		t.Fatalf("SMTP password: got %q", emailConfig.SMTPPass)
+	}
+	telegramConfig, err := encrypted.GetTelegramConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetTelegramConfig: %v", err)
+	}
+	if telegramConfig.BotToken != "telegram-legacy" {
+		t.Fatalf("Telegram token: got %q", telegramConfig.BotToken)
 	}
 	user, err := encrypted.GetUserByUsername(ctx, "admin")
 	if err != nil {

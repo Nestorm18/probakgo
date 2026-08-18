@@ -46,6 +46,7 @@ var templateActive = map[string]string{
 	"settings_hub.html":          "settings",
 	"system_settings.html":       "settings",
 	"email_settings.html":        "settings",
+	"telegram_settings.html":     "settings",
 	"maintenance_settings.html":  "settings",
 	"alerts_settings.html":       "settings",
 	"ip_bans.html":               "settings",

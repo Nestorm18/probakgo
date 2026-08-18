@@ -55,13 +55,15 @@ func (h *WebH) UserEditPage(w http.ResponseWriter, r *http.Request) {
 		h.NotFound(w, r)
 		return
 	}
+	telegramDestination, _ := h.store.GetTelegramDestinationForUser(ctx, u.ID)
 	h.tmpl.Render(w, r, "user_edit.html", map[string]any{
-		"Username":        username,
-		"Role":            role,
-		"CurrentUsername": username,
-		"User":            u,
-		"Flash":           r.URL.Query().Get("flash"),
-		"FlashOK":         r.URL.Query().Get("ok") == "1",
+		"Username":            username,
+		"Role":                role,
+		"CurrentUsername":     username,
+		"User":                u,
+		"TelegramDestination": telegramDestination,
+		"Flash":               r.URL.Query().Get("flash"),
+		"FlashOK":             r.URL.Query().Get("ok") == "1",
 	})
 }
 

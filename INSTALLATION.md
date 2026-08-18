@@ -98,7 +98,7 @@ SESSION_SECURE=false
 # GITHUB_TOKEN=ghp_...
 ```
 
-La aplicación rechaza puertos inválidos, zonas horarias inexistentes, claves de sesión o cifrado menores de 32 bytes, el secreto público de ejemplo y CIDR de proxy inválidos. Conserva `.env` junto con las copias de SQLite: sin `DATA_ENCRYPTION_KEY` no se pueden recuperar API keys, SMTP ni TOTP.
+La aplicación rechaza puertos inválidos, zonas horarias inexistentes, claves de sesión o cifrado menores de 32 bytes, el secreto público de ejemplo y CIDR de proxy inválidos. Conserva `.env` junto con las copias de SQLite: sin `DATA_ENCRYPTION_KEY` no se pueden recuperar API keys, SMTP, Telegram ni TOTP.
 
 ### Ajustes desde la web
 
@@ -106,6 +106,7 @@ Las páginas administrativas están bajo **Configuración**:
 
 - **Sistema**: URL usada en comandos de instalación, declaración de acceso exclusivo por VPN, política 2FA y checklist de producción.
 - **Email**: SMTP, destinatarios, hora del informe diario y alertas críticas inmediatas.
+- **Telegram**: bot global, usuarios vinculados y prueba de alertas críticas inmediatas.
 - **Mantenimiento**: retención automática y descarga segura de una copia SQLite.
 - **Alertas**: umbrales globales de disco PVE/PBS, disco Windows, backup fallido y heartbeat.
 - **IPs baneadas**: desbloqueo de accesos.
@@ -178,6 +179,20 @@ Para activar las notificaciones:
 Cada suscripción queda vinculada al usuario y al navegador que la creó. Las claves VAPID se generan al activar la primera suscripción y la clave privada se cifra con `DATA_ENCRYPTION_KEY`. Al desactivar o eliminar un usuario se eliminan sus suscripciones.
 
 Las notificaciones informan de alertas críticas y de su resolución; al pulsarlas se abre el servidor o la vista de alertas correspondiente. La PWA no ofrece funcionamiento offline ni cachea informes, porque Probakgo debe mostrar siempre el estado actual del servidor.
+
+### Notificaciones de Telegram
+
+Telegram funciona como un canal independiente de email y Web Push y utiliza una vinculación personal por cuenta:
+
+1. Crea un bot dedicado con `@BotFather` y copia su token.
+2. Como administrador, abre **Configuración → Telegram**, pega el token, guarda y activa el canal.
+3. Cada usuario abre **Mi perfil → Mi Telegram**. Desde el móvil pulsa **Abrir bot**; desde un ordenador escanea el QR con el móvil. Después inicia la conversación con **Start**.
+4. El mismo usuario vuelve al navegador que generó el enlace o QR y pulsa **Detectar vinculación**; después puede enviarse una prueba.
+5. El administrador puede revisar o retirar vinculaciones desde **Configuración → Telegram** y desde la edición del usuario.
+
+Cada usuario de Probakgo puede asociar un único chat privado y un mismo chat de Telegram no puede pertenecer a dos usuarios. Las cuentas inactivas no reciben avisos; al eliminar una cuenta se elimina automáticamente su vinculación. Cada usuario conserva su propio estado de entrega, por lo que un fallo no genera duplicados para los demás. No se admiten grupos ni canales en las vinculaciones personales.
+
+El token se cifra con `DATA_ENCRYPTION_KEY` y nunca vuelve a mostrarse. Probakgo no expone un webhook: la vinculación consulta temporalmente las actualizaciones pendientes del bot, por lo que debe utilizarse un bot dedicado sin webhook. Telegram recibe el nombre del servidor y el detalle de la alerta; tenlo en cuenta al habilitar este canal.
 
 ## 3. Usuarios, 2FA y claves
 
@@ -478,4 +493,4 @@ cp /opt/probakgo/.env /ruta/segura/probakgo.env
 systemctl start probakgo
 ```
 
-La copia de `.env` es imprescindible para conservar sesiones y descifrar API keys, SMTP y TOTP; también conserva el acceso a releases privadas y otros secretos de despliegue.
+La copia de `.env` es imprescindible para conservar sesiones y descifrar API keys, SMTP, Telegram y TOTP; también conserva el acceso a releases privadas y otros secretos de despliegue.

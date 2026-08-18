@@ -150,6 +150,58 @@ func ClearPendingTOTPSetup(w http.ResponseWriter, r *http.Request) error {
 	return sess.Save(r, w)
 }
 
+func SetTelegramPairing(w http.ResponseWriter, r *http.Request, userID int64, code string, expires time.Time) error {
+	sess, err := getSession(r)
+	if err != nil {
+		return err
+	}
+	sess.Values["telegram_pairing_code"] = code
+	sess.Values["telegram_pairing_expires"] = expires.Unix()
+	sess.Values["telegram_pairing_user_id"] = userID
+	return sess.Save(r, w)
+}
+
+func GetTelegramPairing(r *http.Request, userID int64, now time.Time) (string, bool) {
+	if store == nil {
+		return "", false
+	}
+	sess, err := getSession(r)
+	if err != nil {
+		return "", false
+	}
+	code, _ := sess.Values["telegram_pairing_code"].(string)
+	var expires int64
+	switch value := sess.Values["telegram_pairing_expires"].(type) {
+	case int64:
+		expires = value
+	case int:
+		expires = int64(value)
+	case float64:
+		expires = int64(value)
+	}
+	var pairedUserID int64
+	switch value := sess.Values["telegram_pairing_user_id"].(type) {
+	case int64:
+		pairedUserID = value
+	case int:
+		pairedUserID = int64(value)
+	case float64:
+		pairedUserID = int64(value)
+	}
+	return code, code != "" && pairedUserID == userID && time.Unix(expires, 0).After(now)
+}
+
+func ClearTelegramPairing(w http.ResponseWriter, r *http.Request) error {
+	sess, err := getSession(r)
+	if err != nil {
+		return err
+	}
+	delete(sess.Values, "telegram_pairing_code")
+	delete(sess.Values, "telegram_pairing_expires")
+	delete(sess.Values, "telegram_pairing_user_id")
+	return sess.Save(r, w)
+}
+
 func SensitiveTOTPFresh(r *http.Request, now time.Time) bool {
 	until, ok := SensitiveTOTPUntil(r)
 	return ok && until.After(now)

@@ -108,6 +108,25 @@
 
   <div class="col-xl-4">
     <div class="card mb-3">
+      <div class="card-header"><strong><i class="bi bi-telegram me-2" style="color:#229ED9"></i>Telegram</strong></div>
+      <div class="card-body">
+        {{if .TelegramDestination}}
+        <span class="status-pill ok">Vinculado</span>
+        <div class="mt-2 fw-semibold">{{.TelegramDestination.DisplayName}}</div>
+        <div class="small text-secondary mb-3">Solo recibe avisos mientras el usuario esta activo.</div>
+        <form method="POST" action="/users/{{.User.ID}}/telegram/delete">
+          {{.CSRFField}}
+          <input type="hidden" name="back" value="/users/{{.User.ID}}/edit">
+          <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-link-45deg me-1"></i>Desvincular Telegram</button>
+        </form>
+        {{else}}
+        <span class="status-pill muted">No vinculado</span>
+        <p class="small text-secondary mb-0 mt-2">El usuario puede vincular su chat privado desde Mi perfil.</p>
+        {{end}}
+      </div>
+    </div>
+
+    <div class="card mb-3">
       <div class="card-header"><strong><i class="bi bi-shield-lock me-2"></i>Seguridad</strong></div>
       <div class="card-body">
         <form method="POST" action="/users/{{.User.ID}}/2fa/disable" class="mb-3">
@@ -132,25 +151,35 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header"><strong><i class="bi bi-exclamation-triangle me-2"></i>Zona delicada</strong></div>
-      <div class="card-body">
-        {{if eq .User.Role "admin"}}
-        <p class="mb-0" style="font-size:.85rem;color:var(--txt-muted)">Los usuarios administradores no se pueden eliminar desde la web.</p>
-        {{else}}
-        <form id="del-user-{{.User.ID}}" method="POST" action="/users/{{.User.ID}}/delete">
-          {{ .CSRFField }}
-          <input type="hidden" name="back" value="/users/{{.User.ID}}/edit">
-          <button type="button" class="btn btn-outline-danger w-100"
-                  data-confirm="¿Eliminar usuario?" data-form="del-user-{{.User.ID}}">
-            <i class="bi bi-trash me-1"></i>Eliminar usuario
-          </button>
-        </form>
-        {{end}}
+  </div>
+</div>
+
+{{if ne .User.Role "admin"}}
+<section class="danger-zone" aria-labelledby="userDangerZoneTitle">
+  <div class="mb-3">
+    <h2 class="danger-zone-title mb-1" id="userDangerZoneTitle"><i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>Zona peligrosa</h2>
+    <p class="text-secondary small mb-0">Acciones irreversibles sobre esta cuenta.</p>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-7 col-xl-5">
+      <div class="card h-100">
+        <div class="card-header text-danger"><strong><i class="bi bi-person-x me-2"></i>Eliminar usuario</strong></div>
+        <div class="card-body">
+          <p class="text-secondary small">Elimina la cuenta, sus sesiones y sus vinculaciones personales de notificaciones.</p>
+          <form id="del-user-{{.User.ID}}" method="POST" action="/users/{{.User.ID}}/delete">
+            {{ .CSRFField }}
+            <input type="hidden" name="back" value="/users/{{.User.ID}}/edit">
+            <button type="button" class="btn btn-outline-danger"
+                    data-confirm="¿Eliminar usuario?" data-form="del-user-{{.User.ID}}">
+              <i class="bi bi-trash me-1"></i>Eliminar usuario
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
-</div>
+</section>
+{{end}}
 
 {{end}}
 {{block "page_scripts" .}}

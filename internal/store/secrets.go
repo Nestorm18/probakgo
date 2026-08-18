@@ -54,6 +54,7 @@ func (s *Store) ValidateProtectedSecrets(ctx context.Context) (bool, error) {
 		query string
 	}{
 		{"SMTP password", `SELECT id, smtp_password FROM email_config WHERE smtp_password <> ''`},
+		{"Telegram bot token", `SELECT id, bot_token FROM telegram_config WHERE bot_token <> ''`},
 		{"TOTP secret", `SELECT id, totp_secret FROM users WHERE totp_secret <> ''`},
 	} {
 		rows, err = s.db.QueryContext(ctx, source.query)
@@ -91,8 +92,8 @@ func (s *Store) ValidateProtectedSecrets(ctx context.Context) (bool, error) {
 	return protected, nil
 }
 
-// ProtectLegacySecrets migrates plaintext API keys, SMTP passwords and TOTP
-// secrets in one transaction. It is safe to call on every startup.
+// ProtectLegacySecrets migrates plaintext API keys, SMTP passwords, Telegram
+// bot tokens and TOTP secrets in one transaction. It is safe to call on every startup.
 func (s *Store) ProtectLegacySecrets(ctx context.Context) error {
 	if s.secrets == nil {
 		return nil
@@ -177,6 +178,41 @@ func (s *Store) ProtectLegacySecrets(ctx context.Context) error {
 		}
 		if _, err := tx.ExecContext(ctx, `UPDATE email_config SET smtp_password=? WHERE id=?`, encrypted, row.id); err != nil {
 			return fmt.Errorf("protect SMTP password %d: %w", row.id, err)
+		}
+	}
+
+	var telegramSecrets []secretRow
+	rows, err = tx.QueryContext(ctx, `SELECT id, bot_token FROM telegram_config WHERE bot_token <> ''`)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var row secretRow
+		if err := rows.Scan(&row.id, &row.value); err != nil {
+			rows.Close()
+			return err
+		}
+		telegramSecrets = append(telegramSecrets, row)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, row := range telegramSecrets {
+		if secretbox.IsEncrypted(row.value) {
+			if _, err := s.secrets.Decrypt(row.value); err != nil {
+				return fmt.Errorf("decrypt Telegram bot token %d: %w", row.id, err)
+			}
+			continue
+		}
+		encrypted, err := s.secrets.Encrypt(row.value)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE telegram_config SET bot_token=? WHERE id=?`, encrypted, row.id); err != nil {
+			return fmt.Errorf("protect Telegram bot token %d: %w", row.id, err)
 		}
 	}
 

@@ -21,12 +21,26 @@ func (h *WebH) Profile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
+	telegramConfig, _ := h.store.GetTelegramConfig(ctx)
+	telegramDestination, _ := h.store.GetTelegramDestinationForUser(ctx, user.ID)
+	telegramPairingURL := ""
+	telegramQRDataURI := template.URL("")
+	if telegramDestination == nil {
+		telegramPairingURL = h.telegramPairingURL(w, r, user.ID, telegramConfig)
+		if telegramPairingURL != "" {
+			telegramQRDataURI = qrCodeDataURI(telegramPairingURL)
+		}
+	}
 	h.tmpl.Render(w, r, "profile.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"User":     user,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"Username":            username,
+		"Role":                role,
+		"User":                user,
+		"TelegramConfig":      telegramConfig,
+		"TelegramDestination": telegramDestination,
+		"TelegramPairingURL":  telegramPairingURL,
+		"TelegramQRDataURI":   telegramQRDataURI,
+		"Flash":               r.URL.Query().Get("flash"),
+		"FlashOK":             r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -97,7 +111,7 @@ func (h *WebH) Profile2FASetup(w http.ResponseWriter, r *http.Request) {
 		"Role":      role,
 		"Secret":    secret,
 		"URI":       totp.ProvisioningURI(username, secret),
-		"QRDataURI": totpQRCodeDataURI(totp.ProvisioningURI(username, secret)),
+		"QRDataURI": qrCodeDataURI(totp.ProvisioningURI(username, secret)),
 	})
 }
 
@@ -120,7 +134,7 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 			"Role":      user.Role,
 			"Secret":    secret,
 			"URI":       totp.ProvisioningURI(username, secret),
-			"QRDataURI": totpQRCodeDataURI(totp.ProvisioningURI(username, secret)),
+			"QRDataURI": qrCodeDataURI(totp.ProvisioningURI(username, secret)),
 			"Error":     "Codigo 2FA incorrecto",
 		})
 		return
@@ -154,7 +168,7 @@ func (h *WebH) Profile2FADisable(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/profile?flash=2FA+desactivado&ok=1", http.StatusSeeOther)
 }
 
-func totpQRCodeDataURI(uri string) template.URL {
+func qrCodeDataURI(uri string) template.URL {
 	png, err := qrcode.Encode(uri, qrcode.Medium, 220)
 	if err != nil {
 		return ""

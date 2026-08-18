@@ -374,6 +374,39 @@ type EmailDeliveryStatus struct {
 	LastError     string
 }
 
+type TelegramConfig struct {
+	ID          int64  `db:"id"`
+	BotToken    string `db:"bot_token" json:"-"`
+	BotUsername string `db:"bot_username"`
+	IsEnabled   bool   `db:"is_enabled"`
+	UpdatedAt   time.Time
+}
+
+type TelegramDestination struct {
+	ID           int64
+	UserID       int64
+	Username     string
+	UserIsActive bool
+	ChatID       string
+	ChatTitle    string
+	ChatType     string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+func (d TelegramDestination) DisplayName() string {
+	if d.ChatTitle != "" {
+		return d.ChatTitle
+	}
+	return d.ChatID
+}
+
+type TelegramDeliveryStatus struct {
+	LastAttemptAt *time.Time
+	LastSuccessAt *time.Time
+	LastError     string
+}
+
 type ServerMaintenance struct {
 	ServerType string
 	ServerID   int64

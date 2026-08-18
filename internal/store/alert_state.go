@@ -106,6 +106,9 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 			if err := insertAlertEvent(ctx, tx, alertEventFromAlert(alert, "appeared", "")); err != nil {
 				return err
 			}
+			if _, err := tx.ExecContext(ctx, `DELETE FROM telegram_alert_deliveries WHERE alert_id = ?`, alert.ID); err != nil {
+				return err
+			}
 		}
 		if err := updateAlertState(ctx, tx, alert, now); err != nil {
 			return err
