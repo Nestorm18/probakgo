@@ -748,6 +748,33 @@ div[style*="overflow:hidden"]:has(> .table) {
   display: grid;
   gap: .75rem;
 }
+.alert-config-section + .alert-config-section {
+  margin-top: 1.4rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--card-border);
+}
+.alert-config-section-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: .65rem;
+  margin-bottom: .75rem;
+}
+.alert-config-section-heading > i {
+  margin-top: .05rem;
+  color: var(--clr-accent);
+  font-size: 1rem;
+}
+.alert-config-section-heading h2 {
+  margin: 0;
+  color: var(--txt-primary);
+  font-size: .9rem;
+  font-weight: 650;
+}
+.alert-config-section-heading p {
+  margin: .18rem 0 0;
+  color: var(--txt-muted);
+  font-size: .72rem;
+}
 .alert-config-field {
   padding: .85rem .95rem;
   border: 1px solid var(--card-border);
