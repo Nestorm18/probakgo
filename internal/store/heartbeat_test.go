@@ -23,6 +23,10 @@ func TestServerHeartbeat_UpsertAndList(t *testing.T) {
 		IP:            "10.0.0.10",
 		ClientVersion: "0.0.65",
 		MachineID:     "mid-1",
+		SwapTotal:     2_147_483_648,
+		SwapUsed:      134_217_728,
+		SwapEnabled:   true,
+		SwapReported:  true,
 		LastSeenAt:    firstSeen,
 	}); err != nil {
 		t.Fatalf("UpsertServerHeartbeat first: %v", err)
@@ -50,12 +54,19 @@ func TestServerHeartbeat_UpsertAndList(t *testing.T) {
 	if !hb.LastSeenAt.Equal(secondSeen) {
 		t.Fatalf("LastSeenAt: want %v, got %v", secondSeen, hb.LastSeenAt)
 	}
+	if !hb.SwapReported || !hb.SwapEnabled || hb.SwapTotal != 2_147_483_648 || hb.SwapUsed != 134_217_728 {
+		t.Fatalf("legacy heartbeat did not preserve swap state: %#v", hb)
+	}
 
 	all, err := st.ListServerHeartbeatsByType(ctx, "pve")
 	if err != nil {
 		t.Fatalf("ListServerHeartbeatsByType: %v", err)
 	}
-	if _, ok := all[serverID]; !ok {
+	listed, ok := all[serverID]
+	if !ok {
 		t.Fatalf("heartbeat for server %d not listed", serverID)
+	}
+	if !listed.SwapReported || !listed.SwapEnabled {
+		t.Fatalf("listed heartbeat lost swap state: %#v", listed)
 	}
 }

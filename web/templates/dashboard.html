@@ -19,6 +19,7 @@
 {{end}}
 
 {{if gt .MaintenanceTotal 0}}
+<a href="{{.MaintenanceURL}}" class="text-decoration-none">
 <div class="card mb-4 d-flex flex-row align-items-center gap-3 px-4 py-3" style="border-left:3px solid var(--clr-accent)">
   <i class="bi bi-tools fs-5" style="color:var(--clr-accent)"></i>
   <div class="flex-grow-1">
@@ -30,7 +31,9 @@
       {{if gt .WindowsMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">Windows {{.WindowsMaintenance}}</span>{{end}}
     </span>
   </div>
+  <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.8rem"></i>
 </div>
+</a>
 {{end}}
 
 <!-- Stat cards -->
@@ -56,6 +59,7 @@
     </a>
   </div>
   <div class="col-6 col-md-3">
+    {{if .PVEStaleURL}}<a href="{{.PVEStaleURL}}" class="text-decoration-none d-block h-100">{{end}}
     <div class="stat-card h-100">
       <div class="stat-icon {{if gt .PVEStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-circle-fill"></i></div>
       <div>
@@ -63,6 +67,7 @@
         <div class="stat-label">PVE Sin reporte</div>
       </div>
     </div>
+    {{if .PVEStaleURL}}</a>{{end}}
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-card h-100">
@@ -74,6 +79,7 @@
     </div>
   </div>
   <div class="col-6 col-md-3">
+    {{if .PBSStaleURL}}<a href="{{.PBSStaleURL}}" class="text-decoration-none d-block h-100">{{end}}
     <div class="stat-card h-100">
       <div class="stat-icon {{if gt .PBSStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-triangle-fill"></i></div>
       <div>
@@ -81,6 +87,7 @@
         <div class="stat-label">PBS Sin reporte</div>
       </div>
     </div>
+    {{if .PBSStaleURL}}</a>{{end}}
   </div>
   <div class="col-6 col-md-3">
     <div class="stat-card h-100">
@@ -112,7 +119,7 @@
 </div>
 
 <!-- Server lists -->
-<div class="d-flex align-items-center gap-2 mb-3">
+<div id="dashboard-servers" class="d-flex align-items-center gap-2 mb-3">
   <div class="input-group input-group-sm filter-search" style="max-width:320px">
     <span class="input-group-text"><i class="bi bi-search"></i></span>
     <input type="text" id="dashboardServerFilter" class="form-control form-control-sm" placeholder="Filtrar por cliente o empresa...">
@@ -231,7 +238,7 @@
   const input = document.getElementById('dashboardServerFilter');
   const countEl = document.getElementById('dashboardFilterCount');
   if (!input) return;
-  input.addEventListener('input', () => {
+  const applyFilter = () => {
     const q = input.value.toLowerCase();
     let visible = 0;
     const rows = document.querySelectorAll('.dashboard-server-row');
@@ -241,7 +248,10 @@
       if (match) visible++;
     });
     countEl.textContent = q ? `${visible} de ${rows.length}` : '';
-  });
+  };
+  input.addEventListener('input', applyFilter);
+  input.value = new URLSearchParams(window.location.search).get('filter') || '';
+  if (input.value) applyFilter();
 })();
 </script>
 {{end}}

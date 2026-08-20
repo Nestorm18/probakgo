@@ -74,6 +74,10 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		PublicIP:      req.PublicIP,
 		ClientVersion: req.ClientVersion,
 		MachineID:     req.MachineID,
+		SwapTotal:     req.SwapTotal,
+		SwapUsed:      req.SwapUsed,
+		SwapEnabled:   req.SwapEnabled != nil && *req.SwapEnabled,
+		SwapReported:  req.SwapEnabled != nil,
 		LastSeenAt:    time.Now(),
 	}); err != nil {
 		internalErr(w, "save heartbeat", err)

@@ -16,7 +16,7 @@ func TestHeartbeatPVE_HappyPath(t *testing.T) {
 		t.Fatalf("create api key: %v", err)
 	}
 
-	body := `{"hostname":"pve-01","server_type":"pve","ip_address":"10.0.0.1","client_version":"0.0.65","machine_id":"machine-1"}`
+	body := `{"hostname":"pve-01","server_type":"pve","ip_address":"10.0.0.1","client_version":"0.0.65","machine_id":"machine-1","swap_total":2147483648,"swap_used":134217728,"swap_enabled":true}`
 	req := httptest.NewRequest(http.MethodPost, "/heartbeat", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -38,6 +38,9 @@ func TestHeartbeatPVE_HappyPath(t *testing.T) {
 	}
 	if hb.ClientVersion != "0.0.65" || hb.IP != "10.0.0.1" {
 		t.Fatalf("unexpected heartbeat: %#v", hb)
+	}
+	if !hb.SwapReported || !hb.SwapEnabled || hb.SwapTotal != 2147483648 || hb.SwapUsed != 134217728 {
+		t.Fatalf("unexpected heartbeat swap: %#v", hb)
 	}
 }
 

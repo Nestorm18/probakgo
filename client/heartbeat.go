@@ -12,12 +12,16 @@ import (
 
 func sendHeartbeat(cfg *Config, si *SysInfo) error {
 	machineID := si.machineID()
+	swap := si.swapInfo()
 	data := map[string]any{
 		"hostname":       si.Hostname,
 		"server_type":    cfg.ServerType,
 		"ip_address":     si.localIP(),
 		"client_version": currentVersion(),
 		"machine_id":     machineID,
+		"swap_total":     swap.Total,
+		"swap_used":      swap.Used,
+		"swap_enabled":   swap.Enabled,
 	}
 	body, err := json.Marshal(data)
 	if err != nil {

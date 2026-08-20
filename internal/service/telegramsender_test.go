@@ -109,6 +109,59 @@ func TestTelegramSendTestAndAlertPayload(t *testing.T) {
 	}
 }
 
+func TestTelegramSecurityNotificationOnlyReachesActiveAdmins(t *testing.T) {
+	var requests []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode Telegram payload: %v", err)
+		}
+		requests = append(requests, payload)
+		writeTelegramTestResponse(t, w, map[string]any{"message_id": 1})
+	}))
+	defer server.Close()
+
+	_, st := openTestStore(t)
+	ctx := context.Background()
+	if err := st.UpsertTelegramConfig(ctx, domain.TelegramConfig{BotToken: testTelegramToken, IsEnabled: true}); err != nil {
+		t.Fatalf("save Telegram config: %v", err)
+	}
+	adminID, _ := st.CreateUser(ctx, "admin", "hash", "admin")
+	readerID, _ := st.CreateUser(ctx, "reader", "hash", "reader")
+	inactiveAdminID, _ := st.CreateUser(ctx, "inactive-admin", "hash", "admin")
+	_ = st.SetUserActive(ctx, inactiveAdminID, false)
+	for _, destination := range []domain.TelegramDestination{
+		{UserID: adminID, ChatID: "111111111", ChatTitle: "Admin"},
+		{UserID: readerID, ChatID: "222222222", ChatTitle: "Reader"},
+		{UserID: inactiveAdminID, ChatID: "333333333", ChatTitle: "Inactive"},
+	} {
+		if _, err := st.UpsertTelegramDestination(ctx, destination); err != nil {
+			t.Fatalf("save Telegram destination: %v", err)
+		}
+	}
+	emailCfg, _ := st.GetEmailConfig(ctx)
+	emailCfg.PublicAPIURL = "https://probakgo.example"
+	if err := st.UpsertEmailConfig(ctx, *emailCfg); err != nil {
+		t.Fatalf("save public URL: %v", err)
+	}
+
+	sender := NewTelegramSender(st)
+	sender.baseURL = server.URL
+	sender.client = server.Client()
+	if err := sender.SendAdminSecurityNotification(ctx, "🔐 Inicio de sesión", "/settings/ip-bans"); err != nil {
+		t.Fatalf("SendAdminSecurityNotification: %v", err)
+	}
+	if len(requests) != 1 || requests[0]["chat_id"] != "111111111" {
+		t.Fatalf("security recipients: %+v", requests)
+	}
+	if requests[0]["text"] != "🔐 Inicio de sesión" {
+		t.Fatalf("security message: %+v", requests[0])
+	}
+	if _, ok := requests[0]["reply_markup"]; !ok {
+		t.Fatal("security notification is missing the Probakgo link")
+	}
+}
+
 func TestTelegramAPIErrorDoesNotExposeToken(t *testing.T) {
 	_, st := openTestStore(t)
 	sender := NewTelegramSender(st)

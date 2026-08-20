@@ -41,11 +41,12 @@ type AlertData struct {
 	PVEBackupConfigs map[int64][]domain.VMBackupConfig
 	PVEHeartbeats    map[int64]domain.ServerHeartbeat
 
-	PBSServers   []domain.PBSServer
-	PBSReports   map[int64]*domain.PBSReport
-	PBSStores    map[int64][]domain.PBSStore
-	PBSSnapshots map[int64][]domain.PBSSnapshot
-	PBSTasks     map[int64][]domain.PBSTask
+	PBSServers    []domain.PBSServer
+	PBSReports    map[int64]*domain.PBSReport
+	PBSStores     map[int64][]domain.PBSStore
+	PBSSnapshots  map[int64][]domain.PBSSnapshot
+	PBSTasks      map[int64][]domain.PBSTask
+	PBSHeartbeats map[int64]domain.ServerHeartbeat
 
 	WindowsServers    []domain.WindowsServer
 	WindowsReports    map[int64][]domain.WindowsReport
@@ -141,6 +142,9 @@ func loadAlertData(ctx context.Context, st *store.Store) (*AlertData, error) {
 		return nil, err
 	}
 	if data.PVEHeartbeats, err = st.ListServerHeartbeatsByType(ctx, "pve"); err != nil {
+		return nil, err
+	}
+	if data.PBSHeartbeats, err = st.ListServerHeartbeatsByType(ctx, "pbs"); err != nil {
 		return nil, err
 	}
 	if data.WindowsHeartbeats, err = st.ListServerHeartbeatsByType(ctx, "windows"); err != nil {
@@ -586,7 +590,14 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			continue
 		}
 		rep := cfg.Data.PVEReports[sv.ID]
-		if rep == nil || !rep.SwapEnabled {
+		var reportSwap domain.HostSwap
+		var reportTime time.Time
+		if rep != nil {
+			reportSwap = domain.HostSwap{Total: rep.SwapTotal, Used: rep.SwapUsed, Enabled: rep.SwapEnabled}
+			reportTime = rep.ReportedAt
+		}
+		swap, known := currentHostSwap(cfg.Data.PVEHeartbeats[sv.ID], reportSwap, reportTime, rep != nil)
+		if !known || !swap.Enabled {
 			continue
 		}
 		alerts = append(alerts, domain.Alert{
@@ -595,8 +606,8 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			Type:       domain.AlertTypeSwap,
 			Severity:   domain.AlertSeverityWarning,
 			Title:      "Swap activa",
-			Message:    hostSwapMessage(rep.SwapUsed, rep.SwapTotal),
-			Value:      alertFmtBytes(rep.SwapUsed),
+			Message:    hostSwapMessage(swap.Used, swap.Total),
+			Value:      alertFmtBytes(swap.Used),
 			Threshold:  "swap desactivada",
 			DetectedAt: now,
 		})
@@ -607,7 +618,14 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			continue
 		}
 		rep := cfg.Data.PBSReports[sv.ID]
-		if rep == nil || !rep.SwapEnabled {
+		var reportSwap domain.HostSwap
+		var reportTime time.Time
+		if rep != nil {
+			reportSwap = domain.HostSwap{Total: rep.SwapTotal, Used: rep.SwapUsed, Enabled: rep.SwapEnabled}
+			reportTime = rep.ReportedAt
+		}
+		swap, known := currentHostSwap(cfg.Data.PBSHeartbeats[sv.ID], reportSwap, reportTime, rep != nil)
+		if !known || !swap.Enabled {
 			continue
 		}
 		alerts = append(alerts, domain.Alert{
@@ -616,13 +634,20 @@ func evalHostSwap(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 			Type:       domain.AlertTypeSwap,
 			Severity:   domain.AlertSeverityWarning,
 			Title:      "Swap activa",
-			Message:    hostSwapMessage(rep.SwapUsed, rep.SwapTotal),
-			Value:      alertFmtBytes(rep.SwapUsed),
+			Message:    hostSwapMessage(swap.Used, swap.Total),
+			Value:      alertFmtBytes(swap.Used),
 			Threshold:  "swap desactivada",
 			DetectedAt: now,
 		})
 	}
 	return alerts, nil
+}
+
+func currentHostSwap(hb domain.ServerHeartbeat, report domain.HostSwap, reportTime time.Time, hasReport bool) (domain.HostSwap, bool) {
+	if hb.SwapReported && (!hasReport || !hb.LastSeenAt.Before(reportTime)) {
+		return domain.HostSwap{Total: hb.SwapTotal, Used: hb.SwapUsed, Enabled: hb.SwapEnabled}, true
+	}
+	return report, hasReport
 }
 
 func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {

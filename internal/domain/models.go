@@ -269,6 +269,10 @@ type ServerHeartbeat struct {
 	PublicIP      string    `db:"public_ip"`
 	ClientVersion string    `db:"client_version"`
 	MachineID     string    `db:"machine_id"`
+	SwapTotal     int64     `db:"swap_total"`
+	SwapUsed      int64     `db:"swap_used"`
+	SwapEnabled   bool      `db:"swap_enabled"`
+	SwapReported  bool      `db:"-"`
 	LastSeenAt    time.Time `db:"last_seen_at"`
 	CreatedAt     time.Time `db:"created_at"`
 	UpdatedAt     time.Time `db:"updated_at"`

@@ -47,6 +47,20 @@ func TestPBSStoreDisplays_UsesSameFillStatus(t *testing.T) {
 	}
 }
 
+func TestPBSMaxStoreUsagePercent(t *testing.T) {
+	stores := []domain.PBSStore{
+		{Used: 20, Total: 100},
+		{Used: 75, Total: 100},
+		{Used: 10, Total: 0},
+	}
+	if got := pbsMaxStoreUsagePercent(stores); got != 75 {
+		t.Fatalf("pbsMaxStoreUsagePercent() = %d, want 75", got)
+	}
+	if got := pbsMaxStoreUsagePercent(nil); got != -1 {
+		t.Fatalf("pbsMaxStoreUsagePercent(nil) = %d, want -1", got)
+	}
+}
+
 func TestSummarizeDashboardAlertsFiltersAndPrioritizes(t *testing.T) {
 	alerts := []domain.Alert{
 		{ID: "backup_error:pve:1:100", Type: domain.AlertTypeBackupError, Severity: domain.AlertSeverityWarning, ServerType: "pve", ServerID: 1},
@@ -72,5 +86,46 @@ func TestSummarizeDashboardAlertsFiltersAndPrioritizes(t *testing.T) {
 	}
 	if !got.WindowsMissingVolume[2] {
 		t.Fatal("missing Windows volume alert was not retained")
+	}
+}
+
+func TestDashboardStatusURL(t *testing.T) {
+	tests := []struct {
+		name       string
+		serverType string
+		serverIDs  []int64
+		want       string
+	}{
+		{name: "none", serverType: "pve", want: ""},
+		{name: "single", serverType: "pve", serverIDs: []int64{7}, want: "/servers/pve/7"},
+		{name: "multiple", serverType: "pbs", serverIDs: []int64{3, 9}, want: "/servers/pbs?filter=Sin+reporte"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dashboardStatusURL(tt.serverType, tt.serverIDs, "Sin reporte"); got != tt.want {
+				t.Fatalf("dashboardStatusURL() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDashboardMaintenanceURL(t *testing.T) {
+	if got := dashboardMaintenanceURL(nil); got != "" {
+		t.Fatalf("empty maintenance URL = %q, want empty", got)
+	}
+
+	single := map[string]domain.ServerMaintenance{
+		"pve:7": {ServerType: "pve", ServerID: 7, Active: true},
+	}
+	if got := dashboardMaintenanceURL(single); got != "/servers/pve/7" {
+		t.Fatalf("single maintenance URL = %q, want /servers/pve/7", got)
+	}
+
+	multiple := map[string]domain.ServerMaintenance{
+		"pve:7":     {ServerType: "pve", ServerID: 7, Active: true},
+		"windows:4": {ServerType: "windows", ServerID: 4, Active: true},
+	}
+	if got := dashboardMaintenanceURL(multiple); got != "/?filter=Mantenimiento#dashboard-servers" {
+		t.Fatalf("multiple maintenance URL = %q", got)
 	}
 }

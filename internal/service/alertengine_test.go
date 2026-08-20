@@ -241,6 +241,43 @@ func TestEvalHostSwap_Disabled(t *testing.T) {
 	}
 }
 
+func TestEvalHostSwap_NewerHeartbeatDisablesPVEAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-swap-heartbeat", "1.1.1.1", "", "1.0", "")
+	_, _ = st.InsertPVEReportWithSwap(ctx, serverID, nil, domain.HostSwap{Total: 2_000_000_000, Used: 128_000_000, Enabled: true})
+	_ = st.UpsertServerHeartbeat(ctx, domain.ServerHeartbeat{
+		ServerType: "pve", ServerID: serverID, Hostname: "pve-swap-heartbeat",
+		SwapReported: true, SwapEnabled: false, LastSeenAt: time.Now().Add(time.Minute),
+	})
+
+	alerts, err := evalHostSwap(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasAlert(alerts, domain.AlertTypeSwap, "pve-swap-heartbeat") {
+		t.Fatal("did not expect stale report swap alert after heartbeat reported swap disabled")
+	}
+}
+
+func TestEvalHostSwap_PBSEnabledByHeartbeat(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-swap-heartbeat", "1.1.1.1", "", "1.0", "")
+	_ = st.UpsertServerHeartbeat(ctx, domain.ServerHeartbeat{
+		ServerType: "pbs", ServerID: serverID, Hostname: "pbs-swap-heartbeat",
+		SwapTotal: 2_000_000_000, SwapUsed: 128_000_000, SwapEnabled: true, SwapReported: true,
+	})
+
+	alerts, err := evalHostSwap(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypeSwap, "pbs-swap-heartbeat") {
+		t.Fatal("expected PBS swap alert from heartbeat")
+	}
+}
+
 func TestEvalHostSwap_PVEAlertDisabledPerServer(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

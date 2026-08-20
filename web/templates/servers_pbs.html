@@ -32,6 +32,7 @@
   </div>
   <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
   <div class="ms-auto d-flex gap-2">
+    <a href="/servers/pbs.xlsx" class="btn btn-sm btn-primary" title="Descargar informe Excel de almacenamiento y tareas"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Informe Excel</a>
     <a href="/servers/pbs.csv" class="btn btn-sm btn-secondary" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
     <a href="/servers/pbs.json" class="btn btn-sm btn-secondary" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
   </div>
@@ -44,18 +45,18 @@
         <tr>
           <th data-sort="0" aria-sort="none"><button type="button" class="sort-button">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
           <th data-sort="1" aria-sort="none"><button type="button" class="sort-button">Dirección <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th>Cliente</th>
-          <th>Swap</th>
-          <th data-sort="4" aria-sort="none"><button type="button" class="sort-button">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th>Datastores</th>
-          <th data-sort="6" aria-sort="none"><button type="button" class="sort-button">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="2" aria-sort="none"><button type="button" class="sort-button">Cliente <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="3" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Swap <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="4" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="5" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Datastores <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="6" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
           <th></th>
         </tr>
       </thead>
       <tbody class="server-tbody">
       {{range .Rows}}
       <tr data-has-alerts="{{if .Health.HasAlerts}}1{{else}}0{{end}}">
-        <td>
+        <td data-sort-value="{{.Server.DisplayName}}">
           <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
             {{.Server.DisplayName}}
           </a>
@@ -67,20 +68,20 @@
           <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
           {{end}}
         </td>
-        <td>
+        <td data-sort-value="{{.Server.IP}}">
           <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
         </td>
-        <td>
+        <td data-sort-value="{{.Server.ClientVersion}}">
           {{if clientVersionOutdated .Server.ClientVersion}}<span class="status-pill warn" title="Version anterior a {{$.Version}}">{{.Server.ClientVersion}}</span>
           {{else if clientVersionCurrent .Server.ClientVersion}}<span class="status-pill ok" title="Cliente actualizado">{{.Server.ClientVersion}}</span>
           {{else}}<code>{{.Server.ClientVersion}}</code>{{end}}
         </td>
-        <td>{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">
+        <td data-sort-value="{{if .Swap.Enabled}}{{.Swap.Used}}{{else}}-1{{end}}">{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td data-sort-value="{{if .LastReport}}{{.LastReport.Unix}}{{else}}0{{end}}" style="font-size:.82rem;color:var(--txt-secondary)">
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
-        <td style="font-size:.82rem">
+        <td data-sort-value="{{.StoreUsage}}" style="font-size:.82rem">
           {{range .Stores}}
           <div class="mb-1">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -103,7 +104,7 @@
           </div>
           {{end}}
         </td>
-        <td>
+        <td data-sort-value="{{if .Maintenance.Active}}1{{else if .IsStale}}2{{else}}0{{end}}">
           {{if .Maintenance.Active}}<span class="status-pill info" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
           {{else if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
@@ -266,6 +267,8 @@
       applyFilters();
     });
   });
+  input.value = new URLSearchParams(window.location.search).get('filter') || '';
+  if (input.value) applyFilters();
 })();
 
 // Sort
@@ -280,9 +283,14 @@
       sortCol = col;
       const rows = Array.from(tbody.querySelectorAll('tr:not(.empty-state-row)'));
       rows.sort((a, b) => {
-        const av = a.cells[col]?.textContent.trim() || '';
-        const bv = b.cells[col]?.textContent.trim() || '';
-        return sortAsc ? av.localeCompare(bv, 'es') : bv.localeCompare(av, 'es');
+        const aCell = a.cells[col];
+        const bCell = b.cells[col];
+        const av = aCell?.dataset.sortValue ?? aCell?.textContent.trim() ?? '';
+        const bv = bCell?.dataset.sortValue ?? bCell?.textContent.trim() ?? '';
+        const result = th.dataset.sortType === 'number'
+          ? (Number(av) || 0) - (Number(bv) || 0)
+          : av.localeCompare(bv, 'es', {numeric: true, sensitivity: 'base'});
+        return sortAsc ? result : -result;
       });
       rows.forEach(r => tbody.appendChild(r));
       document.querySelectorAll('th[data-sort] .sort-icon').forEach(i => { i.className = 'bi sort-icon'; });

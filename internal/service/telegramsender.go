@@ -250,6 +250,38 @@ func (s *TelegramSender) SendAlerts(ctx context.Context, destination domain.Tele
 	return err
 }
 
+func (s *TelegramSender) SendAdminSecurityNotification(ctx context.Context, text, linkURL string) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+	cfg, err := s.st.GetTelegramConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("leer configuracion de Telegram: %w", err)
+	}
+	if cfg == nil || !cfg.IsEnabled {
+		return nil
+	}
+	if err := validateTelegramToken(cfg.BotToken); err != nil {
+		return err
+	}
+	destinations, err := s.st.ListActiveAdminTelegramDestinations(ctx)
+	if err != nil {
+		return fmt.Errorf("leer administradores de Telegram: %w", err)
+	}
+	if len(destinations) == 0 {
+		return nil
+	}
+	var deliveryErr error
+	for _, destination := range destinations {
+		if err := s.sendMessage(ctx, cfg, destination, text, linkURL); err != nil {
+			deliveryErr = errors.Join(deliveryErr, fmt.Errorf("%s: %w", destination.DisplayName(), err))
+		}
+	}
+	s.recordDelivery(deliveryErr)
+	return deliveryErr
+}
+
 func (s *TelegramSender) RecordDelivery(deliveryErr error) {
 	s.recordDelivery(deliveryErr)
 }

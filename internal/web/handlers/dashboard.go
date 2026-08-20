@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"probakgo/internal/domain"
@@ -46,6 +48,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	pveConfigs, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
 
 	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
+	var pveStaleIDs []int64
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
 		rep := pveReports[sv.ID]
@@ -60,6 +63,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			pveMaintenance++
 		} else if isStale {
 			pveStale++
+			pveStaleIDs = append(pveStaleIDs, sv.ID)
 		} else if hasBackupError {
 			pveBackupErrorCount++
 		} else {
@@ -101,6 +105,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var pbsOK, pbsStale, pbsMaintenance int
+	var pbsStaleIDs []int64
 	var pbsRows []map[string]any
 	for _, sv := range pbsServers {
 		rep := pbsReports[sv.ID]
@@ -111,6 +116,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			pbsMaintenance++
 		} else if isStale {
 			pbsStale++
+			pbsStaleIDs = append(pbsStaleIDs, sv.ID)
 		} else {
 			pbsOK++
 			fillLabel, fillClass = pbsFillBadge(pbsStores[rep.ID])
@@ -212,17 +218,47 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"WindowsRows":        windowsRows,
 		"PVEOk":              pveOK,
 		"PVEStale":           pveStale,
+		"PVEStaleURL":        dashboardStatusURL("pve", pveStaleIDs, "Sin reporte"),
 		"PVEBackupErrors":    pveBackupErrorCount,
 		"PVEMaintenance":     pveMaintenance,
 		"PBSOk":              pbsOK,
 		"PBSStale":           pbsStale,
+		"PBSStaleURL":        dashboardStatusURL("pbs", pbsStaleIDs, "Sin reporte"),
 		"PBSMaintenance":     pbsMaintenance,
 		"WindowsOK":          windowsOK,
 		"WindowsOffline":     windowsOffline,
 		"WindowsDiskAlerts":  windowsDiskAlerts,
 		"WindowsMaintenance": windowsMaintenance,
 		"MaintenanceTotal":   pveMaintenance + pbsMaintenance + windowsMaintenance,
+		"MaintenanceURL":     dashboardMaintenanceURL(maintenance),
 	})
+}
+
+func dashboardStatusURL(serverType string, serverIDs []int64, filter string) string {
+	if len(serverIDs) == 0 {
+		return ""
+	}
+	base := "/servers/" + serverType
+	if len(serverIDs) == 1 {
+		return base + "/" + strconv.FormatInt(serverIDs[0], 10)
+	}
+	return base + "?filter=" + url.QueryEscape(filter)
+}
+
+func dashboardMaintenanceURL(maintenance map[string]domain.ServerMaintenance) string {
+	active := make([]domain.ServerMaintenance, 0, len(maintenance))
+	for _, item := range maintenance {
+		if item.Active {
+			active = append(active, item)
+		}
+	}
+	if len(active) == 0 {
+		return ""
+	}
+	if len(active) == 1 {
+		return "/servers/" + active[0].ServerType + "/" + strconv.FormatInt(active[0].ServerID, 10)
+	}
+	return "/?filter=" + url.QueryEscape("Mantenimiento") + "#dashboard-servers"
 }
 
 type dashboardAlertSummary struct {
@@ -402,6 +438,20 @@ func pbsStoreDisplays(stores []domain.PBSStore) []pbsStoreDisplay {
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+func pbsMaxStoreUsagePercent(stores []domain.PBSStore) int {
+	maxUsage := -1
+	for _, store := range stores {
+		if store.Total <= 0 {
+			continue
+		}
+		usage := int(float64(store.Used) / float64(store.Total) * 100)
+		if usage > maxUsage {
+			maxUsage = usage
+		}
+	}
+	return maxUsage
 }
 
 func pbsDaysUntil(fullAt, now time.Time) int {

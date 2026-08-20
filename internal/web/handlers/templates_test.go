@@ -53,6 +53,59 @@ func TestTemplatesRenderWithRepresentativeData(t *testing.T) {
 	}
 }
 
+func TestProxmoxServerTablesSortEveryDataColumn(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	fixtures := templateFixtures(time.Now())
+
+	for _, tc := range []struct {
+		name     string
+		path     string
+		template string
+		columns  int
+	}{
+		{name: "PVE", path: "/servers/pve", template: "servers_pve.html", columns: 8},
+		{name: "PBS", path: "/servers/pbs", template: "servers_pbs.html", columns: 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			rr := httptest.NewRecorder()
+			tmpl.Render(rr, req, tc.template, fixtures[tc.template])
+			body := rr.Body.String()
+
+			if got := strings.Count(body, `<th data-sort="`); got != tc.columns {
+				t.Fatalf("sortable columns = %d, want %d", got, tc.columns)
+			}
+			if !strings.Contains(body, "dataset.sortValue") || !strings.Contains(body, "data-sort-type=\"number\"") {
+				t.Fatal("table is missing typed stable sort values")
+			}
+		})
+	}
+}
+
+func TestServerListsExposeExcelReports(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	fixtures := templateFixtures(time.Now())
+
+	for _, tc := range []struct {
+		path     string
+		template string
+		href     string
+	}{
+		{path: "/servers/pve", template: "servers_pve.html", href: `/servers/pve.xlsx`},
+		{path: "/servers/pbs", template: "servers_pbs.html", href: `/servers/pbs.xlsx`},
+		{path: "/servers/windows", template: "servers_windows.html", href: `/servers/windows.xlsx`},
+	} {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		rr := httptest.NewRecorder()
+		tmpl.Render(rr, req, tc.template, fixtures[tc.template])
+		if body := rr.Body.String(); !strings.Contains(body, `href="`+tc.href+`"`) || !strings.Contains(body, "Informe Excel") {
+			t.Fatalf("%s is missing its Excel report action", tc.path)
+		}
+	}
+}
+
 func TestTemplatesRenderFlashFromQuery(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 

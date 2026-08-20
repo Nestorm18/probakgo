@@ -59,17 +59,28 @@ func (s *Store) UpsertTelegramConfig(ctx context.Context, cfg domain.TelegramCon
 }
 
 func (s *Store) ListTelegramDestinations(ctx context.Context) ([]domain.TelegramDestination, error) {
-	return s.listTelegramDestinations(ctx, false)
+	return s.listTelegramDestinations(ctx, false, false)
 }
 
 func (s *Store) ListActiveTelegramDestinations(ctx context.Context) ([]domain.TelegramDestination, error) {
-	return s.listTelegramDestinations(ctx, true)
+	return s.listTelegramDestinations(ctx, true, false)
 }
 
-func (s *Store) listTelegramDestinations(ctx context.Context, activeOnly bool) ([]domain.TelegramDestination, error) {
-	where := ""
+func (s *Store) ListActiveAdminTelegramDestinations(ctx context.Context) ([]domain.TelegramDestination, error) {
+	return s.listTelegramDestinations(ctx, true, true)
+}
+
+func (s *Store) listTelegramDestinations(ctx context.Context, activeOnly, adminOnly bool) ([]domain.TelegramDestination, error) {
+	conditions := make([]string, 0, 2)
 	if activeOnly {
-		where = " WHERE u.is_active = 1"
+		conditions = append(conditions, "u.is_active = 1")
+	}
+	if adminOnly {
+		conditions = append(conditions, "u.role = 'admin'")
+	}
+	where := ""
+	if len(conditions) > 0 {
+		where = " WHERE " + strings.Join(conditions, " AND ")
 	}
 	debug.RecordQuery(ctx, `SELECT destination and user fields FROM telegram_destinations JOIN users`+where+` ORDER BY username`)
 	rows, err := s.db.QueryContext(ctx, `

@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"probakgo/internal/ratelimit"
 	"probakgo/internal/session"
 )
 
@@ -95,6 +96,8 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "user.create", "user", strconv.FormatInt(id, 10), uname, map[string]any{"role": role})
+	actor, _, _ := session.GetUser(r)
+	h.notifyAdminUserCreated(uname, role, actor, ratelimit.ExtractIP(r), id)
 	redirectWithFlash(w, r, "/users", "Usuario creado", true)
 }
 

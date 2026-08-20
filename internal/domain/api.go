@@ -116,6 +116,9 @@ type HeartbeatRequest struct {
 	PublicIP      string `json:"public_ip"`
 	ClientVersion string `json:"client_version"`
 	MachineID     string `json:"machine_id"`
+	SwapTotal     int64  `json:"swap_total,omitempty"`
+	SwapUsed      int64  `json:"swap_used,omitempty"`
+	SwapEnabled   *bool  `json:"swap_enabled,omitempty"`
 }
 
 type PBSInformation struct {

@@ -837,6 +837,7 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 		r2 := map[string]any{
 			"Server":         sv,
 			"IsStale":        rep == nil || rep.IsStale,
+			"StoreUsage":     -1,
 			"AlertConfig":    alertCfg,
 			"AlertOverrides": buildPBSAlertOverrideView(alertCfg),
 			"ServerURL":      serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
@@ -845,9 +846,11 @@ func (h *WebH) PBSServers(w http.ResponseWriter, r *http.Request) {
 			"Maintenance":    maint,
 		}
 		if rep != nil {
+			stores := storesByReport[rep.ID]
 			r2["LastReport"] = rep.ReportedAt
 			r2["Swap"] = buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal)
-			r2["Stores"] = pbsStoreDisplays(storesByReport[rep.ID])
+			r2["Stores"] = pbsStoreDisplays(stores)
+			r2["StoreUsage"] = pbsMaxStoreUsagePercent(stores)
 			r2["Tasks"] = pbsTaskDisplays(tasksByReport[rep.ID])
 		}
 		rows = append(rows, r2)

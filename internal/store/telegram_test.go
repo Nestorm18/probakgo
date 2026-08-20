@@ -76,6 +76,10 @@ func TestTelegramDeliveryStateIsIndependent(t *testing.T) {
 	if err != nil || len(active) != 1 || active[0].UserID != firstUserID {
 		t.Fatalf("inactive Telegram user was not filtered: got=%+v err=%v", active, err)
 	}
+	admins, err := st.ListActiveAdminTelegramDestinations(ctx)
+	if err != nil || len(admins) != 1 || admins[0].UserID != firstUserID {
+		t.Fatalf("active admin Telegram users were not filtered: got=%+v err=%v", admins, err)
+	}
 	alert := domain.Alert{
 		ID: "disk:pve:42", Severity: domain.AlertSeverityCritical, Title: "Disk full", ServerType: "pve", ServerID: 42,
 	}
