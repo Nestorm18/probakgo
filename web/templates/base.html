@@ -592,9 +592,7 @@
       if (!pushBtn) return;
       const icon = pushBtn.querySelector('i');
       if (icon) {
-        icon.className = state === 'on' ? 'bi bi-bell-fill'
-                       : state === 'off' ? 'bi bi-bell-slash'
-                       : 'bi bi-bell';
+        icon.className = 'bi bi-bell me-1';
       }
       pushBtn.classList.toggle('btn-primary', state === 'on');
       pushBtn.classList.toggle('btn-secondary', state !== 'on');
