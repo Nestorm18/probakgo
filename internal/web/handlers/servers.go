@@ -370,11 +370,14 @@ func (h *WebH) visibleAlertsForServerLists(ctx context.Context) []domain.Alert {
 	return alerts
 }
 
-func latestPVESwapView(reports []domain.PVEReport) swapView {
-	if len(reports) == 0 {
+func currentPVESwapView(report *domain.PVEReport, heartbeat *domain.ServerHeartbeat) swapView {
+	if heartbeat != nil && heartbeat.SwapReported && (report == nil || !heartbeat.LastSeenAt.Before(report.ReportedAt)) {
+		return buildSwapView(heartbeat.SwapEnabled, heartbeat.SwapUsed, heartbeat.SwapTotal)
+	}
+	if report == nil {
 		return buildSwapView(false, 0, 0)
 	}
-	return buildSwapView(reports[0].SwapEnabled, reports[0].SwapUsed, reports[0].SwapTotal)
+	return buildSwapView(report.SwapEnabled, report.SwapUsed, report.SwapTotal)
 }
 
 func latestPBSSwapView(reports []domain.PBSReport) swapView {
@@ -428,6 +431,7 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 		backupsDisabled := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
 		ignoreStale := backupsDisabled
 		rep := latestReports[sv.ID]
+		heartbeat := heartbeats[sv.ID]
 		stale := rep == nil && !ignoreStale
 		alertCfg := alertConfigs[sv.ID]
 		alertCfg.ServerID = sv.ID
@@ -450,20 +454,17 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 			"AlertConfig":     alertCfg,
 			"AlertOverrides":  buildPVEAlertOverrideView(alertCfg),
 			"ServerURL":       serverURLFor(sv.APIKeyID, sv.Name, serverURLs),
-			"Heartbeat":       buildHeartbeatView(heartbeats[sv.ID], heartbeatThreshold),
-			"Swap":            buildSwapView(false, 0, 0),
-			"Health":          health,
-			"Maintenance":     maint,
+			"Heartbeat":       buildHeartbeatView(heartbeat, heartbeatThreshold),
+			"Swap": buildPVESwapListView(
+				currentPVESwapView(rep, &heartbeat),
+				alertCfg.SwapAlert == nil || *alertCfg.SwapAlert != 0,
+				swapSuppressed(suppressions, "pve", sv.ID),
+			),
+			"Health":      health,
+			"Maintenance": maint,
 		}
 		if rep != nil {
 			r2["LastReport"] = rep.ReportedAt
-			swapAlertEnabled := alertCfg.SwapAlert == nil || *alertCfg.SwapAlert != 0
-			r2["Swap"] = buildPVESwapListView(
-				buildSwapView(rep.SwapEnabled, rep.SwapUsed, rep.SwapTotal),
-				swapAlertEnabled,
-				swapSuppressed(suppressions, "pve", sv.ID),
-			)
-
 			tasks := tasksByReport[rep.ID]
 			if !backupsDisabled {
 				r2["BackupStatus"] = domain.PVEBackupStatusSummary(tasks, rep.BackupStatus)
@@ -567,6 +568,10 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		heartbeatThreshold = emailCfg.AlertPVEHeartbeatMinutes
 	}
 	hb, _ := h.store.GetServerHeartbeat(ctx, "pve", id)
+	var latestReport *domain.PVEReport
+	if len(latestReports) > 0 {
+		latestReport = &latestReports[0]
+	}
 
 	configuredVMIDs := make(map[string]bool)
 	var missingVMs []map[string]any
@@ -673,7 +678,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"BackupRows":      backupRows,
 		"BackupJobStart":  backupJobStart,
 		"Heartbeat":       buildHeartbeatViewPtr(hb, heartbeatThreshold),
-		"Swap":            latestPVESwapView(latestReports),
+		"Swap":            currentPVESwapView(latestReport, hb),
 		"MissingVMs":      missingVMs,
 		"ConfiguredVMIDs": configuredVMIDs,
 		"JobHistory":      jobHistory,
