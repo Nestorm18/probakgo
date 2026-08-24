@@ -452,6 +452,13 @@ code {
 .page-header h1 {
   font-size: .95rem; font-weight: 600; margin: 0; color: var(--txt-primary);
 }
+.page-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.page-actions:empty,
+.page-actions:not(:has(*)) { display: none !important; }
 .page-body { padding: 1.5rem; flex: 1; }
 
 /* ─── Cards ──────────────────────────────────────────────────── */
@@ -580,6 +587,13 @@ code {
 .server-list-toolbar {
   flex-wrap: wrap;
 }
+.server-list-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
 .dashboard-server-row {
   min-height: 64px;
 }
@@ -631,8 +645,13 @@ code {
     max-width: none !important;
     flex: 1 1 100%;
   }
-  .server-list-toolbar .ms-auto {
+  .server-list-toolbar-actions {
+    width: 100%;
     margin-left: 0 !important;
+  }
+  .server-list-toolbar-actions .btn {
+    flex: 1 1 auto;
+    justify-content: center;
   }
   .dashboard-server-row {
     align-items: flex-start;
@@ -1203,15 +1222,19 @@ details[open] > summary::before { transform: rotate(90deg); }
     padding: 0 .75rem;
   }
   .page-header h1 {
+    flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .page-header .ms-auto {
+  .page-actions {
     min-width: 0;
-    flex-wrap: wrap;
-    justify-content: flex-end;
+    gap: .375rem !important;
+  }
+  .page-header > .page-actions > * {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
   }
 
   .card-body:has(> .table),
@@ -1245,4 +1268,29 @@ details[open] > summary::before { transform: rotate(90deg); }
   .profile-channel-content { align-items: stretch; flex-direction: column; padding-left: 0; }
   .profile-actions { justify-content: flex-start; }
   .profile-actions > form, .profile-actions > .btn { max-width: 100%; }
+}
+
+@media (max-width: 767.98px) {
+  .page-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+  }
+  .page-header > #sidebarToggle {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .page-header > h1 {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .page-header > .page-actions {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+    margin-left: 0 !important;
+    justify-content: flex-start;
+  }
 }

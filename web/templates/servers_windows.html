@@ -31,7 +31,7 @@
     <button type="button" class="btn btn-secondary" data-health-filter="alerts">Con avisos</button>
   </div>
   <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
-  <div class="ms-auto">
+  <div class="server-list-toolbar-actions">
     <a href="/servers/windows.xlsx" class="btn btn-sm btn-primary" title="Descargar informe Excel de discos"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Informe Excel</a>
   </div>
 </div>
@@ -143,7 +143,7 @@
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <form id="windowsAlertCfgForm" method="post">
+      <form id="windowsAlertCfgForm" method="post" data-totp-skip>
         {{.CSRFField}}
         <input type="hidden" name="back" value="list">
         <div class="modal-body">

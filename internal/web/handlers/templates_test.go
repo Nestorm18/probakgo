@@ -203,6 +203,34 @@ func TestAlertSuppressionSkipsSensitiveTOTPPrompt(t *testing.T) {
 	}
 }
 
+func TestServerAlertConfigSkipsSensitiveTOTPPrompt(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })
+	fixtures := templateFixtures(time.Now())
+	fixtures["server_pve_detail.html"]["BackupTasks"] = []domain.PVEBackupTask{{VMID: 100, VMName: "vm-test"}}
+
+	tests := []struct {
+		template string
+		form     string
+	}{
+		{template: "servers_pve.html", form: `<form id="pveAlertCfgForm" method="post" data-totp-skip>`},
+		{template: "servers_pbs.html", form: `<form id="pbsAlertCfgForm" method="post" data-totp-skip>`},
+		{template: "servers_windows.html", form: `<form id="windowsAlertCfgForm" method="post" data-totp-skip>`},
+		{template: "server_pve_detail.html", form: `action="/servers/pve/1/alerts/vm" class="d-flex align-items-center gap-2 flex-wrap" data-totp-skip`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.template, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rr := httptest.NewRecorder()
+			tmpl.Render(rr, req, tt.template, fixtures[tt.template])
+			if body := rr.Body.String(); !strings.Contains(body, tt.form) {
+				t.Fatalf("server alert form does not bypass the sensitive TOTP prompt:\n%s", body)
+			}
+		})
+	}
+}
+
 func TestTelegramProfilePairingSkipsSensitiveTOTPPromptAndShowsMobileQR(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })

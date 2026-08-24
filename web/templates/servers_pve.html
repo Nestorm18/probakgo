@@ -31,7 +31,7 @@
     <button type="button" class="btn btn-secondary" data-health-filter="alerts">Con avisos</button>
   </div>
   <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
-  <div class="ms-auto d-flex gap-2">
+  <div class="server-list-toolbar-actions">
     <a href="/servers/pve.xlsx" class="btn btn-sm btn-primary" title="Descargar informe Excel de las últimas copias"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Informe Excel</a>
     <a href="/servers/pve.csv" class="btn btn-sm btn-secondary" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
     <a href="/servers/pve.json" class="btn btn-sm btn-secondary" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
@@ -154,7 +154,7 @@
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
-      <form id="pveAlertCfgForm" method="post">
+      <form id="pveAlertCfgForm" method="post" data-totp-skip>
         {{.CSRFField}}
         <input type="hidden" name="back" value="list">
         <div class="modal-body">
