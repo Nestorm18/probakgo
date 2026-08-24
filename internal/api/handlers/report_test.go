@@ -67,6 +67,39 @@ func TestReportPVE_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestReportPVE_RejectsTrailingJSON(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(`{"hostname":"pve-01"}{"hostname":"pve-02"}`))
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestReportPVE_RejectsInvalidValues(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+
+	body := `{"hostname":"pve-01","report_id":"bad id","swap_used":-1}`
+	req := httptest.NewRequest(http.MethodPost, "/report/pve", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-1")
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestReportPVE_MissingMachineID(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)

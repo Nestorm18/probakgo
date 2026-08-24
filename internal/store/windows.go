@@ -77,8 +77,12 @@ func (s *Store) UpsertWindowsServerForAPIKey(ctx context.Context, apiKeyID int64
 }
 
 func (s *Store) InsertWindowsReport(ctx context.Context, serverID int64) (int64, error) {
-	debug.RecordQuery(ctx, `INSERT INTO windows_reports (server_id) VALUES (?)`)
-	res, err := s.db.ExecContext(ctx, `INSERT INTO windows_reports (server_id) VALUES (?)`, serverID)
+	return insertWindowsReport(ctx, s.db, serverID, "")
+}
+
+func insertWindowsReport(ctx context.Context, db dbExecer, serverID int64, reportToken string) (int64, error) {
+	debug.RecordQuery(ctx, `INSERT INTO windows_reports (server_id, report_id) VALUES (?, ?)`)
+	res, err := db.ExecContext(ctx, `INSERT INTO windows_reports (server_id, report_id) VALUES (?, ?)`, serverID, reportToken)
 	if err != nil {
 		return 0, fmt.Errorf("insert windows_report: %w", err)
 	}
@@ -86,13 +90,48 @@ func (s *Store) InsertWindowsReport(ctx context.Context, serverID int64) (int64,
 }
 
 func (s *Store) InsertWindowsDisk(ctx context.Context, reportID int64, disk domain.WindowsDiskPayload) error {
+	return insertWindowsDisk(ctx, s.db, reportID, disk)
+}
+
+func insertWindowsDisk(ctx context.Context, db dbExecer, reportID int64, disk domain.WindowsDiskPayload) error {
 	debug.RecordQuery(ctx, `INSERT INTO windows_disks (report_id, name, label, file_system, drive_type, total, used, free, health) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO windows_disks (report_id, name, label, file_system, drive_type, total, used, free, health)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, disk.Name, disk.Label, disk.FileSystem, disk.DriveType, disk.Total, disk.Used, disk.Free, disk.Health,
 	)
 	return err
+}
+
+// InsertWindowsReportData stores a complete Windows report atomically and
+// ignores a repeated report token for the same server.
+func (s *Store) InsertWindowsReportData(ctx context.Context, serverID int64, req *domain.WindowsReportRequest) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if req.ReportID != "" {
+		var exists int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM windows_reports WHERE server_id = ? AND report_id = ?`, serverID, req.ReportID).Scan(&exists)
+		if err == nil {
+			return nil
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
+	reportID, err := insertWindowsReport(ctx, tx, serverID, req.ReportID)
+	if err != nil {
+		return err
+	}
+	for _, disk := range req.Disks {
+		if err := insertWindowsDisk(ctx, tx, reportID, disk); err != nil {
+			return fmt.Errorf("insert windows disk %s: %w", disk.Name, err)
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) ListWindowsServers(ctx context.Context) ([]domain.WindowsServer, error) {

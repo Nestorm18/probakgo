@@ -9,7 +9,7 @@ Despliegue de laboratorio para validar el flujo completo: servidor, clientes, re
 - Opcional: un PBS 2+.
 - Opcional: una máquina Windows.
 - Acceso `root`/administrador y conectividad al puerto `36748`.
-- Go 1.26.5 en la máquina de desarrollo.
+- Go 1.26.6 en la máquina de desarrollo.
 
 No uses credenciales ni bases de datos de producción.
 

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -12,13 +11,14 @@ import (
 
 func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 	var req domain.PVEReportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	req.Hostname = strings.TrimSpace(req.Hostname)
-	if req.Hostname == "" {
-		errJSON(w, http.StatusBadRequest, "hostname is required")
+	req.ReportID = strings.TrimSpace(req.ReportID)
+	if err := req.Validate(); err != nil {
+		errJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !h.requireKeyServer(w, r, req.Hostname) {
@@ -35,13 +35,14 @@ func (h *H) ReportPVE(w http.ResponseWriter, r *http.Request) {
 
 func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 	var req domain.PBSReportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	req.Hostname = strings.TrimSpace(req.Hostname)
-	if req.Hostname == "" {
-		errJSON(w, http.StatusBadRequest, "hostname is required")
+	req.ReportID = strings.TrimSpace(req.ReportID)
+	if err := req.Validate(); err != nil {
+		errJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !h.requireKeyServer(w, r, req.Hostname) {
@@ -58,13 +59,14 @@ func (h *H) ReportPBS(w http.ResponseWriter, r *http.Request) {
 
 func (h *H) ReportWindows(w http.ResponseWriter, r *http.Request) {
 	var req domain.WindowsReportRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	req.Hostname = strings.TrimSpace(req.Hostname)
-	if req.Hostname == "" {
-		errJSON(w, http.StatusBadRequest, "hostname is required")
+	req.ReportID = strings.TrimSpace(req.ReportID)
+	if err := req.Validate(); err != nil {
+		errJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if !h.requireKeyServer(w, r, req.Hostname) {

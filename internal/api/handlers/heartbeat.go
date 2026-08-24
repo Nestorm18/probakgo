@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
@@ -12,14 +11,14 @@ import (
 
 func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	var req domain.HeartbeatRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	req.Hostname = strings.TrimSpace(req.Hostname)
 	req.ServerType = strings.ToLower(strings.TrimSpace(req.ServerType))
-	if req.Hostname == "" {
-		errJSON(w, http.StatusBadRequest, "hostname is required")
+	if err := req.Validate(); err != nil {
+		errJSON(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	if req.ServerType == "" {

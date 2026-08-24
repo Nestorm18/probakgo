@@ -42,33 +42,8 @@ func (r *ReportService) SavePVEReportForAPIKey(ctx context.Context, req *domain.
 		return fmt.Errorf("upsert server: %w", err)
 	}
 
-	reportID, err := r.store.InsertPVEReportWithSwap(ctx, serverID, req.LastBackupStatus, domain.HostSwap{
-		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
-	})
-	if err != nil {
-		return fmt.Errorf("insert report: %w", err)
-	}
-
-	for _, st := range req.Storages {
-		stID, err := r.store.InsertPVEStorage(ctx, reportID, st)
-		if err != nil {
-			return fmt.Errorf("insert storage %s: %w", st.Storage, err)
-		}
-		for _, info := range st.StorageInfo {
-			if err := r.store.InsertPVEStorageInfo(ctx, stID, info); err != nil {
-				return fmt.Errorf("insert storage info: %w", err)
-			}
-		}
-		for _, c := range st.ContentData {
-			if err := r.store.InsertPVEStorageContent(ctx, stID, c); err != nil {
-				return fmt.Errorf("insert content: %w", err)
-			}
-		}
-	}
-	for _, t := range req.BackupTasks {
-		if err := r.store.InsertPVEBackupTask(ctx, reportID, t); err != nil {
-			return fmt.Errorf("insert backup task vmid %d: %w", t.VMID, err)
-		}
+	if err := r.store.InsertPVEReportData(ctx, serverID, req); err != nil {
+		return fmt.Errorf("insert report data: %w", err)
 	}
 	return nil
 }
@@ -95,7 +70,7 @@ func (r *ReportService) SavePBSReportForAPIKey(ctx context.Context, req *domain.
 		return fmt.Errorf("upsert pbs server: %w", err)
 	}
 
-	err = r.store.InsertPBSReportData(ctx, serverID, domain.HostSwap{
+	err = r.store.InsertPBSReportData(ctx, serverID, req.ReportID, domain.HostSwap{
 		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
 	}, req.PBSInformation)
 	if err != nil {
@@ -122,14 +97,8 @@ func (r *ReportService) SaveWindowsReportForAPIKey(ctx context.Context, req *dom
 		return fmt.Errorf("upsert windows server: %w", err)
 	}
 
-	reportID, err := r.store.InsertWindowsReport(ctx, serverID)
-	if err != nil {
-		return fmt.Errorf("insert windows report: %w", err)
-	}
-	for _, disk := range req.Disks {
-		if err := r.store.InsertWindowsDisk(ctx, reportID, disk); err != nil {
-			return fmt.Errorf("insert windows disk %s: %w", disk.Name, err)
-		}
+	if err := r.store.InsertWindowsReportData(ctx, serverID, req); err != nil {
+		return fmt.Errorf("insert windows report data: %w", err)
 	}
 	return nil
 }

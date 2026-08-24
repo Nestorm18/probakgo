@@ -433,6 +433,8 @@ probakgo-client doctor
 probakgo-client --debug --vzdump-hook
 ```
 
+`/api/health` devuelve `200` solo cuando SQLite y el esquema migrado se pueden leer; devuelve `503` si el servicio está vivo pero la base de datos no está disponible.
+
 Comprueba que:
 
 - `API_URL` no termina en una ruta extra;

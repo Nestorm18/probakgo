@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"probakgo/internal/reportid"
 )
 
 func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
@@ -44,6 +48,9 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 		if err != nil {
 			return fmt.Errorf("generate report: %w", err)
 		}
+	}
+	if err := ensureReportID(data, si); err != nil {
+		return err
 	}
 
 	body, err := json.Marshal(data)
@@ -88,4 +95,24 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 	default:
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
 	}
+}
+
+func ensureReportID(data map[string]any, si *SysInfo) error {
+	if existing, _ := data["report_id"].(string); existing != "" {
+		return nil
+	}
+	if marker, err := os.ReadFile(pendingReportPath); err == nil {
+		marker = bytes.TrimSpace(marker)
+		if len(marker) > 0 {
+			sum := sha256.Sum256([]byte(si.machineID() + "|" + string(marker)))
+			data["report_id"] = hex.EncodeToString(sum[:16])
+			return nil
+		}
+	}
+	id, err := reportid.New()
+	if err != nil {
+		return err
+	}
+	data["report_id"] = id
+	return nil
 }

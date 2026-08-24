@@ -26,7 +26,7 @@ type psDisk struct {
 	Health     string `json:"Health"`
 }
 
-func buildReportRequest(ctx context.Context, cfg Config) (domain.WindowsReportRequest, error) {
+func buildReportRequest(ctx context.Context, cfg Config, reportID string) (domain.WindowsReportRequest, error) {
 	hostname, _ := os.Hostname()
 	mid, err := machineID(ctx)
 	if err != nil {
@@ -37,6 +37,7 @@ func buildReportRequest(ctx context.Context, cfg Config) (domain.WindowsReportRe
 		return domain.WindowsReportRequest{}, err
 	}
 	return domain.WindowsReportRequest{
+		ReportID:      reportID,
 		Hostname:      hostname,
 		IPAddress:     localIP(),
 		PublicIP:      publicIP(ctx),

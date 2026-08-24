@@ -72,3 +72,28 @@ func TestLoadEnvIntoProcessLoadsGitHubToken(t *testing.T) {
 		t.Fatalf("GITHUB_TOKEN: got %q, want expired-token", got)
 	}
 }
+
+func TestPendingReportIDPersistsUntilSuccess(t *testing.T) {
+	t.Setenv("ProgramData", t.TempDir())
+	first, err := loadOrCreatePendingReportID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := loadOrCreatePendingReportID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == "" || first != second {
+		t.Fatalf("pending id changed: first=%q second=%q", first, second)
+	}
+	if err := os.Remove(pendingReportIDPath()); err != nil {
+		t.Fatal(err)
+	}
+	third, err := loadOrCreatePendingReportID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if third == first {
+		t.Fatal("new report reused the completed report id")
+	}
+}

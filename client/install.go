@@ -56,7 +56,7 @@ if [ "$1" = "run-report" ]; then
     if [ "$EXIT_CODE" -eq 0 ]; then
         [ -f "$PENDING_FILE" ] && rm -f "$PENDING_FILE"
     else
-        echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
+        [ -f "$PENDING_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
     fi
     exit "$EXIT_CODE"
 fi

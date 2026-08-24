@@ -8,6 +8,7 @@ import (
 // --- PVE report payload (sent by client) ---
 
 type PVEReportRequest struct {
+	ReportID         string              `json:"report_id,omitempty"`
 	Hostname         string              `json:"hostname"`
 	IPAddress        string              `json:"ip_address"`
 	PublicIP         string              `json:"public_ip"`
@@ -98,6 +99,7 @@ type ContentDataPayload struct {
 // --- PBS report payload (sent by client) ---
 
 type PBSReportRequest struct {
+	ReportID       string         `json:"report_id,omitempty"`
 	Hostname       string         `json:"hostname"`
 	IPAddress      string         `json:"ip_address"`
 	PublicIP       string         `json:"public_ip"`
@@ -183,6 +185,7 @@ type PBSTaskPayload struct {
 // --- Windows report payload (sent by windows client) ---
 
 type WindowsReportRequest struct {
+	ReportID      string               `json:"report_id,omitempty"`
 	Hostname      string               `json:"hostname"`
 	IPAddress     string               `json:"ip_address"`
 	PublicIP      string               `json:"public_ip"`

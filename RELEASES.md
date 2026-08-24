@@ -6,7 +6,7 @@ Proceso actual para publicar servidor, cliente Proxmox y cliente Windows.
 
 El workflow `CI` se ejecuta en cada push y pull request:
 
-1. usa Go 1.26.5;
+1. usa Go 1.26.6;
 2. lee la única versión desde `internal/version/version.go`;
 3. ejecuta `go build ./...`, `go vet ./...` y la suite con perfil de cobertura;
 4. exige al menos un 35 % de cobertura global.

@@ -29,7 +29,7 @@ web/static/      - CSS/JS
 
 ## Builds
 
-The module and CI currently use Go 1.26.5.
+The module and CI currently use Go 1.26.6.
 
 ```bash
 go build -o probakgo .
@@ -48,6 +48,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Server
 
 - API endpoints include PVE, PBS and Windows reports, heartbeat, backup config, API keys and downloads.
+- `/api/health` is a readiness check: it returns `503` when SQLite or the migrated schema cannot be read.
 - Web pages include dashboard, alerts, PVE, PBS, Windows, users, API keys, profile, about and the settings hub.
 - Auth uses bcrypt, sessions and RBAC: `reader`, `editor`, `admin`.
 - TOTP 2FA can be enforced for editors/admins and for sensitive actions. User security changes revoke existing sessions.
@@ -57,6 +58,7 @@ Release assets must stay in sync with workflows and download handlers:
 - The UI exposes CSV/JSON exports for alerts and PVE/PBS server/report data.
 - The standard `/opt/probakgo` systemd unit runs as the dedicated `probakgo` user with filesystem and process hardening.
 - The initial admin password is stored in a `0600` one-time file and retrieved with `probakgo initial-password`; it must never be logged.
+- Production backups are covered by the Proxmox backup of the server VM/container, including `/opt/probakgo`, SQLite and `.env`. The web database download remains an on-demand export; a second application-level backup scheduler is intentionally unnecessary for this deployment.
 
 ## Clients
 
@@ -89,7 +91,8 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `044_telegram_user_links.up.sql`.
+- Current latest migration: `046_report_idempotency.up.sql`.
+- New clients attach a stable `report_id`; the server deduplicates it per server. PVE, PBS and Windows report trees must be stored atomically.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
 

@@ -50,6 +50,9 @@ func TestSendReportFromFilePVE(t *testing.T) {
 	if received["hostname"] != "test-node" {
 		t.Errorf("hostname: got %v, want test-node", received["hostname"])
 	}
+	if received["report_id"] == "" {
+		t.Error("report_id was not generated")
+	}
 }
 
 func TestSendReportFromFilePBS(t *testing.T) {

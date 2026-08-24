@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 type testServer struct {
 	handler http.Handler
 	store   *store.Store
+	db      *sql.DB
 }
 
 // newTestServer builds a full api.Server backed by an in-memory SQLite DB.
@@ -33,7 +35,7 @@ func newTestServer(t *testing.T) *testServer {
 	auth := service.NewAuth(st)
 	rep := service.NewReport(st, time.UTC)
 	srv := api.NewServer(st, auth, rep, nil)
-	return &testServer{handler: srv.Router(), store: st}
+	return &testServer{handler: srv.Router(), store: st, db: db}
 }
 
 func (ts *testServer) doJSON(t *testing.T, method, path, key string, body any) *httptest.ResponseRecorder {

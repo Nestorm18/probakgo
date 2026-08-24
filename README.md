@@ -2,7 +2,7 @@
 
 Monitor de copias de seguridad e infraestructura para Proxmox VE, Proxmox Backup Server y Windows.
 
-[![Go 1.26.5](https://img.shields.io/badge/Go-1.26.5-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go 1.26.6](https://img.shields.io/badge/Go-1.26.6-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm_NC_1.0-blue)](LICENSE)
 
 El servidor se distribuye como un único binario con la web y las migraciones embebidas, usa SQLite sin CGO y escucha por defecto en el puerto `36748`. Los clientes envían reportes autenticados con claves `pbk-` vinculadas al Machine ID del primer equipo que las usa.
@@ -206,7 +206,7 @@ El modo reporte del cliente Proxmox acepta `--server-type`, `--vzdump-hook`, `--
 
 ## Compilar y probar
 
-Requiere Go 1.26.5.
+Requiere Go 1.26.6.
 
 ```bash
 go build -o probakgo .

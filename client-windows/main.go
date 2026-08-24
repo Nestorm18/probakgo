@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"probakgo/internal/reportid"
 	"probakgo/internal/selfupdate"
 	appversion "probakgo/internal/version"
 )
@@ -59,7 +61,11 @@ func runReport() error {
 	if err != nil {
 		return err
 	}
-	req, err := buildReportRequest(context.Background(), cfg)
+	reportID, err := loadOrCreatePendingReportID()
+	if err != nil {
+		return err
+	}
+	req, err := buildReportRequest(context.Background(), cfg, reportID)
 	if err != nil {
 		return err
 	}
@@ -70,8 +76,37 @@ func runReport() error {
 	if err := postJSON(cfg, "/api/report/windows", req); err != nil {
 		return err
 	}
+	if err := os.Remove(pendingReportIDPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("clear pending report id: %w", err)
+	}
 	log.Printf("Report sent successfully (%s)", time.Now().Format(time.RFC3339))
 	return nil
+}
+
+func pendingReportIDPath() string {
+	return filepath.Join(installDir(), ".report_pending")
+}
+
+func loadOrCreatePendingReportID() (string, error) {
+	path := pendingReportIDPath()
+	if data, err := os.ReadFile(path); err == nil {
+		if id := strings.TrimSpace(string(data)); id != "" {
+			return id, nil
+		}
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("read pending report id: %w", err)
+	}
+	id, err := reportid.New()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(installDir(), 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(id+"\n"), 0600); err != nil {
+		return "", fmt.Errorf("write pending report id: %w", err)
+	}
+	return id, nil
 }
 
 func runHeartbeat() error {

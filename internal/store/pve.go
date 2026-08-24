@@ -119,6 +119,10 @@ func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.
 }
 
 func (s *Store) InsertPVEReportWithSwap(ctx context.Context, serverID int64, bs *domain.BackupStatus, swap domain.HostSwap) (int64, error) {
+	return insertPVEReportWithSwap(ctx, s.db, serverID, bs, swap, "")
+}
+
+func insertPVEReportWithSwap(ctx context.Context, db dbExecer, serverID int64, bs *domain.BackupStatus, swap domain.HostSwap, reportToken string) (int64, error) {
 	status := ""
 	var starttime, endtime, duration int64
 	if bs != nil {
@@ -131,11 +135,11 @@ func (s *Store) InsertPVEReportWithSwap(ctx context.Context, serverID int64, bs 
 	if swap.Enabled {
 		swapEnabled = 1
 	}
-	debug.RecordQuery(ctx, `INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO pve_reports (server_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		serverID, status, starttime, endtime, duration, swap.Total, swap.Used, swapEnabled,
+	debug.RecordQuery(ctx, `INSERT INTO pve_reports (server_id, report_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	res, err := db.ExecContext(ctx,
+		`INSERT INTO pve_reports (server_id, report_id, backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		serverID, reportToken, status, starttime, endtime, duration, swap.Total, swap.Used, swapEnabled,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("insert pve_report: %w", err)
@@ -144,13 +148,17 @@ func (s *Store) InsertPVEReportWithSwap(ctx context.Context, serverID int64, bs 
 }
 
 func (s *Store) InsertPVEStorage(ctx context.Context, reportID int64, st domain.StoragePayload) (int64, error) {
+	return insertPVEStorage(ctx, s.db, reportID, st)
+}
+
+func insertPVEStorage(ctx context.Context, db dbExecer, reportID int64, st domain.StoragePayload) (int64, error) {
 	pruneJSON, _ := json.Marshal(st.PruneBackups)
 	shared := 0
 	if st.Shared {
 		shared = 1
 	}
 	debug.RecordQuery(ctx, `INSERT INTO pve_storages (report_id, storage, path, content, type, status, shared, server, digest, prune_backups) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	res, err := s.db.ExecContext(ctx,
+	res, err := db.ExecContext(ctx,
 		`INSERT INTO pve_storages (report_id, storage, path, content, type, status, shared, server, digest, prune_backups)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, st.Storage, st.Path, st.Content, st.Type, st.Status,
@@ -163,6 +171,10 @@ func (s *Store) InsertPVEStorage(ctx context.Context, reportID int64, st domain.
 }
 
 func (s *Store) InsertPVEStorageInfo(ctx context.Context, storageID int64, info domain.StorageInfoPayload) error {
+	return insertPVEStorageInfo(ctx, s.db, storageID, info)
+}
+
+func insertPVEStorageInfo(ctx context.Context, db dbExecer, storageID int64, info domain.StorageInfoPayload) error {
 	active, enabled := 0, 0
 	if info.Active {
 		active = 1
@@ -171,7 +183,7 @@ func (s *Store) InsertPVEStorageInfo(ctx context.Context, storageID int64, info 
 		enabled = 1
 	}
 	debug.RecordQuery(ctx, `INSERT INTO pve_storage_info (storage_id, total, used, avail, used_percent, active, enabled, lvl) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO pve_storage_info (storage_id, total, used, avail, used_percent, active, enabled, lvl)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		storageID, info.Total, info.Used, info.Avail, info.UsedPct, active, enabled, info.Lvl,
@@ -180,13 +192,67 @@ func (s *Store) InsertPVEStorageInfo(ctx context.Context, storageID int64, info 
 }
 
 func (s *Store) InsertPVEStorageContent(ctx context.Context, storageID int64, c domain.ContentDataPayload) error {
+	return insertPVEStorageContent(ctx, s.db, storageID, c)
+}
+
+func insertPVEStorageContent(ctx context.Context, db dbExecer, storageID int64, c domain.ContentDataPayload) error {
 	debug.RecordQuery(ctx, `INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO pve_storage_content (storage_id, vmid, format, size, content, volid, ctime, subtype, notes, verification)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		storageID, c.VMID, c.Format, c.Size, c.Content, c.VolID, c.CTime, c.Subtype, c.Notes, c.Verification,
 	)
 	return err
+}
+
+// InsertPVEReportData stores a complete PVE report atomically and ignores a
+// repeated report token for the same server.
+func (s *Store) InsertPVEReportData(ctx context.Context, serverID int64, req *domain.PVEReportRequest) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	if req.ReportID != "" {
+		var exists int
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM pve_reports WHERE server_id = ? AND report_id = ?`, serverID, req.ReportID).Scan(&exists)
+		if err == nil {
+			return nil
+		}
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
+
+	reportID, err := insertPVEReportWithSwap(ctx, tx, serverID, req.LastBackupStatus, domain.HostSwap{
+		Total: req.SwapTotal, Used: req.SwapUsed, Enabled: req.SwapEnabled,
+	}, req.ReportID)
+	if err != nil {
+		return err
+	}
+	for _, storage := range req.Storages {
+		storageID, err := insertPVEStorage(ctx, tx, reportID, storage)
+		if err != nil {
+			return fmt.Errorf("insert storage %s: %w", storage.Storage, err)
+		}
+		for _, info := range storage.StorageInfo {
+			if err := insertPVEStorageInfo(ctx, tx, storageID, info); err != nil {
+				return fmt.Errorf("insert storage info: %w", err)
+			}
+		}
+		for _, content := range storage.ContentData {
+			if err := insertPVEStorageContent(ctx, tx, storageID, content); err != nil {
+				return fmt.Errorf("insert storage content: %w", err)
+			}
+		}
+	}
+	for _, task := range req.BackupTasks {
+		if err := insertPVEBackupTask(ctx, tx, reportID, task); err != nil {
+			return fmt.Errorf("insert backup task vmid %d: %w", task.VMID, err)
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) {
@@ -516,8 +582,12 @@ func (s *Store) GetPVEStorageInfo(ctx context.Context, storageID int64) (*domain
 }
 
 func (s *Store) InsertPVEBackupTask(ctx context.Context, reportID int64, t domain.BackupTaskPayload) error {
+	return insertPVEBackupTask(ctx, s.db, reportID, t)
+}
+
+func insertPVEBackupTask(ctx context.Context, db dbExecer, reportID int64, t domain.BackupTaskPayload) error {
 	debug.RecordQuery(ctx, `INSERT INTO pve_backup_tasks (report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-	_, err := s.db.ExecContext(ctx,
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO pve_backup_tasks (report_id, vmid, vm_name, status, starttime, endtime, duration, size, filename)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		reportID, t.VMID, t.VMName, t.Status, t.StartTime, t.EndTime, t.Duration, t.Size, t.Filename,

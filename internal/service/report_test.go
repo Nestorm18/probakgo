@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"testing"
 	"time"
@@ -193,6 +194,112 @@ func TestSavePBSReport_FullRoundTrip(t *testing.T) {
 	}
 	if len(tasks) != 1 || tasks[0].Remote != "casa" || tasks[0].Status != "OK" {
 		t.Fatalf("unexpected PBS tasks: %#v", tasks)
+	}
+}
+
+func TestSaveReportsAreIdempotent(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("pve", func(t *testing.T) {
+		db, st := openTestStore(t)
+		svc := NewReport(st, time.UTC)
+		req := &domain.PVEReportRequest{
+			ReportID: "pve-report-1", Hostname: "pve-01",
+			Storages: []domain.StoragePayload{{Storage: "local"}},
+		}
+		if err := svc.SavePVEReport(ctx, req); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.SavePVEReport(ctx, req); err != nil {
+			t.Fatal(err)
+		}
+		assertReportRowCount(t, db, "pve_reports", 1)
+		assertReportRowCount(t, db, "pve_storages", 1)
+	})
+
+	t.Run("pbs", func(t *testing.T) {
+		db, st := openTestStore(t)
+		svc := NewReport(st, time.UTC)
+		req := &domain.PBSReportRequest{
+			ReportID: "pbs-report-1", Hostname: "pbs-01",
+			PBSInformation: domain.PBSInformation{Data: []domain.PBSDatastorePayload{{Store: "backup"}}},
+		}
+		if err := svc.SavePBSReport(ctx, req); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.SavePBSReport(ctx, req); err != nil {
+			t.Fatal(err)
+		}
+		assertReportRowCount(t, db, "pbs_reports", 1)
+		assertReportRowCount(t, db, "pbs_stores", 1)
+	})
+
+	t.Run("windows", func(t *testing.T) {
+		db, st := openTestStore(t)
+		svc := NewReport(st, time.UTC)
+		req := &domain.WindowsReportRequest{
+			ReportID: "windows-report-1", Hostname: "windows-01",
+			Disks: []domain.WindowsDiskPayload{{Name: "C:", Total: 100, Free: 100}},
+		}
+		if err := svc.SaveWindowsReportForAPIKey(ctx, req, 0); err != nil {
+			t.Fatal(err)
+		}
+		if err := svc.SaveWindowsReportForAPIKey(ctx, req, 0); err != nil {
+			t.Fatal(err)
+		}
+		assertReportRowCount(t, db, "windows_reports", 1)
+		assertReportRowCount(t, db, "windows_disks", 1)
+	})
+}
+
+func TestPVEAndWindowsReportsRollbackOnChildFailure(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("pve", func(t *testing.T) {
+		db, st := openTestStore(t)
+		if _, err := db.Exec(`CREATE TRIGGER fail_pve_info BEFORE INSERT ON pve_storage_info BEGIN SELECT RAISE(ABORT, 'forced'); END`); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewReport(st, time.UTC)
+		err := svc.SavePVEReport(ctx, &domain.PVEReportRequest{
+			ReportID: "pve-failure", Hostname: "pve-01",
+			Storages: []domain.StoragePayload{{Storage: "local", StorageInfo: []domain.StorageInfoPayload{{Total: 100}}}},
+		})
+		if err == nil {
+			t.Fatal("expected forced insert failure")
+		}
+		assertReportRowCount(t, db, "pve_reports", 0)
+		assertReportRowCount(t, db, "pve_storages", 0)
+	})
+
+	t.Run("windows", func(t *testing.T) {
+		db, st := openTestStore(t)
+		if _, err := db.Exec(`CREATE TRIGGER fail_windows_disk BEFORE INSERT ON windows_disks BEGIN SELECT RAISE(ABORT, 'forced'); END`); err != nil {
+			t.Fatal(err)
+		}
+		svc := NewReport(st, time.UTC)
+		err := svc.SaveWindowsReportForAPIKey(ctx, &domain.WindowsReportRequest{
+			ReportID: "windows-failure", Hostname: "windows-01",
+			Disks: []domain.WindowsDiskPayload{{Name: "C:", Total: 100}},
+		}, 0)
+		if err == nil {
+			t.Fatal("expected forced insert failure")
+		}
+		assertReportRowCount(t, db, "windows_reports", 0)
+		assertReportRowCount(t, db, "windows_disks", 0)
+	})
+}
+
+func assertReportRowCount(t *testing.T, db interface {
+	QueryRow(query string, args ...any) *sql.Row
+}, table string, want int) {
+	t.Helper()
+	var got int
+	if err := db.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
+		t.Fatalf("%s rows: got %d, want %d", table, got, want)
 	}
 }
 
