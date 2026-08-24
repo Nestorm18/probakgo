@@ -83,6 +83,41 @@ func TestProxmoxServerTablesSortEveryDataColumn(t *testing.T) {
 	}
 }
 
+func TestMobileServerLayoutsExposeCompactHooks(t *testing.T) {
+	templateBody, err := os.ReadFile("../../../web/templates/servers_pbs.html")
+	if err != nil {
+		t.Fatalf("read PBS server template: %v", err)
+	}
+	body := string(templateBody)
+
+	for _, want := range []string{
+		`pbs-server-table-card`,
+		`pbs-server-table`,
+		`data-label="Cliente"`,
+		`data-label="Reporte"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("PBS server list is missing mobile layout hook %q", want)
+		}
+	}
+
+	css, err := os.ReadFile("../../../web/static/css/style.css")
+	if err != nil {
+		t.Fatalf("read stylesheet: %v", err)
+	}
+	styles := string(css)
+	for _, want := range []string{
+		`@media (hover: hover) and (pointer: fine)`,
+		`"icon identity chevron"`,
+		`.pbs-server-table tbody tr:not(.empty-state-row)`,
+		`"server client"`,
+	} {
+		if !strings.Contains(styles, want) {
+			t.Fatalf("stylesheet is missing mobile layout rule %q", want)
+		}
+	}
+}
+
 func TestServerListsExposeExcelReports(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })

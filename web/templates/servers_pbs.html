@@ -38,9 +38,9 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card pbs-server-table-card">
   <div class="card-body p-0" style="overflow:hidden;border-radius:.75rem">
-    <table class="table table-hover mb-0">
+    <table class="table table-hover mb-0 pbs-server-table">
       <thead>
         <tr>
           <th data-sort="0" aria-sort="none"><button type="button" class="sort-button">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
@@ -56,7 +56,7 @@
       <tbody class="server-tbody">
       {{range .Rows}}
       <tr data-has-alerts="{{if .Health.HasAlerts}}1{{else}}0{{end}}">
-        <td data-sort-value="{{.Server.DisplayName}}">
+        <td data-sort-value="{{.Server.DisplayName}}" data-label="Servidor">
           <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
             {{.Server.DisplayName}}
           </a>
@@ -68,20 +68,20 @@
           <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
           {{end}}
         </td>
-        <td data-sort-value="{{.Server.IP}}">
+        <td data-sort-value="{{.Server.IP}}" data-label="Dirección">
           <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
         </td>
-        <td data-sort-value="{{.Server.ClientVersion}}">
+        <td data-sort-value="{{.Server.ClientVersion}}" data-label="Cliente">
           {{if clientVersionOutdated .Server.ClientVersion}}<span class="status-pill warn" title="Version anterior a {{$.Version}}">{{.Server.ClientVersion}}</span>
           {{else if clientVersionCurrent .Server.ClientVersion}}<span class="status-pill ok" title="Cliente actualizado">{{.Server.ClientVersion}}</span>
           {{else}}<code>{{.Server.ClientVersion}}</code>{{end}}
         </td>
-        <td data-sort-value="{{if .Swap.Enabled}}{{.Swap.Used}}{{else}}-1{{end}}">{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
-        <td data-sort-value="{{if .LastReport}}{{.LastReport.Unix}}{{else}}0{{end}}" style="font-size:.82rem;color:var(--txt-secondary)">
+        <td data-sort-value="{{if .Swap.Enabled}}{{.Swap.Used}}{{else}}-1{{end}}" data-label="Swap">{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td data-sort-value="{{if .LastReport}}{{.LastReport.Unix}}{{else}}0{{end}}" data-label="Reporte" style="font-size:.82rem;color:var(--txt-secondary)">
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
-        <td data-sort-value="{{.StoreUsage}}" style="font-size:.82rem">
+        <td data-sort-value="{{.StoreUsage}}" data-label="Datastores" style="font-size:.82rem">
           {{range .Stores}}
           <div class="mb-1">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -104,12 +104,12 @@
           </div>
           {{end}}
         </td>
-        <td data-sort-value="{{if .Maintenance.Active}}1{{else if .IsStale}}2{{else}}0{{end}}">
+        <td data-sort-value="{{if .Maintenance.Active}}1{{else if .IsStale}}2{{else}}0{{end}}" data-label="Estado">
           {{if .Maintenance.Active}}<span class="status-pill info" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
           {{else if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
-        <td class="text-end" style="white-space:nowrap">
+        <td class="text-end" data-label="Acciones" style="white-space:nowrap">
           <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
           {{if $.Role}}{{if canEdit $.Role}}
           <button class="btn btn-sm btn-outline-secondary pbs-alert-cfg-btn position-relative"
