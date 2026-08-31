@@ -56,12 +56,12 @@ func (s *Store) DeleteIPBan(ctx context.Context, ip string) error {
 	return err
 }
 
-func (s *Store) InsertLoginAttempt(ctx context.Context, username, ip, userAgent, result, reason string) error {
-	debug.RecordQuery(ctx, `INSERT INTO login_attempts (username, ip, user_agent, result, reason) VALUES (?, ?, ?, ?, ?)`)
+func (s *Store) InsertLoginAttempt(ctx context.Context, username, ip, userAgent, clientDetails, result, reason string) error {
+	debug.RecordQuery(ctx, `INSERT INTO login_attempts (username, ip, user_agent, client_details, result, reason) VALUES (?, ?, ?, ?, ?, ?)`)
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO login_attempts (username, ip, user_agent, result, reason)
-		VALUES (?, ?, ?, ?, ?)`,
-		username, ip, userAgent, result, reason,
+		INSERT INTO login_attempts (username, ip, user_agent, client_details, result, reason)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		username, ip, userAgent, clientDetails, result, reason,
 	)
 	return err
 }
@@ -77,9 +77,9 @@ func (s *Store) ListLoginAttemptsPage(ctx context.Context, limit, offset int) ([
 	if offset < 0 {
 		offset = 0
 	}
-	debug.RecordQuery(ctx, `SELECT id, username, ip, user_agent, result, reason, attempted_at FROM login_attempts ORDER BY attempted_at DESC, id DESC LIMIT ? OFFSET ?`)
+	debug.RecordQuery(ctx, `SELECT id, username, ip, user_agent, client_details, result, reason, attempted_at FROM login_attempts ORDER BY attempted_at DESC, id DESC LIMIT ? OFFSET ?`)
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, username, ip, user_agent, result, reason, attempted_at
+		SELECT id, username, ip, user_agent, client_details, result, reason, attempted_at
 		FROM login_attempts
 		ORDER BY attempted_at DESC, id DESC
 		LIMIT ? OFFSET ?`, limit, offset)
@@ -91,7 +91,7 @@ func (s *Store) ListLoginAttemptsPage(ctx context.Context, limit, offset int) ([
 	var out []domain.LoginAttempt
 	for rows.Next() {
 		var a domain.LoginAttempt
-		if err := rows.Scan(&a.ID, &a.Username, &a.IP, &a.UserAgent, &a.Result, &a.Reason, &a.AttemptedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.Username, &a.IP, &a.UserAgent, &a.ClientDetails, &a.Result, &a.Reason, &a.AttemptedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

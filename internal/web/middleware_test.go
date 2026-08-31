@@ -40,6 +40,9 @@ func TestSecurityHeadersUseAUniqueScriptNonce(t *testing.T) {
 		if strings.Contains(scriptPolicy, "'unsafe-inline'") {
 			t.Fatalf("script policy still permits unsafe-inline: %q", scriptPolicy)
 		}
+		if rr.Header().Get("Accept-CH") == "" {
+			t.Fatal("Accept-CH was not sent")
+		}
 		if nonce == previousNonce {
 			t.Fatal("CSP nonce was reused across requests")
 		}

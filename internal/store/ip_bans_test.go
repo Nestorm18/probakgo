@@ -10,7 +10,7 @@ func TestListLoginAttemptsPage(t *testing.T) {
 	ctx := context.Background()
 
 	for _, username := range []string{"first", "second", "third"} {
-		if err := st.InsertLoginAttempt(ctx, username, "10.0.0.1", "agent", "failed", "bad password"); err != nil {
+		if err := st.InsertLoginAttempt(ctx, username, "10.0.0.1", "agent", `{"timezone":"Europe/Madrid"}`, "failed", "bad password"); err != nil {
 			t.Fatalf("insert login attempt %q: %v", username, err)
 		}
 	}
@@ -35,5 +35,8 @@ func TestListLoginAttemptsPage(t *testing.T) {
 	}
 	if page2[0].Username != "first" {
 		t.Fatalf("second page username: got %q, want first", page2[0].Username)
+	}
+	if page2[0].ClientDetails != `{"timezone":"Europe/Madrid"}` {
+		t.Fatalf("client details: got %q", page2[0].ClientDetails)
 	}
 }

@@ -308,13 +308,14 @@ type User struct {
 }
 
 type LoginAttempt struct {
-	ID          int64     `db:"id"`
-	Username    string    `db:"username"`
-	IP          string    `db:"ip"`
-	UserAgent   string    `db:"user_agent"`
-	Result      string    `db:"result"`
-	Reason      string    `db:"reason"`
-	AttemptedAt time.Time `db:"attempted_at"`
+	ID            int64     `db:"id"`
+	Username      string    `db:"username"`
+	IP            string    `db:"ip"`
+	UserAgent     string    `db:"user_agent"`
+	ClientDetails string    `db:"client_details"`
+	Result        string    `db:"result"`
+	Reason        string    `db:"reason"`
+	AttemptedAt   time.Time `db:"attempted_at"`
 }
 
 type AuditLog struct {

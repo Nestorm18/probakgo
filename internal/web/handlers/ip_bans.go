@@ -57,7 +57,7 @@ func (h *WebH) IPBansPage(w http.ResponseWriter, r *http.Request) {
 		"Username":      username,
 		"Role":          role,
 		"Bans":          bans,
-		"LoginAttempts": attempts,
+		"LoginAttempts": loginAttemptViews(attempts),
 		"Flash":         r.URL.Query().Get("flash"),
 		"FlashOK":       r.URL.Query().Get("ok") == "1",
 

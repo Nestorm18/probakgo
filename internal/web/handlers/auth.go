@@ -60,7 +60,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	if h.ban != nil {
 		if banned, _ := h.ban.IsBanned(ip); banned {
-			_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "blocked", "ip_banned")
+			h.recordLoginAttempt(r, username, ip, userAgent, "blocked", "ip_banned")
 			h.notifyAdminLoginFailed(username, ip, "IP bloqueada")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
@@ -71,7 +71,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.store.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
-		_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "failed", "invalid_credentials")
+		h.recordLoginAttempt(r, username, ip, userAgent, "failed", "invalid_credentials")
 		h.notifyAdminLoginFailed(username, ip, "Credenciales no válidas")
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
@@ -80,7 +80,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
-		_ = h.store.InsertLoginAttempt(r.Context(), username, ip, userAgent, "failed", "invalid_credentials")
+		h.recordLoginAttempt(r, username, ip, userAgent, "failed", "invalid_credentials")
 		h.notifyAdminLoginFailed(username, ip, "Credenciales no válidas")
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
@@ -108,7 +108,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Session error", http.StatusInternalServerError)
 			return
 		}
-		_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "pending", "totp_required")
+		h.recordLoginAttempt(r, user.Username, ip, userAgent, "pending", "totp_required")
 		http.Redirect(w, r, "/login/2fa", http.StatusSeeOther)
 		return
 	}
@@ -117,7 +117,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
-	_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "success", "")
+	h.recordLoginAttempt(r, user.Username, ip, userAgent, "success", "")
 	_ = h.store.UpdateUserLastLogin(r.Context(), user.ID, ratelimit.ExtractIP(r))
 	h.notifyAdminLoginSuccess(user.Username, ip)
 	http.Redirect(w, r, next, http.StatusSeeOther)
@@ -157,14 +157,14 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.ban != nil {
 		if banned, _ := h.ban.IsBanned(ip); banned {
-			_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "blocked", "ip_banned")
+			h.recordLoginAttempt(r, user.Username, ip, userAgent, "blocked", "ip_banned")
 			h.notifyAdminLoginFailed(user.Username, ip, "IP bloqueada durante 2FA")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 	}
 	if !totp.Validate(r.FormValue("code"), user.TOTPSecret, time.Now()) {
-		_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "failed", "invalid_totp")
+		h.recordLoginAttempt(r, user.Username, ip, userAgent, "failed", "invalid_totp")
 		h.notifyAdminLoginFailed(user.Username, ip, "Código 2FA incorrecto")
 		if h.ban != nil {
 			h.ban.RecordFailure(ip)
@@ -182,7 +182,7 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
-	_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ip, userAgent, "success", "")
+	h.recordLoginAttempt(r, user.Username, ip, userAgent, "success", "")
 	_ = h.store.UpdateUserLastLogin(r.Context(), user.ID, ip)
 	h.notifyAdminLoginSuccess(user.Username, ip)
 	http.Redirect(w, r, safeNext(next), http.StatusSeeOther)
@@ -247,7 +247,7 @@ func (h *WebH) handleTOTPEnforcement(w http.ResponseWriter, r *http.Request, use
 	}
 	if now.Sub(*startedAt) >= 72*time.Hour {
 		_ = h.store.SetUserActive(r.Context(), user.ID, false)
-		_ = h.store.InsertLoginAttempt(r.Context(), user.Username, ratelimit.ExtractIP(r), r.UserAgent(), "blocked", "totp_grace_expired")
+		h.recordLoginAttempt(r, user.Username, ratelimit.ExtractIP(r), r.UserAgent(), "blocked", "totp_grace_expired")
 		h.notifyAdminLoginFailed(user.Username, ratelimit.ExtractIP(r), "Usuario desactivado por no configurar 2FA")
 		h.tmpl.Render(w, r, "login.html", map[string]any{
 			"Error": "Usuario desactivado: 2FA no se activo dentro del plazo de 3 dias.",

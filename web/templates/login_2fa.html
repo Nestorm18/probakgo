@@ -29,7 +29,7 @@
           <span style="font-size:.82rem">{{.Error}}</span>
         </div>
         {{end}}
-        <form method="POST" action="/login/2fa">
+        <form method="POST" action="/login/2fa" data-login-device-details>
           {{ .CSRFField }}
           <div class="mb-4">
             <label class="form-label">Código de 6 dígitos</label>
@@ -43,5 +43,6 @@
     </div>
   </div>
 </div>
+<script defer src="/static/js/login-device-details.js"></script>
 </body>
 </html>

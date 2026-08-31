@@ -233,6 +233,9 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		// Ask supporting browsers for richer, privacy-controlled User-Agent
+		// Client Hints on later requests (including the login submission).
+		w.Header().Set("Accept-CH", "Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Model")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'none'; "+
 				"script-src 'self' 'nonce-"+nonce+"' https://cdn.jsdelivr.net; "+

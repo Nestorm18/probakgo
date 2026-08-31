@@ -99,7 +99,7 @@
           <th>IP</th>
           <th>Usuario</th>
           <th>Resultado</th>
-          <th>User-Agent</th>
+          <th>Dispositivo</th>
         </tr>
       </thead>
       <tbody>
@@ -117,8 +117,20 @@
             <span class="status-pill warn">Fallido</span>
           {{end}}
         </td>
-        <td class="text-truncate" style="max-width:360px;font-size:.78rem;color:var(--txt-muted)" title="{{.UserAgent}}">
-          {{if .UserAgent}}{{.UserAgent}}{{else}}–{{end}}
+        <td style="min-width:260px;max-width:420px;font-size:.78rem;color:var(--txt-muted)">
+          <details>
+            <summary class="text-truncate" title="{{.ClientSummary}}" style="cursor:pointer;max-width:390px">{{.ClientSummary}}</summary>
+            <dl class="mb-0 mt-2" style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.3rem .7rem;line-height:1.35">
+              {{range .ClientFields}}
+              <dt style="font-weight:600;color:var(--txt-secondary)">{{.Label}}</dt>
+              <dd class="mb-0 text-break">{{.Value}}</dd>
+              {{end}}
+              {{if .UserAgent}}
+              <dt style="font-weight:600;color:var(--txt-secondary)">User-Agent</dt>
+              <dd class="mb-0 text-break">{{.UserAgent}}</dd>
+              {{end}}
+            </dl>
+          </details>
         </td>
       </tr>
       {{else}}

@@ -44,7 +44,7 @@
           <span style="font-size:.82rem">{{.Error}}</span>
         </div>
         {{end}}
-        <form method="POST" action="/login">
+        <form method="POST" action="/login" data-login-device-details>
           {{ .CSRFField }}
           <div class="mb-3">
             <label class="form-label">Usuario</label>
@@ -74,6 +74,7 @@
 
 </div>
 
+<script defer src="/static/js/login-device-details.js"></script>
 <script nonce="{{.CSPNonce}}">
   const themeIcon = document.getElementById('themeIcon');
   function applyTheme(t) {
