@@ -32,6 +32,7 @@ probakgo-client_linux_arm64
 # IDE
 .idea/
 *.iml
+/.codex-remote-attachments/
 
 # Logs
 /logs/
