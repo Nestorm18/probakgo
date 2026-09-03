@@ -87,7 +87,7 @@
           {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
         </td>
         <td data-sort-value="{{if .BackupsDisabled}}0{{else if gt .TaskMissing 0}}4{{else if backupStatusOK .BackupStatus}}1{{else if backupStatusWarning .BackupStatus}}2{{else if .BackupStatus}}3{{else}}0{{end}}">
-          {{if .BackupsDisabled}}<span class="status-pill muted" title="Todas las VM están excluidas de Backup Config">No requerido</span>
+          {{if .BackupsDisabled}}<span class="status-pill muted" title="No hay VMs con copias programadas">No requerido</span>
           {{else if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
           {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>

@@ -47,3 +47,17 @@ func HasActiveVMBackupConfigs(configs []VMBackupConfig) bool {
 	}
 	return false
 }
+
+// PVEStaleSuppressed reports whether missing PVE backup reports should not
+// raise a "sin reporte" alert: the client confirmed that the host has no VMs,
+// no configured VM requires a backup, or the per-server stale override is
+// explicitly disabled (StaleHours=0).
+func PVEStaleSuppressed(configs []VMBackupConfig, cfg PVEAlertConfig, noVMsConfirmed bool) bool {
+	if cfg.StaleHours != nil && *cfg.StaleHours == 0 {
+		return true
+	}
+	if noVMsConfirmed {
+		return true
+	}
+	return len(configs) > 0 && !HasActiveVMBackupConfigs(configs)
+}

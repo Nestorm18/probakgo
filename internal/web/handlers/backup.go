@@ -77,6 +77,7 @@ func (h *WebH) BackupConfigVMNewPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/new?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	_ = h.store.SetPVEBackupInventory(ctx, serverID, true)
 	http.Redirect(w, r, "/backup-config/"+server+"?flash=VM+creada&ok=1", http.StatusSeeOther)
 }
 
@@ -116,6 +117,7 @@ func (h *WebH) BackupConfigVMEditPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/backup-config/"+server+"/vm/"+vmid+"/edit?flash="+err.Error(), http.StatusSeeOther)
 		return
 	}
+	_ = h.store.SetPVEBackupInventory(ctx, serverID, true)
 	http.Redirect(w, r, "/backup-config/"+server+"?flash=VM+actualizada&ok=1", http.StatusSeeOther)
 }
 

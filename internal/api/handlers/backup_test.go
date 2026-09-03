@@ -66,6 +66,33 @@ func TestGetBackupConfig_PreservesPVEServerMetadata(t *testing.T) {
 	}
 }
 
+func TestUpdateBackupInventory_ConfirmsNoVMs(t *testing.T) {
+	ctx := context.Background()
+	ts := newTestServer(t)
+	k, _ := ts.store.CreateAPIKey(ctx, "client", "", "")
+	if _, err := ts.store.UpsertPVEServerForAPIKey(ctx, k.ID, "pve-empty", "10.0.0.1", "", "1.0", "machine-empty"); err != nil {
+		t.Fatalf("create PVE server: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/backup-config/pve/pve-empty", strings.NewReader(`{"has_vms":false}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+k.Key)
+	req.Header.Set("X-Machine-ID", "machine-empty")
+	rr := httptest.NewRecorder()
+	ts.handler.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	server, err := ts.store.GetPVEServerByName(ctx, "pve-empty")
+	if err != nil {
+		t.Fatalf("get PVE server: %v", err)
+	}
+	if !server.BackupInventoryKnown || server.HasBackupVMs {
+		t.Fatalf("unexpected inventory state: known=%v hasVMs=%v", server.BackupInventoryKnown, server.HasBackupVMs)
+	}
+}
+
 func TestCreateVMConfig_HappyPath(t *testing.T) {
 	ctx := context.Background()
 	ts := newTestServer(t)

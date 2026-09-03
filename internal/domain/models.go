@@ -6,17 +6,19 @@ import (
 )
 
 type PVEServer struct {
-	ID            int64     `db:"id"`
-	Name          string    `db:"name"`
-	DisplayName   string    `db:"display_name"`
-	IP            string    `db:"ip"`
-	PublicIP      string    `db:"public_ip"`
-	ClientVersion string    `db:"client_version"`
-	MachineID     string    `db:"machine_id"`
-	APIKeyID      int64     `db:"api_key_id"`
-	IsDeleted     bool      `db:"is_deleted"`
-	CreatedAt     time.Time `db:"created_at"`
-	UpdatedAt     time.Time `db:"updated_at"`
+	ID                   int64     `db:"id"`
+	Name                 string    `db:"name"`
+	DisplayName          string    `db:"display_name"`
+	IP                   string    `db:"ip"`
+	PublicIP             string    `db:"public_ip"`
+	ClientVersion        string    `db:"client_version"`
+	MachineID            string    `db:"machine_id"`
+	APIKeyID             int64     `db:"api_key_id"`
+	BackupInventoryKnown bool      `db:"backup_inventory_known"`
+	HasBackupVMs         bool      `db:"has_backup_vms"`
+	IsDeleted            bool      `db:"is_deleted"`
+	CreatedAt            time.Time `db:"created_at"`
+	UpdatedAt            time.Time `db:"updated_at"`
 }
 
 type PVEReport struct {

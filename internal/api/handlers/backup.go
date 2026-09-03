@@ -33,6 +33,30 @@ func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"server": server, "configs": resp})
 }
 
+func (h *H) UpdateBackupInventory(w http.ResponseWriter, r *http.Request) {
+	server := strings.TrimSpace(chi.URLParam(r, "server"))
+	if !h.requireKeyServer(w, r, server) {
+		return
+	}
+	serverID, err := h.pveServerIDForKey(r, server)
+	if err != nil {
+		internalErr(w, "resolve pve server", err)
+		return
+	}
+	var req struct {
+		HasVMs bool `json:"has_vms"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errJSON(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if err := h.store.SetPVEBackupInventory(r.Context(), serverID, req.HasVMs); err != nil {
+		internalErr(w, "update pve backup inventory", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
 func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	if !h.requireKeyServer(w, r, server) {
@@ -57,6 +81,7 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "create vm backup config", err)
 		return
 	}
+	_ = h.store.SetPVEBackupInventory(r.Context(), serverID, true)
 	writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 }
 
@@ -80,6 +105,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "update vm backup config", err)
 		return
 	}
+	_ = h.store.SetPVEBackupInventory(r.Context(), serverID, true)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }
 

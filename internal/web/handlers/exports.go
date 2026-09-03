@@ -215,16 +215,21 @@ func (h *WebH) exportPVERows(r *http.Request) ([]pveExportRow, error) {
 	rows := make([]pveExportRow, 0, len(servers))
 	for _, sv := range servers {
 		rep := reports[sv.ID]
+		alertCfg := alertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
+		configs := configsByServer[sv.ID]
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
 		state := "Sin reporte"
 		lastReport := ""
 		backupStatus := ""
+		if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+			state = "Activo"
+		}
 		if rep != nil {
 			lastReport = formatExportTime(rep.ReportedAt)
 			backupStatus = domain.PVEBackupStatusSummary(tasksByReport[rep.ID], rep.BackupStatus)
-			alertCfg := alertConfigs[sv.ID]
-			alertCfg.ServerID = sv.ID
-			stale, _ := h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configsByServer[sv.ID], alertCfg, globalFinishTime)
-			if stale || rep.IsStale {
+			stale, _ := h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg, globalFinishTime, noVMsConfirmed)
+			if stale {
 				state = "Sin reporte"
 			} else {
 				state = "Activo"

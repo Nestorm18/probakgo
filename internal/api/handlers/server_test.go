@@ -40,6 +40,13 @@ func TestListPVEServers_WithServer(t *testing.T) {
 	ts := newTestServer(t)
 	k, _ := ts.store.CreateAPIKey(ctx, "client", "pve-01", "")
 	ts.store.UpsertPVEServerForAPIKey(ctx, k.ID, "pve-01", "10.0.0.1", "", "1.0", "")
+	server, err := ts.store.GetPVEServerByName(ctx, "pve-01")
+	if err != nil {
+		t.Fatalf("GetPVEServerByName: %v", err)
+	}
+	if err := ts.store.SetPVEBackupInventory(ctx, server.ID, false); err != nil {
+		t.Fatalf("confirm empty inventory: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	req.Header.Set("Authorization", "Bearer "+k.Key)
@@ -58,8 +65,8 @@ func TestListPVEServers_WithServer(t *testing.T) {
 		t.Fatalf("want 1 server, got %v", resp["servers"])
 	}
 	sv := servers[0].(map[string]any)
-	if sv["is_stale"] != true {
-		t.Error("want is_stale=true for server without reports")
+	if sv["is_stale"] == true {
+		t.Error("want is_stale=false for server without reports when no VMs are configured")
 	}
 }
 

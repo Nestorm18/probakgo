@@ -116,8 +116,17 @@ func (r *ReportService) IsStale(reportedAt time.Time) bool {
 // the next morning, using the global cutoff unless the server overrides it.
 func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Time, serverName string) (bool, string) {
 	configs, err := r.store.ListVMBackupConfigs(ctx, serverName)
-	if err != nil || len(configs) == 0 {
+	if err != nil {
 		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+	}
+	var alertCfg domain.PVEAlertConfig
+	noVMsConfirmed := false
+	if sv, getErr := r.store.GetPVEServerByName(ctx, serverName); getErr == nil {
+		alertCfg, _ = r.store.GetPVEAlertConfig(ctx, sv.ID)
+		noVMsConfirmed = sv.BackupInventoryKnown && !sv.HasBackupVMs
+	}
+	if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+		return false, "sin backups activos configurados"
 	}
 
 	expected := make(map[time.Weekday]bool)
@@ -148,7 +157,7 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 		}
 	}
 	if len(expected) == 0 {
-		return false, "sin backups activos configurados"
+		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 	}
 
 	now := r.now().In(r.tz)
@@ -172,15 +181,21 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 
 func (r *ReportService) IsStaleForServerID(ctx context.Context, reportedAt time.Time, serverID int64) (bool, string) {
 	configs, err := r.store.ListVMBackupConfigsForServer(ctx, "pve", serverID)
-	if err != nil || len(configs) == 0 {
+	if err != nil {
 		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+	}
+	alertCfg, _ := r.store.GetPVEAlertConfig(ctx, serverID)
+	sv, _ := r.store.GetPVEServer(ctx, serverID)
+	noVMsConfirmed := sv != nil && sv.BackupInventoryKnown && !sv.HasBackupVMs
+	if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+		return false, "sin backups activos configurados"
 	}
 	return r.isStaleForConfigs(ctx, reportedAt, configs, serverID)
 }
 
-func (r *ReportService) IsStaleForLoadedPVEConfig(reportedAt time.Time, configs []domain.VMBackupConfig, alertCfg domain.PVEAlertConfig, globalFinishTime string) (bool, string) {
-	if len(configs) == 0 {
-		return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
+func (r *ReportService) IsStaleForLoadedPVEConfig(reportedAt time.Time, configs []domain.VMBackupConfig, alertCfg domain.PVEAlertConfig, globalFinishTime string, noVMsConfirmed bool) (bool, string) {
+	if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+		return false, "sin backups activos configurados"
 	}
 	finishHour, finishMinute := expectedFinishFromAlertConfig(alertCfg, globalFinishTime)
 	return r.isStaleForConfigsAt(reportedAt, configs, finishHour, finishMinute)
@@ -293,19 +308,19 @@ func (r *ReportService) BuildPVEServerResponse(ctx context.Context, sv domain.PV
 	}
 	rep, err := r.store.GetLatestPVEReport(ctx, sv.ID)
 	if err != nil {
+		configs, _ := r.store.ListVMBackupConfigsForServer(ctx, "pve", sv.ID)
+		alertCfg, _ := r.store.GetPVEAlertConfig(ctx, sv.ID)
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
+		if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+			return resp
+		}
 		resp.IsStale = true
 		resp.StaleReason = "no se han recibido reportes"
 		return resp
 	}
 	resp.LastReport = &rep.ReportedAt
 	resp.BackupStatus = rep.BackupStatus
-	if stale, reason := r.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID); stale {
-		resp.IsStale = true
-		resp.StaleReason = reason
-	} else {
-		resp.IsStale = rep.IsStale
-		resp.StaleReason = rep.StaleReason
-	}
+	resp.IsStale, resp.StaleReason = r.IsStaleForServerID(ctx, rep.ReportedAt, sv.ID)
 	return resp
 }
 

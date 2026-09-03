@@ -46,3 +46,23 @@ func TestHasActiveVMBackupConfigs(t *testing.T) {
 		t.Fatal("non-excluded config with a scheduled day should be active")
 	}
 }
+
+func TestPVEStaleSuppressed(t *testing.T) {
+	zero := 0
+	active := []VMBackupConfig{{VMID: "100", Monday: true}}
+	if PVEStaleSuppressed(nil, PVEAlertConfig{}, false) {
+		t.Fatal("unknown empty backup config should not suppress stale")
+	}
+	if !PVEStaleSuppressed(nil, PVEAlertConfig{}, true) {
+		t.Fatal("confirmed empty VM inventory should suppress stale")
+	}
+	if !PVEStaleSuppressed([]VMBackupConfig{{VMID: "100", Monday: true, IsExcluded: true}}, PVEAlertConfig{}, false) {
+		t.Fatal("excluded VMs should suppress stale")
+	}
+	if PVEStaleSuppressed(active, PVEAlertConfig{}, false) {
+		t.Fatal("scheduled VM should not suppress stale")
+	}
+	if !PVEStaleSuppressed(active, PVEAlertConfig{StaleHours: &zero}, false) {
+		t.Fatal("StaleHours=0 should suppress stale even with scheduled VMs")
+	}
+}

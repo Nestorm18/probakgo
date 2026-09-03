@@ -337,7 +337,14 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
 		configs := pveConfigs[sv.ID]
-		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
+		alertCfg := pveAlertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
+		if domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed) {
+			if len(configs) > 0 {
+				continue
+			}
+			pveOk = append(pveOk, row)
 			continue
 		}
 		r := pveReports[sv.ID]
@@ -350,9 +357,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		tasks := pveTasks[r.ID]
 		isStale := false
 		staleReason := ""
-		alertCfg := pveAlertConfigs[sv.ID]
-		alertCfg.ServerID = sv.ID
-		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg, cfg.AlertPVEExpectedFinishTime); stale {
+		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg, cfg.AlertPVEExpectedFinishTime, noVMsConfirmed); stale {
 			isStale = true
 			staleReason = reason
 		} else if r.IsStale {

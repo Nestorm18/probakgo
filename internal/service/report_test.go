@@ -312,14 +312,19 @@ func TestBuildPVEServerResponse_NoReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("upsert server: %v", err)
 	}
-
-	resp := svc.BuildPVEServerResponse(ctx, domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
-
-	if !resp.IsStale {
-		t.Error("want IsStale=true for server with no reports")
+	if err := st.SetPVEBackupInventory(ctx, serverID, false); err != nil {
+		t.Fatalf("confirm empty inventory: %v", err)
 	}
-	if resp.StaleReason == "" {
-		t.Error("want non-empty StaleReason")
+
+	resp := svc.BuildPVEServerResponse(ctx, domain.PVEServer{
+		ID: serverID, Name: "pve-node", IP: "10.0.0.1", BackupInventoryKnown: true,
+	})
+
+	if resp.IsStale {
+		t.Error("want IsStale=false for server with no VMs configured for backup")
+	}
+	if resp.StaleReason != "" {
+		t.Errorf("want empty StaleReason, got %q", resp.StaleReason)
 	}
 	if resp.LastReport != nil {
 		t.Error("want LastReport=nil")
@@ -332,20 +337,24 @@ func TestBuildPVEServerResponse_StaleReport(t *testing.T) {
 	svc := NewReport(st, time.UTC)
 
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-node", "10.0.0.1", "", "1.0", "")
+	if err := st.SetPVEBackupInventory(ctx, serverID, false); err != nil {
+		t.Fatalf("confirm empty inventory: %v", err)
+	}
 	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 
 	yesterday := time.Now().Add(-25 * time.Hour)
-	if _, err := db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, reportID); err != nil {
+	if _, err := db.Exec(
+		"UPDATE pve_reports SET reported_at = ?, is_stale = 1, stale_reason = 'valor antiguo' WHERE id = ?",
+		yesterday,
+		reportID,
+	); err != nil {
 		t.Fatalf("backdate report: %v", err)
 	}
 
 	resp := svc.BuildPVEServerResponse(ctx, domain.PVEServer{ID: serverID, Name: "pve-node", IP: "10.0.0.1"})
 
-	if !resp.IsStale {
-		t.Error("want IsStale=true for yesterday's report")
-	}
-	if resp.StaleReason != "No se ha recibido el reporte de hoy" {
-		t.Errorf("StaleReason: want 'No se ha recibido el reporte de hoy', got %q", resp.StaleReason)
+	if resp.IsStale {
+		t.Error("want IsStale=false for yesterday's report when no VMs are configured")
 	}
 	if resp.LastReport == nil {
 		t.Error("want LastReport to be set")

@@ -46,6 +46,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pveConfigs, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
+	pveAlertConfigs, _ := h.store.ListPVEAlertConfigs(ctx)
 
 	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
 	var pveStaleIDs []int64
@@ -53,7 +54,8 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	for _, sv := range pveServers {
 		rep := pveReports[sv.ID]
 		configs := pveConfigs[sv.ID]
-		ignoreStale := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
+		ignoreStale := domain.PVEStaleSuppressed(configs, pveAlertConfigs[sv.ID], noVMsConfirmed)
 		isStale := (rep == nil || rep.IsStale) && !ignoreStale
 		backupSeverity := alertSummary.PVEBackupSeverity[sv.ID]
 		hasBackupError := backupSeverity == domain.AlertSeverityCritical

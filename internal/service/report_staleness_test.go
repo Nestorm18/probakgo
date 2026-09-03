@@ -30,18 +30,28 @@ func newSvcAt(t *testing.T, now time.Time) (*ReportService, func(domain.CreateVM
 	return svc, create
 }
 
-func TestIsStaleForServer_NoConfig_FallsBackToIsStale(t *testing.T) {
+func TestIsStaleForServer_NoConfig_NotStale(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
 	svc := NewReport(st, time.UTC)
+	serverID, err := st.UpsertPVEServer(ctx, "pve-noconfig", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+	if err := st.SetPVEBackupInventory(ctx, serverID, false); err != nil {
+		t.Fatalf("confirm empty inventory: %v", err)
+	}
 
-	stale, _ := svc.IsStaleForServer(ctx, time.Now().Add(-25*time.Hour), "pve-noconfig")
-	if !stale {
-		t.Error("want stale=true: yesterday's report, no config")
+	stale, reason := svc.IsStaleForServer(ctx, time.Now().Add(-25*time.Hour), "pve-noconfig")
+	if stale {
+		t.Error("want stale=false: no VMs configured for backup")
+	}
+	if reason != "sin backups activos configurados" {
+		t.Errorf("reason: got %q", reason)
 	}
 	stale2, _ := svc.IsStaleForServer(ctx, time.Now(), "pve-noconfig")
 	if stale2 {
-		t.Error("want stale=false: today's report, no config")
+		t.Error("want stale=false: no VMs configured for backup")
 	}
 }
 
@@ -199,6 +209,22 @@ func TestIsStaleForServer_StaleAfterServerExpectedFinishTime(t *testing.T) {
 	stale, _ := svc.IsStaleForServer(ctx, thursdayEvening, "pve-01")
 	if !stale {
 		t.Error("want stale=true at custom 11:00 cutoff")
+	}
+}
+
+func TestIsStaleForLoadedPVEConfig_StaleHoursZero(t *testing.T) {
+	svc := &ReportService{tz: time.UTC, now: func() time.Time { return saturday }}
+	zero := 0
+	configs := []domain.VMBackupConfig{{VMID: "100", Monday: true, Friday: true}}
+	stale, reason := svc.IsStaleForLoadedPVEConfig(
+		time.Time{},
+		configs,
+		domain.PVEAlertConfig{StaleHours: &zero},
+		"09:00",
+		false,
+	)
+	if stale {
+		t.Fatalf("want stale=false when StaleHours=0, got reason=%q", reason)
 	}
 }
 

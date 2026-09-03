@@ -428,15 +428,16 @@ func (h *WebH) PVEServers(w http.ResponseWriter, r *http.Request) {
 	var rows []map[string]any
 	for _, sv := range servers {
 		configs := configsByServer[sv.ID]
-		backupsDisabled := len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs)
-		ignoreStale := backupsDisabled
+		alertCfg := alertConfigs[sv.ID]
+		alertCfg.ServerID = sv.ID
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
+		backupsDisabled := noVMsConfirmed || (len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs))
+		ignoreStale := domain.PVEStaleSuppressed(configs, alertCfg, noVMsConfirmed)
 		rep := latestReports[sv.ID]
 		heartbeat := heartbeats[sv.ID]
 		stale := rep == nil && !ignoreStale
-		alertCfg := alertConfigs[sv.ID]
-		alertCfg.ServerID = sv.ID
 		if rep != nil {
-			stale, _ = h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg, globalFinishTime)
+			stale, _ = h.report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, alertCfg, globalFinishTime, noVMsConfirmed)
 		}
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
 		health := buildServerHealth(alertCounts[sv.ID])

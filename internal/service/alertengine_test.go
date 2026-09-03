@@ -411,6 +411,23 @@ func TestEvalPVEBackupErrors_ReportStatusFallbackForOldClients(t *testing.T) {
 	}
 }
 
+func TestEvalPVEBackupErrors_JobErrorWithSuccessfulVMTasks(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-final-error", "1.1.1.1", "", "1.0", "")
+	bs := &domain.BackupStatus{Status: json.RawMessage(`"prune failed: storage is read-only"`)}
+	reportID, _ := st.InsertPVEReport(ctx, serverID, bs)
+	_ = st.InsertPVEBackupTask(ctx, reportID, domain.BackupTaskPayload{VMID: 101, VMName: "debian", Status: "OK"})
+
+	alerts, err := evalPVEBackupErrors(st, defaultCfg())
+	if err != nil {
+		t.Fatalf("evalPVEBackupErrors: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypeBackupError, "pve-final-error") {
+		t.Fatal("expected server-level backup alert for a final job error")
+	}
+}
+
 func TestEvalPVEBackupErrors_AllVMsExcluded_NoAlert(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
@@ -519,6 +536,11 @@ func TestEvalPVEStale_StaleServer(t *testing.T) {
 	ctx := context.Background()
 	db, st := openTestStore(t)
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "1.1.1.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-stale", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
 	reportID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	// backdate report so is_stale=1 gets set
 	_, _ = db.Exec(`UPDATE pve_reports SET is_stale=1, stale_reason='No se ha recibido el reporte de hoy' WHERE id=?`, reportID)
@@ -546,13 +568,69 @@ func TestEvalPVEStale_NotStale_NoAlert(t *testing.T) {
 func TestEvalPVEStale_NoReport(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)
-	_, _ = st.UpsertPVEServer(ctx, "pve-never", "1.1.1.1", "", "1.0", "")
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-never", "1.1.1.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-never", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
 
 	cfg := defaultCfg()
 	cfg.Report = NewReport(st, time.UTC)
 	alerts, _ := evalPVEStale(st, cfg)
 	if !hasAlert(alerts, domain.AlertTypePVEStale, "pve-never") {
 		t.Error("expected pve_stale alert for server without reports")
+	}
+}
+
+func TestEvalPVEStale_NoVMsConfigured_NoAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-novms", "1.1.1.1", "", "1.0", "")
+	if err := st.SetPVEBackupInventory(ctx, serverID, false); err != nil {
+		t.Fatalf("confirm empty inventory: %v", err)
+	}
+
+	cfg := defaultCfg()
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, _ := evalPVEStale(st, cfg)
+	if hasAlert(alerts, domain.AlertTypePVEStale, "pve-novms") {
+		t.Error("unexpected pve_stale alert when the server has no VMs configured for backup")
+	}
+}
+
+func TestEvalPVEStale_UnknownEmptyInventory_Alerts(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	_, _ = st.UpsertPVEServer(ctx, "pve-unsynced", "1.1.1.1", "", "1.0", "")
+
+	cfg := defaultCfg()
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, err := evalPVEStale(st, cfg)
+	if err != nil {
+		t.Fatalf("evalPVEStale: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypePVEStale, "pve-unsynced") {
+		t.Fatal("expected pve_stale alert before the VM inventory is confirmed")
+	}
+}
+
+func TestEvalPVEStale_StaleHoursDisabled_NoAlert(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale-off", "1.1.1.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-stale-off", domain.CreateVMBackupConfigRequest{
+		VMID: "100", VMName: "vm", Monday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
+	disabled := 0
+	cfg := defaultCfg()
+	cfg.PVEConfigs[serverID] = domain.PVEAlertConfig{ServerID: serverID, StaleHours: &disabled}
+	cfg.Report = NewReport(st, time.UTC)
+	alerts, _ := evalPVEStale(st, cfg)
+	if hasAlert(alerts, domain.AlertTypePVEStale, "pve-stale-off") {
+		t.Error("unexpected pve_stale alert when Sin reporte is disabled")
 	}
 }
 

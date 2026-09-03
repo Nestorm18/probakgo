@@ -104,8 +104,8 @@
           {{end}}
           {{else}}
           {{if backupStatusOK .Status}}<span class="status-pill ok">OK</span>
-          {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">ADVERTENCIA</span>
-          {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
+          {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">{{.Status}}</span>
+          {{else}}<span class="status-pill bad" title="{{.Status}}">{{.Status}}</span>{{end}}
           {{end}}
         </td>
         {{if .IsMissing}}
@@ -239,8 +239,8 @@
             <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
             <td>
               {{if backupStatusOK .Status}}<span class="status-pill ok">OK</span>
-              {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">ADVERTENCIA</span>
-              {{else}}<span class="status-pill bad" title="{{.Status}}">ERROR</span>{{end}}
+              {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">{{.Status}}</span>
+              {{else}}<span class="status-pill bad" title="{{.Status}}">{{.Status}}</span>{{end}}
             </td>
             <td style="color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
             <td style="color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>

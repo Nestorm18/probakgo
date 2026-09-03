@@ -92,6 +92,8 @@ type backupFile struct {
 type backupLogInfo struct {
 	durations map[int64]int64
 	vmids     map[int64]struct{}
+	statuses  map[int64]string
+	jobError  string
 }
 
 func (c *pveClient) vmNames() map[int64]string {
@@ -200,11 +202,16 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 	}
 	logDurations := make(map[int64]int64)
 	var aggregateDuration int64
+	var jobError string
 	for _, t := range jobTasks {
 		if parseVMID(t.id) == 0 && aggregateDuration == 0 {
 			aggregateDuration = int64(t.end - t.start)
 		}
-		for vmid, duration := range getLogInfo(t.upid).durations {
+		info := getLogInfo(t.upid)
+		if jobError == "" && isGenericBackupStatus(t.status) && info.jobError != "" {
+			jobError = info.jobError
+		}
+		for vmid, duration := range info.durations {
 			logDurations[vmid] = duration
 		}
 	}
@@ -236,7 +243,7 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		task := map[string]any{
 			"vmid":      vmid,
 			"vm_name":   names[vmid],
-			"status":    t.status,
+			"status":    resolveBackupTaskStatus(t.status, vmid, getLogInfo(t.upid)),
 			"starttime": start,
 			"endtime":   end,
 			"duration":  duration,
@@ -263,6 +270,9 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 		result = append(result, task)
 	}
 	if len(result) > 0 {
+		if jobError != "" {
+			result[0]["job_error"] = jobError
+		}
 		return result
 	}
 
@@ -314,10 +324,14 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 				end = matchedFile.ctime + d
 			}
 		}
+		status := resolveBackupTaskStatus(aggregate.status, vmid, logInfo)
+		if status == aggregate.status && hasFile && isGenericBackupStatus(aggregate.status) && logInfo.statuses[vmid] == "" {
+			status = "OK"
+		}
 		task := map[string]any{
 			"vmid":      vmid,
 			"vm_name":   names[vmid],
-			"status":    aggregate.status,
+			"status":    status,
 			"starttime": start,
 			"endtime":   end,
 			"duration":  duration,
@@ -329,6 +343,9 @@ func (c *pveClient) backupJobTasks(names map[int64]string, filesByVMID map[int64
 			task["filename"] = matchedFile.volid
 		}
 		result = append(result, task)
+	}
+	if len(result) > 0 && logInfo.jobError != "" {
+		result[0]["job_error"] = logInfo.jobError
 	}
 	return result
 }
@@ -365,6 +382,7 @@ func (c *pveClient) aggregateTaskInfo(upid string) backupLogInfo {
 	empty := backupLogInfo{
 		durations: make(map[int64]int64),
 		vmids:     make(map[int64]struct{}),
+		statuses:  make(map[int64]string),
 	}
 	if upid == "" {
 		return empty
@@ -391,14 +409,11 @@ func (c *pveClient) aggregateTaskInfo(upid string) backupLogInfo {
 			break
 		}
 	}
-	durations := parseBackupDurations(lines)
-	if len(durations) == 0 {
+	info := parseBackupLog(lines)
+	if len(info.durations) == 0 && len(info.vmids) > 0 && info.jobError == "" {
 		log.Printf("WARN: no per-VM durations found in vzdump task log %s (%d lines)", upid, len(lines))
 	}
-	return backupLogInfo{
-		durations: durations,
-		vmids:     parseBackupVMIDs(lines),
-	}
+	return info
 }
 
 func (c *pveClient) aggregateTaskDurations(upid string) map[int64]int64 {
@@ -412,6 +427,169 @@ var finishedBackupREs = []*regexp.Regexp{
 }
 
 var startedBackupRE = regexp.MustCompile(`(?i)Starting Backup of (?:VM|CT)\s+(\d+)`)
+var failedBackupRE = regexp.MustCompile(`(?i)(?:ERROR:\s*)?Backup of (?:VM|CT)\s+(\d+)\s+failed(?:\s*-\s*(.*))?`)
+
+const maxBackupStatusLen = 180
+
+func parseBackupLog(lines []string) backupLogInfo {
+	info := backupLogInfo{
+		durations: parseBackupDurations(lines),
+		vmids:     parseBackupVMIDs(lines),
+		statuses:  make(map[int64]string),
+	}
+	var currentVM int64
+	var lastDetail, lastError string
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if matches := startedBackupRE.FindStringSubmatch(line); len(matches) == 2 {
+			currentVM, _ = strconv.ParseInt(matches[1], 10, 64)
+			lastDetail = ""
+			continue
+		}
+		if matches := failedBackupRE.FindStringSubmatch(line); len(matches) >= 2 {
+			vmid, err := strconv.ParseInt(matches[1], 10, 64)
+			if err == nil {
+				rest := ""
+				if len(matches) > 2 {
+					rest = matches[2]
+				}
+				info.statuses[vmid] = shortenBackupFailure(rest, lastDetail)
+				info.vmids[vmid] = struct{}{}
+			}
+			currentVM = 0
+			lastDetail = ""
+			continue
+		}
+		if _, ok := finishedBackupVMID(line); ok {
+			currentVM = 0
+			lastDetail = ""
+			continue
+		}
+		upper := strings.ToUpper(line)
+		if strings.HasPrefix(upper, "TASK ERROR:") {
+			msg := compactBackupStatus(strings.TrimSpace(line[len("TASK ERROR:"):]))
+			if !isGenericBackupStatus(msg) {
+				info.jobError = msg
+			} else if info.jobError == "" && lastError != "" {
+				info.jobError = lastError
+			}
+			continue
+		}
+		if detail := backupErrorDetail(line); detail != "" {
+			lastDetail = detail
+			if currentVM == 0 {
+				lastError = detail
+			}
+		}
+	}
+	for vmid := range info.durations {
+		if _, exists := info.statuses[vmid]; !exists {
+			info.statuses[vmid] = "OK"
+		}
+	}
+	if info.jobError == "" && lastError != "" && len(info.statuses) == 0 {
+		info.jobError = lastError
+	}
+	return info
+}
+
+func resolveBackupTaskStatus(taskStatus string, vmid int64, info backupLogInfo) string {
+	if s := info.statuses[vmid]; s != "" {
+		if strings.EqualFold(strings.TrimSpace(s), "OK") && isBackupWarningStatus(taskStatus) {
+			return taskStatus
+		}
+		return s
+	}
+	if isGenericBackupStatus(taskStatus) && info.jobError != "" {
+		return info.jobError
+	}
+	return taskStatus
+}
+
+func isBackupWarningStatus(status string) bool {
+	upper := strings.ToUpper(strings.TrimSpace(status))
+	return strings.HasPrefix(upper, "WARN") || strings.HasPrefix(upper, "PARTIAL")
+}
+
+func isGenericBackupStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "", "job errors", "error", "failed", "warning", "warnings":
+		return true
+	default:
+		return false
+	}
+}
+
+func shortenBackupFailure(rest, lastDetail string) string {
+	if lastDetail != "" {
+		return lastDetail
+	}
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return "backup failed"
+	}
+	if strings.HasPrefix(strings.ToLower(rest), "command ") {
+		if i := strings.LastIndex(strings.ToLower(rest), "failed:"); i >= 0 {
+			if tail := strings.TrimSpace(rest[i+len("failed:"):]); tail != "" {
+				return compactBackupStatus(tail)
+			}
+		}
+		return "command failed"
+	}
+	return compactBackupStatus(rest)
+}
+
+func compactBackupStatus(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "ERROR: ")
+	s = strings.TrimPrefix(s, "TASK ERROR: ")
+	if len(s) > maxBackupStatusLen {
+		return s[:maxBackupStatusLen-3] + "..."
+	}
+	return s
+}
+
+func backupErrorDetail(line string) string {
+	body := stripVzdumpPrefix(line)
+	lower := strings.ToLower(body)
+	if body == "" || strings.Contains(lower, "backup of vm") || strings.Contains(lower, "backup of ct") {
+		return ""
+	}
+	switch {
+	case strings.Contains(lower, "cannot open:"):
+		if i := strings.Index(lower, "cannot open:"); i >= 0 {
+			return compactBackupStatus(body[i:])
+		}
+	case strings.Contains(lower, "could not activate storage"):
+		return compactBackupStatus(body)
+	case strings.Contains(lower, "is not online"):
+		return compactBackupStatus(body)
+	case strings.Contains(lower, "permission denied"):
+		return "Permission denied"
+	case strings.Contains(lower, "no space left"):
+		return "No space left on device"
+	case strings.Contains(lower, "read-only file system"):
+		return "Read-only file system"
+	case strings.Contains(lower, "connection timed out"):
+		return compactBackupStatus(body)
+	case strings.Contains(lower, "connection refused"):
+		return compactBackupStatus(body)
+	}
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(line)), "ERROR:") {
+		return compactBackupStatus(body)
+	}
+	return ""
+}
+
+func stripVzdumpPrefix(line string) string {
+	line = strings.TrimSpace(line)
+	for _, prefix := range []string{"INFO: ", "ERROR: ", "WARN: ", "WARNING: "} {
+		if len(line) >= len(prefix) && strings.EqualFold(line[:len(prefix)], prefix) {
+			return strings.TrimSpace(line[len(prefix):])
+		}
+	}
+	return line
+}
 
 func parseBackupVMIDs(lines []string) map[int64]struct{} {
 	vmids := make(map[int64]struct{})
@@ -450,6 +628,18 @@ func parseBackupDurations(lines []string) map[int64]int64 {
 	return durations
 }
 
+func finishedBackupVMID(line string) (int64, bool) {
+	for _, re := range finishedBackupREs {
+		matches := re.FindStringSubmatch(line)
+		if len(matches) != 3 {
+			continue
+		}
+		vmid, err := strconv.ParseInt(matches[1], 10, 64)
+		return vmid, err == nil
+	}
+	return 0, false
+}
+
 func parseClockDuration(s string) (int64, bool) {
 	parts := strings.Split(s, ":")
 	if len(parts) != 2 && len(parts) != 3 {
@@ -481,6 +671,7 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 	type task struct {
 		end, start float64
 		status     string
+		upid       string
 	}
 	var finished []task
 	for _, t := range tasks {
@@ -492,7 +683,7 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 		start, hasStart := m["starttime"].(float64)
 		status, hasStatus := c.taskStatus(m)
 		if hasEnd && hasStart && hasStatus {
-			finished = append(finished, task{end, start, status})
+			finished = append(finished, task{end, start, status, str(m["upid"])})
 		}
 	}
 	if len(finished) == 0 {
@@ -500,8 +691,14 @@ func (c *pveClient) lastBackupStatus() backupStatus {
 	}
 	sort.Slice(finished, func(i, j int) bool { return finished[i].end > finished[j].end })
 	last := finished[0]
+	status := last.status
+	if isGenericBackupStatus(status) && last.upid != "" {
+		if errMsg := c.aggregateTaskInfo(last.upid).jobError; errMsg != "" {
+			status = errMsg
+		}
+	}
 	return backupStatus{
-		Status:    last.status,
+		Status:    status,
 		StartTime: int64(last.start),
 		EndTime:   int64(last.end),
 		Duration:  int64(last.end - last.start),
@@ -650,9 +847,13 @@ func jobBackupStatus(tasks []map[string]any) backupStatus {
 		return backupStatus{Status: "ERROR", StartTime: -1, EndTime: -1, Duration: -1}
 	}
 	status := "OK"
+	jobError := ""
 	var minStart int64 = 1 << 62
 	var maxEnd int64
 	for _, t := range tasks {
+		if jobError == "" {
+			jobError = strings.TrimSpace(str(t["job_error"]))
+		}
 		taskStatus := strings.TrimSpace(str(t["status"]))
 		if !strings.EqualFold(taskStatus, "OK") {
 			if strings.HasPrefix(strings.ToUpper(taskStatus), "WARNING") {
@@ -672,6 +873,9 @@ func jobBackupStatus(tasks []map[string]any) backupStatus {
 		if e, _ := t["endtime"].(int64); e > maxEnd {
 			maxEnd = e
 		}
+	}
+	if jobError != "" {
+		status = jobError
 	}
 	return backupStatus{
 		Status:    status,

@@ -91,6 +91,7 @@ func TestDiscoverPVEVMsFallsBackToPVE6ClusterResources(t *testing.T) {
 func TestSyncBackupConfigCreatesMissingAndUpdatesUnscheduledVMs(t *testing.T) {
 	var created []map[string]any
 	var updated []map[string]any
+	var inventoryHasVMs bool
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/backup-config/pve/pve-01", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer pbk-test" {
@@ -108,6 +109,13 @@ func TestSyncBackupConfigCreatesMissingAndUpdatesUnscheduledVMs(t *testing.T) {
 					map[string]any{"vm_id": "101", "vm_name": "scheduled", "monday": true},
 				},
 			})
+		case http.MethodPut:
+			var body map[string]bool
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode inventory body: %v", err)
+			}
+			inventoryHasVMs = body["has_vms"]
+			json.NewEncoder(w).Encode(map[string]string{"status": "updated"}) //nolint:errcheck
 		default:
 			http.NotFound(w, r)
 		}
@@ -169,6 +177,44 @@ func TestSyncBackupConfigCreatesMissingAndUpdatesUnscheduledVMs(t *testing.T) {
 	}
 	if created[0]["vm_id"] != "200" || created[0]["vm_name"] != "proxy" || created[0]["monday"] != true || created[0]["friday"] != true {
 		t.Fatalf("created body: %+v", created[0])
+	}
+	if !inventoryHasVMs {
+		t.Fatal("backup inventory was not confirmed with VMs")
+	}
+}
+
+func TestSyncBackupConfigConfirmsEmptyInventory(t *testing.T) {
+	var inventoryUpdated bool
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/backup-config/pve/pve-empty", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			json.NewEncoder(w).Encode(map[string]any{"server": "pve-empty", "configs": []any{}}) //nolint:errcheck
+		case http.MethodPut:
+			var body map[string]bool
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode inventory body: %v", err)
+			}
+			if body["has_vms"] {
+				t.Fatal("empty inventory reported has_vms=true")
+			}
+			inventoryUpdated = true
+			json.NewEncoder(w).Encode(map[string]string{"status": "updated"}) //nolint:errcheck
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	created, updated, skipped, err := syncBackupConfig(
+		&Config{APIURL: srv.URL, APIKey: "pbk-test"}, "pve-empty", "machine-empty", nil,
+	)
+	if err != nil {
+		t.Fatalf("syncBackupConfig: %v", err)
+	}
+	if created != 0 || updated != 0 || skipped != 0 || !inventoryUpdated {
+		t.Fatalf("empty sync: got %d/%d/%d inventory=%v", created, updated, skipped, inventoryUpdated)
 	}
 }
 

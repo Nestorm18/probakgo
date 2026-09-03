@@ -580,6 +580,208 @@ func TestBackupJobTasksUsesLogDurationsWithoutAggregateTask(t *testing.T) {
 	}
 }
 
+func TestParseBackupLogPerVMStatusAndStorageError(t *testing.T) {
+	sofan := parseBackupLog([]string{
+		"INFO: starting new backup job: vzdump 750 740 200 --storage BACKUP",
+		"INFO: Starting Backup of VM 200 (lxc)",
+		"INFO: CT Name: nginxproxymanager",
+		"INFO: tar: /mnt/pve/BACKUP/dump/vzdump-lxc-200.tmp: Cannot open: Permission denied",
+		"INFO: tar: Error is not recoverable: exiting now",
+		"ERROR: Backup of VM 200 failed - command 'set -o pipefail && lxc-usernsexec -- tar cpf -' failed: exit code 2",
+		"INFO: Failed at 2026-09-02 21:00:05",
+		"INFO: Starting Backup of VM 740 (qemu)",
+		"INFO: VM Name: WindowsIOT",
+		"INFO: Finished Backup of VM 740 (00:02:46)",
+		"INFO: Starting Backup of VM 750 (qemu)",
+		"INFO: VM Name: OdooFerreteria",
+		"INFO: Finished Backup of VM 750 (00:05:58)",
+		"INFO: Backup job finished with errors",
+		"TASK ERROR: job errors",
+	})
+	if sofan.statuses[200] != "Cannot open: Permission denied" {
+		t.Errorf("VM 200 status: got %q, want permission denied", sofan.statuses[200])
+	}
+	if sofan.statuses[740] != "OK" {
+		t.Errorf("VM 740 status: got %q, want OK", sofan.statuses[740])
+	}
+	if sofan.statuses[750] != "OK" {
+		t.Errorf("VM 750 status: got %q, want OK", sofan.statuses[750])
+	}
+
+	storage := parseBackupLog([]string{
+		"INFO: starting new backup job: vzdump 100 --storage NAS",
+		"ERROR: could not activate storage 'NAS': storage 'NAS' is not online",
+		"TASK ERROR: job errors",
+	})
+	if storage.jobError != "could not activate storage 'NAS': storage 'NAS' is not online" {
+		t.Errorf("jobError: got %q", storage.jobError)
+	}
+
+	direct := parseBackupLog([]string{
+		"TASK ERROR: could not activate storage 'NAS': storage 'NAS' is not online",
+	})
+	if direct.jobError != "could not activate storage 'NAS': storage 'NAS' is not online" {
+		t.Errorf("direct TASK ERROR: got %q", direct.jobError)
+	}
+}
+
+func TestBackupJobTasksUsesPerVMLogStatus(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":        "",
+					"upid":      "UPID:test-node:000123:ABCDEF:664BEEF0:vzdump::root@pam:",
+					"starttime": float64(10000),
+					"endtime":   float64(11000),
+					"status":    "job errors",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Starting Backup of VM 200 (lxc)"},
+				map[string]any{"n": float64(2), "t": "INFO: tar: dump.tmp: Cannot open: Permission denied"},
+				map[string]any{"n": float64(3), "t": "ERROR: Backup of VM 200 failed - command 'tar' failed: exit code 2"},
+				map[string]any{"n": float64(4), "t": "INFO: Starting Backup of VM 740 (qemu)"},
+				map[string]any{"n": float64(5), "t": "INFO: Finished Backup of VM 740 (00:02:46)"},
+				map[string]any{"n": float64(6), "t": "INFO: Starting Backup of VM 750 (qemu)"},
+				map[string]any{"n": float64(7), "t": "INFO: Finished Backup of VM 750 (00:05:58)"},
+				map[string]any{"n": float64(8), "t": "TASK ERROR: job errors"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPVEClient(srv).backupJobTasks(
+		map[int64]string{200: "nginxproxymanager", 740: "WindowsIOT", 750: "OdooFerreteria"},
+		nil,
+	)
+	byVMID := make(map[int64]map[string]any)
+	for _, task := range tasks {
+		byVMID[task["vmid"].(int64)] = task
+	}
+	if got := byVMID[200]["status"]; got != "Cannot open: Permission denied" {
+		t.Errorf("VM 200 status: got %v", got)
+	}
+	if got := byVMID[740]["status"]; got != "OK" {
+		t.Errorf("VM 740 status: got %v, want OK", got)
+	}
+	if got := byVMID[750]["status"]; got != "OK" {
+		t.Errorf("VM 750 status: got %v, want OK", got)
+	}
+	if got := jobBackupStatus(tasks).Status; got != "Cannot open: Permission denied" {
+		t.Errorf("job status: got %q", got)
+	}
+}
+
+func TestLastBackupStatusUsesTaskErrorFromLog(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{
+					"id":         "",
+					"upid":       "UPID:test-node:000123:ABCDEF:664BEEF0:vzdump::root@pam:",
+					"starttime":  float64(10000),
+					"endtime":    float64(10005),
+					"status":     "stopped",
+					"exitstatus": "job errors",
+				},
+			},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/status") {
+			json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+				"data": map[string]any{"status": "stopped", "exitstatus": "job errors"},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "ERROR: could not activate storage 'NAS': storage 'NAS' is not online"},
+				map[string]any{"n": float64(2), "t": "TASK ERROR: job errors"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	bs := newTestPVEClient(srv).lastBackupStatus()
+	want := "could not activate storage 'NAS': storage 'NAS' is not online"
+	if bs.Status != want {
+		t.Errorf("Status: got %q, want %q", bs.Status, want)
+	}
+}
+
+func TestBackupJobTasksPreservesAggregateWarning(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{map[string]any{
+				"id": "", "upid": "UPID:warning", "starttime": float64(10000),
+				"endtime": float64(10100), "status": "WARNINGS: 1",
+			}},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Starting Backup of VM 100 (qemu)"},
+				map[string]any{"n": float64(2), "t": "INFO: Finished Backup of VM 100 (00:01:00)"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPVEClient(srv).backupJobTasks(map[int64]string{100: "vm"}, nil)
+	if len(tasks) != 1 || tasks[0]["status"] != "WARNINGS: 1" {
+		t.Fatalf("warning task status: %+v", tasks)
+	}
+	if got := jobBackupStatus(tasks).Status; got != "WARNINGS: 1" {
+		t.Fatalf("job status: got %q, want WARNINGS: 1", got)
+	}
+}
+
+func TestBackupJobTasksPreservesPostJobError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{map[string]any{
+				"id": "", "upid": "UPID:post-job-error", "starttime": float64(10000),
+				"endtime": float64(10100), "status": "job errors",
+			}},
+		})
+	})
+	mux.HandleFunc("/api2/json/nodes/test-node/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{ //nolint:errcheck
+			"data": []any{
+				map[string]any{"n": float64(1), "t": "INFO: Starting Backup of VM 100 (qemu)"},
+				map[string]any{"n": float64(2), "t": "INFO: Finished Backup of VM 100 (00:01:00)"},
+				map[string]any{"n": float64(3), "t": "ERROR: prune failed: storage is read-only"},
+				map[string]any{"n": float64(4), "t": "TASK ERROR: job errors"},
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	tasks := newTestPVEClient(srv).backupJobTasks(map[int64]string{100: "vm"}, nil)
+	if len(tasks) != 1 || tasks[0]["status"] != "OK" {
+		t.Fatalf("per-VM status should remain OK: %+v", tasks)
+	}
+	want := "prune failed: storage is read-only"
+	if got := jobBackupStatus(tasks).Status; got != want {
+		t.Fatalf("job status: got %q, want %q", got, want)
+	}
+}
+
 func TestParseBackupDurations(t *testing.T) {
 	got := parseBackupDurations([]string{
 		"INFO: Finished Backup of VM 101 (00:02:15)",

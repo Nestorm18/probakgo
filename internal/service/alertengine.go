@@ -392,10 +392,12 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			})
 			continue
 		}
+		hasTaskFailure := false
 		for _, t := range tasks {
 			if domain.PVEBackupStatusOK(t.Status) {
 				continue
 			}
+			hasTaskFailure = true
 			if pveVMBackupExcluded(backupCfgs, t.VMID) {
 				continue
 			}
@@ -416,6 +418,19 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 				Severity:   severity,
 				Title:      title,
 				Message:    fmt.Sprintf("%s: %s", name, t.Status),
+				DetectedAt: time.Now(),
+			})
+		}
+		status := strings.TrimSpace(rep.BackupStatus)
+		if !hasTaskFailure && status != "" && !domain.PVEBackupStatusOK(status) && resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
+			severity, title := pveBackupAlertPresentation(status)
+			alerts = append(alerts, domain.Alert{
+				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
+				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
+				Type:       domain.AlertTypeBackupError,
+				Severity:   severity,
+				Title:      title,
+				Message:    fmt.Sprintf("Ultimo job: %s", status),
 				DetectedAt: time.Now(),
 			})
 		}
@@ -499,7 +514,8 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	var alerts []domain.Alert
 	for _, sv := range cfg.Data.PVEServers {
 		configs := cfg.Data.PVEBackupConfigs[sv.ID]
-		if len(configs) > 0 && !domain.HasActiveVMBackupConfigs(configs) {
+		noVMsConfirmed := sv.BackupInventoryKnown && !sv.HasBackupVMs
+		if domain.PVEStaleSuppressed(configs, cfg.PVEConfigs[sv.ID], noVMsConfirmed) {
 			continue
 		}
 		rep := cfg.Data.PVEReports[sv.ID]
@@ -520,7 +536,7 @@ func evalPVEStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		if cfg.Report != nil {
 			svCfg := cfg.PVEConfigs[sv.ID]
 			svCfg.ServerID = sv.ID
-			stale, reason = cfg.Report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, svCfg, cfg.GlobalPVEExpectedFinishTime)
+			stale, reason = cfg.Report.IsStaleForLoadedPVEConfig(rep.ReportedAt, configs, svCfg, cfg.GlobalPVEExpectedFinishTime, noVMsConfirmed)
 		}
 		if !stale {
 			continue

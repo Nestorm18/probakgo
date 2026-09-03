@@ -38,6 +38,37 @@ func TestUpsertPVEServer_CreateAndUpdate(t *testing.T) {
 	}
 }
 
+func TestSetPVEBackupInventory(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, err := st.UpsertPVEServer(ctx, "pve-inventory", "10.0.0.1", "", "1.0", "mid")
+	if err != nil {
+		t.Fatalf("upsert server: %v", err)
+	}
+
+	server, err := st.GetPVEServer(ctx, serverID)
+	if err != nil {
+		t.Fatalf("get server: %v", err)
+	}
+	if server.BackupInventoryKnown {
+		t.Fatal("new server inventory should be unknown")
+	}
+	if err := st.SetPVEBackupInventory(ctx, serverID, false); err != nil {
+		t.Fatalf("set empty inventory: %v", err)
+	}
+	server, _ = st.GetPVEServer(ctx, serverID)
+	if !server.BackupInventoryKnown || server.HasBackupVMs {
+		t.Fatalf("empty inventory: known=%v hasVMs=%v", server.BackupInventoryKnown, server.HasBackupVMs)
+	}
+	if err := st.SetPVEBackupInventory(ctx, serverID, true); err != nil {
+		t.Fatalf("set populated inventory: %v", err)
+	}
+	server, _ = st.GetPVEServer(ctx, serverID)
+	if !server.BackupInventoryKnown || !server.HasBackupVMs {
+		t.Fatalf("populated inventory: known=%v hasVMs=%v", server.BackupInventoryKnown, server.HasBackupVMs)
+	}
+}
+
 func TestInsertPVEReport_NilBackupStatus(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)

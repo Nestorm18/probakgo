@@ -114,6 +114,21 @@ func (s *Store) ResolvePVEServerForAPIKey(ctx context.Context, apiKeyID int64, n
 	return res.LastInsertId()
 }
 
+func (s *Store) SetPVEBackupInventory(ctx context.Context, serverID int64, hasVMs bool) error {
+	debug.RecordQuery(ctx, `UPDATE pve_servers SET backup_inventory_known=1, has_backup_vms=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_deleted=0`)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE pve_servers SET backup_inventory_known=1, has_backup_vms=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_deleted=0`,
+		hasVMs, serverID,
+	)
+	if err != nil {
+		return err
+	}
+	if rows, err := res.RowsAffected(); err == nil && rows == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (s *Store) InsertPVEReport(ctx context.Context, serverID int64, bs *domain.BackupStatus) (int64, error) {
 	return s.InsertPVEReportWithSwap(ctx, serverID, bs, domain.HostSwap{})
 }
@@ -256,8 +271,8 @@ func (s *Store) InsertPVEReportData(ctx context.Context, serverID int64, req *do
 }
 
 func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE is_deleted = 0 ORDER BY display_name`)
-	rows, err := s.db.QueryContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.is_deleted, s.created_at, s.updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, backup_inventory_known, has_backup_vms, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE is_deleted = 0 ORDER BY display_name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.backup_inventory_known, s.has_backup_vms, s.is_deleted, s.created_at, s.updated_at
 		FROM pve_servers s
 		LEFT JOIN api_keys k ON k.id = s.api_key_id
 		WHERE s.is_deleted = 0
@@ -270,7 +285,8 @@ func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) 
 	for rows.Next() {
 		var sv domain.PVEServer
 		if err := rows.Scan(&sv.ID, &sv.Name, &sv.DisplayName, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-			&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+			&sv.MachineID, &sv.APIKeyID, &sv.BackupInventoryKnown, &sv.HasBackupVMs,
+			&sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 			return nil, err
 		}
 		servers = append(servers, sv)
@@ -279,22 +295,23 @@ func (s *Store) ListPVEServers(ctx context.Context) ([]domain.PVEServer, error) 
 }
 
 func (s *Store) GetPVEServer(ctx context.Context, id int64) (*domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE id = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.is_deleted, s.created_at, s.updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, backup_inventory_known, has_backup_vms, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE id = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.backup_inventory_known, s.has_backup_vms, s.is_deleted, s.created_at, s.updated_at
 		FROM pve_servers s
 		LEFT JOIN api_keys k ON k.id = s.api_key_id
 		WHERE s.id = ? AND s.is_deleted = 0`, id)
 	var sv domain.PVEServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.DisplayName, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.BackupInventoryKnown, &sv.HasBackupVMs,
+		&sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil
 }
 
 func (s *Store) GetPVEServerByName(ctx context.Context, name string) (*domain.PVEServer, error) {
-	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE name = ? AND is_deleted = 0`)
-	row := s.db.QueryRowContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.is_deleted, s.created_at, s.updated_at
+	debug.RecordQuery(ctx, `SELECT id, name, display_name, ip, public_ip, client_version, machine_id, api_key_id, backup_inventory_known, has_backup_vms, is_deleted, created_at, updated_at FROM pve_servers LEFT JOIN api_keys ON ... WHERE name = ? AND is_deleted = 0`)
+	row := s.db.QueryRowContext(ctx, `SELECT s.id, s.name, COALESCE(NULLIF(k.name, ''), s.name) AS display_name, s.ip, s.public_ip, s.client_version, s.machine_id, COALESCE(s.api_key_id, 0), s.backup_inventory_known, s.has_backup_vms, s.is_deleted, s.created_at, s.updated_at
 		FROM pve_servers s
 		LEFT JOIN api_keys k ON k.id = s.api_key_id
 		WHERE s.name = ? AND s.is_deleted = 0
@@ -302,7 +319,8 @@ func (s *Store) GetPVEServerByName(ctx context.Context, name string) (*domain.PV
 		LIMIT 1`, name)
 	var sv domain.PVEServer
 	if err := row.Scan(&sv.ID, &sv.Name, &sv.DisplayName, &sv.IP, &sv.PublicIP, &sv.ClientVersion,
-		&sv.MachineID, &sv.APIKeyID, &sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
+		&sv.MachineID, &sv.APIKeyID, &sv.BackupInventoryKnown, &sv.HasBackupVMs,
+		&sv.IsDeleted, &sv.CreatedAt, &sv.UpdatedAt); err != nil {
 		return nil, err
 	}
 	return &sv, nil

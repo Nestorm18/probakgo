@@ -182,9 +182,14 @@ func TestBuildEmailData_WithStale(t *testing.T) {
 	svc := NewReport(st, time.UTC)
 
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "10.0.0.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-stale", domain.CreateVMBackupConfigRequest{
+		VMID: "101", VMName: "vm", Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
 	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
-	yesterday := time.Now().Add(-25 * time.Hour)
-	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, oldID)
+	old := time.Now().Add(-8 * 24 * time.Hour)
+	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", old, oldID)
 
 	cfg, _ := st.GetEmailConfig(ctx)
 	cfg.AlertDiskPct = 0
@@ -283,20 +288,26 @@ func TestBuildEmailData_StaleReportDoesNotShowOldTasksOK(t *testing.T) {
 	svc := NewReport(st, time.UTC)
 
 	serverID, _ := st.UpsertPVEServer(ctx, "pve-stale", "10.0.0.1", "", "1.0", "")
+	if _, err := st.CreateVMBackupConfigForServer(ctx, "pve", serverID, "pve-stale", domain.CreateVMBackupConfigRequest{
+		VMID: "101", VMName: "mikrotik-routeros-chr",
+		Monday: true, Tuesday: true, Wednesday: true, Thursday: true, Friday: true, Saturday: true, Sunday: true,
+	}); err != nil {
+		t.Fatalf("create backup config: %v", err)
+	}
 	oldID, _ := st.InsertPVEReport(ctx, serverID, nil)
 	if err := st.InsertPVEBackupTask(ctx, oldID, domain.BackupTaskPayload{
 		VMID:      101,
 		VMName:    "mikrotik-routeros-chr",
 		Status:    "OK",
-		StartTime: time.Now().Add(-26 * time.Hour).Unix(),
-		EndTime:   time.Now().Add(-26*time.Hour + 175*time.Second).Unix(),
+		StartTime: time.Now().Add(-8 * 24 * time.Hour).Unix(),
+		EndTime:   time.Now().Add(-8*24*time.Hour + 175*time.Second).Unix(),
 		Duration:  175,
 		Size:      41_860_000,
 	}); err != nil {
 		t.Fatalf("InsertPVEBackupTask: %v", err)
 	}
-	yesterday := time.Now().Add(-25 * time.Hour)
-	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", yesterday, oldID)
+	old := time.Now().Add(-8 * 24 * time.Hour)
+	db.Exec("UPDATE pve_reports SET reported_at = ? WHERE id = ?", old, oldID)
 
 	cfg, _ := st.GetEmailConfig(ctx)
 	cfg.AlertDiskPct = 0

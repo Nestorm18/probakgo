@@ -59,6 +59,7 @@ func (s *Server) Router() http.Handler {
 	r.With(s.requireServerKey).Get("/servers/pbs", h.ListPBSServers)
 
 	r.With(s.requireServerKey).Get("/backup-config/pve/{server}", h.GetBackupConfig)
+	r.With(s.requireServerKey).Put("/backup-config/pve/{server}", h.UpdateBackupInventory)
 	r.With(s.requireServerKey).Post("/backup-config/pve/{server}/vms", h.CreateVMConfig)
 	r.With(s.requireServerKey).Put("/backup-config/pve/{server}/vms/{vmid}", h.UpdateVMConfig)
 	r.With(s.requireServerKey).Delete("/backup-config/pve/{server}/vms/{vmid}", h.DeleteVMConfig)

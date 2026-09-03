@@ -189,9 +189,6 @@ func syncBackupConfig(cfg *Config, serverName, machineID string, vms []discovere
 }
 
 func syncBackupConfigWithOverwrite(cfg *Config, serverName, machineID string, vms []discoveredVM, overwriteExisting bool, schedules ...map[string]pveBackupSchedule) (created, updated, skipped int, err error) {
-	if len(vms) == 0 {
-		return 0, 0, 0, nil
-	}
 	apiURL := strings.TrimRight(cfg.APIURL, "/")
 	if apiURL == "" || cfg.APIKey == "" {
 		return 0, 0, 0, fmt.Errorf("API_URL and API_KEY are required")
@@ -200,6 +197,9 @@ func syncBackupConfigWithOverwrite(cfg *Config, serverName, machineID string, vm
 	base := apiURL + "/api/backup-config/pve/" + url.PathEscape(serverName)
 	existing, err := fetchExistingVMConfigs(base, cfg.APIKey, machineID)
 	if err != nil {
+		return 0, 0, 0, err
+	}
+	if err := updateBackupInventory(base, cfg.APIKey, machineID, len(vms) > 0); err != nil {
 		return 0, 0, 0, err
 	}
 
@@ -239,6 +239,32 @@ func syncBackupConfigWithOverwrite(cfg *Config, serverName, machineID string, vm
 		created++
 	}
 	return created, updated, skipped, nil
+}
+
+func updateBackupInventory(baseURL, apiKey, machineID string, hasVMs bool) error {
+	body, err := json.Marshal(map[string]bool{"has_vms": hasVMs})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest(http.MethodPut, baseURL, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	if machineID != "" {
+		req.Header.Set("X-Machine-ID", machineID)
+	}
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return fmt.Errorf("update backup inventory: %w", err)
+	}
+	defer resp.Body.Close()
+	responseBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("update backup inventory returned %d: %s", resp.StatusCode, strings.TrimSpace(string(responseBody)))
+	}
+	return nil
 }
 
 func syncInstalledBackupConfig(overwriteExisting bool) error {
