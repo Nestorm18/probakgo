@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"probakgo/internal/domain"
+	"probakgo/internal/ratelimit"
 	"probakgo/internal/session"
 	"probakgo/internal/store"
 	"probakgo/internal/totp"
@@ -26,8 +27,9 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 				http.Redirect(w, r, "/login?next="+r.URL.Path, http.StatusSeeOther)
 				return
 			}
-			user, err := st.GetUserByUsername(r.Context(), username)
-			if err != nil || !user.IsActive {
+			userID, hasID := session.UserID(r)
+			user, err := st.GetUser(r.Context(), userID)
+			if !hasID || err != nil || !user.IsActive || user.Username != username {
 				session.Clear(w, r)
 				http.Redirect(w, r, "/login?flash=Tu+sesión+ha+sido+invalidada", http.StatusSeeOther)
 				return
@@ -38,9 +40,17 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 				return
 			}
 			if user.Role != sessionRole {
-				_ = session.SetUserWithVersion(w, r, username, user.Role, user.SessionVersion)
+				if err := session.SetUserWithVersion(w, r, user.ID, username, user.Role, user.SessionVersion); err != nil {
+					http.Error(w, "Session error", http.StatusInternalServerError)
+					return
+				}
 			}
-			if userNeedsTOTPEnforcement(st, r, user) {
+			needsTOTP, err := userNeedsTOTPEnforcement(st, r, user)
+			if err != nil {
+				http.Error(w, "Security configuration unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if needsTOTP {
 				_ = st.SetUserActive(r.Context(), user.ID, false)
 				session.Clear(w, r)
 				http.Redirect(w, r, "/login?flash=Usuario+desactivado:+2FA+no+se+activo+dentro+del+plazo", http.StatusSeeOther)
@@ -53,6 +63,7 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 }
 
 func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Handler {
+	attempts := ratelimit.New(5, 5*time.Minute)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			username, _, ok := session.GetUser(r)
@@ -61,7 +72,11 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 				return
 			}
 			cfg, err := st.GetEmailConfig(r.Context())
-			if err != nil || cfg == nil || !cfg.SensitiveActionsRequireTOTP {
+			if err != nil || cfg == nil {
+				http.Error(w, "Security configuration unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if !cfg.SensitiveActionsRequireTOTP {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -84,8 +99,16 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 			now := time.Now()
 			code := strings.TrimSpace(r.FormValue("totp_code"))
 			if code != "" {
+				if !attempts.AllowKey(username) {
+					w.Header().Set("Retry-After", "300")
+					http.Error(w, "Too many verification attempts", http.StatusTooManyRequests)
+					return
+				}
 				if totp.Validate(code, user.TOTPSecret, now) {
-					_ = session.SetSensitiveTOTPFresh(w, r, now.Add(sensitiveTOTPFreshDuration))
+					if err := session.SetSensitiveTOTPFresh(w, r, now.Add(sensitiveTOTPFreshDuration)); err != nil {
+						http.Error(w, "Session error", http.StatusInternalServerError)
+						return
+					}
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -152,19 +175,21 @@ func wantsJSON(r *http.Request) bool {
 		strings.HasSuffix(r.URL.Path, "/reveal")
 }
 
-func userNeedsTOTPEnforcement(st *store.Store, r *http.Request, user *domain.User) bool {
+func userNeedsTOTPEnforcement(st *store.Store, r *http.Request, user *domain.User) (bool, error) {
 	if user.Role == "reader" || user.TOTPEnabled {
-		return false
+		return false, nil
 	}
 	cfg, err := st.GetEmailConfig(r.Context())
-	if err != nil || cfg == nil || !cfg.EnforceTOTPNonReaders {
-		return false
+	if err != nil {
+		return false, err
+	}
+	if !cfg.EnforceTOTPNonReaders {
+		return false, nil
 	}
 	if user.TOTPGraceStartedAt == nil {
-		_ = st.StartUserTOTPGrace(r.Context(), user.ID)
-		return false
+		return false, st.StartUserTOTPGrace(r.Context(), user.ID)
 	}
-	return time.Since(*user.TOTPGraceStartedAt) >= 72*time.Hour
+	return time.Since(*user.TOTPGraceStartedAt) >= 72*time.Hour, nil
 }
 
 // RequireEditor allows admin and editor roles.

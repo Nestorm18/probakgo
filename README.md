@@ -44,7 +44,7 @@ Las notificaciones se activan por usuario y navegador desde **Perfil → Notific
 
 - Roles `reader`, `editor` y `admin`.
 - 2FA TOTP por usuario, política opcional para exigirlo a editores/administradores y confirmación TOTP para acciones sensibles.
-- Revocación de sesiones al cambiar contraseña, rol, estado o 2FA.
+- Cookies cifradas y sesiones ligadas al identificador de usuario; revocación al cambiar nombre, contraseña, rol, estado o 2FA.
 - Protección CSRF/origen, límites de peticiones, cabeceras de seguridad y confianza explícita de proxies.
 - CSP con nonce por petición para scripts y SRI en Bootstrap, Bootstrap Icons y Chart.js.
 - Bloqueo progresivo de IP tras intentos de login fallidos y gestión de baneos desde la web.
@@ -53,7 +53,7 @@ Las notificaciones se activan por usuario y navegador desde **Perfil → Notific
 - Checklist de producción para HTTPS/VPN, cookie segura, 2FA, URL pública, email y retención.
 - Retención automática, descarga de una copia SQLite y reinicio operativo que preserva usuarios, auditoría y migraciones.
 - Servicio systemd endurecido y ejecutado como usuario dedicado `probakgo` en la instalación estándar.
-- Auto-update verificado mediante `SHA256SUMS`; las releases publican procedencia firmada verificable.
+- Auto-update verificado mediante `SHA256SUMS` y firma de procedencia, ligada al workflow de release y al commit del tag.
 
 CPU y RAM del cliente Windows están fuera del alcance actual.
 

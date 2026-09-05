@@ -59,7 +59,7 @@ func TestUserVersion(t *testing.T) {
 	Init("test-session-key-32-bytes-long!!", false)
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
-	if err := SetUserWithVersion(rr, req, "admin", "admin", 4); err != nil {
+	if err := SetUserWithVersion(rr, req, 1, "admin", "admin", 4); err != nil {
 		t.Fatalf("SetUserWithVersion: %v", err)
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"probakgo/internal/schedule"
 )
@@ -196,6 +198,7 @@ func runInstall(args []string) {
 	}
 
 	// 4. Write vzdump hook script
+	must(ensurePVEMonitoringToken(), "restrict monitoring token")
 	must(os.WriteFile(hookPath, []byte(hookScript), 0755), "write hook script")
 	fmt.Printf("Hook script: %s\n", hookPath)
 
@@ -526,9 +529,12 @@ func generateProxmoxToken(tokenID string) (token, secret string, err error) {
 		fmt.Println("Generating Proxmox VE API token...")
 		_ = exec.Command("pveum", "user", "token", "remove", "root@pam", tokenID).Run()
 		out, e := exec.Command("pveum", "user", "token", "add", "root@pam", tokenID,
-			"--privsep", "0", "--comment", "probakgo monitoring client", "--output-format", "json").Output()
+			"--privsep", "1", "--comment", "probakgo monitoring client (read only)", "--output-format", "json").Output()
 		if e == nil {
 			if val := jsonField(out, "value"); val != "" {
+				if err := restrictPVEToken(tokenID, runPVETokenCommand); err != nil {
+					return "", "", err
+				}
 				fmt.Println("PVE API token generated")
 				return "root@pam!" + tokenID, val, nil
 			}
@@ -548,6 +554,38 @@ func generateProxmoxToken(tokenID string) (token, secret string, err error) {
 	}
 
 	return "", "", fmt.Errorf("pveum and proxmox-backup-manager not found; configure credentials manually")
+}
+
+// Keep the existing token secret so upgrades do not interrupt reporting. This
+// also restricts the full-privilege token created by older installations.
+func ensurePVEMonitoringToken() error {
+	if _, err := exec.LookPath("pveum"); err != nil {
+		return nil
+	}
+	cfg := loadConfig()
+	if cfg.ProxmoxToken != "root@pam!probakgo-client" {
+		return nil // custom credentials are managed by the operator
+	}
+	return restrictPVEToken("probakgo-client", runPVETokenCommand)
+}
+
+func restrictPVEToken(tokenID string, run func(...string) error) error {
+	if err := run("user", "token", "modify", "root@pam", tokenID, "--privsep", "1"); err != nil {
+		return fmt.Errorf("enable token privilege separation: %w", err)
+	}
+	if err := run("acl", "modify", "/", "--tokens", "root@pam!"+tokenID, "--roles", "PVEAuditor", "--propagate", "1"); err != nil {
+		return fmt.Errorf("grant read-only monitoring permissions: %w", err)
+	}
+	return nil
+}
+
+func runPVETokenCommand(args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if out, err := exec.CommandContext(ctx, "pveum", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("pveum: %w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 // grantPBSTokenACL grants the Audit role on / so the token can read datastore-usage.

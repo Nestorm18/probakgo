@@ -30,7 +30,7 @@ func TestPVEServersRendersServerWithoutReport(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	loginReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loginRR := httptest.NewRecorder()
-	if err := session.SetUser(loginRR, loginReq, "admin", "admin"); err != nil {
+	if err := session.SetUser(loginRR, loginReq, 1, "admin", "admin"); err != nil {
 		t.Fatalf("session.SetUser: %v", err)
 	}
 	for _, cookie := range loginRR.Result().Cookies() {
@@ -68,7 +68,7 @@ func TestPVEServersShowsBackupsNotRequiredWhenNoVMsConfigured(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	loginReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loginRR := httptest.NewRecorder()
-	if err := session.SetUser(loginRR, loginReq, "admin", "admin"); err != nil {
+	if err := session.SetUser(loginRR, loginReq, 1, "admin", "admin"); err != nil {
 		t.Fatalf("session.SetUser: %v", err)
 	}
 	for _, cookie := range loginRR.Result().Cookies() {
@@ -111,7 +111,7 @@ func TestPVEServersShowsBackupsNotRequiredWhenAllVMsExcluded(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/servers/pve", nil)
 	loginReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loginRR := httptest.NewRecorder()
-	if err := session.SetUser(loginRR, loginReq, "admin", "admin"); err != nil {
+	if err := session.SetUser(loginRR, loginReq, 1, "admin", "admin"); err != nil {
 		t.Fatalf("session.SetUser: %v", err)
 	}
 	for _, cookie := range loginRR.Result().Cookies() {
@@ -149,7 +149,7 @@ func TestPVEServerDetailLinksConfiguredProxmoxURL(t *testing.T) {
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx))
 	loginReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loginRR := httptest.NewRecorder()
-	if err := session.SetUser(loginRR, loginReq, "admin", "admin"); err != nil {
+	if err := session.SetUser(loginRR, loginReq, 1, "admin", "admin"); err != nil {
 		t.Fatalf("session.SetUser: %v", err)
 	}
 	for _, cookie := range loginRR.Result().Cookies() {

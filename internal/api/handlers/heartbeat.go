@@ -32,6 +32,9 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	k, _ := apictx.APIKey(r.Context())
+	if req.PublicIP == "" {
+		req.PublicIP, _ = h.store.ServerPublicIPForAPIKey(r.Context(), req.ServerType, k.ID)
+	}
 
 	var (
 		serverID int64
@@ -39,25 +42,10 @@ func (h *H) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	)
 	switch req.ServerType {
 	case "pve":
-		if req.PublicIP == "" {
-			if sv, getErr := h.store.GetPVEServerByName(r.Context(), req.Hostname); getErr == nil {
-				req.PublicIP = sv.PublicIP
-			}
-		}
 		serverID, err = h.store.UpsertPVEServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	case "pbs":
-		if req.PublicIP == "" {
-			if sv, getErr := h.store.GetPBSServerByName(r.Context(), req.Hostname); getErr == nil {
-				req.PublicIP = sv.PublicIP
-			}
-		}
 		serverID, err = h.store.UpsertPBSServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	case "windows":
-		if req.PublicIP == "" {
-			if sv, getErr := h.store.GetWindowsServerByName(r.Context(), req.Hostname); getErr == nil {
-				req.PublicIP = sv.PublicIP
-			}
-		}
 		serverID, err = h.store.UpsertWindowsServerForAPIKey(r.Context(), k.ID, req.Hostname, req.IPAddress, req.PublicIP, req.ClientVersion, req.MachineID)
 	}
 	if err != nil {

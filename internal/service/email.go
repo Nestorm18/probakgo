@@ -3,10 +3,12 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	_ "embed"
 	"fmt"
 	"html/template"
 	"log/slog"
+	"net"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -134,7 +136,7 @@ func sendDailyReportWithConfig(ctx context.Context, st *store.Store, rep *Report
 		subject = fmt.Sprintf("Probakgo Alert: %d servidor(es) con problemas - %s", data.TotalIssues, data.ReportDate)
 	}
 
-	return sendSMTP(cfg, recipients, subject, html)
+	return sendSMTP(ctx, cfg, recipients, subject, html)
 }
 
 // SendCriticalAlertTestEmail sends a synthetic critical alert email to validate SMTP and layout.
@@ -168,7 +170,7 @@ func SendCriticalAlertTestEmail(st *store.Store) error {
 		DetectedAt: now,
 	}
 
-	return sendSMTP(cfg, recipients, "[PRUEBA] Probakgo alerta critica", renderImmediateCriticalEmail([]domain.Alert{alert}, now))
+	return sendSMTP(ctx, cfg, recipients, "[PRUEBA] Probakgo alerta critica", renderImmediateCriticalEmail([]domain.Alert{alert}, now))
 }
 
 func shouldSendImmediateCriticalEmail(a domain.Alert) bool {
@@ -685,13 +687,63 @@ func renderEmailTemplate(data emailData) (string, error) {
 	return buf.String(), nil
 }
 
-func sendSMTP(cfg *domain.EmailConfig, recipients []string, subject, html string) error {
-	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
+func sendSMTP(parent context.Context, cfg *domain.EmailConfig, recipients []string, subject, html string) error {
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
+	defer cancel()
+	addr := net.JoinHostPort(cfg.SMTPHost, strconv.Itoa(cfg.SMTPPort))
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
-
-	msg := buildMIMEMessage(cfg.SMTPUser, recipients, subject, html)
-	if err := smtp.SendMail(addr, auth, cfg.SMTPUser, recipients, msg); err != nil {
-		return fmt.Errorf("smtp send: %w", err)
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("smtp connect: %w", err)
+	}
+	defer conn.Close()
+	deadline, _ := ctx.Deadline()
+	if err := conn.SetDeadline(deadline); err != nil {
+		return err
+	}
+	rawConn := conn
+	stop := context.AfterFunc(ctx, func() { _ = rawConn.Close() })
+	defer stop()
+	tlsConfig := &tls.Config{ServerName: cfg.SMTPHost, MinVersion: tls.VersionTLS12}
+	implicitTLS := cfg.SMTPPort == 465
+	if implicitTLS {
+		conn = tls.Client(conn, tlsConfig)
+	}
+	client, err := smtp.NewClient(conn, cfg.SMTPHost)
+	if err != nil {
+		return fmt.Errorf("smtp greeting: %w", err)
+	}
+	defer client.Close()
+	if ok, _ := client.Extension("STARTTLS"); ok && !implicitTLS {
+		if err := client.StartTLS(tlsConfig); err != nil {
+			return err
+		}
+	}
+	if ok, _ := client.Extension("AUTH"); ok {
+		if err := client.Auth(auth); err != nil {
+			return err
+		}
+	}
+	if err := client.Mail(cfg.SMTPUser); err != nil {
+		return err
+	}
+	for _, recipient := range recipients {
+		if err := client.Rcpt(recipient); err != nil {
+			return err
+		}
+	}
+	w, err := client.Data()
+	if err != nil {
+		return err
+	}
+	if _, err := w.Write(buildMIMEMessage(cfg.SMTPUser, recipients, subject, html)); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	if err := client.Quit(); err != nil {
+		return err
 	}
 	slog.Info("email sent", "recipients", len(recipients))
 	return nil

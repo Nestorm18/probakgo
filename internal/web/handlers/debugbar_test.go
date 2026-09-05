@@ -181,7 +181,7 @@ func authenticatedRequest(t *testing.T, path string) *http.Request {
 
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	rr := httptest.NewRecorder()
-	if err := session.SetUser(rr, req, "probakgo", "admin"); err != nil {
+	if err := session.SetUser(rr, req, 1, "probakgo", "admin"); err != nil {
 		t.Fatalf("set session: %v", err)
 	}
 

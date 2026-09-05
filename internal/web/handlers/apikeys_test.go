@@ -37,7 +37,7 @@ func sessionCookies(t *testing.T, username, role string) []*http.Cookie {
 	t.Helper()
 	dummy := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
-	if err := session.SetUser(rr, dummy, username, role); err != nil {
+	if err := session.SetUser(rr, dummy, 1, username, role); err != nil {
 		t.Fatalf("session.SetUser: %v", err)
 	}
 	return rr.Result().Cookies()

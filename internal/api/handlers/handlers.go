@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -64,11 +63,6 @@ func (h *H) sendImmediateCriticalAlerts() {
 
 func (h *H) runAlertQueue() {
 	for range h.alertQueue {
-		if alerts, err := service.CurrentAlertsRaw(context.Background(), h.store, h.report); err == nil {
-			_ = h.store.SyncAlertStates(context.Background(), alerts)
-		} else {
-			slog.Warn("sync alert states", "err", err)
-		}
 		if err := service.SendImmediateCriticalAlerts(h.store, h.report); err != nil {
 			slog.Warn("send immediate critical alerts", "err", err)
 		}

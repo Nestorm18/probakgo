@@ -123,6 +123,10 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
+	if user.TOTPEnabled {
+		http.Redirect(w, r, "/profile?flash=2FA+ya+esta+activo", http.StatusSeeOther)
+		return
+	}
 	secret, ok := session.GetPendingTOTPSetup(r)
 	if !ok {
 		http.Redirect(w, r, "/profile?flash=No+hay+configuracion+2FA+pendiente", http.StatusSeeOther)

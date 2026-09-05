@@ -67,7 +67,7 @@ func Run(repo, binaryName, currentVersion string) (bool, error) {
 	fmt.Printf("New version: %s → %s\n", currentVersion, tag)
 	fmt.Println("Downloading...")
 
-	if err := replace(repo, binID, sha256ID, binaryURL, sha256URL, binaryName); err != nil {
+	if err := replace(repo, tag, binID, sha256ID, binaryURL, sha256URL, binaryName); err != nil {
 		return false, fmt.Errorf("update: %w", err)
 	}
 
@@ -237,7 +237,7 @@ func shouldRetryGitHubAnonymous(status int) bool {
 	return status == http.StatusUnauthorized || status == http.StatusForbidden
 }
 
-func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryName string) error {
+func replace(repo, tag string, binID, sha256ID int64, downloadURL, sha256URL, binaryName string) error {
 	executable, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("locate executable: %w", err)
@@ -263,10 +263,15 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 		return fmt.Errorf("download exceeds maximum size")
 	}
 
-	tmpPath := executable + ".new"
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	f, err := os.CreateTemp(filepath.Dir(executable), filepath.Base(executable)+"-*.new")
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := f.Name()
+	if err := f.Chmod(0755); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return err
 	}
 
 	h := sha256.New()
@@ -275,7 +280,10 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 		os.Remove(tmpPath)
 		return fmt.Errorf("write: %w", err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("close downloaded binary: %w", err)
+	}
 	actualHash := hex.EncodeToString(h.Sum(nil))
 
 	if sha256URL == "" || sha256ID == 0 {
@@ -283,6 +291,10 @@ func replace(repo string, binID, sha256ID int64, downloadURL, sha256URL, binaryN
 		return fmt.Errorf("release does not include SHA256SUMS")
 	}
 	if err := verifyChecksum(client, repo, sha256ID, sha256URL, binaryName, actualHash); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := verifyReleaseAttestation(repo, tag, actualHash); err != nil {
 		os.Remove(tmpPath)
 		return err
 	}

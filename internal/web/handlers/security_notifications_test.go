@@ -107,7 +107,7 @@ func TestCreateUserPostNotifiesAdmins(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	sessionRR := httptest.NewRecorder()
-	if err := session.SetUser(sessionRR, req, "admin", "admin"); err != nil {
+	if err := session.SetUser(sessionRR, req, 1, "admin", "admin"); err != nil {
 		t.Fatalf("set admin session: %v", err)
 	}
 	for _, cookie := range sessionRR.Result().Cookies() {

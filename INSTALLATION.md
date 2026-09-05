@@ -275,7 +275,7 @@ En una reinstalación, `.env` se conserva por defecto y solo se actualizan los v
 
 El token Proxmox se genera como `root@pam!probakgo-client` cuando no se proporciona:
 
-- PVE: token sin separación de privilegios para consultar tareas, storages y backups.
+- PVE: token con separación de privilegios y rol de lectura `PVEAuditor` en `/` para consultar tareas, storages y backups. La actualización o reinstalación aplica esta restricción también al token `root@pam!probakgo-client` de instalaciones anteriores.
 - PBS: token con rol `Audit` en `/`.
 
 En PVE:
@@ -414,14 +414,14 @@ Al cambiar el día, el log activo se archiva como `probakgo-windows-client-YYYY-
 
 ## 6. Actualizaciones privadas
 
-Para un repositorio privado, crea un token GitHub de corta duración con permiso **Contents: Read-only** sobre `Nestorm18/probakgo`.
+Para un repositorio privado, crea un token GitHub de corta duración con permisos **Contents: Read-only** y **Attestations: Read-only** sobre `Nestorm18/probakgo`.
 
 - Servidor: guarda `GITHUB_TOKEN` en `/opt/probakgo/.env`.
 - Proxmox: instala con `--github-token`; queda guardado en `/opt/probakgo/.env`.
 - Windows: añade `GITHUB_TOKEN=...` manualmente a `C:\ProgramData\Probakgo\.env` si necesita auto-update privado.
 - La pantalla de API key acepta temporalmente el token para generar comandos de descarga; no lo guarda en SQLite.
 
-El actualizador descarga la release correspondiente y valida el binario con `SHA256SUMS`. El workflow de publicación genera además una attestation firmada de procedencia para cada binario.
+El actualizador valida `SHA256SUMS` y la attestation firmada antes de sustituir el binario. Exige el repositorio y workflow de release esperados y que el commit firmado coincida con el tag. Si falta la firma, no es válida o no se puede verificar, la actualización se detiene. Además de GitHub, necesita HTTPS saliente hacia los repositorios TUF de Sigstore (`tuf-repo-cdn.sigstore.dev`) o GitHub (`tuf-repo.github.com` para repositorios privados).
 
 ## 7. Resolución de problemas
 
