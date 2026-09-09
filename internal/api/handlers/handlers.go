@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"probakgo/internal/service"
 	"probakgo/internal/store"
@@ -63,7 +64,16 @@ func (h *H) sendImmediateCriticalAlerts() {
 }
 
 func (h *H) runAlertQueue() {
-	for range h.alertQueue {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case _, ok := <-h.alertQueue:
+			if !ok {
+				return
+			}
+		case <-ticker.C:
+		}
 		if alerts, err := service.CurrentAlertsRaw(context.Background(), h.store, h.report); err == nil {
 			_ = h.store.SyncAlertStates(context.Background(), alerts)
 		} else {

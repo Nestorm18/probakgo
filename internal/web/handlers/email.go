@@ -84,6 +84,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.AlertPVEExpectedFinishTime = existing.AlertPVEExpectedFinishTime
 		cfg.AlertPVEHeartbeatMinutes = existing.AlertPVEHeartbeatMinutes
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.AlertEmailBatchMinutes = existing.AlertEmailBatchMinutes
 		cfg.EnforceTOTPNonReaders = r.FormValue("enforce_totp_non_readers") == "on"
 		cfg.SensitiveActionsRequireTOTP = r.FormValue("sensitive_actions_require_totp") == "on"
 	} else {
@@ -138,6 +139,14 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	existing, _ := h.store.GetEmailConfig(ctx)
 
+	batchMinutes, err := strconv.Atoi(r.FormValue("alert_email_batch_minutes"))
+	if r.FormValue("alert_email_batch_minutes") == "" {
+		batchMinutes, err = 0, nil
+	}
+	if err != nil || (batchMinutes != 0 && batchMinutes != 5 && batchMinutes != 15) {
+		http.Error(w, "Intervalo de correo no válido", http.StatusBadRequest)
+		return
+	}
 	port, _ := strconv.Atoi(r.FormValue("smtp_port"))
 	if port == 0 {
 		port = 587
@@ -152,14 +161,15 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := domain.EmailConfig{
-		SMTPHost:              r.FormValue("smtp_host"),
-		SMTPPort:              port,
-		SMTPUser:              r.FormValue("smtp_user"),
-		SMTPPass:              pass,
-		Recipients:            r.FormValue("recipients"),
-		IsEnabled:             r.FormValue("is_enabled") == "on",
-		SendTime:              sendTime,
-		CriticalAlertsEnabled: r.FormValue("critical_alerts_enabled") == "on",
+		SMTPHost:               r.FormValue("smtp_host"),
+		SMTPPort:               port,
+		SMTPUser:               r.FormValue("smtp_user"),
+		SMTPPass:               pass,
+		Recipients:             r.FormValue("recipients"),
+		IsEnabled:              r.FormValue("is_enabled") == "on",
+		SendTime:               sendTime,
+		CriticalAlertsEnabled:  r.FormValue("critical_alerts_enabled") == "on",
+		AlertEmailBatchMinutes: batchMinutes,
 	}
 	if existing != nil {
 		cfg.RetentionMonths = existing.RetentionMonths
@@ -183,14 +193,15 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "settings.email_update", "settings", "email", "Email", map[string]any{
-		"smtp_host":               cfg.SMTPHost,
-		"smtp_port":               cfg.SMTPPort,
-		"smtp_user_set":           cfg.SMTPUser != "",
-		"smtp_pass_set":           cfg.SMTPPass != "",
-		"recipients_set":          cfg.Recipients != "",
-		"is_enabled":              cfg.IsEnabled,
-		"send_time":               cfg.SendTime,
-		"critical_alerts_enabled": cfg.CriticalAlertsEnabled,
+		"smtp_host":                 cfg.SMTPHost,
+		"smtp_port":                 cfg.SMTPPort,
+		"smtp_user_set":             cfg.SMTPUser != "",
+		"smtp_pass_set":             cfg.SMTPPass != "",
+		"recipients_set":            cfg.Recipients != "",
+		"is_enabled":                cfg.IsEnabled,
+		"send_time":                 cfg.SendTime,
+		"critical_alerts_enabled":   cfg.CriticalAlertsEnabled,
+		"alert_email_batch_minutes": cfg.AlertEmailBatchMinutes,
 	})
 	http.Redirect(w, r, "/settings/email?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
 }
@@ -204,12 +215,23 @@ func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 		return
 	}
+	nas, err := h.store.GetNASBackupConfig(ctx)
+	if err != nil {
+		slog.Error("load NAS backup config", "err", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+		return
+	}
+	hasNASPassword := nas.Password != ""
+	nas.Password = ""
 	h.tmpl.Render(w, r, "maintenance_settings.html", map[string]any{
-		"Username": username,
-		"Role":     role,
-		"Config":   cfg,
-		"Flash":    r.URL.Query().Get("flash"),
-		"FlashOK":  r.URL.Query().Get("ok") == "1",
+		"NAS":            nas,
+		"HasNASPassword": hasNASPassword,
+		"ServerTimezone": time.Now().Location().String(),
+		"Username":       username,
+		"Role":           role,
+		"Config":         cfg,
+		"Flash":          r.URL.Query().Get("flash"),
+		"FlashOK":        r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -246,6 +268,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.AlertEmailBatchMinutes = existing.AlertEmailBatchMinutes
 		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 		cfg.SensitiveActionsRequireTOTP = existing.SensitiveActionsRequireTOTP
 	}
@@ -378,6 +401,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		cfg.PublicAPIURL = existing.PublicAPIURL
 		cfg.VPNOnlyAccess = existing.VPNOnlyAccess
 		cfg.CriticalAlertsEnabled = existing.CriticalAlertsEnabled
+		cfg.AlertEmailBatchMinutes = existing.AlertEmailBatchMinutes
 		cfg.EnforceTOTPNonReaders = existing.EnforceTOTPNonReaders
 		cfg.SensitiveActionsRequireTOTP = existing.SensitiveActionsRequireTOTP
 	} else {

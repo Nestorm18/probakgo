@@ -70,6 +70,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		VPNOnlyAccess:               true,
 		AlertPVEHeartbeatMinutes:    10,
 		CriticalAlertsEnabled:       true,
+		AlertEmailBatchMinutes:      15,
 		SensitiveActionsRequireTOTP: true,
 	}
 
@@ -88,6 +89,7 @@ func TestUpsertEmailConfig_RoundTrip(t *testing.T) {
 		want any
 	}{
 		{"SMTPHost", got.SMTPHost, want.SMTPHost},
+		{"AlertEmailBatchMinutes", got.AlertEmailBatchMinutes, want.AlertEmailBatchMinutes},
 		{"SMTPPort", got.SMTPPort, want.SMTPPort},
 		{"SMTPUser", got.SMTPUser, want.SMTPUser},
 		{"SMTPPass", got.SMTPPass, want.SMTPPass},

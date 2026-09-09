@@ -6,15 +6,21 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"probakgo/internal/domain"
 	"probakgo/internal/store"
 )
 
+var immediateNotificationMu sync.Mutex
+
 // SendImmediateCriticalAlerts coordinates the independent email, Web Push and
 // Telegram channels when a critical alert appears or is resolved.
 func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
+	immediateNotificationMu.Lock()
+	defer immediateNotificationMu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
@@ -140,29 +146,49 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	if err != nil {
 		return err
 	}
-	if len(selected) > 0 {
-		subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
-		if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
-			return err
-		}
-		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
-			return fmt.Errorf("mark critical email sent: %w", err)
-		}
-	}
 	resolved, err := st.ListPendingAlertResolutionEmails(ctx)
 	if err != nil {
 		return fmt.Errorf("list resolved critical alerts: %w", err)
 	}
-	if len(resolved) > 0 {
-		subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
-		if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+	due, err := st.AlertEmailBatchDue(ctx, cfg.AlertEmailBatchMinutes, len(selected)+len(resolved) > 0, now)
+	if err != nil {
+		return fmt.Errorf("check email batch: %w", err)
+	}
+	if !due {
+		return nil
+	}
+	if cfg.AlertEmailBatchMinutes > 0 {
+		subject := fmt.Sprintf("Probakgo incidencias: %d activa(s), %d resuelta(s)", len(selected), len(resolved))
+		if err := sendSMTP(cfg, recipients, subject, renderAlertDigestEmail(selected, resolved, now)); err != nil {
+			return err
+		}
+		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
 			return err
 		}
 		if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs(resolved), now); err != nil {
-			return fmt.Errorf("mark resolution email sent: %w", err)
+			return err
+		}
+	} else {
+		if len(selected) > 0 {
+			subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
+			if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+				return err
+			}
+			if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
+				return err
+			}
+		}
+		if len(resolved) > 0 {
+			subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
+			if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+				return err
+			}
+			if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs(resolved), now); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return st.ClearAlertEmailBatch(ctx)
 }
 
 func dispatchPush(st *store.Store, sender *PushSender, alerts []domain.Alert, linkURL string, resolved bool) {
@@ -254,4 +280,23 @@ func criticalAlertsPending(_ context.Context, alerts []domain.Alert, suppressed 
 		}
 	}
 	return selected, nil
+}
+
+// Keep both existing styled sections inside a single HTML document.
+func renderAlertDigestEmail(active, resolved []domain.Alert, now time.Time) string {
+	var b strings.Builder
+	b.WriteString(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Probakgo incidencias</title></head><body style="margin:0;font-family:Arial,sans-serif;background:#f5f5f5">`)
+	appendSection := func(document string) {
+		start := strings.Index(document, "<body")
+		start += strings.Index(document[start:], ">") + 1
+		b.WriteString(document[start:strings.LastIndex(document, "</body>")])
+	}
+	if len(active) > 0 {
+		appendSection(renderImmediateCriticalEmail(active, now))
+	}
+	if len(resolved) > 0 {
+		appendSection(renderResolvedCriticalEmail(resolved, now))
+	}
+	b.WriteString("</body></html>")
+	return b.String()
 }

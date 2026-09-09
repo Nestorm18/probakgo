@@ -105,7 +105,10 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 }
 
 func sensitiveActionFailureURL(r *http.Request) string {
-	const message = "Codigo 2FA requerido para esta operacion"
+	message := "Codigo 2FA requerido para esta operacion"
+	if strings.TrimSpace(r.FormValue("totp_code")) != "" {
+		message = "Codigo 2FA incorrecto o caducado. Usa un codigo nuevo de tu cuenta de Probakgo."
+	}
 
 	target := localRedirectTarget(r.FormValue("back"))
 	if target == "" {

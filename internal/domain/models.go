@@ -370,6 +370,7 @@ type EmailConfig struct {
 	PublicAPIURL                string `db:"public_api_url"`
 	VPNOnlyAccess               bool   `db:"vpn_only_access"`
 	AlertPVEHeartbeatMinutes    int    `db:"alert_pve_heartbeat_minutes"` // 0 = disabled
+	AlertEmailBatchMinutes      int    `db:"alert_email_batch_minutes"`
 	CriticalAlertsEnabled       bool   `db:"critical_alerts_enabled"`
 	EnforceTOTPNonReaders       bool   `db:"enforce_totp_non_readers"`
 	SensitiveActionsRequireTOTP bool   `db:"sensitive_actions_require_totp"`

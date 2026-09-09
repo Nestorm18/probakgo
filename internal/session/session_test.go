@@ -1,10 +1,62 @@
 package session
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 )
+
+func TestLoginReplacesInvalidSessionCookie(t *testing.T) {
+	for _, pending := range []bool{false, true} {
+		Init("old-session-key-32-bytes-long!!", false)
+		old := httptest.NewRecorder()
+		if err := SetUser(old, httptest.NewRequest("GET", "/", nil), "old-admin", "admin"); err != nil {
+			t.Fatal(err)
+		}
+		stale := old.Result().Cookies()[0]
+		Init("new-session-key-32-bytes-long!!", true)
+		for _, cookie := range []*http.Cookie{stale, {Name: sessionName, Value: "corrupt-cookie"}} {
+			req := httptest.NewRequest("POST", "/login", nil)
+			req.AddCookie(cookie)
+			if _, _, ok := GetUser(req); ok {
+				t.Fatal("invalid cookie authenticated")
+			}
+			rr := httptest.NewRecorder()
+			var err error
+			if pending {
+				err = SetPending2FA(rr, req, 42, "/settings/maintenance")
+			} else {
+				err = SetUserWithVersion(rr, req, "alice", "reader", 3)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			next := httptest.NewRequest("GET", "/", nil)
+			for _, fresh := range rr.Result().Cookies() {
+				if !fresh.Secure || !fresh.HttpOnly || fresh.Path != "/" {
+					t.Fatal("lost cookie protections")
+				}
+				next.AddCookie(fresh)
+			}
+			if pending {
+				if _, _, ok := GetUser(next); ok {
+					t.Fatal("2FA bypassed")
+				}
+				if id, target, ok := GetPending2FA(next); !ok || id != 42 || target != "/settings/maintenance" {
+					t.Fatal("missing pending 2FA")
+				}
+			} else {
+				if user, role, ok := GetUser(next); !ok || user != "alice" || role != "reader" {
+					t.Fatal("new session invalid")
+				}
+				if v, ok := UserVersion(next); !ok || v != 3 {
+					t.Fatal("incorrect session version")
+				}
+			}
+		}
+	}
+}
 
 func TestSensitiveTOTPFresh(t *testing.T) {
 	Init("test-session-key-32-bytes-long!!", false)

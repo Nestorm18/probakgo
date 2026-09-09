@@ -236,7 +236,11 @@
     close.addEventListener('click', () => finish(null));
     root.addEventListener('click', e => { if (e.target === root) finish(null); });
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') finish(input.value.trim());
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!e.repeat) finish(input.value.trim());
+      }
     });
     return {
       danger: opts => open(Object.assign({ okText: 'Eliminar', okClass: 'btn-danger', variant: 'danger' }, opts)),
@@ -289,42 +293,65 @@
     return () => modal.show();
   }
 
+  const sensitivePending = new WeakSet();
   document.addEventListener('submit', async e => {
     const form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
     if ((form.method || '').toLowerCase() !== 'post') return;
     if (form.hasAttribute('data-totp-skip')) return;
-	if (Date.now() < sensitiveTOTPValidUntil) return;
     const action = form.getAttribute('action') || window.location.pathname;
     if (action.includes('/profile/2fa/setup') || action.includes('/profile/2fa/confirm')) return;
 	if (action.includes('/backup-config/')) return;
-    if (form.querySelector('input[name="totp_code"]')?.value) return;
     if (sensitiveBypass.has(form)) {
       sensitiveBypass.delete(form);
       return;
     }
+    // A hidden code belongs to one submission only, including after Back.
+    form.querySelectorAll('input[type="hidden"][name="totp_code"]').forEach(input => input.remove());
+    if (Date.now() < sensitiveTOTPValidUntil) return;
+    if (form.querySelector('input[name="totp_code"]')?.value) return;
     e.preventDefault();
-    const restoreModal = await releaseModalFocusForDialog(form);
-    const code = await pbkDialog.code({
-      title: 'Confirmacion 2FA',
-      message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
-      placeholder: 'Codigo 2FA'
-    });
-    if (!code) {
-      restoreModal();
-      return;
-    }
-    let input = form.querySelector('input[name="totp_code"]');
-    if (!input) {
-      input = document.createElement('input');
+    if (sensitivePending.has(form)) return;
+    sensitivePending.add(form);
+    const submitter = e.submitter;
+    try {
+      const restoreModal = await releaseModalFocusForDialog(form);
+      const code = await pbkDialog.code({
+        title: 'Confirmacion 2FA',
+        message: 'Introduce el codigo 2FA para confirmar esta operacion delicada.',
+        placeholder: 'Codigo 2FA'
+      });
+      if (!code) {
+        restoreModal();
+        return;
+      }
+      const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'totp_code';
+      input.value = code.trim();
       form.appendChild(input);
+      sensitiveBypass.add(form);
+      let actionInput;
+      try {
+        if (form.requestSubmit) form.requestSubmit(submitter || undefined);
+        else {
+          if (submitter?.name) {
+            actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = submitter.name;
+            actionInput.value = submitter.value;
+            form.appendChild(actionInput);
+          }
+          form.submit();
+        }
+      } finally {
+        input.remove();
+        actionInput?.remove();
+        sensitiveBypass.delete(form);
+      }
+    } finally {
+      sensitivePending.delete(form);
     }
-    input.value = code.trim();
-    sensitiveBypass.add(form);
-    if (form.requestSubmit) form.requestSubmit();
-    else form.submit();
   }, true);
 
   {{end}}

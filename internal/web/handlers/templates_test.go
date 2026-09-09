@@ -681,7 +681,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 		}),
 		"login.html":                base(map[string]any{"Error": ""}),
 		"login_2fa.html":            base(map[string]any{"Error": ""}),
-		"maintenance_settings.html": base(map[string]any{"Config": emailConfig}),
+		"maintenance_settings.html": base(map[string]any{"Config": emailConfig, "NAS": &domain.NASBackupConfig{Port: 22, SendTime: "03:00"}, "ServerTimezone": "UTC"}),
 		"profile.html": base(map[string]any{
 			"User":                domain.User{ID: 1, Username: "admin", Role: "admin", IsActive: true, CreatedAt: now},
 			"TelegramConfig":      telegramConfig,

@@ -54,6 +54,7 @@ func (s *Store) ValidateProtectedSecrets(ctx context.Context) (bool, error) {
 		query string
 	}{
 		{"SMTP password", `SELECT id, smtp_password FROM email_config WHERE smtp_password <> ''`},
+		{"NAS password", `SELECT id, password FROM nas_backup_config WHERE password <> ''`},
 		{"Telegram bot token", `SELECT id, bot_token FROM telegram_config WHERE bot_token <> ''`},
 		{"TOTP secret", `SELECT id, totp_secret FROM users WHERE totp_secret <> ''`},
 	} {

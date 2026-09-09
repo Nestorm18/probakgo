@@ -129,6 +129,21 @@ func TestSensitiveActionFailureURLReturnsToAlertPage(t *testing.T) {
 	}
 }
 
+func TestSensitiveActionFailureURLExplainsRejectedCode(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/settings/maintenance/nas", strings.NewReader("back=%2Fsettings%2Fmaintenance&totp_code=123456"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	u, err := url.Parse(sensitiveActionFailureURL(req))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.Path != "/settings/maintenance" || !strings.Contains(u.Query().Get("flash"), "incorrecto o caducado") {
+		t.Fatalf("misleading failure: %s", u)
+	}
+	if strings.Contains(u.String(), "123456") {
+		t.Fatal("code leaked into redirect")
+	}
+}
+
 func TestSensitiveActionFailureURLUsesSameOriginReferer(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "https://probakgo.test/settings/system", nil)
 	req.Header.Set("Referer", "https://probakgo.test/settings/system?section=security")

@@ -161,6 +161,7 @@ func main() {
 	defer appCancel()
 	service.StartEmailScheduler(appCtx, st, reportSvc)
 	service.StartCleanupScheduler(appCtx, st)
+	service.StartNASBackupScheduler(appCtx, st)
 
 	mux := http.NewServeMux()
 	mux.Handle("/api/", http.StripPrefix("/api", apiSrv.Router()))

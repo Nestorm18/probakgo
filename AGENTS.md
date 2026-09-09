@@ -58,7 +58,7 @@ Release assets must stay in sync with workflows and download handlers:
 - The UI exposes CSV/JSON exports for alerts and PVE/PBS server/report data.
 - The standard `/opt/probakgo` systemd unit runs as the dedicated `probakgo` user with filesystem and process hardening.
 - The initial admin password is stored in a `0600` one-time file and retrieved with `probakgo initial-password`; it must never be logged.
-- Production backups are covered by the Proxmox backup of the server VM/container, including `/opt/probakgo`, SQLite and `.env`. The web database download remains an on-demand export; a second application-level backup scheduler is intentionally unnecessary for this deployment.
+- Production backups include the Proxmox backup of the server VM/container, including `/opt/probakgo`, SQLite and `.env`. Maintenance supports daily and manual ZIP exports to a NAS over SFTP, containing a consistent `probakgo_data.db` and `.env` with the active server configuration and keys. Manual copies use saved settings, even with scheduling disabled. After a successful upload, remove only Probakgo ZIP archives older than 7 days. Manual and scheduled copies cannot overlap. NAS credentials are encrypted in SQLite. SSH host-key verification is disabled by explicit user request. Restore the database and `.env` from the same archive; the executable can be reinstalled.
 
 ## Clients
 
@@ -91,7 +91,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `046_report_idempotency.up.sql`.
+- Current latest migration: `050_nas_backup.up.sql`.
 - New clients attach a stable `report_id`; the server deduplicates it per server. PVE, PBS and Windows report trees must be stored atomically.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.

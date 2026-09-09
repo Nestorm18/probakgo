@@ -46,7 +46,9 @@ func SetUser(w http.ResponseWriter, r *http.Request, username, role string) erro
 func SetUserWithVersion(w http.ResponseWriter, r *http.Request, username, role string, version int) error {
 	sess, err := getSession(r)
 	if err != nil {
-		return err
+		// Authentication has succeeded. Discard an expired or invalid cookie
+		// instead of preventing the user from starting a new session.
+		sess.Values = make(map[interface{}]interface{})
 	}
 	sess.Values["username"] = username
 	sess.Values["role"] = role
@@ -79,7 +81,8 @@ func UserVersion(r *http.Request) (int, bool) {
 func SetPending2FA(w http.ResponseWriter, r *http.Request, userID int64, next string) error {
 	sess, err := getSession(r)
 	if err != nil {
-		return err
+		// Password verification succeeded, but this is not authenticated yet.
+		sess.Values = make(map[interface{}]interface{})
 	}
 	sess.Values["pending_2fa_user_id"] = userID
 	sess.Values["pending_2fa_next"] = next

@@ -8,7 +8,7 @@
 
     <div class="card">
       <div class="card-header">
-        <i class="bi bi-envelope me-2" style="color:var(--clr-accent)"></i>Reporte Diario por Email
+        <i class="bi bi-envelope me-2" style="color:var(--clr-accent)"></i>Envío de correo
       </div>
       <div class="card-body">
         <form method="POST" action="/settings/email">
@@ -51,9 +51,18 @@
               <div class="check-toggle-wrap">
                 <input class="form-check-input m-0" type="checkbox" name="critical_alerts_enabled" id="criticalAlertsEnabled" {{if .Config.CriticalAlertsEnabled}}checked{{end}}>
                 <label class="form-check-label m-0" for="criticalAlertsEnabled" style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
-                  Enviar alertas críticas inmediatas
+                  Enviar alertas críticas y resoluciones
                 </label>
               </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="alertEmailBatchMinutes">Frecuencia de avisos de incidencias</label>
+              <select class="form-select" id="alertEmailBatchMinutes" name="alert_email_batch_minutes">
+                <option value="0" {{if eq .Config.AlertEmailBatchMinutes 0}}selected{{end}}>Inmediato</option>
+                <option value="5" {{if eq .Config.AlertEmailBatchMinutes 5}}selected{{end}}>Agrupar cada 5 minutos</option>
+                <option value="15" {{if eq .Config.AlertEmailBatchMinutes 15}}selected{{end}}>Agrupar cada 15 minutos</option>
+              </select>
+              <div class="form-text">Un único correo con las alertas pendientes y las resoluciones de incidencias notificadas. El intervalo comienza con la primera novedad; sin novedades no se envía correo. El reporte diario mantiene su horario.</div>
             </div>
           </div>
           <div class="mt-4 d-flex gap-2">

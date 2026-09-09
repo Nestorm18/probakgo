@@ -177,6 +177,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		r.With(RequireAdmin).Get("/settings/maintenance", h.MaintenanceSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance", h.MaintenanceSettingsPost)
 		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/database/download", h.MaintenanceDatabaseDownload)
+		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/nas", h.NASBackupSettingsPost)
+		r.With(RequireAdmin, sensitive).Post("/settings/maintenance/nas/backup", h.NASBackupNow)
 		r.With(RequireAdmin).Get("/settings/alerts", h.AlertsSettings)
 		r.With(RequireAdmin, sensitive).Post("/settings/alerts", h.AlertsSettingsPost)
 		r.With(RequireAdmin).Get("/settings/ip-bans", h.IPBansPage)

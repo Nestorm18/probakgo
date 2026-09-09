@@ -21,6 +21,7 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		"windows_alert_config",
 		"alert_state_events",
 		"alert_states",
+		"alert_email_batch",
 		"alert_suppressions",
 		"server_maintenance",
 		"server_heartbeats",
@@ -48,6 +49,7 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		"telegram_destinations",
 		"telegram_config",
 		"email_config",
+		"nas_backup_config",
 		"ip_bans",
 		"login_attempts",
 	}
@@ -57,5 +59,8 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 		}
 	}
 
+	if _, err := tx.ExecContext(ctx, `INSERT INTO nas_backup_config (id) VALUES (1)`); err != nil {
+		return fmt.Errorf("reset NAS backup config: %w", err)
+	}
 	return tx.Commit()
 }
