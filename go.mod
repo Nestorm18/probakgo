@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0
-	github.com/go-chi/chi/v5 v5.3.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/sftp v1.13.9
