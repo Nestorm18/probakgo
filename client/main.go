@@ -178,6 +178,9 @@ func runUpdatedClientPostUpdate() error {
 
 func runClientPostUpdate(updated bool) {
 	if os.Getuid() == 0 {
+		if err := ensurePVEMonitoringToken(); err != nil {
+			fmt.Fprintf(os.Stderr, "ERROR: monitoring token permissions could not be restricted: %v\n", err)
+		}
 		ensureHeartbeatTimerInstalled()
 		ensureVzdumpHookInstalled()
 		if err := autoSyncInstalledBackupConfig(); err != nil {

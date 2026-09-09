@@ -26,7 +26,7 @@ type alertStateRow struct {
 }
 
 // ListPresentAlerts returns the latest persisted snapshot of active alerts.
-// Alert states are refreshed asynchronously whenever a client report or heartbeat arrives.
+// Alert states are refreshed on incoming reports and by the periodic evaluator.
 func (s *Store) ListPresentAlerts(ctx context.Context) ([]domain.Alert, error) {
 	debug.RecordQuery(ctx, `SELECT alert_id, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name, last_seen_at FROM alert_states WHERE is_present = 1`)
 	rows, err := s.db.QueryContext(ctx, `

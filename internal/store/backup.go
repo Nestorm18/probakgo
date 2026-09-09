@@ -38,7 +38,21 @@ func (s *Store) ListVMBackupConfigsForServerOrName(ctx context.Context, serverTy
 	if err != nil || len(configs) > 0 || serverName == "" {
 		return configs, err
 	}
-	return s.ListVMBackupConfigs(ctx, serverName)
+	// Only unassigned legacy rows may fall back to a name, and only when that
+	// name identifies this server unambiguously. Never read another key's rows.
+	rows, err := s.db.QueryContext(ctx, `SELECT id, server_name, vm_id, vm_name, monday, tuesday, wednesday,
+		thursday, friday, saturday, sunday, is_excluded, is_deleted, deleted_at, created_at
+		FROM vm_backup_configs
+		WHERE server_name = ? AND server_type = ? AND server_id = 0 AND is_deleted = 0
+		AND ? = 'pve'
+		AND (SELECT COUNT(*) FROM pve_servers WHERE name = ? AND is_deleted = 0) = 1
+		AND EXISTS (SELECT 1 FROM pve_servers WHERE id = ? AND name = ? AND is_deleted = 0)
+		ORDER BY vm_id`, serverName, serverType, serverType, serverName, serverID, serverName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanVMConfigs(rows)
 }
 
 func (s *Store) ListPVEVMBackupConfigsByServer(ctx context.Context) (map[int64][]domain.VMBackupConfig, error) {

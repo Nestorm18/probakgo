@@ -14,14 +14,22 @@ import (
 	"probakgo/internal/store"
 )
 
-var immediateNotificationMu sync.Mutex
-
 // SendImmediateCriticalAlerts coordinates the independent email, Web Push and
 // Telegram channels when a critical alert appears or is resolved.
 func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
-	immediateNotificationMu.Lock()
-	defer immediateNotificationMu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	return sendImmediateCriticalAlerts(context.Background(), st, rep)
+}
+
+func sendImmediateCriticalAlerts(parent context.Context, st *store.Store, rep *ReportService) error {
+	// The API worker and periodic scheduler share one ReportService. Coalesce
+	// concurrent evaluations until delivery state for every channel is recorded.
+	if rep != nil {
+		if !rep.notificationMu.TryLock() {
+			return nil
+		}
+		defer rep.notificationMu.Unlock()
+	}
+	ctx, cancel := context.WithTimeout(parent, 45*time.Second)
 	defer cancel()
 
 	cfg, err := st.GetEmailConfig(ctx)
@@ -37,9 +45,6 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	if telegram != nil && !telegram.Ready(ctx) {
 		telegram = nil
 	}
-	if !emailEnabled && push == nil && telegram == nil {
-		return nil
-	}
 	var recipients []string
 	var emailConfigErr error
 	if emailEnabled {
@@ -51,9 +56,6 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 				emailConfigErr = fmt.Errorf("no email recipients configured")
 			}
 		}
-	}
-	if emailConfigErr != nil && push == nil && telegram == nil {
-		return emailConfigErr
 	}
 
 	alertCfg, err := LoadAlertConfigs(ctx, st)
@@ -68,23 +70,30 @@ func SendImmediateCriticalAlerts(st *store.Store, rep *ReportService) error {
 	if err := st.SyncAlertStates(ctx, rawAlerts); err != nil {
 		return fmt.Errorf("sync alert states: %w", err)
 	}
+	if !emailEnabled && push == nil && telegram == nil {
+		return nil
+	}
 	alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 	suppressed, _ := st.GetActiveSuppressions(ctx)
 
 	now := time.Now()
+	var deliveries sync.WaitGroup
+	defer deliveries.Wait()
 	if push != nil {
-		selected, err := criticalAlertsPendingPush(ctx, st, alerts, suppressed)
-		if err != nil {
-			slog.Warn("get critical push state", "err", err)
-		} else if len(selected) > 0 {
-			dispatchPush(st, push, selected, alertLink(selected), false)
-		}
-		resolved, err := st.ListPendingAlertResolutionPushes(ctx)
-		if err != nil {
-			slog.Warn("list resolved critical push alerts", "err", err)
-		} else if len(resolved) > 0 {
-			dispatchPush(st, push, resolved, "/alerts", true)
-		}
+		deliveries.Go(func() {
+			selected, err := criticalAlertsPendingPush(ctx, st, alerts, suppressed)
+			if err != nil {
+				slog.Warn("get critical push state", "err", err)
+			} else if len(selected) > 0 {
+				dispatchPush(ctx, st, push, selected, alertLink(selected), false)
+			}
+			resolved, err := st.ListPendingAlertResolutionPushes(ctx)
+			if err != nil {
+				slog.Warn("list resolved critical push alerts", "err", err)
+			} else if len(resolved) > 0 {
+				dispatchPush(ctx, st, push, resolved, "/alerts", true)
+			}
+		})
 	}
 	telegramErr := dispatchTelegram(ctx, st, telegram, alerts, suppressed, now)
 	if emailConfigErr != nil {
@@ -159,7 +168,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	}
 	if cfg.AlertEmailBatchMinutes > 0 {
 		subject := fmt.Sprintf("Probakgo incidencias: %d activa(s), %d resuelta(s)", len(selected), len(resolved))
-		if err := sendSMTP(cfg, recipients, subject, renderAlertDigestEmail(selected, resolved, now)); err != nil {
+		if err := sendSMTP(ctx, cfg, recipients, subject, renderAlertDigestEmail(selected, resolved, now)); err != nil {
 			return err
 		}
 		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
@@ -171,7 +180,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	} else {
 		if len(selected) > 0 {
 			subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
-			if err := sendSMTP(cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+			if err := sendSMTP(ctx, cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
 				return err
 			}
 			if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
@@ -180,7 +189,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 		}
 		if len(resolved) > 0 {
 			subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
-			if err := sendSMTP(cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+			if err := sendSMTP(ctx, cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
 				return err
 			}
 			if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs(resolved), now); err != nil {
@@ -191,31 +200,29 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	return st.ClearAlertEmailBatch(ctx)
 }
 
-func dispatchPush(st *store.Store, sender *PushSender, alerts []domain.Alert, linkURL string, resolved bool) {
+func dispatchPush(parent context.Context, st *store.Store, sender *PushSender, alerts []domain.Alert, linkURL string, resolved bool) {
 	batch := append([]domain.Alert(nil), alerts...)
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		var delivered int
-		if resolved {
-			delivered = sender.SendResolutions(ctx, batch, linkURL)
-		} else {
-			delivered = sender.SendAlerts(ctx, batch, linkURL)
-		}
-		if delivered == 0 {
-			return
-		}
-		now := time.Now()
-		var err error
-		if resolved {
-			err = st.MarkAlertResolutionPushesSent(ctx, alertIDs(batch), now)
-		} else {
-			err = st.MarkAlertCriticalPushesSent(ctx, alertIDs(batch), now)
-		}
-		if err != nil {
-			slog.Warn("mark push notification sent", "resolved", resolved, "err", err)
-		}
-	}()
+	ctx, cancel := context.WithTimeout(parent, 30*time.Second)
+	defer cancel()
+	var delivered int
+	if resolved {
+		delivered = sender.SendResolutions(ctx, batch, linkURL)
+	} else {
+		delivered = sender.SendAlerts(ctx, batch, linkURL)
+	}
+	if delivered == 0 {
+		return
+	}
+	now := time.Now()
+	var err error
+	if resolved {
+		err = st.MarkAlertResolutionPushesSent(ctx, alertIDs(batch), now)
+	} else {
+		err = st.MarkAlertCriticalPushesSent(ctx, alertIDs(batch), now)
+	}
+	if err != nil {
+		slog.Warn("mark push notification sent", "resolved", resolved, "err", err)
+	}
 }
 
 func alertIDs(alerts []domain.Alert) []string {

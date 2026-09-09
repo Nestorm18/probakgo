@@ -44,7 +44,7 @@ Las notificaciones se activan por usuario y navegador desde **Perfil → Notific
 
 - Roles `reader`, `editor` y `admin`.
 - 2FA TOTP por usuario, política opcional para exigirlo a editores/administradores y confirmación TOTP para acciones sensibles.
-- Revocación de sesiones al cambiar contraseña, rol, estado o 2FA.
+- Cookies cifradas y sesiones ligadas al identificador de usuario; revocación al cambiar nombre, contraseña, rol, estado o 2FA.
 - Protección CSRF/origen, límites de peticiones, cabeceras de seguridad y confianza explícita de proxies.
 - CSP con nonce por petición para scripts y SRI en Bootstrap, Bootstrap Icons y Chart.js.
 - Bloqueo progresivo de IP tras intentos de login fallidos y gestión de baneos desde la web.
@@ -55,7 +55,7 @@ Las notificaciones se activan por usuario y navegador desde **Perfil → Notific
 - Copia diaria opcional al NAS por SFTP desde **Ajustes → Mantenimiento de Datos**: servidor, puerto, usuario, contraseña cifrada, carpeta existente y hora (zona horaria del servidor). Cada ZIP contiene una copia consistente `probakgo_data.db` y un `.env` con la configuración y las claves activas del servidor. Incluye prueba de escritura, resultado del último intento y **Hacer copia ahora**, que utiliza la configuración guardada incluso con la programación desactivada. Las copias manuales y automáticas conservan los últimos 7 días: tras completar una copia se eliminan únicamente los ZIP de Probakgo anteriores a ese plazo. Los fallos automáticos se vuelven a intentar al día siguiente; también se puede reintentar manualmente. La conexión SFTP está cifrada, pero no verifica la identidad del NAS mediante su clave SSH.
 - Para restaurar una instalación estándar, reinstala Probakgo, detén el servicio y recupera del mismo ZIP el `.env` y la base de datos. Coloca la base de datos en la ruta `DATABASE_PATH` del `.env` (por defecto `probakgo_data.db`), asigna los archivos al usuario del servicio y arráncalo. El ZIP incluye las claves de acceso y cifrado: mantenlo accesible solo a los administradores de las copias.
 - Servicio systemd endurecido y ejecutado como usuario dedicado `probakgo` en la instalación estándar.
-- Auto-update verificado mediante `SHA256SUMS`; las releases publican procedencia firmada verificable.
+- Auto-update verificado mediante `SHA256SUMS` y firma de procedencia, ligada al workflow de release y al commit del tag.
 
 CPU y RAM del cliente Windows están fuera del alcance actual.
 

@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"net"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
 
 	"probakgo/internal/debug"
+	"probakgo/internal/netutil"
 )
 
 // PushSubscription is one browser endpoint registered for a user.
@@ -128,14 +129,14 @@ func validatePushSubscription(sub PushSubscription) error {
 		return ErrInvalidPushSubscription
 	}
 	u, err := url.Parse(sub.Endpoint)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" || (u.Port() != "" && u.Port() != "443") {
 		return ErrInvalidPushSubscription
 	}
 	host := strings.ToLower(u.Hostname())
 	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
 		return ErrInvalidPushSubscription
 	}
-	if ip := net.ParseIP(host); ip != nil && (!ip.IsGlobalUnicast() || ip.IsPrivate()) {
+	if ip, err := netip.ParseAddr(host); err == nil && !netutil.IsPublicIP(ip) {
 		return ErrInvalidPushSubscription
 	}
 	if len(sub.P256DH) == 0 || len(sub.P256DH) > 512 || len(sub.Auth) == 0 || len(sub.Auth) > 512 {

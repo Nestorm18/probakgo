@@ -88,7 +88,7 @@ func (s *Store) CreateUser(ctx context.Context, username, hash, role string) (in
 
 func (s *Store) UpdateUserUsername(ctx context.Context, id int64, username string) error {
 	debug.RecordQuery(ctx, `UPDATE users SET username=? WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET username=? WHERE id=?`, username, id)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET username=?, session_version=session_version+1 WHERE id=?`, username, id)
 	return err
 }
 

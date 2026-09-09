@@ -1,13 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"probakgo/internal/service"
 	"probakgo/internal/store"
@@ -64,21 +62,7 @@ func (h *H) sendImmediateCriticalAlerts() {
 }
 
 func (h *H) runAlertQueue() {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case _, ok := <-h.alertQueue:
-			if !ok {
-				return
-			}
-		case <-ticker.C:
-		}
-		if alerts, err := service.CurrentAlertsRaw(context.Background(), h.store, h.report); err == nil {
-			_ = h.store.SyncAlertStates(context.Background(), alerts)
-		} else {
-			slog.Warn("sync alert states", "err", err)
-		}
+	for range h.alertQueue {
 		if err := service.SendImmediateCriticalAlerts(h.store, h.report); err != nil {
 			slog.Warn("send immediate critical alerts", "err", err)
 		}

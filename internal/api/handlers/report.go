@@ -77,7 +77,7 @@ func (h *H) ReportWindows(w http.ResponseWriter, r *http.Request) {
 		internalErr(w, "save windows report", err)
 		return
 	}
-	if sv, err := h.store.GetWindowsServerByName(r.Context(), req.Hostname); err == nil {
+	if sv, err := h.store.GetWindowsServerByAPIKey(r.Context(), k.ID); err == nil {
 		_ = h.store.UpsertServerHeartbeat(r.Context(), domain.ServerHeartbeat{
 			ServerType:    "windows",
 			ServerID:      sv.ID,

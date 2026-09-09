@@ -77,7 +77,7 @@ func TestSensitiveTOTPRecentSessionNeverAcceptsExplicitWrongCode(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	authReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	authRR := httptest.NewRecorder()
-	if err := session.SetUserWithVersion(authRR, authReq, user.Username, user.Role, user.SessionVersion); err != nil {
+	if err := session.SetUserWithVersion(authRR, authReq, 1, user.Username, user.Role, user.SessionVersion); err != nil {
 		t.Fatalf("set user session: %v", err)
 	}
 
@@ -159,7 +159,7 @@ func TestRequireEditorRejectsReader(t *testing.T) {
 	session.Init("test-session-key-32-bytes-long!!", false)
 	baseReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	loginRR := httptest.NewRecorder()
-	if err := session.SetUser(loginRR, baseReq, "reader", "reader"); err != nil {
+	if err := session.SetUser(loginRR, baseReq, 1, "reader", "reader"); err != nil {
 		t.Fatalf("set reader session: %v", err)
 	}
 

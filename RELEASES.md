@@ -2,6 +2,21 @@
 
 Proceso actual para publicar servidor, cliente Proxmox y cliente Windows.
 
+## Cambios de seguridad en 0.0.243
+
+- Las cookies se cifran y se ligan al ID del usuario. Las sesiones anteriores se invalidan al reiniciar con esta versión: será necesario iniciar sesión de nuevo.
+- El paso pendiente de 2FA caduca a los cinco minutos, admite cinco intentos y se consume una sola vez. Los cambios de credenciales lo invalidan. La configuración temporal de TOTP caduca a los diez minutos.
+- Las acciones sensibles limitan los intentos TOTP por usuario y se bloquean si no se puede leer la política de seguridad.
+- Web Push bloquea redirecciones y conexiones a direcciones privadas, incluso mediante DNS. Los envíos concurrentes se coordinan antes de registrar el estado de entrega.
+- SQLite activa claves foráneas, WAL y tiempo de espera en cada conexión. Cada migración y su registro se guardan en la misma transacción.
+- Las API keys mantienen separados los datos de servidores con nombres duplicados. Las alertas se evalúan cada minuto aunque no lleguen reportes; SMTP tiene un límite de diez segundos por envío.
+- Se conserva el historial de baneos para que la limpieza no reinicie su escalado. El cliente restringe el token PVE gestionado a `PVEAuditor` al actualizarse o reinstalarse.
+- Se actualiza `golang.org/x/crypto` y se incorpora la verificación criptográfica de procedencia en el actualizador.
+
+Durante la revisión, el tag público `v0.0.242` apuntaba a `c96362756231a273361ab806efa0ef4ece0b0004`, mientras sus binarios estaban firmados para `cacb6de8d716742e7bbaa3cbd09803d695d93b48`. La política nueva rechaza esta discrepancia. El workflow comprueba el commit del checkout y de cualquier tag existente antes de publicar versiones posteriores.
+
+La comprobación de firmas con la atestación real, sin ejecutar binarios, se puede repetir con `PROBAKGO_TEST_ATTESTATIONS=1 go test ./internal/selfupdate -run TestReleaseAttestationIntegration -v`. La prueba fija el commit de compilación firmado y comprueba también el rechazo de un binario o commit diferente.
+
 ## Flujo automático
 
 El workflow `CI` se ejecuta en cada push y pull request:
@@ -148,7 +163,7 @@ Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 - envío SMTP de prueba;
 - descarga Linux/Windows desde la pantalla de API key.
 
-El actualizador y los endpoints de descarga verifican tamaño y checksum. Un fallo en `SHA256SUMS` debe bloquear la sustitución.
+El actualizador verifica tamaño, checksum y procedencia firmada antes de sustituir el binario; un fallo en cualquiera de ellos bloquea la actualización. Los endpoints de descarga mantienen su comprobación de tamaño y checksum.
 
 ## Rollback
 

@@ -79,7 +79,7 @@ func (b *Banhammer) Load() error {
 			s.banExpiry = permanentExpiry
 		case ban.BanExpiry.After(now):
 			s.banExpiry = *ban.BanExpiry
-		// expired: keep banCount for escalation, banExpiry stays zero
+			// expired: keep banCount for escalation, banExpiry stays zero
 		}
 		b.states[ban.IP] = s
 	}
@@ -102,31 +102,36 @@ func (b *Banhammer) getOrCreate(ip string) *ipState {
 	return s
 }
 
-// cleanup runs every hour and evicts states that have no active ban and no recent failures.
+// cleanup evicts unused states while preserving prior bans for escalation.
 func (b *Banhammer) cleanup() {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for range ticker.C {
-		now := time.Now()
-		cutoff := now.Add(-b.window)
-		b.mu.Lock()
-		for ip, s := range b.states {
-			if !s.banExpiry.IsZero() && (s.banExpiry.Equal(permanentExpiry) || now.Before(s.banExpiry)) {
-				continue // actively banned
-			}
-			hasRecent := false
-			for _, t := range s.failures {
-				if t.After(cutoff) {
-					hasRecent = true
-					break
-				}
-			}
-			if !hasRecent {
-				delete(b.states, ip)
+		b.cleanupAt(time.Now())
+	}
+}
+
+func (b *Banhammer) cleanupAt(now time.Time) {
+	cutoff := now.Add(-b.window)
+	b.mu.Lock()
+	for ip, s := range b.states {
+		if !s.banExpiry.IsZero() && (s.banExpiry.Equal(permanentExpiry) || now.Before(s.banExpiry)) {
+			continue // actively banned
+		}
+		hasRecent := false
+		for _, t := range s.failures {
+			if t.After(cutoff) {
+				hasRecent = true
+				break
 			}
 		}
-		b.mu.Unlock()
+		if !hasRecent && s.banCount == 0 {
+			delete(b.states, ip)
+		} else if !hasRecent {
+			s.failures = nil
+		}
 	}
+	b.mu.Unlock()
 }
 
 // IsBanned reports whether ip is currently banned.

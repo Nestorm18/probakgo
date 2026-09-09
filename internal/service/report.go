@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"probakgo/internal/domain"
@@ -11,9 +12,10 @@ import (
 )
 
 type ReportService struct {
-	store *store.Store
-	tz    *time.Location
-	now   func() time.Time
+	store          *store.Store
+	tz             *time.Location
+	now            func() time.Time
+	notificationMu sync.Mutex
 }
 
 func NewReport(st *store.Store, tz *time.Location) *ReportService {

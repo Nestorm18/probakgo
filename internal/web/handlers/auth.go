@@ -104,7 +104,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.TOTPEnabled {
-		if err := session.SetPending2FA(w, r, user.ID, next); err != nil {
+		if err := session.SetPending2FA(w, r, user.ID, next, user.SessionVersion); err != nil {
 			http.Error(w, "Session error", http.StatusInternalServerError)
 			return
 		}
@@ -113,7 +113,7 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := session.SetUserWithVersion(w, r, user.Username, user.Role, user.SessionVersion); err != nil {
+	if err := session.SetUserWithVersion(w, r, user.ID, user.Username, user.Role, user.SessionVersion); err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
@@ -124,13 +124,13 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WebH) Login2FAPage(w http.ResponseWriter, r *http.Request) {
-	userID, _, ok := session.GetPending2FA(r)
+	userID, _, version, ok := session.GetPending2FA(r)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 	user, err := h.store.GetUser(r.Context(), userID)
-	if err != nil || !user.TOTPEnabled {
+	if err != nil || !user.IsActive || !user.TOTPEnabled || user.SessionVersion != version {
 		_ = session.ClearPending2FA(w, r)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
@@ -144,13 +144,13 @@ func (h *WebH) Login2FAPage(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	ip := ratelimit.ExtractIP(r)
 	userAgent := r.UserAgent()
-	userID, next, ok := session.GetPending2FA(r)
+	userID, next, version, ok := session.GetPending2FA(r)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 	user, err := h.store.GetUser(r.Context(), userID)
-	if err != nil || !user.IsActive || !user.TOTPEnabled {
+	if err != nil || !user.IsActive || !user.TOTPEnabled || user.SessionVersion != version {
 		_ = session.ClearPending2FA(w, r)
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
@@ -162,6 +162,11 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+	}
+	if !session.AllowPending2FAAttempt(r) {
+		_ = session.ClearPending2FA(w, r)
+		http.Error(w, "Demasiados intentos 2FA. Inicia sesion de nuevo.", http.StatusTooManyRequests)
+		return
 	}
 	if !totp.Validate(r.FormValue("code"), user.TOTPSecret, time.Now()) {
 		h.recordLoginAttempt(r, user.Username, ip, userAgent, "failed", "invalid_totp")
@@ -178,7 +183,11 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		h.ban.ClearFailures(ip)
 	}
-	if err := session.SetUserWithVersion(w, r, user.Username, user.Role, user.SessionVersion); err != nil {
+	if !session.ConsumePending2FA(r, user.ID, user.SessionVersion) {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	if err := session.SetUserWithVersion(w, r, user.ID, user.Username, user.Role, user.SessionVersion); err != nil {
 		http.Error(w, "Session error", http.StatusInternalServerError)
 		return
 	}
@@ -231,7 +240,11 @@ func (h *WebH) handleTOTPEnforcement(w http.ResponseWriter, r *http.Request, use
 		return "", false
 	}
 	cfg, err := h.store.GetEmailConfig(r.Context())
-	if err != nil || cfg == nil || !cfg.EnforceTOTPNonReaders {
+	if err != nil || cfg == nil {
+		http.Error(w, "Security configuration unavailable", http.StatusServiceUnavailable)
+		return "", true
+	}
+	if !cfg.EnforceTOTPNonReaders {
 		return "", false
 	}
 

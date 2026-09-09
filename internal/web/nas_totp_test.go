@@ -49,7 +49,7 @@ func TestNASActionsAcceptValidTOTPWithEncryptedSecret(t *testing.T) {
 	}
 	session.Init("test-session-key-32-bytes-long!!", false)
 	auth := httptest.NewRecorder()
-	if err := session.SetUserWithVersion(auth, httptest.NewRequest("GET", "/", nil), user.Username, user.Role, user.SessionVersion); err != nil {
+	if err := session.SetUserWithVersion(auth, httptest.NewRequest("GET", "/", nil), user.ID, user.Username, user.Role, user.SessionVersion); err != nil {
 		t.Fatal(err)
 	}
 	tmpl := webhandlers.NewTemplates(os.DirFS("../.."), "test", time.UTC, false, func() (int, int) { return 0, 0 }, func() (bool, bool) { return true, false })

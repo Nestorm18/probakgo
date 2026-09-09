@@ -11,7 +11,7 @@ func TestLoginReplacesInvalidSessionCookie(t *testing.T) {
 	for _, pending := range []bool{false, true} {
 		Init("old-session-key-32-bytes-long!!", false)
 		old := httptest.NewRecorder()
-		if err := SetUser(old, httptest.NewRequest("GET", "/", nil), "old-admin", "admin"); err != nil {
+		if err := SetUser(old, httptest.NewRequest("GET", "/", nil), 1, "old-admin", "admin"); err != nil {
 			t.Fatal(err)
 		}
 		stale := old.Result().Cookies()[0]
@@ -25,9 +25,9 @@ func TestLoginReplacesInvalidSessionCookie(t *testing.T) {
 			rr := httptest.NewRecorder()
 			var err error
 			if pending {
-				err = SetPending2FA(rr, req, 42, "/settings/maintenance")
+				err = SetPending2FA(rr, req, 42, "/settings/maintenance", 3)
 			} else {
-				err = SetUserWithVersion(rr, req, "alice", "reader", 3)
+				err = SetUserWithVersion(rr, req, 42, "alice", "reader", 3)
 			}
 			if err != nil {
 				t.Fatal(err)
@@ -43,7 +43,7 @@ func TestLoginReplacesInvalidSessionCookie(t *testing.T) {
 				if _, _, ok := GetUser(next); ok {
 					t.Fatal("2FA bypassed")
 				}
-				if id, target, ok := GetPending2FA(next); !ok || id != 42 || target != "/settings/maintenance" {
+				if id, target, version, ok := GetPending2FA(next); !ok || id != 42 || version != 3 || target != "/settings/maintenance" {
 					t.Fatal("missing pending 2FA")
 				}
 			} else {
@@ -111,7 +111,7 @@ func TestUserVersion(t *testing.T) {
 	Init("test-session-key-32-bytes-long!!", false)
 	req := httptest.NewRequest("GET", "/", nil)
 	rr := httptest.NewRecorder()
-	if err := SetUserWithVersion(rr, req, "admin", "admin", 4); err != nil {
+	if err := SetUserWithVersion(rr, req, 1, "admin", "admin", 4); err != nil {
 		t.Fatalf("SetUserWithVersion: %v", err)
 	}
 

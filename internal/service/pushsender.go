@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,6 +18,7 @@ import (
 	webpush "github.com/SherClockHolmes/webpush-go"
 
 	"probakgo/internal/domain"
+	"probakgo/internal/netutil"
 	"probakgo/internal/store"
 )
 
@@ -43,6 +45,7 @@ type PushSender struct {
 	// simulate expired endpoints without hitting a real push service.
 	deliverFn func(ctx context.Context, cfg *store.PushConfig, sub store.PushSubscription, payload []byte) error
 	keyMu     sync.Mutex
+	client    *http.Client
 }
 
 // NewPushSender wires a PushSender to the store. The getter is called on every
@@ -50,7 +53,8 @@ type PushSender struct {
 // into push_config without restarting the server.
 func NewPushSender(st *store.Store) *PushSender {
 	p := &PushSender{
-		st: st,
+		st:     st,
+		client: netutil.PublicHTTPSClient(),
 		getter: func(ctx context.Context) *store.PushConfig {
 			cfg, err := st.GetPushConfig(ctx)
 			if err != nil {
@@ -198,6 +202,10 @@ func (p *PushSender) SendTest(ctx context.Context, sub store.PushSubscription, l
 }
 
 func (p *PushSender) realDeliver(ctx context.Context, cfg *store.PushConfig, sub store.PushSubscription, payload []byte) error {
+	u, err := url.Parse(sub.Endpoint)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" || (u.Port() != "" && u.Port() != "443") {
+		return store.ErrInvalidPushSubscription
+	}
 	s := &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys: webpush.Keys{
@@ -206,6 +214,7 @@ func (p *PushSender) realDeliver(ctx context.Context, cfg *store.PushConfig, sub
 		},
 	}
 	opts := &webpush.Options{
+		HTTPClient:      p.client,
 		VAPIDPrivateKey: cfg.PrivateKey,
 		VAPIDPublicKey:  cfg.PublicKey,
 		Topic:           "probakgo-alerts",
