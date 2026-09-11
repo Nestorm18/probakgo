@@ -69,14 +69,15 @@
             <button type="submit" class="btn btn-primary">
               <i class="bi bi-floppy me-1"></i>Guardar
             </button>
-            <form method="POST" action="/settings/email/test" class="d-inline">
-              {{ .CSRFField }}
-              <button type="submit" class="btn btn-secondary">
+              <button type="submit" form="email-test-form" class="btn btn-secondary">
               <i class="bi bi-send me-1"></i>Enviar prueba ahora
               </button>
-            </form>
           </div>
         </form>
+        <form id="email-test-form" method="POST" action="/settings/email/test">
+          {{ .CSRFField }}
+        </form>
+        <div class="form-text mt-2">La prueba envía el reporte y una alerta inmediatamente con la configuración guardada. Guarda los cambios antes de probar.</div>
       </div>
     </div>
 

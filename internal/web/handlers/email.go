@@ -477,7 +477,7 @@ func (h *WebH) EmailTest(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/email?flash=Servicio+no+disponible", http.StatusSeeOther)
 		return
 	}
-	if err := service.SendDailyReport(h.store, rep); err != nil {
+	if err := service.SendDailyReportTest(h.store, rep); err != nil {
 		http.Redirect(w, r, "/settings/email?flash=Error:+"+err.Error(), http.StatusSeeOther)
 		return
 	}

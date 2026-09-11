@@ -82,9 +82,9 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 	}
 
 	if cfg != nil && cfg.SensitiveActionsRequireTOTP {
-		add(checklistOK("2FA en operaciones delicadas", "Cambios sensibles requieren 2FA activo.", "bi-fingerprint"))
+		add(checklistOK("2FA en operaciones sensibles", "Cambios sensibles requieren 2FA activo.", "bi-fingerprint"))
 	} else {
-		add(checklistBad("Operaciones delicadas sin 2FA", "API keys, usuarios y configuracion deberian requerir 2FA.", "bi-fingerprint", "/settings/system", "Activar proteccion"))
+		add(checklistBad("Operaciones sensibles sin 2FA", "API keys, usuarios y configuracion deberian requerir 2FA.", "bi-fingerprint", "/settings/system", "Activar proteccion"))
 	}
 
 	missingTOTP := h.countPrivilegedUsersWithoutTOTP(r)

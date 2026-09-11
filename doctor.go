@@ -106,9 +106,9 @@ func runServerDoctor() error {
 		} else {
 			checkPublicAPIURL(add, emailCfg.PublicAPIURL)
 			if emailCfg.SensitiveActionsRequireTOTP {
-				add("OK", "Operaciones delicadas", "requieren 2FA")
+				add("OK", "Operaciones sensibles", "requieren 2FA")
 			} else {
-				add("WARN", "Operaciones delicadas", "no requieren 2FA")
+				add("WARN", "Operaciones sensibles", "no requieren 2FA")
 			}
 		}
 	}

@@ -93,7 +93,7 @@
           <div class="mb-3">
             <div class="form-check form-switch">
               <input type="checkbox" name="sensitive_actions_require_totp" value="on" class="form-check-input" id="sensitive_actions_require_totp" {{if .Config.SensitiveActionsRequireTOTP}}checked{{end}}>
-              <label class="form-check-label" for="sensitive_actions_require_totp">Forzar 2FA en operaciones delicadas</label>
+              <label class="form-check-label" for="sensitive_actions_require_totp">Forzar 2FA en operaciones sensibles</label>
             </div>
             <div class="form-text">Solicita un código 2FA adicional al realizar cambios sensibles. Después de validarlo no se vuelve a pedir durante 10 minutos.</div>
           </div>

@@ -45,6 +45,7 @@ type vmTaskRow struct {
 	Status     string
 	Duration   string
 	Size       string
+	Copies     int
 	IsMissing  bool
 	IsExcluded bool
 }
@@ -95,13 +96,22 @@ type emailData struct {
 
 // SendDailyReport builds and sends the daily status email.
 func SendDailyReport(st *store.Store, rep *ReportService) error {
+	return sendDailyReport(st, rep, false)
+}
+
+// SendDailyReportTest sends immediately, even when scheduled reports are disabled.
+func SendDailyReportTest(st *store.Store, rep *ReportService) error {
+	return sendDailyReport(st, rep, true)
+}
+
+func sendDailyReport(st *store.Store, rep *ReportService, force bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	cfg, err := st.GetEmailConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("get email config: %w", err)
 	}
-	if !cfg.IsEnabled {
+	if !cfg.IsEnabled && !force {
 		slog.Info("email disabled, skipping daily report")
 		return nil
 	}
@@ -317,6 +327,20 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		pveReportIDs = append(pveReportIDs, report.ID)
 	}
 	pveTasks, _ := st.GetPVEBackupTasksForReports(ctx, pveReportIDs)
+	pveStorages, err := st.GetPVEStoragesForReports(ctx, pveReportIDs)
+	if err != nil {
+		return emailData{}, err
+	}
+	var storageIDs []int64
+	for _, storages := range pveStorages {
+		for _, storage := range storages {
+			storageIDs = append(storageIDs, storage.ID)
+		}
+	}
+	pveContents, err := st.GetPVEStorageContentForStorages(ctx, storageIDs)
+	if err != nil {
+		return emailData{}, err
+	}
 
 	pbsReports, _ := st.GetLatestPBSReports(ctx)
 	pbsReportIDs := make([]int64, 0, len(pbsReports))
@@ -358,6 +382,10 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 
 		tasks := pveTasks[r.ID]
+		copies := make(map[string]int)
+		for _, vm := range domain.CountPVEVMCopies(pveStorages[r.ID], pveContents) {
+			copies[strconv.FormatInt(vm.VMID, 10)] = vm.Total
+		}
 		isStale := false
 		staleReason := ""
 		if stale, reason := rep.IsStaleForLoadedPVEConfig(r.ReportedAt, configs, alertCfg, cfg.AlertPVEExpectedFinishTime, noVMsConfirmed); stale {
@@ -371,6 +399,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		if isStale {
 			row.StaleReason = staleReason
 			row.VMTasks = staleVMRows(configs, tasks)
+			for i := range row.VMTasks {
+				row.VMTasks[i].Copies = copies[row.VMTasks[i].VMID]
+			}
 			pveIssues = append(pveIssues, row)
 			continue
 		}
@@ -390,6 +421,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 		missingRows, activeMissing := missingVMRows(configs, tasks)
 		row.VMTasks = append(row.VMTasks, missingRows...)
+		for i := range row.VMTasks {
+			row.VMTasks[i].Copies = copies[row.VMTasks[i].VMID]
+		}
 		if activeMissing > 0 {
 			if activeMissing == 1 {
 				row.StaleReason = "1 VM activa sin backup en el ultimo job"
