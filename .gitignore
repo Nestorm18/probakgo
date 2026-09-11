@@ -37,3 +37,4 @@ probakgo-client_linux_arm64
 # Logs
 /logs/
 sss.json
+*.xlsx

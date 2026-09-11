@@ -239,11 +239,11 @@ func nasBackupDue(c domain.NASBackupConfig, now time.Time) bool {
 		return false
 	}
 	due := time.Date(now.Year(), now.Month(), now.Day(), t.Hour(), t.Minute(), 0, 0, now.Location())
-	last, err := time.Parse(time.RFC3339, c.LastAttempt)
+	last, err := time.Parse(time.RFC3339, c.LastScheduledAttempt)
 	return !now.Before(due) && (err != nil || last.In(now.Location()).Format("2006-01-02") < now.Format("2006-01-02"))
 }
 
-func runNASBackup(parent context.Context, st *store.Store) {
+func runNASBackup(parent context.Context, st *store.Store, loc *time.Location) {
 	if !nasBackupLock.TryLock() {
 		return
 	}
@@ -255,7 +255,7 @@ func runNASBackup(parent context.Context, st *store.Store) {
 		slog.Error("NAS backup: load config", "err", err)
 		return
 	}
-	now := time.Now()
+	now := time.Now().In(loc)
 	if !nasBackupDue(*c, now) {
 		return
 	}
@@ -320,8 +320,8 @@ func performNASBackup(ctx context.Context, st *store.Store, c domain.NASBackupCo
 	}
 }
 
-// Daily in the server's local timezone. A missed run is caught up at startup.
-func StartNASBackupScheduler(ctx context.Context, st *store.Store) {
+// Daily in the configured application timezone. A missed run is caught up at startup.
+func StartNASBackupScheduler(ctx context.Context, st *store.Store, loc *time.Location) {
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
@@ -329,7 +329,7 @@ func StartNASBackupScheduler(ctx context.Context, st *store.Store) {
 			if ctx.Err() != nil {
 				return
 			}
-			runNASBackup(ctx, st)
+			runNASBackup(ctx, st, loc)
 			select {
 			case <-ctx.Done():
 				return

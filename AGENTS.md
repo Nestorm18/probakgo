@@ -91,7 +91,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `050_nas_backup.up.sql`.
+- Current latest migration: `051_nas_scheduled_attempt.up.sql`.
 - New clients attach a stable `report_id`; the server deduplicates it per server. PVE, PBS and Windows report trees must be stored atomically.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.

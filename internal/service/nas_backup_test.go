@@ -39,7 +39,7 @@ func TestNASBackupSchedule(t *testing.T) {
 		{"invalid", "", "invalid", true, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := nasBackupDue(domain.NASBackupConfig{Enabled: tc.enabled, SendTime: tc.hour, LastAttempt: tc.last}, now); got != tc.want {
+			if got := nasBackupDue(domain.NASBackupConfig{Enabled: tc.enabled, SendTime: tc.hour, LastScheduledAttempt: tc.last}, now); got != tc.want {
 				t.Fatalf("due=%v", got)
 			}
 		})
@@ -298,5 +298,54 @@ func TestManualNASBackupUsesSavedSettingsWhileDisabled(t *testing.T) {
 	got, err := st.GetNASBackupConfig(ctx)
 	if err != nil || got.LastSuccess == "" || got.LastError != "" || got.Enabled {
 		t.Fatalf("manual backup result: %+v, %v", got, err)
+	}
+}
+
+func TestManualBackupDoesNotSkipEveningSchedule(t *testing.T) {
+	zone := time.FixedZone("Madrid", 2*60*60)
+	c := domain.NASBackupConfig{Enabled: true, SendTime: "22:00", LastAttempt: "2026-09-09T17:16:46+02:00"}
+	now := time.Date(2026, 9, 9, 22, 0, 0, 0, zone)
+	if !nasBackupDue(c, now) {
+		t.Fatal("manual copy suppressed scheduled backup")
+	}
+	c.LastScheduledAttempt = now.Format(time.RFC3339)
+	if nasBackupDue(c, now.Add(time.Minute)) {
+		t.Fatal("scheduled copy repeated")
+	}
+}
+
+func TestScheduledNASBackupAfterManualCopy(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("DATA_ENCRYPTION_KEY", "0123456789abcdef0123456789abcdef")
+	t.Setenv("SESSION_KEY", "test-session-key-32-bytes-long!!")
+	c := testNASServer(t)
+	c.Enabled, c.SendTime = true, "00:00"
+	database, _ := openTestStore(t)
+	st, err := store.NewEncrypted(database, os.Getenv("DATA_ENCRYPTION_KEY"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if err := st.SaveNASBackupConfig(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	if err := StartManualNASBackup(ctx, st); err != nil {
+		t.Fatal(err)
+	}
+	nasBackupLock.Lock()
+	nasBackupLock.Unlock()
+	before, err := st.GetNASBackupConfig(ctx)
+	if err != nil || before.LastSuccess == "" || before.LastScheduledAttempt != "" {
+		t.Fatal("manual copy failed or consumed schedule", err)
+	}
+	runNASBackup(ctx, st, time.UTC)
+	after, err := st.GetNASBackupConfig(ctx)
+	if err != nil || after.LastScheduledAttempt == "" || after.LastSuccess != after.LastScheduledAttempt || after.LastError != "" {
+		t.Fatal("scheduled upload failed after manual copy", err)
+	}
+	runNASBackup(ctx, st, time.UTC)
+	again, err := st.GetNASBackupConfig(ctx)
+	if err != nil || again.LastScheduledAttempt != after.LastScheduledAttempt {
+		t.Fatal("scheduled upload repeated", err)
 	}
 }

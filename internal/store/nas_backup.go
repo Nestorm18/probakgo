@@ -8,7 +8,7 @@ import (
 
 func (s *Store) GetNASBackupConfig(ctx context.Context) (*domain.NASBackupConfig, error) {
 	c := &domain.NASBackupConfig{}
-	err := s.db.QueryRowContext(ctx, `SELECT enabled, host, port, username, password, directory, send_time, last_attempt, last_success, last_error FROM nas_backup_config WHERE id=1`).Scan(&c.Enabled, &c.Host, &c.Port, &c.Username, &c.Password, &c.Directory, &c.SendTime, &c.LastAttempt, &c.LastSuccess, &c.LastError)
+	err := s.db.QueryRowContext(ctx, `SELECT enabled, host, port, username, password, directory, send_time, last_attempt, last_success, last_error, last_scheduled_attempt FROM nas_backup_config WHERE id=1`).Scan(&c.Enabled, &c.Host, &c.Port, &c.Username, &c.Password, &c.Directory, &c.SendTime, &c.LastAttempt, &c.LastSuccess, &c.LastError, &c.LastScheduledAttempt)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func (s *Store) ClaimManualNASBackup(ctx context.Context, previous, attempt stri
 }
 
 func (s *Store) claimNASBackup(ctx context.Context, previous, attempt string, manual bool) (bool, error) {
-	res, err := s.db.ExecContext(ctx, `UPDATE nas_backup_config SET last_attempt=?, last_error='Copia en curso; si el servicio se reinicia, se retomará al día siguiente' WHERE id=1 AND (enabled=1 OR ?) AND last_attempt=?`, attempt, manual, previous)
+	res, err := s.db.ExecContext(ctx, `UPDATE nas_backup_config SET last_attempt=?, last_scheduled_attempt=CASE WHEN ? THEN last_scheduled_attempt ELSE ? END, last_error='Copia en curso; si el servicio se reinicia, se retomará al día siguiente' WHERE id=1 AND (enabled=1 OR ?) AND last_attempt=?`, attempt, manual, attempt, manual, previous)
 	if err != nil {
 		return false, err
 	}

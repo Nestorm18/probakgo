@@ -546,6 +546,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 	normalizePVEReportBackupStatuses(reports, reportTasks)
 
 	var storages []map[string]any
+	var vmCopies []pveVMCopies
 	var latestReportID int64
 	if len(latestReports) > 0 {
 		latestReportID = latestReports[0].ID
@@ -555,6 +556,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 			storageIDs[i] = st.ID
 		}
 		contentByStorage, _ := h.store.GetPVEStorageContentForStorages(ctx, storageIDs)
+		vmCopies = countPVEVMCopies(sts, contentByStorage)
 		for _, st := range sts {
 			storages = append(storages, map[string]any{
 				"Storage": st,
@@ -563,6 +565,19 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	backupTasks := reportTasks[latestReportID]
+	vmNames := make(map[string]string)
+	copyConfigs, _ := h.store.ListVMBackupConfigsForServerOrName(ctx, "pve", sv.ID, sv.Name)
+	for _, config := range copyConfigs {
+		vmNames[config.VMID] = config.VMName
+	}
+	for _, task := range backupTasks {
+		if task.VMName != "" {
+			vmNames[strconv.FormatInt(task.VMID, 10)] = task.VMName
+		}
+	}
+	for i := range vmCopies {
+		vmCopies[i].VMName = vmNames[strconv.FormatInt(vmCopies[i].VMID, 10)]
+	}
 	emailCfg, _ := h.store.GetEmailConfig(ctx)
 	heartbeatThreshold := 15
 	if emailCfg != nil {
@@ -675,6 +690,7 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Reports":         reports,
 		"Pagination":      pagination,
 		"Storages":        storages,
+		"VMCopies":        vmCopies,
 		"BackupTasks":     backupTasks,
 		"BackupRows":      backupRows,
 		"BackupJobStart":  backupJobStart,

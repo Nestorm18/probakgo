@@ -175,6 +175,23 @@
 </div>
 {{end}}
 
+{{if .VMCopies}}
+<div class="card mb-4">
+  <div class="card-header">Copias disponibles por VM</div>
+  <div class="card-body p-0 table-responsive">
+    <table class="table table-hover mb-0">
+      <thead><tr><th>VMID</th><th>Nombre</th><th>PBS</th><th>vzdump</th><th>Total de copias</th></tr></thead>
+      <tbody>
+      {{range .VMCopies}}
+        <tr><td>{{.VMID}}</td><td>{{if .VMName}}{{.VMName}}{{else}}—{{end}}</td><td>{{.PBS}}</td><td>{{.Vzdump}}</td><td class="fw-semibold">{{.Total}}</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted">Copias visibles en los almacenamientos de este PVE según el último reporte recibido. Los almacenamientos compartidos pueden incluir VM de otros nodos.</div>
+</div>
+{{end}}
+
 {{if .Storages}}
 <div class="card mb-4">
   <div class="card-header">

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"log/slog"
+	"mime/quotedprintable"
 	"net"
 	"net/smtp"
 	"strconv"
@@ -753,11 +754,14 @@ func buildMIMEMessage(from string, to []string, subject, html string) []byte {
 	var b strings.Builder
 	b.WriteString("MIME-Version: 1.0\r\n")
 	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + strings.Join(to, ", ") + "\r\n")
 	b.WriteString("Subject: " + subject + "\r\n")
 	b.WriteString("\r\n")
-	b.WriteString(html)
+	w := quotedprintable.NewWriter(&b)
+	_, _ = w.Write([]byte(html))
+	_ = w.Close()
 	return []byte(b.String())
 }
 

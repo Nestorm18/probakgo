@@ -56,7 +56,7 @@ func TestNASBackupEncryptedConfigAndClaims(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, err = st.GetNASBackupConfig(ctx)
-	if err != nil || got.LastSuccess != attempt || got.LastAttempt != attempt {
+	if err != nil || got.LastSuccess != attempt || got.LastAttempt != attempt || got.LastScheduledAttempt != attempt {
 		t.Fatal("saving erased run state", err)
 	}
 	if err := st.FinishNASBackup(ctx, attempt, "failed"); err != nil {
@@ -66,11 +66,18 @@ func TestNASBackupEncryptedConfigAndClaims(t *testing.T) {
 	if got.LastSuccess != attempt || got.LastError != "failed" {
 		t.Fatal("failure erased successful backup")
 	}
+	if ok, err := st.ClaimManualNASBackup(ctx, attempt, "2026-09-09T10:00:00Z"); err != nil || !ok {
+		t.Fatal("manual claim failed", err)
+	}
+	got, err = st.GetNASBackupConfig(ctx)
+	if err != nil || got.LastScheduledAttempt != attempt {
+		t.Fatal("manual backup changed schedule", err)
+	}
 	if err := st.ResetAllData(ctx); err != nil {
 		t.Fatal(err)
 	}
 	got, err = st.GetNASBackupConfig(ctx)
-	if err != nil || got.Enabled || got.Password != "" || got.LastAttempt != "" || got.Port != 22 {
+	if err != nil || got.Enabled || got.Password != "" || got.LastAttempt != "" || got.LastScheduledAttempt != "" || got.Port != 22 {
 		t.Fatalf("NAS config not reset: %+v, %v", got, err)
 	}
 	if err := st.SaveNASBackupConfig(ctx, domain.NASBackupConfig{}); err != nil {

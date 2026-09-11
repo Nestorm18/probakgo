@@ -719,6 +719,7 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"ServerURL":       "https://pve.example.test:8006",
 			"BackupTasks":     []domain.PVEBackupTask{},
 			"BackupRows":      []pveBackupJobRow{},
+			"VMCopies":        []pveVMCopies{{VMID: 100, VMName: "vm-test", PBS: 20, Vzdump: 3, Total: 23}, {VMID: 101, PBS: 1, Total: 1}},
 			"BackupJobStart":  int64(0),
 			"Heartbeat":       heartbeatView{Label: "Sin datos", CSSClass: "muted"},
 			"MissingVMs":      []map[string]any{},
