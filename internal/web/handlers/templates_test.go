@@ -474,6 +474,44 @@ func TestAPIKeysRevealExplainsMissingTOTP(t *testing.T) {
 	}
 }
 
+func TestAPIKeyCreatedCombinesLinuxChmodAndInstall(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	req := httptest.NewRequest(http.MethodGet, "/api-keys", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "api_key_created.html", templateFixtures(time.Now())["api_key_created.html"])
+
+	body := html.UnescapeString(rr.Body.String())
+	linuxIdx := strings.Index(body, `id="linux-install"`)
+	windowsIdx := strings.Index(body, `id="windows-install"`)
+	if linuxIdx < 0 || windowsIdx < 0 || windowsIdx < linuxIdx {
+		t.Fatal("linux/windows install tabs were removed")
+	}
+	linuxPane := body[linuxIdx:windowsIdx]
+	wantLinux := `chmod +x /tmp/probakgo-client && /tmp/probakgo-client install --api-url http://probakgo.test:36748 --api-key pbk-1234567890abcdef`
+	if !strings.Contains(linuxPane, wantLinux) {
+		t.Fatalf("linux install does not combine chmod and install:\n%s", linuxPane)
+	}
+	if strings.Contains(linuxPane, "Dar permisos de ejecucion") {
+		t.Fatal("linux still shows chmod as its own step")
+	}
+	if strings.Count(linuxPane, "Dar permisos e instalar") != 1 {
+		t.Fatal("linux combined step label missing")
+	}
+	if strings.Contains(linuxPane, ">3</span>") {
+		t.Fatal("linux still has a third install step")
+	}
+	windowsPane := body[windowsIdx:]
+	if !strings.Contains(windowsPane, `& "$env:TEMP\probakgo-windows-client.exe" install --api-url http://probakgo.test:36748 --api-key pbk-1234567890abcdef`) {
+		t.Fatal("windows install command is missing")
+	}
+	if !strings.Contains(windowsPane, ">2</span>") || !strings.Contains(windowsPane, ">3</span>") {
+		t.Fatal("windows install steps were merged")
+	}
+}
+
 func templateFixtures(now time.Time) map[string]map[string]any {
 	base := func(extra map[string]any) map[string]any {
 		data := map[string]any{

@@ -67,23 +67,10 @@
               <div>
                 <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
                   <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">2</span>
-                  Dar permisos de ejecucion
+                  Dar permisos e instalar
                 </div>
                 <div style="position:relative">
-                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client</pre>
-                  <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
-                    <i class="bi bi-clipboard" style="font-size:.85rem"></i>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <div style="font-size:.78rem;color:var(--txt-secondary);margin-bottom:.35rem">
-                  <span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:var(--clr-accent);color:#fff;font-size:.65rem;font-weight:700;margin-right:.4rem">3</span>
-                  Instalar
-                </div>
-                <div style="position:relative">
-                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}{{if .GitHubToken}} --github-token {{.GitHubToken}}{{end}}</pre>
+                  <pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.6rem 2.4rem .6rem .75rem;font-size:.75rem;white-space:pre;overflow-x:auto;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client && /tmp/probakgo-client install --api-url {{.APIURL}} --api-key {{.Key}}{{if .GitHubToken}} --github-token {{.GitHubToken}}{{end}}</pre>
                   <button class="copy-step-btn" title="Copiar" style="position:absolute;top:.35rem;right:.35rem;background:none;border:none;cursor:pointer;color:var(--txt-muted);padding:.2rem .3rem;border-radius:.3rem;line-height:1">
                     <i class="bi bi-clipboard" style="font-size:.85rem"></i>
                   </button>
