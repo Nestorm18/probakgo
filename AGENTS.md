@@ -11,6 +11,7 @@ Guidance for Codex when working in this repository. Keep changes small, explicit
 - Always verify meaningful code changes with tests or a targeted build.
 - Before every push, complete the mandatory checks in "Push verification" below; targeted tests alone are not enough.
 - After code changes, bump the single release version in `internal/version/version.go`.
+- Every new commit pushed to `master` also requires an unused release version, including documentation-only changes: CI always triggers a release, and the release workflow rejects a tag belonging to another commit.
 
 ## Layout
 
