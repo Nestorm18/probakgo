@@ -9,6 +9,7 @@ Guidance for Codex when working in this repository. Keep changes small, explicit
 - Match existing style and naming. The project name is **probakgo**.
 - Use Conventional Commits when committing: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`.
 - Always verify meaningful code changes with tests or a targeted build.
+- Before every push, complete the mandatory checks in "Push verification" below; targeted tests alone are not enough.
 - After code changes, bump the single release version in `internal/version/version.go`.
 
 ## Layout
@@ -44,6 +45,26 @@ Release assets must stay in sync with workflows and download handlers:
 - `probakgo_linux_amd64`
 - `probakgo-client_linux_amd64`
 - `probakgo-windows-client_windows_amd64.exe`
+
+## Push verification
+
+- Read `.github/workflows/ci.yml` and `.github/workflows/release.yml` before pushing. Keep local checks aligned with their Go version, pinned tools, build targets and coverage threshold.
+- Before every push, including documentation-only changes, run these checks against the final working tree and require successful exit codes:
+
+  ```bash
+  git diff --check
+  go build ./...
+  go vet ./...
+  go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+  go test -coverprofile=coverage.out ./...
+  go tool cover -func=coverage.out
+  ```
+
+- Verify that total coverage meets the CI floor (currently **35%**). Keep the coverage report temporary and exclude it from commits. Targeted tests or `go test ./...` without coverage do not replace this gate.
+- Run the vulnerability scan with access to the current Go vulnerability database. If it fails, update affected dependencies to a fixed version, tidy modules and repeat the affected checks. Do not suppress findings or weaken CI to make a release pass.
+- Check the release version after code changes and verify the release build commands when changing build configuration, dependencies or platform-specific code. Prefer the CI operating system for matching results; explicitly disclose local platform differences.
+- Do not push with failing or unexecuted checks. Fix failures first. If the environment prevents a required check, explain the concrete blocker and obtain an explicit user exception before pushing; never report an unexecuted check as passed.
+- After pushing, inspect GitHub Actions for the exact pushed commit and verify CI and any triggered release. Report success only when GitHub confirms it; otherwise report the actual pending, blocked or failed state and address failures.
 
 ## Server
 
