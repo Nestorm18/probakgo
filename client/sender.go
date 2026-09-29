@@ -91,7 +91,7 @@ func sendReport(cfg *Config, si *SysInfo, fromFile string) error {
 		log.Printf("Report sent successfully (%s)", time.Now().Format(time.RFC3339))
 		return nil
 	case 401:
-		return fmt.Errorf("authentication error: API key invalid or inactive")
+		return authenticationError(respBody)
 	default:
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
 	}

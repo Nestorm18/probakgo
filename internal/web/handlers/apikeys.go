@@ -1,7 +1,9 @@
 package webhandlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -165,16 +167,31 @@ func (h *WebH) DeleteAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 
 func (h *WebH) UnbindAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	k, _ := h.store.GetAPIKey(ctx, id)
-	_ = h.store.UnbindAPIKeyServer(ctx, id)
-	if k != nil {
-		h.audit(r, "api_key.unbind", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{
-			"machine_id_was_set":  k.MachineID != "",
-			"server_name_was_set": k.ServerName != "",
-		})
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		redirectWithFlash(w, r, "/api-keys", "ID de clave inválido", false)
+		return
 	}
-	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
+	k, err := h.store.GetAPIKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			redirectWithFlash(w, r, "/api-keys", "No se encontró la clave", false)
+		} else {
+			slog.Error("get api key for unbind", "id", id, "err", err)
+			redirectWithFlash(w, r, "/api-keys", "No se pudo consultar la clave", false)
+		}
+		return
+	}
+	if err := h.store.UnbindAPIKeyServer(ctx, id); err != nil {
+		slog.Error("unbind api key", "id", id, "err", err)
+		redirectWithFlash(w, r, "/api-keys", "No se pudo desvincular la máquina", false)
+		return
+	}
+	h.audit(r, "api_key.unbind", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{
+		"machine_id_was_set":  k.MachineID != "",
+		"server_name_was_set": k.ServerName != "",
+	})
+	redirectWithFlash(w, r, "/api-keys", "Máquina desvinculada", true)
 }
 
 func (h *WebH) RevealAPIKeyPost(w http.ResponseWriter, r *http.Request) {

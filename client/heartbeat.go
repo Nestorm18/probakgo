@@ -56,7 +56,7 @@ func sendHeartbeat(cfg *Config, si *SysInfo) error {
 		log.Printf("Heartbeat sent successfully (%s)", time.Now().Format(time.RFC3339))
 		return nil
 	case http.StatusUnauthorized:
-		return fmt.Errorf("authentication error: API key invalid or inactive")
+		return authenticationError(respBody)
 	default:
 		return fmt.Errorf("server returned %d: %s", resp.StatusCode, string(respBody))
 	}

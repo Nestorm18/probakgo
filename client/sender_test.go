@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -77,6 +78,7 @@ func TestSendReportFromFilePBS(t *testing.T) {
 func TestSendReportAuthError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"machine ID mismatch: key bound to different machine"}`))
 	}))
 	defer srv.Close()
 
@@ -87,6 +89,9 @@ func TestSendReportAuthError(t *testing.T) {
 	err := sendReport(cfg, si, fixturePath)
 	if err == nil {
 		t.Fatal("expected error for 401 response")
+	}
+	if !strings.Contains(err.Error(), "machine ID mismatch") {
+		t.Fatalf("authentication error lost server reason: %v", err)
 	}
 }
 

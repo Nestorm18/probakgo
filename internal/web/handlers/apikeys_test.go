@@ -242,3 +242,65 @@ func TestRevealAPIKeyPost_KeyNotFound(t *testing.T) {
 		t.Errorf("want 404, got %d", rr.Code)
 	}
 }
+
+func TestUnbindAPIKeyPostClearsMachineBinding(t *testing.T) {
+	ctx := context.Background()
+	st := openHandlerDB(t)
+	k, err := st.CreateAPIKey(ctx, "node", "old-node", "")
+	if err != nil {
+		t.Fatalf("create API key: %v", err)
+	}
+	if err := st.BindAPIKeyMachineID(ctx, k.ID, "old-machine"); err != nil {
+		t.Fatalf("bind machine: %v", err)
+	}
+
+	h := webhandlers.New(st, nil, nil)
+	req := withChiID(httptest.NewRequest(http.MethodPost, "/api-keys/1/unbind", nil), fmt.Sprintf("%d", k.ID))
+	rr := httptest.NewRecorder()
+	h.UnbindAPIKeyPost(rr, req)
+	if rr.Code != http.StatusSeeOther || !strings.Contains(rr.Header().Get("Location"), "ok=1") {
+		t.Fatalf("unbind redirect: %d %q", rr.Code, rr.Header().Get("Location"))
+	}
+	got, err := st.GetAPIKey(ctx, k.ID)
+	if err != nil || got.MachineID != "" || got.ServerName != "" {
+		t.Fatalf("binding was not cleared: key=%+v err=%v", got, err)
+	}
+}
+
+func TestUnbindAPIKeyPostLookupErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		closeDB bool
+		message string
+	}{
+		{"missing key", false, "No se encontró la clave"},
+		{"database failure", true, "No se pudo consultar la clave"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, err := dbpkg.Open(":memory:")
+			if err != nil {
+				t.Fatalf("open test db: %v", err)
+			}
+			t.Cleanup(func() { db.Close() })
+			if tc.closeDB {
+				if err := db.Close(); err != nil {
+					t.Fatalf("close test db: %v", err)
+				}
+			}
+			h := webhandlers.New(store.New(db), nil, nil)
+			req := withChiID(httptest.NewRequest(http.MethodPost, "/api-keys/9999/unbind", nil), "9999")
+			rr := httptest.NewRecorder()
+			h.UnbindAPIKeyPost(rr, req)
+			if rr.Code != http.StatusSeeOther {
+				t.Fatalf("want 303, got %d", rr.Code)
+			}
+			location, err := rr.Result().Location()
+			if err != nil {
+				t.Fatalf("redirect location: %v", err)
+			}
+			if location.Query().Get("flash") != tc.message || location.Query().Get("ok") != "" {
+				t.Fatalf("unexpected error redirect: %s", location)
+			}
+		})
+	}
+}
