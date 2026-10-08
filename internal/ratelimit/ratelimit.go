@@ -64,6 +64,15 @@ func (l *Limiter) AllowKey(key string) bool {
 	return l.allow(key)
 }
 
+// Blocked reports whether key already used its window without counting a new
+// event. Pair it with AllowKey to limit only failures.
+func (l *Limiter) Blocked(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	b, ok := l.buckets[key]
+	return ok && time.Now().Before(b.reset) && b.count >= l.max
+}
+
 // Middleware returns a plain-text 429 when the limit is exceeded (for web UI).
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

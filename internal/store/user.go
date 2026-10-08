@@ -113,19 +113,53 @@ func (s *Store) EnableUserTOTP(ctx context.Context, id int64, secret string) err
 }
 
 func (s *Store) DisableUserTOTP(ctx context.Context, id int64) error {
-	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, session_version=session_version+1 WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, session_version=session_version+1 WHERE id=?`, id)
+	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, totp_last_step=0, session_version=session_version+1 WHERE id=?`)
+	_, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, totp_last_step=0, session_version=session_version+1 WHERE id=?`, id)
 	return err
 }
 
 func (s *Store) DisableUserTOTPByUsername(ctx context.Context, username string) (bool, error) {
-	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, session_version=session_version+1 WHERE username=?`)
-	res, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, session_version=session_version+1 WHERE username=?`, username)
+	debug.RecordQuery(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, totp_last_step=0, session_version=session_version+1 WHERE username=?`)
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET totp_enabled=0, totp_secret='', totp_confirmed_at=NULL, totp_grace_started_at=NULL, totp_last_step=0, session_version=session_version+1 WHERE username=?`, username)
 	if err != nil {
 		return false, err
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+// ClaimUserTOTPStep records a TOTP time step as used. It reports false when the
+// step (or a later one) was already accepted, so a code works only once.
+func (s *Store) ClaimUserTOTPStep(ctx context.Context, id, step int64) (bool, error) {
+	debug.RecordQuery(ctx, `UPDATE users SET totp_last_step=? WHERE id=? AND totp_last_step < ?`)
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET totp_last_step=? WHERE id=? AND totp_last_step < ?`, step, id, step)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// ReactivateUserByUsername enables a user and restarts any 2FA grace period.
+// It is the CLI recovery path for administrators locked out by enforcement.
+func (s *Store) ReactivateUserByUsername(ctx context.Context, username string) (bool, error) {
+	debug.RecordQuery(ctx, `UPDATE users SET is_active=1, totp_grace_started_at=NULL, session_version=session_version+1 WHERE username=?`)
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET is_active=1, totp_grace_started_at=NULL, session_version=session_version+1 WHERE username=?`, username)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// IsLastActiveAdmin reports whether id is an active admin and no other active
+// admin exists.
+func (s *Store) IsLastActiveAdmin(ctx context.Context, id int64) (bool, error) {
+	debug.RecordQuery(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='admin' AND is_active=1) AND NOT EXISTS(SELECT 1 FROM users WHERE id<>? AND role='admin' AND is_active=1)`)
+	var last bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE id=? AND role='admin' AND is_active=1)
+		AND NOT EXISTS(SELECT 1 FROM users WHERE id<>? AND role='admin' AND is_active=1)`, id, id).Scan(&last)
+	return last, err
 }
 
 func (s *Store) StartUserTOTPGrace(ctx context.Context, id int64) error {

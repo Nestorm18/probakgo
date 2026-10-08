@@ -43,29 +43,18 @@ func (s *Store) HardDeleteServerDataForAPIKey(ctx context.Context, apiKeyID int6
 	}
 	defer tx.Rollback()
 
-	deletedPVE, err := hardDeletePVEByAPIKey(ctx, tx, apiKeyID)
-	if err != nil {
+	if _, err := hardDeletePVEByAPIKey(ctx, tx, apiKeyID); err != nil {
 		return err
 	}
-	deletedPBS, err := hardDeletePBSByAPIKey(ctx, tx, apiKeyID)
-	if err != nil {
+	if _, err := hardDeletePBSByAPIKey(ctx, tx, apiKeyID); err != nil {
 		return err
 	}
-	deletedWindows, err := hardDeleteWindowsByAPIKey(ctx, tx, apiKeyID)
-	if err != nil {
+	if _, err := hardDeleteWindowsByAPIKey(ctx, tx, apiKeyID); err != nil {
 		return err
 	}
-	if !deletedPVE && !deletedPBS && !deletedWindows && fallbackName != "" {
-		if err := hardDeletePVE(ctx, tx, fallbackName); err != nil {
-			return err
-		}
-		if err := hardDeletePBS(ctx, tx, fallbackName); err != nil {
-			return err
-		}
-		if err := hardDeleteWindows(ctx, tx, fallbackName); err != nil {
-			return err
-		}
-	} else if fallbackName != "" {
+	// The hostname only matches unbound legacy rows. A key that never reported
+	// must not delete servers that another key owns under the same hostname.
+	if fallbackName != "" {
 		if err := hardDeleteLegacyPVE(ctx, tx, fallbackName); err != nil {
 			return err
 		}

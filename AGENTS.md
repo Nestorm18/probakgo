@@ -56,10 +56,13 @@ Release assets must stay in sync with workflows and download handlers:
   git diff --check
   go build ./...
   go vet ./...
+  GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./client-windows/
   go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
   go test -coverprofile=coverage.out ./...
   go tool cover -func=coverage.out
   ```
+
+- `.githooks/pre-push` runs these checks; enable it once per clone with `git config core.hooksPath .githooks`.
 
 - Verify that total coverage meets the CI floor (currently **35%**). Keep the coverage report temporary and exclude it from commits. Targeted tests or `go test ./...` without coverage do not replace this gate.
 - Run the vulnerability scan with access to the current Go vulnerability database. If it fails, update affected dependencies to a fixed version, tidy modules and repeat the affected checks. Do not suppress findings or weaken CI to make a release pass.
@@ -73,7 +76,7 @@ Release assets must stay in sync with workflows and download handlers:
 - `/api/health` is a readiness check: it returns `503` when SQLite or the migrated schema cannot be read.
 - Web pages include dashboard, alerts, PVE, PBS, Windows, users, API keys, profile, about and the settings hub.
 - Auth uses bcrypt, sessions and RBAC: `reader`, `editor`, `admin`.
-- TOTP 2FA can be enforced for editors/admins and for sensitive actions. User security changes revoke existing sessions.
+- TOTP 2FA can be enforced for editors/admins and for sensitive actions. Each TOTP code is accepted only once (`users.totp_last_step`). User security changes revoke the other sessions and keep the one that made the change. The last active admin is never disabled by 2FA enforcement; `probakgo enable-user`, `unlock2fa` and `unban` are the CLI recovery paths.
 - API keys are `pbk-` client keys, bind to the first reporting Machine ID and can be revealed only after credential checks.
 - API keys, SMTP passwords, Telegram bot tokens and TOTP secrets are encrypted at rest with `DATA_ENCRYPTION_KEY`; API-key authentication uses a keyed lookup hash.
 - Settings under `/settings/*` cover system/security, email, Telegram, retention/database backup, alerts, IP bans, audit log and operational reset.
@@ -113,7 +116,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `051_nas_scheduled_attempt.up.sql`.
+- Current latest migration: `052_user_totp_last_step.up.sql`.
 - New clients attach a stable `report_id`; the server deduplicates it per server. PVE, PBS and Windows report trees must be stored atomically.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.
@@ -162,4 +165,4 @@ Release assets must stay in sync with workflows and download handlers:
 - PVE staleness uses configured backup schedules and expected finish time, not just "today".
 - PBS snapshots are informational; stale PBS snapshot alerts were intentionally removed/avoided for old retained backups.
 - Swap detection exists for PVE/PBS reports and should remain visible in dashboard, PVE and PBS pages.
-- Operational reset removes PVE/PBS/Windows reports and configuration but preserves users, audit logs and `schema_migrations`.
+- Operational reset removes PVE/PBS/Windows reports and configuration but preserves users, audit logs, `schema_migrations` and the security policy (2FA enforcement, sensitive-action TOTP and VPN-only access).

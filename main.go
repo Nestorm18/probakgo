@@ -6,11 +6,13 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"math/big"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -27,6 +29,7 @@ import (
 	"probakgo/internal/api"
 	"probakgo/internal/config"
 	dbpkg "probakgo/internal/db"
+	"probakgo/internal/ratelimit"
 	"probakgo/internal/schedule"
 	"probakgo/internal/selfupdate"
 	"probakgo/internal/service"
@@ -83,6 +86,29 @@ func main() {
 			}
 			fmt.Printf("2FA disabled for user %q.\n", os.Args[2])
 			return
+		case "enable-user":
+			if len(os.Args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: probakgo enable-user <usuario>")
+				os.Exit(2)
+			}
+			if err := enableUser(os.Args[2]); err != nil {
+				fmt.Fprintln(os.Stderr, "enable-user:", err)
+				os.Exit(1)
+			}
+			fmt.Printf("User %q enabled; the 2FA grace period starts again.\n", os.Args[2])
+			return
+		case "unban":
+			if len(os.Args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: probakgo unban <ip>")
+				os.Exit(2)
+			}
+			ip, err := unbanIP(os.Args[2])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "unban:", err)
+				os.Exit(1)
+			}
+			fmt.Printf("Ban removed for %s. Restart the service to apply it: systemctl restart probakgo\n", ip)
+			return
 		case "initial-password":
 			pass, err := consumeInitialPassword(initialPasswordPath())
 			if err != nil {
@@ -123,6 +149,12 @@ func main() {
 	if err := st.ProtectLegacySecrets(context.Background()); err != nil {
 		slog.Error("protect legacy secrets", "err", err)
 		os.Exit(1)
+	}
+	if snapshot, err := dbpkg.OpenSnapshotReader(cfg.DBPath); err != nil {
+		slog.Warn("database copies will share the main connection", "err", err)
+	} else if snapshot != nil {
+		defer snapshot.Close()
+		st.SetSnapshotReader(snapshot)
 	}
 
 	if err := ensureDefaults(st); err != nil {
@@ -222,13 +254,10 @@ func ensureSessionKey() {
 	key := hex.EncodeToString(b)
 	os.Setenv("SESSION_KEY", key)
 
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
+	if err := config.SetEnvFileValue(".env", "SESSION_KEY", key); err != nil {
 		slog.Warn("SESSION_KEY generated but could not persist to .env", "err", err)
 		return
 	}
-	defer f.Close()
-	fmt.Fprintf(f, "SESSION_KEY=%s\n", key)
 	slog.Info("SESSION_KEY generated and saved to .env")
 }
 
@@ -241,15 +270,7 @@ func ensureDataEncryptionKey() error {
 		return fmt.Errorf("generate DATA_ENCRYPTION_KEY: %w", err)
 	}
 	key := hex.EncodeToString(b)
-	f, err := os.OpenFile(".env", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		return err
-	}
-	if _, err := fmt.Fprintf(f, "DATA_ENCRYPTION_KEY=%s\n", key); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
+	if err := config.SetEnvFileValue(".env", "DATA_ENCRYPTION_KEY", key); err != nil {
 		return err
 	}
 	if err := os.Setenv("DATA_ENCRYPTION_KEY", key); err != nil {
@@ -444,6 +465,10 @@ func signalSystemdMainProcess() error {
 }
 
 func ensureDefaults(st *store.Store) error {
+	return ensureDefaultsAt(st, initialPasswordPath())
+}
+
+func ensureDefaultsAt(st *store.Store, passwordPath string) error {
 	ctx := context.Background()
 	hasUsers, err := st.HasUsers(ctx)
 	if err != nil {
@@ -458,8 +483,16 @@ func ensureDefaults(st *store.Store) error {
 		if err != nil {
 			return err
 		}
-		passwordPath := initialPasswordPath()
-		if err := writeInitialPassword(passwordPath, pass); err != nil {
+		err = writeInitialPassword(passwordPath, pass)
+		if errors.Is(err, os.ErrExist) {
+			// Left over from a database that no longer has users; it is stale.
+			slog.Warn("replacing stale initial admin password file", "path", passwordPath)
+			if removeErr := os.Remove(passwordPath); removeErr != nil {
+				return fmt.Errorf("remove stale initial admin password: %w", removeErr)
+			}
+			err = writeInitialPassword(passwordPath, pass)
+		}
+		if err != nil {
 			return fmt.Errorf("store initial admin password: %w", err)
 		}
 		if _, err := st.CreateUser(ctx, "probakgo", string(hash), "admin"); err != nil {
@@ -475,8 +508,63 @@ func ensureDefaults(st *store.Store) error {
 }
 
 func unlock2FA(username string) error {
+	return withCLIStore(func(st *store.Store) error {
+		ok, err := st.DisableUserTOTPByUsername(context.Background(), username)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("user %q not found", username)
+		}
+		return nil
+	})
+}
+
+// enableUser reactivates a user disabled by 2FA enforcement or by an admin.
+func enableUser(username string) error {
+	return withCLIStore(func(st *store.Store) error {
+		ok, err := st.ReactivateUserByUsername(context.Background(), username)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("user %q not found", username)
+		}
+		return nil
+	})
+}
+
+// unbanIP removes a persisted login ban. The running server keeps bans in
+// memory, so it must be restarted to reload them.
+func unbanIP(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	var ip string
+	if addr, err := netip.ParseAddr(raw); err == nil {
+		ip = addr.Unmap().String()
+	} else if prefix, err := netip.ParsePrefix(raw); err == nil {
+		// IPv6 bans are listed by /64 prefix.
+		ip = prefix.Masked().String()
+	} else {
+		return "", fmt.Errorf("invalid IP address %q", raw)
+	}
+	return ip, withCLIStore(func(st *store.Store) error {
+		for _, key := range ratelimit.UnbanKeys(ip) {
+			if err := st.DeleteIPBan(context.Background(), key); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func withCLIStore(run func(*store.Store) error) error {
 	cfg := config.Load()
 	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	// A relative DATABASE_PATH depends on the working directory; never create
+	// an empty database and report "user not found" from the wrong directory.
+	if err := requireExistingDatabase(cfg.DBPath); err != nil {
 		return err
 	}
 	db, err := dbpkg.Open(cfg.DBPath)
@@ -488,12 +576,16 @@ func unlock2FA(username string) error {
 	if err != nil {
 		return err
 	}
-	ok, err := st.DisableUserTOTPByUsername(context.Background(), username)
-	if err != nil {
-		return err
+	return run(st)
+}
+
+func requireExistingDatabase(path string) error {
+	if path == ":memory:" || strings.HasPrefix(path, "file:") {
+		return nil
 	}
-	if !ok {
-		return fmt.Errorf("user %q not found", username)
+	if _, err := os.Stat(path); err != nil {
+		abs, _ := filepath.Abs(path)
+		return fmt.Errorf("database %s not found: run the command from the service directory (for example /opt/probakgo) or set DATABASE_PATH", abs)
 	}
 	return nil
 }

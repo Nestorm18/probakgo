@@ -314,7 +314,7 @@ func (h *WebH) exportPBSRows(r *http.Request) ([]pbsExportRow, error) {
 
 func serveCSV(w http.ResponseWriter, filename string, fn func(*csv.Writer)) {
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", attachmentDisposition(filename))
 	wr := csv.NewWriter(w)
 	fn(wr)
 	wr.Flush()

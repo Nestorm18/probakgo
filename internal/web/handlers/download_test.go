@@ -2,10 +2,12 @@ package webhandlers
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestGitHubDownloadToken(t *testing.T) {
@@ -40,5 +42,26 @@ func TestDownloadResponseLimits(t *testing.T) {
 	}
 	if _, err := copyWithLimit(&dst, strings.NewReader("123456"), 5); err == nil {
 		t.Fatal("expected oversized copy to fail")
+	}
+}
+
+func TestExtendDownloadDeadlineOutlivesServerWriteTimeout(t *testing.T) {
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		extendDownloadDeadline(w)
+		time.Sleep(300 * time.Millisecond)
+		_, _ = w.Write([]byte("complete"))
+	}))
+	srv.Config.WriteTimeout = 100 * time.Millisecond
+	srv.Start()
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL)
+	if err != nil {
+		t.Fatalf("download: %v", err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil || string(body) != "complete" {
+		t.Fatalf("download was cut by the server write timeout: %q %v", body, err)
 	}
 }

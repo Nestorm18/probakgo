@@ -1309,7 +1309,7 @@ func (h *WebH) PVEServerReportsCSV(w http.ResponseWriter, r *http.Request) {
 
 	filename := fmt.Sprintf("reportes_%s_%s.csv", sv.DisplayName, time.Now().Format("20060102"))
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", attachmentDisposition(filename))
 
 	wr := csv.NewWriter(w)
 	_ = writeSafeCSV(wr, []string{"Fecha", "Estado backup", "Inicio backup", "Duracion (s)", "Sin reporte"})

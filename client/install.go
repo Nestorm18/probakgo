@@ -44,7 +44,7 @@ PENDING_FILE="$INSTALL_DIR/.report_pending"
 log_msg() { echo "$(date '+%Y-%m-%d %H:%M:%S') $1" >> "$LOG_FILE"; }
 
 if [ "$1" = "run-report" ]; then
-    touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
+    touch "$LOCK_FILE"; chmod 600 "$LOCK_FILE"
     exec 200>"$LOCK_FILE"
     flock -w 30 200 || {
         log_msg "WARN: Could not acquire lock, saving as pending"
@@ -66,7 +66,7 @@ fi
 if [ "$1" = "job-end" ]; then
     log_msg "INFO: Backup completed, scheduling report..."
     echo "$(date '+%Y-%m-%d %H:%M:%S')" > "$PENDING_FILE"
-    touch "$LOCK_FILE"; chmod 666 "$LOCK_FILE"
+    touch "$LOCK_FILE"; chmod 600 "$LOCK_FILE"
     # A transient systemd timer escapes the vzdump task scope. PVE 6 kills
     # ordinary background children when the backup job finishes.
     UNIT_NAME="probakgo-report-$(date +%s)-$$"
@@ -205,15 +205,16 @@ func runInstall(args []string) {
 	// 5. Register hook in /etc/vzdump.conf (PVE) or cron report (PBS)
 	isPBS := false
 	if _, err := os.Stat(vzdumpConfPath); err == nil {
-		hookLine := "script: " + hookPath
-		if !fileContains(vzdumpConfPath, hookLine) {
-			f, err := os.OpenFile(vzdumpConfPath, os.O_APPEND|os.O_WRONLY, 0644)
-			must(err, "open vzdump.conf")
-			_, err = fmt.Fprintf(f, "%s\n", hookLine)
-			f.Close()
-			must(err, "write vzdump.conf")
+		added, err := registerVzdumpHook(vzdumpConfPath, hookPath)
+		var conflict *vzdumpHookConflictError
+		switch {
+		case errors.As(err, &conflict):
+			fmt.Printf("WARN: %v\n", err)
+		case err != nil:
+			fatalf("register vzdump hook: %v", err)
+		case added:
 			fmt.Println("Hook registered in /etc/vzdump.conf")
-		} else {
+		default:
 			fmt.Println("Hook already in /etc/vzdump.conf")
 		}
 	} else {
@@ -459,25 +460,55 @@ func ensureVzdumpHookInstalled() {
 		fmt.Printf("WARN: could not refresh vzdump hook: %v\n", err)
 		return
 	}
-	hookLine := "script: " + hookPath
-	if !fileContains(vzdumpConfPath, hookLine) {
-		f, err := os.OpenFile(vzdumpConfPath, os.O_APPEND|os.O_WRONLY, 0644)
-		if err != nil {
-			fmt.Printf("WARN: could not open %s: %v\n", vzdumpConfPath, err)
-			return
-		}
-		_, writeErr := fmt.Fprintf(f, "%s\n", hookLine)
-		closeErr := f.Close()
-		if writeErr != nil {
-			fmt.Printf("WARN: could not register vzdump hook: %v\n", writeErr)
-			return
-		}
-		if closeErr != nil {
-			fmt.Printf("WARN: could not close %s: %v\n", vzdumpConfPath, closeErr)
-			return
-		}
+	if _, err := registerVzdumpHook(vzdumpConfPath, hookPath); err != nil {
+		fmt.Printf("WARN: could not register vzdump hook: %v\n", err)
+		return
 	}
 	fmt.Println("vzdump hook refreshed")
+}
+
+// vzdumpHookConflictError reports that vzdump.conf already runs another hook.
+type vzdumpHookConflictError struct {
+	confPath, existing, hook string
+}
+
+func (e *vzdumpHookConflictError) Error() string {
+	return fmt.Sprintf("%s already runs another hook (%s); vzdump accepts only one, so it was kept. "+
+		"Call \"%s job-end\" from that script on job-end to send backup reports", e.confPath, e.existing, e.hook)
+}
+
+// registerVzdumpHook adds the probakgo hook to vzdump.conf and reports whether
+// it added the line. PVE accepts a single "script:" entry, so another tool's
+// hook is kept and reported as *vzdumpHookConflictError instead of replaced.
+func registerVzdumpHook(confPath, hook string) (bool, error) {
+	data, err := os.ReadFile(confPath)
+	if err != nil {
+		return false, err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		value, ok := strings.CutPrefix(strings.TrimSpace(line), "script:")
+		if !ok {
+			continue
+		}
+		if existing := strings.TrimSpace(value); existing != hook {
+			return false, &vzdumpHookConflictError{confPath: confPath, existing: existing, hook: hook}
+		}
+		return false, nil
+	}
+	entry := "script: " + hook + "\n"
+	// Appending to a last line without a newline would corrupt that setting.
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		entry = "\n" + entry
+	}
+	f, err := os.OpenFile(confPath, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return false, err
+	}
+	if _, err := f.WriteString(entry); err != nil {
+		f.Close()
+		return false, err
+	}
+	return true, f.Close()
 }
 
 func removeHeartbeatTimer() {
@@ -751,14 +782,6 @@ func copyExec(src, dst string) error {
 	defer out.Close()
 	_, err = io.Copy(out, in)
 	return err
-}
-
-func fileContains(path, substr string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(data), substr)
 }
 
 func must(err error, msg string) {

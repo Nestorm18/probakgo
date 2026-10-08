@@ -5,7 +5,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -196,5 +199,39 @@ func TestLimitWebRequestBodyRejectsOversizedRequest(t *testing.T) {
 	}
 	if rr.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("status: got %d, want %d", rr.Code, http.StatusRequestEntityTooLarge)
+	}
+}
+
+func TestCSPAllowsOnlyThePinnedCDNFiles(t *testing.T) {
+	rr := httptest.NewRecorder()
+	securityHeaders(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})).ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/", nil))
+	header := rr.Header().Get("Content-Security-Policy")
+	for _, directive := range strings.Split(header, ";") {
+		for _, source := range strings.Fields(directive) {
+			if source == "https://cdn.jsdelivr.net" || source == "https://cdn.jsdelivr.net/" {
+				t.Fatalf("CSP allows the whole CDN host: %q", directive)
+			}
+		}
+	}
+
+	paths, err := filepath.Glob("../../web/templates/*.html")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("list templates: %v", err)
+	}
+	cdnURL := regexp.MustCompile(`https://cdn\.jsdelivr\.net/[^"'\s)]+`)
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, url := range cdnURL.FindAllString(string(data), -1) {
+			allowed := cdnStyles
+			if strings.HasSuffix(url, ".js") {
+				allowed = cdnScripts
+			}
+			if !slices.Contains(strings.Fields(allowed), url) {
+				t.Errorf("%s loads %s, which the CSP does not allow", filepath.Base(path), url)
+			}
+		}
 	}
 }

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	dbpkg "probakgo/internal/db"
+	"probakgo/internal/store"
 )
 
 func TestRandomPasswordUsesExpectedAlphabetAndLength(t *testing.T) {
@@ -69,5 +73,56 @@ func TestSystemdServiceContentIsHardened(t *testing.T) {
 		if !strings.Contains(content, expected) {
 			t.Errorf("service unit does not contain %q", expected)
 		}
+	}
+}
+
+func TestUnbanIPRejectsInvalidAddress(t *testing.T) {
+	for _, raw := range []string{"", "not-an-ip", "10.0.0.256", "2001:db8::/129"} {
+		if _, err := unbanIP(raw); err == nil {
+			t.Errorf("unbanIP(%q) accepted an invalid address", raw)
+		}
+	}
+}
+
+func TestRequireExistingDatabaseDoesNotCreateIt(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "probakgo_data.db")
+	if err := requireExistingDatabase(missing); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("missing database: got %v", err)
+	}
+	if _, err := os.Stat(missing); !os.IsNotExist(err) {
+		t.Fatalf("database file was created: %v", err)
+	}
+	if err := os.WriteFile(missing, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := requireExistingDatabase(missing); err != nil {
+		t.Fatalf("existing database rejected: %v", err)
+	}
+	if err := requireExistingDatabase(":memory:"); err != nil {
+		t.Fatalf("in-memory database rejected: %v", err)
+	}
+}
+
+func TestEnsureDefaultsReplacesStaleInitialPasswordFile(t *testing.T) {
+	database, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	st := store.New(database)
+	path := filepath.Join(t.TempDir(), ".initial-admin-password")
+	if err := os.WriteFile(path, []byte("stale\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ensureDefaultsAt(st, path); err != nil {
+		t.Fatalf("ensureDefaultsAt with a stale password file: %v", err)
+	}
+	password, err := consumeInitialPassword(path)
+	if err != nil || password == "stale" || len(password) != 16 {
+		t.Fatalf("initial password not replaced: %q %v", password, err)
+	}
+	if hasUsers, err := st.HasUsers(context.Background()); err != nil || !hasUsers {
+		t.Fatalf("default admin not created: %v %v", hasUsers, err)
 	}
 }

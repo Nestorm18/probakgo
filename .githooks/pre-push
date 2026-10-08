@@ -1,28 +1,27 @@
 #!/bin/sh
-# Bump patch version in main.go and client/main.go before each push
+# Runs the mandatory push checks from AGENTS.md ("Push verification").
+# Enable it once per clone with: git config core.hooksPath .githooks
 
 set -e
 
-# Read current version from main.go
-CURRENT=$(grep -oP '(?<=var version = ")\d+\.\d+\.\d+' main.go)
-if [ -z "$CURRENT" ]; then
-    echo "pre-push: could not read version from main.go" >&2
+echo "pre-push: git diff --check"
+git diff --check
+
+echo "pre-push: build and vet"
+go build ./...
+go vet ./...
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go vet ./client-windows/
+
+echo "pre-push: vulnerability scan"
+go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+echo "pre-push: tests with coverage"
+profile=$(mktemp)
+trap 'rm -f "$profile"' EXIT
+go test -coverprofile="$profile" ./...
+total=$(go tool cover -func="$profile" | awk '/^total:/ {gsub("%", "", $3); print $3}')
+echo "pre-push: total coverage ${total}%"
+if ! awk -v total="$total" 'BEGIN { exit !(total + 0 >= 35) }'; then
+    echo "pre-push: coverage ${total}% is below the 35% CI floor" >&2
     exit 1
 fi
-
-# Split and increment patch
-MAJOR=$(echo "$CURRENT" | cut -d. -f1)
-MINOR=$(echo "$CURRENT" | cut -d. -f2)
-PATCH=$(echo "$CURRENT" | cut -d. -f3)
-NEW_PATCH=$((PATCH + 1))
-NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
-
-echo "pre-push: bumping version $CURRENT → $NEW_VERSION"
-
-# Update both files
-sed -i "s/var version = \"$CURRENT\"/var version = \"$NEW_VERSION\"/" main.go
-sed -i "s/var version = \"$CURRENT\"/var version = \"$NEW_VERSION\"/" client/main.go
-
-# Commit the bump
-git add main.go client/main.go
-git commit -m "chore: bump version to $NEW_VERSION"

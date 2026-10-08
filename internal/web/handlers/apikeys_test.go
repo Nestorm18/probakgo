@@ -250,7 +250,7 @@ func TestUnbindAPIKeyPostClearsMachineBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create API key: %v", err)
 	}
-	if err := st.BindAPIKeyMachineID(ctx, k.ID, "old-machine"); err != nil {
+	if _, err := st.BindAPIKeyMachineID(ctx, k.ID, "old-machine"); err != nil {
 		t.Fatalf("bind machine: %v", err)
 	}
 

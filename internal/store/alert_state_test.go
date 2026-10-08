@@ -195,3 +195,43 @@ func TestAlertCriticalEmailSentResetsWhenResolved(t *testing.T) {
 		t.Fatalf("reappeared alert should not keep old resolution email pending")
 	}
 }
+
+func TestDeleteOldAlertHistoryKeepsPendingAndPresentAlerts(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	alert := func(id string) domain.Alert {
+		return domain.Alert{ID: id, Severity: domain.AlertSeverityWarning, Title: id}
+	}
+	if err := st.SyncAlertStates(ctx, []domain.Alert{alert("resolved"), alert("pending"), alert("present")}); err != nil {
+		t.Fatalf("seed alerts: %v", err)
+	}
+	if err := st.SyncAlertStates(ctx, []domain.Alert{alert("present")}); err != nil {
+		t.Fatalf("resolve alerts: %v", err)
+	}
+	old := time.Now().AddDate(0, -6, 0)
+	if _, err := st.db.ExecContext(ctx, `UPDATE alert_states SET updated_at=?`, old); err != nil {
+		t.Fatalf("backdate states: %v", err)
+	}
+	if _, err := st.db.ExecContext(ctx, `UPDATE alert_states SET resolution_email_pending=1 WHERE alert_id='pending'`); err != nil {
+		t.Fatalf("mark pending resolution: %v", err)
+	}
+	if _, err := st.db.ExecContext(ctx, `UPDATE alert_state_events SET created_at=?`, old.UTC().Format("2006-01-02 15:04:05")); err != nil {
+		t.Fatalf("backdate events: %v", err)
+	}
+	if err := st.InsertAlertStateEvent(ctx, domain.AlertStateEvent{AlertID: "present", EventType: "suppressed"}); err != nil {
+		t.Fatalf("insert recent event: %v", err)
+	}
+
+	events, states, err := st.DeleteOldAlertHistory(ctx, time.Now().AddDate(0, -3, 0))
+	if err != nil {
+		t.Fatalf("DeleteOldAlertHistory: %v", err)
+	}
+	if events == 0 || states != 1 {
+		t.Fatalf("deleted events=%d states=%d, want old events and only the delivered resolved state", events, states)
+	}
+	assertCount(t, st, `SELECT COUNT(*) FROM alert_states WHERE alert_id = ?`, "resolved", 0)
+	assertCount(t, st, `SELECT COUNT(*) FROM alert_states WHERE alert_id = ?`, "pending", 1)
+	assertCount(t, st, `SELECT COUNT(*) FROM alert_states WHERE alert_id = ?`, "present", 1)
+	assertCount(t, st, `SELECT COUNT(*) FROM alert_state_events WHERE event_type = ?`, "suppressed", 1)
+}

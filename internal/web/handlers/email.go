@@ -8,8 +8,6 @@ import (
 	"strconv"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
 	"probakgo/internal/domain"
 	"probakgo/internal/service"
 	"probakgo/internal/session"
@@ -226,7 +224,7 @@ func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
 	h.tmpl.Render(w, r, "maintenance_settings.html", map[string]any{
 		"NAS":            nas,
 		"HasNASPassword": hasNASPassword,
-		"ServerTimezone": time.Now().Location().String(),
+		"ServerTimezone": h.appTimezone(),
 		"Username":       username,
 		"Role":           role,
 		"Config":         cfg,
@@ -300,8 +298,9 @@ func (h *WebH) MaintenanceDatabaseDownload(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	filename := "probakgo_data_" + time.Now().Format("20060102_150405") + ".db"
+	extendDownloadDeadline(w)
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", attachmentDisposition(filename))
 	h.audit(r, "settings.database_download", "settings", "maintenance", "Copia BD", nil)
 	http.ServeFile(w, r, tmpName)
 }
@@ -453,13 +452,14 @@ func (h *WebH) ResetDatabasePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings/reset?flash=Las+contrasenas+no+coinciden", http.StatusSeeOther)
 		return
 	}
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(pass)) != nil {
-		http.Redirect(w, r, "/settings/reset?flash=Contrasena+incorrecta", http.StatusSeeOther)
+	if ok, blocked := h.checkCurrentPassword(r, user, pass); !ok {
+		redirectWithFlash(w, r, "/settings/reset", currentPasswordFailureMessage(blocked), false)
 		return
 	}
 
 	if err := h.store.ResetAllData(ctx); err != nil {
-		http.Redirect(w, r, "/settings/reset?flash=Error:+"+err.Error(), http.StatusSeeOther)
+		slog.Error("reset database", "err", err)
+		redirectWithFlash(w, r, "/settings/reset", "No se pudo reiniciar la base de datos", false)
 		return
 	}
 	h.audit(r, "settings.reset_database", "settings", "reset", "Reiniciar BD", nil)

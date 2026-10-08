@@ -522,7 +522,7 @@ func (s *Store) ListPVEReportsByDays(ctx context.Context, serverID int64, days i
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
 		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC`,
-		serverID, threshold)
+		serverID, sqliteUTC(threshold))
 	if err != nil {
 		return nil, err
 	}
@@ -552,7 +552,7 @@ func (s *Store) ListPVEReportsByDaysPage(ctx context.Context, serverID int64, da
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale, stale_reason,
 		backup_status, backup_starttime, backup_endtime, backup_duration, swap_total, swap_used, swap_enabled
 		FROM pve_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC LIMIT ? OFFSET ?`,
-		serverID, threshold, limit, offset)
+		serverID, sqliteUTC(threshold), limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +580,7 @@ func (s *Store) CountPVEReportsByDays(ctx context.Context, serverID int64, days 
 	threshold := time.Now().AddDate(0, 0, -days)
 	debug.RecordQuery(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ? AND reported_at >= ?`)
 	var count int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ? AND reported_at >= ?`, serverID, threshold).Scan(&count)
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pve_reports WHERE server_id = ? AND reported_at >= ?`, serverID, sqliteUTC(threshold)).Scan(&count)
 	return count, err
 }
 
@@ -757,12 +757,12 @@ func (s *Store) DeleteOldPVEReports(ctx context.Context, cutoff time.Time) (int6
 			SELECT id FROM pve_reports WHERE reported_at < ?)`,
 	}
 	for _, q := range steps {
-		if _, err := tx.ExecContext(ctx, q, cutoff); err != nil {
+		if _, err := tx.ExecContext(ctx, q, sqliteUTC(cutoff)); err != nil {
 			return 0, err
 		}
 	}
 
-	res, err := tx.ExecContext(ctx, `DELETE FROM pve_reports WHERE reported_at < ?`, cutoff)
+	res, err := tx.ExecContext(ctx, `DELETE FROM pve_reports WHERE reported_at < ?`, sqliteUTC(cutoff))
 	if err != nil {
 		return 0, err
 	}

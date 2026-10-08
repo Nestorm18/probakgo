@@ -40,12 +40,23 @@ func (a *AuthService) ValidateServerKey(rawKey, machineID string) (*domain.APIKe
 		return nil, fmt.Errorf("%w: missing X-Machine-ID", ErrMachineID)
 	}
 	if k.MachineID == "" {
-		if err := a.store.BindAPIKeyMachineID(ctx, k.ID, machineID); err != nil {
+		bound, err := a.store.BindAPIKeyMachineID(ctx, k.ID, machineID)
+		if err != nil {
 			slog.Error("bind machine id", "err", err)
 			return nil, fmt.Errorf("bind machine id: %w", err)
 		}
-		k.MachineID = machineID
-	} else if k.MachineID != machineID {
+		if bound {
+			k.MachineID = machineID
+		} else {
+			// A concurrent request bound the key first; validate against it.
+			current, err := a.store.GetAPIKey(ctx, k.ID)
+			if err != nil {
+				return nil, ErrInvalidKey
+			}
+			k.MachineID = current.MachineID
+		}
+	}
+	if k.MachineID != machineID {
 		return nil, fmt.Errorf("%w: key bound to different machine", ErrMachineID)
 	}
 	_ = a.store.UpdateAPIKeyLastUsed(ctx, k.ID)

@@ -288,7 +288,7 @@ func (s *Store) ListWindowsReportsByDays(ctx context.Context, serverID int64, da
 	threshold := time.Now().AddDate(0, 0, -days)
 	debug.RecordQuery(ctx, `SELECT id, server_id, reported_at, is_stale FROM windows_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC, id DESC`)
 	rows, err := s.db.QueryContext(ctx, `SELECT id, server_id, reported_at, is_stale
-		FROM windows_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC, id DESC`, serverID, threshold)
+		FROM windows_reports WHERE server_id = ? AND reported_at >= ? ORDER BY reported_at DESC, id DESC`, serverID, sqliteUTC(threshold))
 	if err != nil {
 		return nil, err
 	}
@@ -387,10 +387,10 @@ func (s *Store) DeleteOldWindowsReports(ctx context.Context, cutoff time.Time) (
 	defer tx.Rollback() //nolint:errcheck
 
 	if _, err := tx.ExecContext(ctx, `DELETE FROM windows_disks WHERE report_id IN (
-		SELECT id FROM windows_reports WHERE reported_at < ?)`, cutoff); err != nil {
+		SELECT id FROM windows_reports WHERE reported_at < ?)`, sqliteUTC(cutoff)); err != nil {
 		return 0, err
 	}
-	res, err := tx.ExecContext(ctx, `DELETE FROM windows_reports WHERE reported_at < ?`, cutoff)
+	res, err := tx.ExecContext(ctx, `DELETE FROM windows_reports WHERE reported_at < ?`, sqliteUTC(cutoff))
 	if err != nil {
 		return 0, err
 	}

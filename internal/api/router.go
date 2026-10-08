@@ -38,8 +38,9 @@ func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(netutil.TrustedProxyRealIP(s.trustedProxies))
 	r.Use(limitRequestBody(maxAPIRequestBodyBytes))
-	r.Use(ratelimit.New(120, time.Minute).JSONMiddleware)
+	// Log before limiting so rejected (429) requests are visible too.
 	r.Use(requestLogger)
+	r.Use(ratelimit.New(120, time.Minute).JSONMiddleware)
 	r.Use(middleware.Recoverer)
 	r.Use(apiSecurityHeaders)
 

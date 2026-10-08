@@ -410,3 +410,40 @@ func TestDeletePVEServer_SoftDelete(t *testing.T) {
 		t.Error("want soft-deleted row to remain in DB with is_deleted=1")
 	}
 }
+
+func TestReportTimeFiltersIgnoreProcessTimezone(t *testing.T) {
+	// reported_at defaults to SQLite's UTC CURRENT_TIMESTAMP. A bound
+	// time.Time used to be stored in local time, shifting every cutoff by the
+	// process UTC offset.
+	original := time.Local
+	time.Local = time.FixedZone("UTC+5", 5*60*60)
+	t.Cleanup(func() { time.Local = original })
+
+	ctx := context.Background()
+	st := openTestDB(t)
+	serverID, err := st.UpsertPVEServer(ctx, "pve-tz", "10.0.0.1", "", "1.0", "")
+	if err != nil {
+		t.Fatalf("UpsertPVEServer: %v", err)
+	}
+	reportID, err := st.InsertPVEReport(ctx, serverID, nil)
+	if err != nil {
+		t.Fatalf("InsertPVEReport: %v", err)
+	}
+	if _, err := st.db.ExecContext(ctx, `UPDATE pve_reports SET reported_at=? WHERE id=?`,
+		time.Now().UTC().Add(-23*time.Hour).Format("2006-01-02 15:04:05"), reportID); err != nil {
+		t.Fatalf("backdate report: %v", err)
+	}
+
+	if n, err := st.CountPVEReportsByDays(ctx, serverID, 1); err != nil || n != 1 {
+		t.Fatalf("report from 23h ago missing from the last day: n=%d err=%v", n, err)
+	}
+	if deleted, err := st.DeleteOldPVEReports(ctx, time.Now().Add(-90*time.Minute)); err != nil || deleted != 1 {
+		t.Fatalf("report older than the cutoff: deleted=%d err=%v", deleted, err)
+	}
+	if _, err := st.InsertPVEReport(ctx, serverID, nil); err != nil {
+		t.Fatalf("InsertPVEReport: %v", err)
+	}
+	if deleted, err := st.DeleteOldPVEReports(ctx, time.Now().Add(-90*time.Minute)); err != nil || deleted != 0 {
+		t.Fatalf("a new report was treated as older than the cutoff: deleted=%d err=%v", deleted, err)
+	}
+}

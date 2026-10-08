@@ -28,17 +28,7 @@ func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error)
 		&c.AlertEmailBatchMinutes, &criticalAlertsEnabled, &enforceTOTPNonReaders, &sensitiveActionsRequireTOTP,
 	)
 	if err == sql.ErrNoRows {
-		return &domain.EmailConfig{
-			SendTime:                   "08:00",
-			RetentionMonths:            3,
-			RetentionEnabled:           true,
-			AlertDiskPct:               85,
-			AlertWindowsDiskPct:        90,
-			AlertBackupErr:             true,
-			AlertPBSStaleHours:         48,
-			AlertPVEExpectedFinishTime: domain.DefaultPVEExpectedFinishTime("08:00"),
-			AlertPVEHeartbeatMinutes:   15,
-		}, nil
+		return defaultEmailConfig(), nil
 	}
 	if err != nil {
 		return nil, err
@@ -62,7 +52,26 @@ func (s *Store) GetEmailConfig(ctx context.Context) (*domain.EmailConfig, error)
 	return &c, nil
 }
 
+// defaultEmailConfig is the configuration used before an administrator saves one.
+func defaultEmailConfig() *domain.EmailConfig {
+	return &domain.EmailConfig{
+		SendTime:                   "08:00",
+		RetentionMonths:            3,
+		RetentionEnabled:           true,
+		AlertDiskPct:               85,
+		AlertWindowsDiskPct:        90,
+		AlertBackupErr:             true,
+		AlertPBSStaleHours:         48,
+		AlertPVEExpectedFinishTime: domain.DefaultPVEExpectedFinishTime("08:00"),
+		AlertPVEHeartbeatMinutes:   15,
+	}
+}
+
 func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) error {
+	return s.upsertEmailConfig(ctx, s.db, c)
+}
+
+func (s *Store) upsertEmailConfig(ctx context.Context, db dbExecer, c domain.EmailConfig) error {
 	if c.AlertPVEExpectedFinishTime == "" {
 		c.AlertPVEExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(c.SendTime)
 	}
@@ -75,7 +84,7 @@ func (s *Store) UpsertEmailConfig(ctx context.Context, c domain.EmailConfig) err
 		}
 	}
 	debug.RecordQuery(ctx, `INSERT INTO email_config (id, smtp_host, smtp_port, smtp_user, smtp_password, recipients, is_enabled, send_time, retention_months, retention_enabled, alert_disk_pct, alert_windows_disk_pct, alert_backup_err, alert_pbs_stale_hours, alert_pve_expected_finish_time, public_api_url, vpn_only_access, alert_pve_heartbeat_minutes, alert_email_batch_minutes, critical_alerts_enabled, enforce_totp_non_readers, sensitive_actions_require_totp) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET ...`)
-	_, err := s.db.ExecContext(ctx, `
+	_, err := db.ExecContext(ctx, `
 		INSERT INTO email_config (
 			id, smtp_host, smtp_port, smtp_user, smtp_password, recipients,
 			is_enabled, send_time,

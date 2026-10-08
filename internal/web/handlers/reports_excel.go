@@ -452,7 +452,7 @@ func reportFreshnessCell(current bool) xlsx.Cell {
 
 func serveXLSX(w http.ResponseWriter, filename string, workbook xlsx.Workbook) {
 	w.Header().Set("Content-Type", xlsxContentType)
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", attachmentDisposition(filename))
 	if err := workbook.Write(w); err != nil {
 		http.Error(w, "error generando el informe", http.StatusInternalServerError)
 	}

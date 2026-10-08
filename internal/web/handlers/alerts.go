@@ -296,20 +296,17 @@ func alertServerDetailURL(alert domain.Alert) string {
 	return "/servers/" + alert.ServerType + "/" + strconv.FormatInt(alert.ServerID, 10)
 }
 
+// activeAlerts reads the alert state that report ingestion and the periodic
+// evaluator persist every minute, like the sidebar badge. Every open page
+// polls it, so it must not run a full evaluation per request.
 func (h *WebH) activeAlerts(ctx context.Context) ([]domain.Alert, int, int, error) {
-	allAlerts, err := h.runAlerts(ctx, true)
+	active, err := service.ActivePersistedAlerts(ctx, h.store)
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	suppressions, _ := h.store.GetActiveSuppressions(ctx)
 
-	var active []domain.Alert
 	var critical, warning int
-	for _, a := range allAlerts {
-		if _, ok := suppressions[a.ID]; ok {
-			continue
-		}
-		active = append(active, a)
+	for _, a := range active {
 		if a.Severity == domain.AlertSeverityCritical {
 			critical++
 		} else {
@@ -335,10 +332,16 @@ func (h *WebH) runRawAlerts(ctx context.Context, syncState bool) ([]domain.Alert
 	cfg.Report = h.report
 	allAlerts, err := service.RunAll(h.store, cfg)
 	if err != nil {
-		return nil, err
+		if !service.IsPartialAlertsError(err) {
+			return nil, err
+		}
+		// Show what the healthy evaluators found instead of an error page.
+		slog.Warn("partial alert evaluation", "err", err)
 	}
 	if syncState {
-		_ = h.store.SyncAlertStates(ctx, allAlerts)
+		if syncErr := service.SyncAlertStatesFor(ctx, h.store, allAlerts, err); syncErr != nil {
+			slog.Warn("sync alert states", "err", syncErr)
+		}
 	}
 	return allAlerts, nil
 }
@@ -355,12 +358,18 @@ func (h *WebH) AlertSuppressPost(w http.ResponseWriter, r *http.Request) {
 	until := time.Now().Add(duration)
 	current := h.alertMap(ctx)
 	for _, alertID := range alertIDs {
-		_ = h.store.UpsertAlertSuppression(ctx, alertID, until, reason)
+		if err := h.store.UpsertAlertSuppression(ctx, alertID, until, reason); err != nil {
+			slog.Error("suppress alert", "alert_id", alertID, "err", err)
+			redirectWithFlash(w, r, alertRedirectBack(r), "No se pudo silenciar la alerta", false)
+			return
+		}
 		alert := current[alertID]
 		if alert.ID == "" {
 			alert = h.alertFromSuppressionID(ctx, alertID)
 		}
-		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "suppressed", reason))
+		if err := h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "suppressed", reason)); err != nil {
+			slog.Warn("record alert suppression event", "alert_id", alertID, "err", err)
+		}
 	}
 	http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
 }
@@ -380,22 +389,24 @@ func (h *WebH) AlertUnsuppressPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	current := h.alertMap(ctx)
 	for _, alertID := range formAlertIDs(r) {
-		_ = h.store.DeleteAlertSuppression(ctx, alertID)
+		if err := h.store.DeleteAlertSuppression(ctx, alertID); err != nil {
+			slog.Error("unsuppress alert", "alert_id", alertID, "err", err)
+			redirectWithFlash(w, r, alertRedirectBack(r), "No se pudo reactivar la alerta", false)
+			return
+		}
 		alert := current[alertID]
 		if alert.ID == "" {
 			alert = h.alertFromSuppressionID(ctx, alertID)
 		}
-		_ = h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "unsuppressed", ""))
+		if err := h.store.InsertAlertStateEvent(ctx, alertStateEventFromAlert(alert, "unsuppressed", "")); err != nil {
+			slog.Warn("record alert unsuppression event", "alert_id", alertID, "err", err)
+		}
 	}
 	http.Redirect(w, r, alertRedirectBack(r), http.StatusSeeOther)
 }
 
 func alertRedirectBack(r *http.Request) string {
-	back := strings.TrimSpace(r.FormValue("back"))
-	if back == "" || !strings.HasPrefix(back, "/") || strings.HasPrefix(back, "//") || strings.Contains(back, "\n") || strings.Contains(back, "\r") {
-		return "/alerts"
-	}
-	return back
+	return formBackOrDefault(r, "/alerts")
 }
 
 func (h *WebH) alertMap(ctx context.Context) map[string]domain.Alert {
@@ -490,7 +501,7 @@ func alertTitleFromID(alertID string) string {
 		return "PVE sin reporte"
 	case domain.AlertTypePBSReportStale:
 		return "PBS sin reporte"
-	case domain.AlertTypePVEHeartbeat:
+	case domain.AlertTypePVEHeartbeat, domain.AlertTypePBSHeartbeat:
 		return "Servidor offline"
 	case domain.AlertTypePVEMissingVM:
 		return "VM sin backup"

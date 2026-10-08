@@ -24,7 +24,12 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			username, sessionRole, ok := session.GetUser(r)
 			if !ok {
-				http.Redirect(w, r, "/login?next="+r.URL.Path, http.StatusSeeOther)
+				target := "/login"
+				// Only pages can be resumed after login; a POST cannot be replayed.
+				if r.Method == http.MethodGet || r.Method == http.MethodHead {
+					target += "?next=" + url.QueryEscape(r.URL.RequestURI())
+				}
+				http.Redirect(w, r, target, http.StatusSeeOther)
 				return
 			}
 			userID, hasID := session.UserID(r)
@@ -104,7 +109,17 @@ func RequireTOTPForSensitiveAction(st *store.Store) func(http.Handler) http.Hand
 					http.Error(w, "Too many verification attempts", http.StatusTooManyRequests)
 					return
 				}
-				if totp.Validate(code, user.TOTPSecret, now) {
+				step, valid := totp.ValidateStep(code, user.TOTPSecret, now)
+				if valid {
+					// A code works once: a replayed code falls through to rejection.
+					claimed, err := st.ClaimUserTOTPStep(r.Context(), user.ID, step)
+					if err != nil {
+						http.Error(w, "Security configuration unavailable", http.StatusServiceUnavailable)
+						return
+					}
+					valid = claimed
+				}
+				if valid {
 					if err := session.SetSensitiveTOTPFresh(w, r, now.Add(sensitiveTOTPFreshDuration)); err != nil {
 						http.Error(w, "Session error", http.StatusInternalServerError)
 						return
@@ -192,7 +207,15 @@ func userNeedsTOTPEnforcement(st *store.Store, r *http.Request, user *domain.Use
 	if user.TOTPGraceStartedAt == nil {
 		return false, st.StartUserTOTPGrace(r.Context(), user.ID)
 	}
-	return time.Since(*user.TOTPGraceStartedAt) >= 72*time.Hour, nil
+	if time.Since(*user.TOTPGraceStartedAt) < 72*time.Hour {
+		return false, nil
+	}
+	// Never lock out the last active administrator; login keeps asking for 2FA.
+	lastAdmin, err := st.IsLastActiveAdmin(r.Context(), user.ID)
+	if err != nil {
+		return false, err
+	}
+	return !lastAdmin, nil
 }
 
 // RequireEditor allows admin and editor roles.

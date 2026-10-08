@@ -53,14 +53,18 @@ func runServerDoctor() error {
 	checkListenAddress(add, cfg)
 
 	dbPath, _ := filepath.Abs(cfg.DBPath)
+	dbMissing := false
 	if _, err := os.Stat(cfg.DBPath); err != nil {
+		dbMissing = true
 		add("WARN", "Base de datos", fmt.Sprintf("%s no existe todavia o no se puede leer: %v", dbPath, err))
 	} else {
 		add("OK", "Base de datos", dbPath)
 	}
 
-	db, err := dbpkg.Open(cfg.DBPath)
-	if err != nil {
+	// Opening applies migrations; a diagnosis must not create an empty database.
+	if dbMissing {
+		add("WARN", "Migraciones", "omitidas: doctor no crea una base de datos vacia")
+	} else if db, err := dbpkg.Open(cfg.DBPath); err != nil {
 		add("FAIL", "Base de datos", "no se puede abrir o migrar: "+err.Error())
 	} else {
 		defer db.Close()

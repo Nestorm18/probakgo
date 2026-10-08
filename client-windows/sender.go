@@ -79,6 +79,8 @@ func httpClient() *http.Client {
 	return &http.Client{
 		Timeout: 60 * time.Second,
 		Transport: &http.Transport{
+			// Honour HTTPS_PROXY/HTTP_PROXY like the default transport does.
+			Proxy:           http.ProxyFromEnvironment,
 			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
 		},
 	}

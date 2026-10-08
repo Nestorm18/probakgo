@@ -209,13 +209,23 @@ Cada usuario puede activar TOTP desde **Perfil**. El administrador puede:
 - exigir 2FA a `editor` y `admin`, con 3 días de gracia desde el primer aviso;
 - exigir una confirmación TOTP reciente para operaciones sensibles.
 
+Al vencer el plazo, el usuario sin 2FA se desactiva, salvo que sea el único administrador activo: en ese caso se le sigue pidiendo activar 2FA para no bloquear el acceso.
+
 Una confirmación sensible es válida durante 10 minutos. Los cambios de contraseña, rol, estado o 2FA invalidan las sesiones existentes.
 
-Si un usuario pierde el segundo factor y tienes acceso al servidor:
+Recuperación con acceso al servidor:
 
 ```bash
+# Desactiva el 2FA de un usuario que perdió el segundo factor
 /opt/probakgo/probakgo unlock2fa <usuario>
+# Reactiva un usuario desactivado y reinicia su plazo de 2FA
+/opt/probakgo/probakgo enable-user <usuario>
+# Retira el bloqueo de una IP tras demasiados intentos fallidos (en IPv6 se bloquea su /64)
+/opt/probakgo/probakgo unban <ip>
+systemctl restart probakgo
 ```
+
+Los avisos de Telegram por accesos fallidos se limitan a uno cada 10 minutos por IP y a 10 por hora; el bloqueo de una IP se notifica una sola vez.
 
 ### API keys
 
@@ -381,7 +391,7 @@ El instalador:
 3. instala `probakgo-windows-client.exe`;
 4. escribe `.env` con `API_URL` y `API_KEY`;
 5. crea `Probakgo Windows Report` cada 5 minutos;
-6. crea `Probakgo Windows Update` a diario a las 04:17.
+6. crea `Probakgo Windows Update` a diario a un minuto fijo por equipo entre las 04:00 y las 04:59.
 
 Las tareas se ejecutan como `SYSTEM`. Una reinstalación detiene ambas tareas y reintenta hasta 30 segundos si Windows mantiene ocupado el ejecutable.
 

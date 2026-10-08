@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -53,11 +55,14 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.Use(middleware.Recoverer)
 	r.Use(limitWebRequestBody(maxWebRequestBodyBytes))
 	r.Use(securityHeaders)
+	r.Use(strictTransportSecurity(secure))
 	r.Use(webhandlers.DebugBarMiddleware(dev))
 
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
-	r.Get("/download/client/linux-amd64", h.DownloadClientLinuxAMD64)
-	r.Get("/download/client/windows-amd64", h.DownloadClientWindowsAMD64)
+	r.Handle("/static/*", http.StripPrefix("/static/", staticFiles(staticFS)))
+	// Unauthenticated: each request may proxy a large release asset from GitHub.
+	downloadLimiter := ratelimit.New(10, time.Minute)
+	r.With(downloadLimiter.Middleware).Get("/download/client/linux-amd64", h.DownloadClientLinuxAMD64)
+	r.With(downloadLimiter.Middleware).Get("/download/client/windows-amd64", h.DownloadClientWindowsAMD64)
 
 	// PWA: service worker and web manifest. They live at the site root so
 	// the manifest can declare a scope of "/" and the SW can claim the
@@ -224,6 +229,46 @@ func newCrossOriginProtection(trustedOrigins []string) (*http.CrossOriginProtect
 	return protection, nil
 }
 
+// strictTransportSecurity pins HTTPS once SESSION_SECURE declares the site is
+// served over it. Requests that reached the server over HTTP are left alone.
+func strictTransportSecurity(secure bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		if !secure {
+			return next
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if netutil.RequestScheme(r) == "https" {
+				w.Header().Set("Strict-Transport-Security", "max-age=15552000")
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// staticFiles serves embedded assets without listing directories.
+func staticFiles(fsys fs.FS) http.Handler {
+	files := http.FileServer(http.FS(fsys))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean("/"+r.URL.Path), "/")
+		if info, err := fs.Stat(fsys, name); err != nil || info.IsDir() {
+			http.NotFound(w, r)
+			return
+		}
+		files.ServeHTTP(w, r)
+	})
+}
+
+// The CSP lists the exact pinned CDN files instead of the whole jsDelivr host,
+// which serves any npm package or GitHub repository. Keep these in sync with
+// the SRI-pinned URLs in web/templates.
+const (
+	cdnScripts = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js " +
+		"https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+	cdnStyles = "https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css " +
+		"https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+	cdnFonts = "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/"
+)
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestWithNonce, nonce, err := csp.WithNonce(r)
@@ -240,10 +285,10 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Accept-CH", "Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Bitness, Sec-CH-UA-Model")
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'none'; "+
-				"script-src 'self' 'nonce-"+nonce+"' https://cdn.jsdelivr.net; "+
-				"style-src 'self' 'nonce-"+nonce+"' https://cdn.jsdelivr.net; "+
+				"script-src 'self' 'nonce-"+nonce+"' "+cdnScripts+"; "+
+				"style-src 'self' 'nonce-"+nonce+"' "+cdnStyles+"; "+
 				"style-src-attr 'unsafe-inline'; "+
-				"font-src 'self' https://cdn.jsdelivr.net; "+
+				"font-src 'self' "+cdnFonts+"; "+
 				"img-src 'self' data:; "+
 				"connect-src 'self'; "+
 				"frame-ancestors 'self'; "+

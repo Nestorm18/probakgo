@@ -74,3 +74,33 @@ func TestResetAllDataClearsOperationalDataAndPreservesSecurityTrail(t *testing.T
 		}
 	}
 }
+
+func TestResetAllDataPreservesSecurityPolicy(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	cfg := *defaultEmailConfig()
+	cfg.SMTPHost = "smtp.example"
+	cfg.Recipients = "ops@example.com"
+	cfg.EnforceTOTPNonReaders = true
+	cfg.SensitiveActionsRequireTOTP = true
+	cfg.VPNOnlyAccess = true
+	if err := st.UpsertEmailConfig(ctx, cfg); err != nil {
+		t.Fatalf("UpsertEmailConfig: %v", err)
+	}
+
+	if err := st.ResetAllData(ctx); err != nil {
+		t.Fatalf("ResetAllData: %v", err)
+	}
+
+	got, err := st.GetEmailConfig(ctx)
+	if err != nil {
+		t.Fatalf("GetEmailConfig: %v", err)
+	}
+	if !got.EnforceTOTPNonReaders || !got.SensitiveActionsRequireTOTP || !got.VPNOnlyAccess {
+		t.Fatalf("security policy lost after reset: %+v", got)
+	}
+	if got.SMTPHost != "" || got.Recipients != "" || got.RetentionMonths != 3 {
+		t.Fatalf("operational email settings were not reset to defaults: %+v", got)
+	}
+}

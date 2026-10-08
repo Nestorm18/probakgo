@@ -3,11 +3,14 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	_ "embed"
+	"encoding/hex"
 	"fmt"
 	"html/template"
 	"log/slog"
+	"mime"
 	"mime/quotedprintable"
 	"net"
 	"net/smtp"
@@ -490,7 +493,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	windowsAlertReasons := make(map[int64][]string)
 	if alertCfg, err := LoadAlertConfigs(ctx, st); err == nil {
 		alertCfg.Report = rep
-		if rawAlerts, err := RunAll(st, alertCfg); err == nil {
+		if rawAlerts, err := RunAll(st, alertCfg); err == nil || IsPartialAlertsError(err) {
 			alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 			suppressed, _ := st.GetActiveSuppressions(ctx)
 			for _, a := range alerts {
@@ -787,16 +790,31 @@ func sendSMTP(parent context.Context, cfg *domain.EmailConfig, recipients []stri
 func buildMIMEMessage(from string, to []string, subject, html string) []byte {
 	var b strings.Builder
 	b.WriteString("MIME-Version: 1.0\r\n")
+	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
+	b.WriteString("Message-ID: " + newMessageID(from) + "\r\n")
 	b.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
 	b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n")
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + strings.Join(to, ", ") + "\r\n")
-	b.WriteString("Subject: " + subject + "\r\n")
+	// RFC 2047 keeps non-ASCII subjects intact; ASCII subjects are unchanged.
+	b.WriteString("Subject: " + mime.QEncoding.Encode("utf-8", subject) + "\r\n")
 	b.WriteString("\r\n")
 	w := quotedprintable.NewWriter(&b)
 	_, _ = w.Write([]byte(html))
 	_ = w.Close()
 	return []byte(b.String())
+}
+
+// newMessageID returns a unique Message-ID in the sender's domain; mail
+// filters penalise messages without one.
+func newMessageID(from string) string {
+	domain := "probakgo.local"
+	if at := strings.LastIndex(from, "@"); at >= 0 && at < len(from)-1 {
+		domain = strings.Trim(from[at+1:], "<> ")
+	}
+	var raw [12]byte
+	_, _ = rand.Read(raw[:])
+	return fmt.Sprintf("<%d.%s@%s>", time.Now().UnixNano(), hex.EncodeToString(raw[:]), domain)
 }
 
 func parseRecipients(raw string) []string {
@@ -875,12 +893,18 @@ func emailFmtDuration(secs int64) string {
 
 // nextRunTime returns the next wall-clock moment matching HH:MM in the given timezone.
 func nextRunTime(sendTime string, loc *time.Location) time.Time {
-	now := time.Now().In(loc)
+	return nextRunTimeAt(sendTime, time.Now(), loc)
+}
+
+// nextRunTimeAt moves to the next calendar day rather than adding 24 hours,
+// which would shift the send time by an hour across a DST change.
+func nextRunTimeAt(sendTime string, now time.Time, loc *time.Location) time.Time {
+	now = now.In(loc)
 	var h, m int
 	fmt.Sscanf(sendTime, "%d:%d", &h, &m)
 	next := time.Date(now.Year(), now.Month(), now.Day(), h, m, 0, 0, loc)
 	if !next.After(now) {
-		next = next.Add(24 * time.Hour)
+		next = time.Date(now.Year(), now.Month(), now.Day()+1, h, m, 0, 0, loc)
 	}
 	return next
 }

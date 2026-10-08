@@ -77,7 +77,7 @@
       </div>
       <div class="card-body" style="font-size:.88rem;color:var(--txt-secondary)">
         <p class="mb-2">Las actualizaciones automáticas se comprueban diariamente a las <strong>01:00</strong> via cron (<code>/etc/cron.d/probakgo</code>).</p>
-        {{if canEdit .Role}}
+        {{if isAdmin .Role}}
         <form method="post" action="/about/update" data-totp-skip>
           {{.CSRFField}}
           <button type="submit" class="btn btn-sm btn-primary">

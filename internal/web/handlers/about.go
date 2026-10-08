@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -58,10 +59,31 @@ func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
 	exe, _ = filepath.EvalSymlinks(exe)
 	cmd := exec.Command(exe, "update")
 	cmd.Dir = filepath.Dir(exe)
+	// Same log as the update cron, so a failed manual update is visible.
+	logPath := filepath.Join(cmd.Dir, "probakgo-update.log")
+	logFile, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		slog.Warn("open update log", "path", logPath, "err", err)
+	} else {
+		cmd.Stdout = logFile
+		cmd.Stderr = logFile
+	}
 	if err := cmd.Start(); err != nil {
+		if logFile != nil {
+			_ = logFile.Close()
+		}
 		redirectFlash(w, r, "No se pudo iniciar la actualizacion", false)
 		return
 	}
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			slog.Warn("manual update finished with error", "err", err, "log", logPath)
+		}
+		if logFile != nil {
+			_ = logFile.Close()
+		}
+	}()
+	h.audit(r, "system.update_start", "system", "probakgo", "Actualización", map[string]any{"from": h.tmpl.version, "to": latest})
 	redirectFlash(w, r, "Hay una nueva version ("+latest+"). Actualizacion iniciada; el servicio se reiniciara al instalarla.", true)
 }
 

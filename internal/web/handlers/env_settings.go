@@ -1,13 +1,12 @@
 package webhandlers
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"probakgo/internal/config"
 	"probakgo/internal/netutil"
 )
 
@@ -31,12 +30,7 @@ func (h *WebH) EnableSessionSecurePost(w http.ResponseWriter, r *http.Request) {
 
 func setServerEnvValue(key, value string) (string, error) {
 	path := serverEnvPath()
-	data, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return "", err
-	}
-	updated := setDotEnvValue(string(data), key, value)
-	if err := os.WriteFile(path, []byte(updated), 0600); err != nil {
+	if err := config.SetEnvFileValue(path, key, value); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -62,39 +56,6 @@ func serverEnvPath() string {
 		return candidates[0]
 	}
 	return ".env"
-}
-
-func setDotEnvValue(content, key, value string) string {
-	line := fmt.Sprintf("%s=%s", key, value)
-	if strings.TrimSpace(content) == "" {
-		return line + "\n"
-	}
-	content = strings.ReplaceAll(content, "\r\n", "\n")
-	lines := strings.Split(content, "\n")
-	found := false
-	for i, raw := range lines {
-		trimmed := strings.TrimSpace(raw)
-		if strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		if strings.HasPrefix(trimmed, key+"=") {
-			lines[i] = line
-			found = true
-		}
-	}
-	if !found {
-		if len(lines) > 0 && lines[len(lines)-1] == "" {
-			lines[len(lines)-1] = line
-			lines = append(lines, "")
-		} else {
-			lines = append(lines, line, "")
-		}
-	}
-	out := strings.Join(lines, "\n")
-	if !strings.HasSuffix(out, "\n") {
-		out += "\n"
-	}
-	return out
 }
 
 func urlFlash(s string) string {

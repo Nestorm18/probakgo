@@ -236,7 +236,7 @@ C:\ProgramData\Probakgo\probakgo-windows-client.exe
 Valida:
 
 - tarea de reporte cada 5 minutos;
-- tarea de update diaria a las 04:17;
+- tarea de update diaria a un minuto fijo por equipo entre las 04:00 y las 04:59;
 - MachineGuid, IPs y versión;
 - volúmenes fijos y salud best-effort;
 - alertas de disco, heartbeat, salud y volumen desaparecido;

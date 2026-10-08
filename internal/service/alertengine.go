@@ -69,6 +69,7 @@ var evaluators = []AlertEvaluator{
 	evalPVEHeartbeat,
 	evalHostSwap,
 	evalPBSReportStale,
+	evalPBSHeartbeat,
 	evalPBSDisk,
 	evalPBSFill,
 	evalPBSVerify,
@@ -79,8 +80,26 @@ var evaluators = []AlertEvaluator{
 	evalWindowsMissingVolume,
 }
 
+// PartialAlertsError reports evaluators that failed while the others still
+// produced alerts. Callers may use the alerts, but must not treat the alerts
+// missing from a partial run as resolved.
+type PartialAlertsError struct {
+	Err error
+}
+
+func (e *PartialAlertsError) Error() string { return "partial alert evaluation: " + e.Err.Error() }
+
+func (e *PartialAlertsError) Unwrap() error { return e.Err }
+
+// IsPartialAlertsError reports whether err only describes failed evaluators.
+func IsPartialAlertsError(err error) bool {
+	var partial *PartialAlertsError
+	return errors.As(err, &partial)
+}
+
 // RunAll executes all registered evaluators. Individual errors are logged but do not
-// stop execution - partial alerts are better than none.
+// stop execution - partial alerts are better than none. Evaluator failures are
+// returned as *PartialAlertsError together with the alerts that were produced.
 func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 	var err error
 	cfg, err = ensureAlertData(st, cfg)
@@ -98,7 +117,19 @@ func RunAll(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
 		}
 		all = append(all, alerts...)
 	}
-	return all, errors.Join(evaluatorErrors...)
+	if len(evaluatorErrors) > 0 {
+		return all, &PartialAlertsError{Err: errors.Join(evaluatorErrors...)}
+	}
+	return all, nil
+}
+
+// SyncAlertStatesFor persists an evaluation, never resolving alerts after a
+// partial one.
+func SyncAlertStatesFor(ctx context.Context, st *store.Store, alerts []domain.Alert, runErr error) error {
+	if IsPartialAlertsError(runErr) {
+		return st.SyncPartialAlertStates(ctx, alerts)
+	}
+	return st.SyncAlertStates(ctx, alerts)
 }
 
 func ensureAlertData(st *store.Store, cfg AlertConfigs) (AlertConfigs, error) {
@@ -223,7 +254,7 @@ func FilterMaintenanceAlerts(ctx context.Context, st *store.Store, alerts []doma
 
 func CurrentAlerts(ctx context.Context, st *store.Store, rep *ReportService) ([]domain.Alert, error) {
 	alerts, err := CurrentAlertsRaw(ctx, st, rep)
-	if err != nil {
+	if err != nil && !IsPartialAlertsError(err) {
 		return nil, err
 	}
 	return FilterMaintenanceAlerts(ctx, st, alerts), nil
@@ -585,6 +616,44 @@ func evalPVEHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error)
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Servidor offline",
 			Message:    fmt.Sprintf("No se recibe señal del servidor desde hace %s", since),
+			Value:      since,
+			Threshold:  fmt.Sprintf("%d min", cfg.GlobalPVEHeartbeatMinutes),
+			DetectedAt: now,
+		})
+	}
+	return alerts, nil
+}
+
+// evalPBSHeartbeat detects an offline PBS within the global heartbeat interval
+// instead of waiting for the daily report staleness threshold.
+func evalPBSHeartbeat(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {
+	if cfg.GlobalPVEHeartbeatMinutes <= 0 {
+		return nil, nil
+	}
+	cfg, err := ensureAlertData(st, cfg)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	threshold := time.Duration(cfg.GlobalPVEHeartbeatMinutes) * time.Minute
+	var alerts []domain.Alert
+	for _, sv := range cfg.Data.PBSServers {
+		hb, ok := cfg.Data.PBSHeartbeats[sv.ID]
+		if !ok {
+			continue
+		}
+		age := now.Sub(hb.LastSeenAt)
+		if age <= threshold {
+			continue
+		}
+		since := alertFmtAge(age)
+		alerts = append(alerts, domain.Alert{
+			ID:         fmt.Sprintf("pbs_heartbeat:pbs:%d", sv.ID),
+			ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
+			Type:       domain.AlertTypePBSHeartbeat,
+			Severity:   domain.AlertSeverityCritical,
+			Title:      "Servidor offline",
+			Message:    fmt.Sprintf("No se recibe señal del servidor PBS desde hace %s", since),
 			Value:      since,
 			Threshold:  fmt.Sprintf("%d min", cfg.GlobalPVEHeartbeatMinutes),
 			DetectedAt: now,

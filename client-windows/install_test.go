@@ -46,3 +46,13 @@ func TestReplaceInstalledBinaryDoesNotTruncateItself(t *testing.T) {
 		t.Fatalf("installed content = %q, want same-version", got)
 	}
 }
+
+func TestUpdateTaskTimeIsStableWithinTheFourOClockHour(t *testing.T) {
+	first := updateTaskTime()
+	if len(first) != 5 || first[:3] != "04:" || first[3] > '5' {
+		t.Fatalf("update time %q outside 04:00-04:59", first)
+	}
+	if again := updateTaskTime(); again != first {
+		t.Fatalf("update time changed between calls: %q then %q", first, again)
+	}
+}

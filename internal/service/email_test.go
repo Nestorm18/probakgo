@@ -142,6 +142,19 @@ func TestNextRunTime_Past(t *testing.T) {
 	}
 }
 
+func TestNextRunTimeKeepsWallClockAcrossDST(t *testing.T) {
+	madrid, err := time.LoadLocation("Europe/Madrid")
+	if err != nil {
+		t.Skipf("timezone data unavailable: %v", err)
+	}
+	// Summer time ends in Spain on 2026-10-25 at 03:00.
+	now := time.Date(2026, 10, 24, 9, 0, 0, 0, madrid)
+	next := nextRunTimeAt("08:00", now, madrid)
+	if want := time.Date(2026, 10, 25, 8, 0, 0, 0, madrid); !next.Equal(want) || next.Hour() != 8 {
+		t.Fatalf("next run: got %s, want %s", next, want)
+	}
+}
+
 func TestBuildEmailData_AllOK(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

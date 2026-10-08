@@ -13,6 +13,15 @@ import (
 	"probakgo/internal/session"
 )
 
+// appTimezone is the TIMEZONE the schedulers use, which may differ from the
+// process timezone.
+func (h *WebH) appTimezone() string {
+	if h.tmpl != nil && h.tmpl.loc != nil {
+		return h.tmpl.loc.String()
+	}
+	return time.Local.String()
+}
+
 func (h *WebH) NASBackupNow(w http.ResponseWriter, r *http.Request) {
 	q := url.Values{}
 	if err := service.StartManualNASBackup(r.Context(), h.store); err != nil {
@@ -49,7 +58,11 @@ func (h *WebH) NASBackupSettingsPost(w http.ResponseWriter, r *http.Request) {
 		Username: strings.TrimSpace(r.FormValue("nas_username")), Password: r.FormValue("nas_password"),
 		Directory: strings.TrimSpace(r.FormValue("nas_directory")), SendTime: r.FormValue("nas_time"),
 	}
-	if c.Password == "" {
+	// The saved password only applies to the saved destination; reusing it for a
+	// new host would send the credential (and the backup) somewhere else.
+	destinationChanged := c.Host != existing.Host || c.Port != existing.Port || c.Username != existing.Username
+	keepPassword := c.Password == "" && existing.Password != "" && !destinationChanged
+	if keepPassword {
 		c.Password = existing.Password
 	}
 	render := func(message string, ok bool) {
@@ -67,12 +80,16 @@ func (h *WebH) NASBackupSettingsPost(w http.ResponseWriter, r *http.Request) {
 		}
 		h.tmpl.Render(w, r, "maintenance_settings.html", map[string]any{
 			"Username": username, "Role": role, "Config": cfg, "NAS": &view,
-			"HasNASPassword": existing.Password != "", "ServerTimezone": time.Now().Location().String(), "Flash": message, "FlashOK": ok,
+			"HasNASPassword": existing.Password != "", "ServerTimezone": h.appTimezone(), "Flash": message, "FlashOK": ok,
 		})
 	}
 	action := r.FormValue("action")
 	if action != "save" && action != "test" {
 		http.Error(w, "acción inválida", http.StatusBadRequest)
+		return
+	}
+	if c.Password == "" && existing.Password != "" && destinationChanged && (c.Enabled || action == "test") {
+		render("Introduce la contraseña SFTP al cambiar el servidor, el puerto o el usuario del NAS.", false)
 		return
 	}
 	if c.Enabled || action == "test" {

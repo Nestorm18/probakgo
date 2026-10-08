@@ -152,7 +152,7 @@ Invoke-WebRequest `
 Se instala en `C:\ProgramData\Probakgo`, restringe sus ACL a `SYSTEM` y administradores, y crea:
 
 - `Probakgo Windows Report`, cada 5 minutos;
-- `Probakgo Windows Update`, a diario a las 04:17.
+- `Probakgo Windows Update`, a diario a un minuto fijo por equipo entre las 04:00 y las 04:59.
 
 Ambas tareas se ejecutan como `SYSTEM`. Los logs rotan diariamente y conservan 7 días.
 
@@ -200,7 +200,7 @@ El cliente Windows solo guarda `API_URL` y `API_KEY` en `C:\ProgramData\Probakgo
 
 | Binario | Comandos |
 |---|---|
-| `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>` |
+| `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>`, `enable-user <usuario>`, `unban <ip>` |
 | `probakgo-client` | `install`, `uninstall`, `update`, `heartbeat`, `sync-backups`, `doctor`, `version` |
 | `probakgo-windows-client.exe` | reporte por defecto, `install`, `update`, `heartbeat`, `doctor`, `version` |
 

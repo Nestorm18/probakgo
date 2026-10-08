@@ -207,6 +207,35 @@ func TestEvalPVEHeartbeat_NoAlertBeforeFirstHeartbeat(t *testing.T) {
 	}
 }
 
+func TestEvalPBSHeartbeat(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	staleID, _ := st.UpsertPBSServer(ctx, "pbs-offline", "1.1.1.2", "", "1.0", "mid-2")
+	freshID, _ := st.UpsertPBSServer(ctx, "pbs-online", "1.1.1.3", "", "1.0", "mid-3")
+	_, _ = st.UpsertPBSServer(ctx, "pbs-no-heartbeat-yet", "1.1.1.4", "", "1.0", "")
+	for id, lastSeen := range map[int64]time.Time{staleID: time.Now().Add(-20 * time.Minute), freshID: time.Now()} {
+		_ = st.UpsertServerHeartbeat(ctx, domain.ServerHeartbeat{ServerType: "pbs", ServerID: id, LastSeenAt: lastSeen})
+	}
+
+	cfg := defaultCfg()
+	cfg.GlobalPVEHeartbeatMinutes = 15
+	alerts, err := evalPBSHeartbeat(st, cfg)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasAlert(alerts, domain.AlertTypePBSHeartbeat, "pbs-offline") || len(alerts) != 1 {
+		t.Fatalf("expected one PBS heartbeat alert for pbs-offline, got %+v", alerts)
+	}
+	if alerts[0].Severity != domain.AlertSeverityCritical || !shouldSendImmediateCriticalEmail(alerts[0]) {
+		t.Fatalf("PBS heartbeat alert must notify immediately: %+v", alerts[0])
+	}
+
+	cfg.GlobalPVEHeartbeatMinutes = 0
+	if alerts, _ := evalPBSHeartbeat(st, cfg); len(alerts) != 0 {
+		t.Fatalf("heartbeat alerts must be disabled with 0 minutes, got %+v", alerts)
+	}
+}
+
 func TestEvalHostSwap_PVEEnabled(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

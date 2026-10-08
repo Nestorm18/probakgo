@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	_ "modernc.org/sqlite"
@@ -30,6 +31,31 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	restrictSQLitePermissions(path)
+	return db, nil
+}
+
+// OpenSnapshotReader opens a separate read-only connection for long reads such
+// as VACUUM INTO. In WAL mode it reads a consistent snapshot without holding
+// the single read-write connection that serves every request. It returns nil
+// for in-memory or URI databases, which cannot be shared this way.
+func OpenSnapshotReader(path string) (*sql.DB, error) {
+	if path == ":memory:" || strings.HasPrefix(path, "file:") || strings.Contains(path, "?") {
+		return nil, nil
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	escaped := strings.NewReplacer("%", "%25", "#", "%23").Replace(filepath.ToSlash(abs))
+	db, err := sql.Open("sqlite", "file:"+escaped+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return nil, fmt.Errorf("open snapshot reader: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("open snapshot reader: %w", err)
+	}
 	return db, nil
 }
 

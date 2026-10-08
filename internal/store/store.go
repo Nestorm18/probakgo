@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"probakgo/internal/secretbox"
 )
@@ -12,6 +13,14 @@ import (
 type Store struct {
 	db      *sql.DB
 	secrets *secretbox.Box
+	// snapshot is an optional read-only connection for long copies, so a
+	// backup does not block the single read-write connection.
+	snapshot *sql.DB
+}
+
+// SetSnapshotReader sets the read-only connection used by BackupTo.
+func (s *Store) SetSnapshotReader(db *sql.DB) {
+	s.snapshot = db
 }
 
 type dbExecer interface {
@@ -28,6 +37,13 @@ func NewEncrypted(db *sql.DB, masterKey string) (*Store, error) {
 		return nil, err
 	}
 	return &Store{db: db, secrets: box}, nil
+}
+
+// sqliteUTC formats t like SQLite's CURRENT_TIMESTAMP. Columns that default to
+// it store UTC text, while a bound time.Time is stored as local time with an
+// offset, so the two only compare correctly in this format.
+func sqliteUTC(t time.Time) string {
+	return t.UTC().Format("2006-01-02 15:04:05")
 }
 
 func (s *Store) DBSize(ctx context.Context) int64 {
@@ -49,6 +65,10 @@ func (s *Store) Health(ctx context.Context) error {
 }
 
 func (s *Store) BackupTo(ctx context.Context, path string) error {
-	_, err := s.db.ExecContext(ctx, `VACUUM INTO '`+strings.ReplaceAll(path, `'`, `''`)+`'`)
+	db := s.db
+	if s.snapshot != nil {
+		db = s.snapshot
+	}
+	_, err := db.ExecContext(ctx, `VACUUM INTO '`+strings.ReplaceAll(path, `'`, `''`)+`'`)
 	return err
 }

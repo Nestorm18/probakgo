@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -827,5 +828,39 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Action":     "new",
 			"VM":         (*domain.VMBackupConfig)(nil),
 		}),
+	}
+}
+
+func TestRenderParsesEachTemplateOnceAndRendersConcurrently(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	fixtures := templateFixtures(time.Now())
+
+	var wg sync.WaitGroup
+	for range 8 {
+		for _, name := range []string{"about.html", "login.html"} {
+			// Render adds request fields to the data map, so each request gets its own.
+			data := make(map[string]any, len(fixtures[name]))
+			for k, v := range fixtures[name] {
+				data[k] = v
+			}
+			wg.Go(func() {
+				rr := httptest.NewRecorder()
+				tmpl.Render(rr, httptest.NewRequest(http.MethodGet, "/", nil), name, data)
+				if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), "</html>") {
+					t.Errorf("%s render: HTTP %d", name, rr.Code)
+				}
+			})
+		}
+	}
+	wg.Wait()
+
+	first, ok := tmpl.parsed.Load("about.html")
+	if !ok {
+		t.Fatal("about.html was not cached")
+	}
+	tmpl.Render(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil), "about.html", fixtures["about.html"])
+	if again, _ := tmpl.parsed.Load("about.html"); again != first {
+		t.Fatal("about.html was parsed again")
 	}
 }

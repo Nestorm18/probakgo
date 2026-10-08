@@ -56,14 +56,47 @@ func (s *Store) DeleteIPBan(ctx context.Context, ip string) error {
 	return err
 }
 
+// Unauthenticated clients choose these values; bound what every attempt stores.
+const (
+	maxLoginAttemptUsernameLength  = 128
+	maxLoginAttemptUserAgentLength = 512
+	maxLoginAttemptIPLength        = 64
+)
+
 func (s *Store) InsertLoginAttempt(ctx context.Context, username, ip, userAgent, clientDetails, result, reason string) error {
 	debug.RecordQuery(ctx, `INSERT INTO login_attempts (username, ip, user_agent, client_details, result, reason) VALUES (?, ?, ?, ?, ?, ?)`)
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO login_attempts (username, ip, user_agent, client_details, result, reason)
 		VALUES (?, ?, ?, ?, ?, ?)`,
-		username, ip, userAgent, clientDetails, result, reason,
+		truncateRunes(username, maxLoginAttemptUsernameLength),
+		truncateRunes(ip, maxLoginAttemptIPLength),
+		truncateRunes(userAgent, maxLoginAttemptUserAgentLength),
+		clientDetails, result, reason,
 	)
 	return err
+}
+
+// DeleteOldLoginAttempts removes attempts older than cutoff. attempted_at is
+// written by SQLite as UTC text, so the cutoff uses the same format.
+func (s *Store) DeleteOldLoginAttempts(ctx context.Context, cutoff time.Time) (int64, error) {
+	debug.RecordQuery(ctx, `DELETE FROM login_attempts WHERE attempted_at < ?`)
+	res, err := s.db.ExecContext(ctx, `DELETE FROM login_attempts WHERE attempted_at < ?`,
+		sqliteUTC(cutoff))
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+func truncateRunes(value string, max int) string {
+	count := 0
+	for i := range value {
+		if count == max {
+			return value[:i]
+		}
+		count++
+	}
+	return value
 }
 
 func (s *Store) ListLoginAttempts(ctx context.Context, limit int) ([]domain.LoginAttempt, error) {

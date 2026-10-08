@@ -21,12 +21,23 @@ func (h *H) requireKeyServer(w http.ResponseWriter, r *http.Request, serverName 
 		return false
 	}
 	if boundServerName == "" {
-		if err := h.store.BindAPIKeyServerName(r.Context(), k.ID, serverName); err != nil {
+		bound, err := h.store.BindAPIKeyServerName(r.Context(), k.ID, serverName)
+		if err != nil {
 			internalErr(w, "bind api key server", err)
 			return false
 		}
-		k.ServerName = serverName
-		return true
+		if bound {
+			k.ServerName = serverName
+			return true
+		}
+		// A concurrent request bound the key first; validate against it.
+		current, err := h.store.GetAPIKey(r.Context(), k.ID)
+		if err != nil {
+			internalErr(w, "reload api key server", err)
+			return false
+		}
+		k.ServerName = current.ServerName
+		boundServerName = strings.TrimSpace(current.ServerName)
 	}
 	if boundServerName != serverName {
 		errJSON(w, http.StatusForbidden, "API key is bound to a different server: expected "+strconv.Quote(boundServerName)+", got "+strconv.Quote(serverName))

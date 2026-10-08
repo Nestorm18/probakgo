@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"sync"
 	"time"
 )
@@ -93,6 +94,21 @@ func (b *Banhammer) banDurFor(count int) time.Duration {
 	return b.banDurs[count]
 }
 
+// BanKey is the key bans are tracked under. IPv6 clients are grouped by /64,
+// the prefix a single host usually controls, so rotating addresses inside it
+// cannot evade a ban. IPv4 addresses and unparsable values are used as-is.
+func BanKey(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || !addr.Is6() || addr.Is4In6() {
+		return ip
+	}
+	prefix, err := addr.Prefix(64)
+	if err != nil {
+		return ip
+	}
+	return prefix.String()
+}
+
 func (b *Banhammer) getOrCreate(ip string) *ipState {
 	s, ok := b.states[ip]
 	if !ok {
@@ -137,6 +153,7 @@ func (b *Banhammer) cleanupAt(now time.Time) {
 // IsBanned reports whether ip is currently banned.
 // remaining == -1 signals a permanent ban.
 func (b *Banhammer) IsBanned(ip string) (banned bool, remaining time.Duration) {
+	ip = BanKey(ip)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	s, ok := b.states[ip]
@@ -158,6 +175,7 @@ func (b *Banhammer) IsBanned(ip string) (banned bool, remaining time.Duration) {
 // RecordFailure registers a failed login for ip.
 // Returns true if the IP just got banned.
 func (b *Banhammer) RecordFailure(ip string) bool {
+	ip = BanKey(ip)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	now := time.Now()
@@ -211,6 +229,7 @@ func (b *Banhammer) RecordFailure(ip string) bool {
 // ClearFailures resets the failure counter for ip after a successful login.
 // banCount is kept so escalation applies to future offenses.
 func (b *Banhammer) ClearFailures(ip string) {
+	ip = BanKey(ip)
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if s, ok := b.states[ip]; ok {
@@ -222,11 +241,23 @@ func (b *Banhammer) ClearFailures(ip string) {
 func (b *Banhammer) UnbanIP(ip string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	delete(b.states, ip)
-	if b.store != nil {
-		_ = b.store.DeleteIPBan(context.Background(), ip)
+	// Lift both the IPv6 /64 key and a ban recorded for the exact address
+	// before bans were grouped by prefix.
+	for _, key := range UnbanKeys(ip) {
+		delete(b.states, key)
+		if b.store != nil {
+			_ = b.store.DeleteIPBan(context.Background(), key)
+		}
 	}
 	slog.Info("ip unbanned by admin", "ip", ip)
+}
+
+// UnbanKeys lists the ban keys that may hold a ban for ip.
+func UnbanKeys(ip string) []string {
+	if key := BanKey(ip); key != ip {
+		return []string{ip, key}
+	}
+	return []string{ip}
 }
 
 // ListBanned returns all currently active bans (temporary and permanent).

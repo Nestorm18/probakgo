@@ -12,6 +12,7 @@ import (
 
 	dbpkg "probakgo/internal/db"
 	"probakgo/internal/domain"
+	"probakgo/internal/service"
 	"probakgo/internal/store"
 )
 
@@ -150,6 +151,10 @@ func TestAlertsStatusIncludesHeartbeatAlert(t *testing.T) {
 		t.Fatalf("UpsertServerHeartbeat: %v", err)
 	}
 
+	// The periodic evaluator persists alert state; status.json only reads it.
+	if err := service.SendImmediateCriticalAlerts(st, nil); err != nil {
+		t.Fatalf("evaluate alerts: %v", err)
+	}
 	h := New(st, nil, nil)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/alerts/status.json", nil)
@@ -187,6 +192,10 @@ func TestAlertsStatusHidesMaintenanceAlert(t *testing.T) {
 		t.Fatalf("UpsertServerMaintenance: %v", err)
 	}
 
+	// The periodic evaluator persists alert state; status.json only reads it.
+	if err := service.SendImmediateCriticalAlerts(st, nil); err != nil {
+		t.Fatalf("evaluate alerts: %v", err)
+	}
 	h := New(st, nil, nil)
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/alerts/status.json", nil)

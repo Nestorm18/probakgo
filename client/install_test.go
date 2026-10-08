@@ -2,6 +2,8 @@ package main
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -100,4 +102,53 @@ func TestSendInitialPBSReportUsesInstalledClient(t *testing.T) {
 	if len(gotArgs) != 2 || gotArgs[0] != "--server-type" || gotArgs[1] != "pbs" {
 		t.Fatalf("command args = %q, want [--server-type pbs]", gotArgs)
 	}
+}
+
+func TestRegisterVzdumpHook(t *testing.T) {
+	const hook = "/opt/probakgo/vzdump_client.sh"
+	write := func(t *testing.T, content string) string {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "vzdump.conf")
+		if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	read := func(t *testing.T, path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+
+	t.Run("appends on its own line", func(t *testing.T) {
+		path := write(t, "# defaults\nbwlimit: 1000")
+		added, err := registerVzdumpHook(path, hook)
+		if err != nil || !added {
+			t.Fatalf("added=%v err=%v", added, err)
+		}
+		if got := read(t, path); got != "# defaults\nbwlimit: 1000\nscript: "+hook+"\n" {
+			t.Fatalf("content: %q", got)
+		}
+	})
+	t.Run("already registered", func(t *testing.T) {
+		path := write(t, "script:  "+hook+"\n")
+		if added, err := registerVzdumpHook(path, hook); err != nil || added {
+			t.Fatalf("added=%v err=%v", added, err)
+		}
+	})
+	t.Run("keeps another hook", func(t *testing.T) {
+		original := "#script: /old/commented.sh\nscript: /usr/local/bin/other-hook.sh\n"
+		path := write(t, original)
+		added, err := registerVzdumpHook(path, hook)
+		var conflict *vzdumpHookConflictError
+		if !errors.As(err, &conflict) || added || conflict.existing != "/usr/local/bin/other-hook.sh" {
+			t.Fatalf("added=%v err=%v", added, err)
+		}
+		if got := read(t, path); got != original {
+			t.Fatalf("vzdump.conf was modified: %q", got)
+		}
+	})
 }

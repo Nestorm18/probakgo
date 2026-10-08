@@ -2,17 +2,27 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 )
 
 // ResetAllData deletes all operational data. Users, audit logs and migration
 // history are preserved so administrators retain access and a security trail.
+// The security policy (2FA enforcement, TOTP for sensitive actions and VPN-only
+// access) survives the reset; the rest of email_config returns to defaults.
 func (s *Store) ResetAllData(ctx context.Context) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
 	defer tx.Rollback()
+
+	var enforceTOTP, sensitiveTOTP, vpnOnly bool
+	err = tx.QueryRowContext(ctx, `SELECT enforce_totp_non_readers, sensitive_actions_require_totp, vpn_only_access
+		FROM email_config LIMIT 1`).Scan(&enforceTOTP, &sensitiveTOTP, &vpnOnly)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("read security policy: %w", err)
+	}
 
 	tables := []string{
 		"pve_vm_alert_config",
@@ -61,6 +71,15 @@ func (s *Store) ResetAllData(ctx context.Context) error {
 
 	if _, err := tx.ExecContext(ctx, `INSERT INTO nas_backup_config (id) VALUES (1)`); err != nil {
 		return fmt.Errorf("reset NAS backup config: %w", err)
+	}
+	if enforceTOTP || sensitiveTOTP || vpnOnly {
+		cfg := defaultEmailConfig()
+		cfg.EnforceTOTPNonReaders = enforceTOTP
+		cfg.SensitiveActionsRequireTOTP = sensitiveTOTP
+		cfg.VPNOnlyAccess = vpnOnly
+		if err := s.upsertEmailConfig(ctx, tx, *cfg); err != nil {
+			return fmt.Errorf("restore security policy: %w", err)
+		}
 	}
 	return tx.Commit()
 }

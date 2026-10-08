@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -11,9 +12,12 @@ import (
 func newHTTPClient(cfg *Config) *http.Client {
 	tlsCfg := &tls.Config{}
 	if cfg.CABundle != "" {
-		if caCert, err := os.ReadFile(cfg.CABundle); err == nil {
-			pool := x509.NewCertPool()
-			pool.AppendCertsFromPEM(caCert)
+		caCert, err := os.ReadFile(cfg.CABundle)
+		pool := x509.NewCertPool()
+		if err != nil || !pool.AppendCertsFromPEM(caCert) {
+			// Fall back to the system roots, but say why the bundle was ignored.
+			log.Printf("WARN: PROXMOX_CA_BUNDLE %s ignored: no PEM certificates could be read (%v); using system roots", cfg.CABundle, err)
+		} else {
 			tlsCfg.RootCAs = pool
 		}
 	} else if !cfg.VerifyTLS {

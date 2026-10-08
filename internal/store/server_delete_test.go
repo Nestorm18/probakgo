@@ -57,6 +57,35 @@ func TestHardDeleteServerDataForAPIKey_DeletesOnlyBoundServerAlerts(t *testing.T
 	assertCount(t, st, `SELECT COUNT(*) FROM pve_alert_config WHERE server_id = ?`, server2, 1)
 }
 
+func TestHardDeleteServerDataForUnusedAPIKeyKeepsOtherKeysServer(t *testing.T) {
+	ctx := context.Background()
+	st := openTestDB(t)
+
+	usedKey, err := st.CreateAPIKey(ctx, "pve-a", "duplicate-host", "")
+	if err != nil {
+		t.Fatalf("create used key: %v", err)
+	}
+	unusedKey, err := st.CreateAPIKey(ctx, "pve-b", "duplicate-host", "")
+	if err != nil {
+		t.Fatalf("create unused key: %v", err)
+	}
+	pveServer, err := st.UpsertPVEServerForAPIKey(ctx, usedKey.ID, "duplicate-host", "10.0.0.1", "", "0.0.260", "machine-1")
+	if err != nil {
+		t.Fatalf("upsert PVE server: %v", err)
+	}
+	pbsServer, err := st.UpsertPBSServerForAPIKey(ctx, usedKey.ID, "duplicate-host", "10.0.0.1", "", "0.0.260", "machine-1")
+	if err != nil {
+		t.Fatalf("upsert PBS server: %v", err)
+	}
+
+	if err := st.HardDeleteServerDataForAPIKey(ctx, unusedKey.ID, "duplicate-host"); err != nil {
+		t.Fatalf("hard delete unused key: %v", err)
+	}
+
+	assertCount(t, st, `SELECT COUNT(*) FROM pve_servers WHERE id = ?`, pveServer, 1)
+	assertCount(t, st, `SELECT COUNT(*) FROM pbs_servers WHERE id = ?`, pbsServer, 1)
+}
+
 func TestHardDeleteServerDataForAPIKey_DeletesLegacyServerWithSameHostname(t *testing.T) {
 	ctx := context.Background()
 	st := openTestDB(t)

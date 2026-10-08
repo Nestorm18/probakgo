@@ -58,7 +58,19 @@ func (s *Store) ListPresentAlerts(ctx context.Context) ([]domain.Alert, error) {
 	return alerts, rows.Err()
 }
 
+// SyncAlertStates records a complete evaluation: present alerts are upserted
+// and every previously present alert that is missing is resolved.
 func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) error {
+	return s.syncAlertStates(ctx, alerts, true)
+}
+
+// SyncPartialAlertStates records an evaluation in which some evaluators
+// failed. Missing alerts stay present, so a failure never looks resolved.
+func (s *Store) SyncPartialAlertStates(ctx context.Context, alerts []domain.Alert) error {
+	return s.syncAlertStates(ctx, alerts, false)
+}
+
+func (s *Store) syncAlertStates(ctx context.Context, alerts []domain.Alert, resolveMissing bool) error {
 	debug.RecordQuery(ctx, `SELECT alert_id, is_present, severity, title, message, server_name, server_type, server_id, store_name, vmid, vm_name FROM alert_states`)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -116,7 +128,7 @@ func (s *Store) SyncAlertStates(ctx context.Context, alerts []domain.Alert) erro
 	}
 
 	for alertID, state := range existing {
-		if !state.IsPresent {
+		if !resolveMissing || !state.IsPresent {
 			continue
 		}
 		if _, ok := current[alertID]; ok {
@@ -495,4 +507,43 @@ func alertEventFromState(state alertStateRow, eventType, note string) domain.Ale
 		Message: state.Message, ServerName: state.ServerName, ServerType: state.ServerType,
 		ServerID: state.ServerID, StoreName: state.StoreName, VMID: state.VMID, VMName: state.VMName, Note: note,
 	}
+}
+
+// DeleteOldAlertHistory prunes alert events older than cutoff and resolved
+// alert states not updated since then whose resolution was already delivered
+// on every channel. An alert that appears again starts a new state.
+func (s *Store) DeleteOldAlertHistory(ctx context.Context, cutoff time.Time) (events, states int64, err error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	// created_at is SQLite UTC text; updated_at is written from Go.
+	res, err := tx.ExecContext(ctx, `DELETE FROM alert_state_events WHERE created_at < ?`, sqliteUTC(cutoff))
+	if err != nil {
+		return 0, 0, fmt.Errorf("delete alert events: %w", err)
+	}
+	if events, err = res.RowsAffected(); err != nil {
+		return 0, 0, err
+	}
+	res, err = tx.ExecContext(ctx, `
+		DELETE FROM alert_states
+		WHERE is_present = 0
+		  AND resolution_email_pending = 0
+		  AND resolution_push_pending = 0
+		  AND updated_at < ?
+		  AND NOT EXISTS (
+		      SELECT 1 FROM telegram_alert_deliveries d
+		      WHERE d.alert_id = alert_states.alert_id
+		        AND d.active_sent_at IS NOT NULL
+		        AND d.resolution_sent_at IS NULL
+		  )`, cutoff)
+	if err != nil {
+		return 0, 0, fmt.Errorf("delete resolved alert states: %w", err)
+	}
+	if states, err = res.RowsAffected(); err != nil {
+		return 0, 0, err
+	}
+	return events, states, tx.Commit()
 }

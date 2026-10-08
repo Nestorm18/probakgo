@@ -98,3 +98,51 @@ func TestUpdateUserRole(t *testing.T) {
 		t.Errorf("SessionVersion: want 2 after role update, got %d", u.SessionVersion)
 	}
 }
+
+func TestIsLastActiveAdminAndReactivateUser(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	adminID, err := st.CreateUser(ctx, "admin", "hash", "admin")
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	editorID, err := st.CreateUser(ctx, "editor", "hash", "editor")
+	if err != nil {
+		t.Fatalf("create editor: %v", err)
+	}
+	if last, err := st.IsLastActiveAdmin(ctx, adminID); err != nil || !last {
+		t.Fatalf("single admin: last=%v err=%v", last, err)
+	}
+	if last, err := st.IsLastActiveAdmin(ctx, editorID); err != nil || last {
+		t.Fatalf("editor reported as last admin: last=%v err=%v", last, err)
+	}
+	secondID, err := st.CreateUser(ctx, "admin2", "hash", "admin")
+	if err != nil {
+		t.Fatalf("create second admin: %v", err)
+	}
+	if last, err := st.IsLastActiveAdmin(ctx, adminID); err != nil || last {
+		t.Fatalf("two active admins: last=%v err=%v", last, err)
+	}
+	if err := st.SetUserActive(ctx, secondID, false); err != nil {
+		t.Fatalf("disable second admin: %v", err)
+	}
+	if last, err := st.IsLastActiveAdmin(ctx, adminID); err != nil || !last {
+		t.Fatalf("inactive admins must not count: last=%v err=%v", last, err)
+	}
+
+	if err := st.StartUserTOTPGrace(ctx, secondID); err != nil {
+		t.Fatalf("start grace: %v", err)
+	}
+	before, _ := st.GetUser(ctx, secondID)
+	if ok, err := st.ReactivateUserByUsername(ctx, "admin2"); err != nil || !ok {
+		t.Fatalf("reactivate: ok=%v err=%v", ok, err)
+	}
+	after, err := st.GetUser(ctx, secondID)
+	if err != nil || !after.IsActive || after.TOTPGraceStartedAt != nil || after.SessionVersion <= before.SessionVersion {
+		t.Fatalf("reactivated user: %+v %v", after, err)
+	}
+	if ok, err := st.ReactivateUserByUsername(ctx, "missing"); err != nil || ok {
+		t.Fatalf("missing user: ok=%v err=%v", ok, err)
+	}
+}

@@ -24,6 +24,25 @@ func TestAllowKeyLimitsIndependently(t *testing.T) {
 	}
 }
 
+func TestBlockedDoesNotCountEvents(t *testing.T) {
+	l := New(2, time.Minute)
+
+	if l.Blocked("key") {
+		t.Fatal("unused key should not be blocked")
+	}
+	l.AllowKey("key")
+	if l.Blocked("key") || l.Blocked("key") {
+		t.Fatal("key below the limit should not be blocked")
+	}
+	l.AllowKey("key")
+	if !l.Blocked("key") {
+		t.Fatal("key at the limit should be blocked")
+	}
+	if l.Blocked("other") {
+		t.Fatal("other keys should not be blocked")
+	}
+}
+
 func TestLimiterMiddlewareResponses(t *testing.T) {
 	t.Run("plain text", func(t *testing.T) {
 		limiter := New(1, time.Minute)
@@ -194,5 +213,33 @@ func TestBanhammerLoadAndClearFailures(t *testing.T) {
 	wantErr := errors.New("database unavailable")
 	if err := NewBanhammer(2, time.Minute, &memoryBanStore{listErr: wantErr}).Load(); !errors.Is(err, wantErr) {
 		t.Fatalf("Load error = %v", err)
+	}
+}
+
+func TestBanhammerGroupsIPv6ByPrefix(t *testing.T) {
+	if got := BanKey("2001:db8:1:2:aaaa::1"); got != "2001:db8:1:2::/64" {
+		t.Fatalf("IPv6 key: %q", got)
+	}
+	for _, ip := range []string{"192.0.2.10", "::ffff:192.0.2.10", "not-an-ip"} {
+		if got := BanKey(ip); got != ip {
+			t.Fatalf("BanKey(%q) = %q, want unchanged", ip, got)
+		}
+	}
+
+	b := NewBanhammer(3, time.Hour, nil, time.Hour)
+	b.RecordFailure("2001:db8:1:2::1")
+	b.RecordFailure("2001:db8:1:2::2")
+	if !b.RecordFailure("2001:db8:1:2::3") {
+		t.Fatal("rotating addresses inside one /64 avoided the ban")
+	}
+	if banned, _ := b.IsBanned("2001:db8:1:2:ffff::9"); !banned {
+		t.Fatal("another address in the banned /64 is not banned")
+	}
+	if banned, _ := b.IsBanned("2001:db8:1:3::1"); banned {
+		t.Fatal("a different /64 is banned")
+	}
+	b.UnbanIP("2001:db8:1:2::/64")
+	if banned, _ := b.IsBanned("2001:db8:1:2::1"); banned {
+		t.Fatal("unban by prefix did not lift the ban")
 	}
 }

@@ -3,12 +3,15 @@ package webhandlers
 import (
 	"encoding/base64"
 	"html/template"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
 	"golang.org/x/crypto/bcrypt"
 
+	"probakgo/internal/domain"
 	"probakgo/internal/session"
 	"probakgo/internal/totp"
 )
@@ -61,8 +64,8 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/profile?flash=La+nueva+contrasena+no+puede+estar+vacia", http.StatusSeeOther)
 		return
 	}
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPass)) != nil {
-		http.Redirect(w, r, "/profile?flash=Contrasena+actual+incorrecta", http.StatusSeeOther)
+	if ok, blocked := h.checkCurrentPassword(r, user, currentPass); !ok {
+		redirectWithFlash(w, r, "/profile", currentPasswordFailureMessage(blocked), false)
 		return
 	}
 	if newPass != confirm {
@@ -75,14 +78,57 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
 	if err != nil {
-		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
+		redirectWithFlash(w, r, "/profile", passwordTooLongMessage, false)
 		return
 	}
 	if err := h.store.UpdateUserPassword(ctx, user.ID, string(hash)); err != nil {
-		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
+		slog.Error("update own password", "user_id", user.ID, "err", err)
+		redirectWithFlash(w, r, "/profile", "No se pudo actualizar la contraseña", false)
 		return
 	}
-	http.Redirect(w, r, "/profile?flash=Contrasena+actualizada&ok=1", http.StatusSeeOther)
+	h.audit(r, "user.password_change", "user", strconv.FormatInt(user.ID, 10), user.Username, map[string]any{"self": true})
+	h.redirectAfterOwnSecurityChange(w, r, user.ID, "Contraseña actualizada. Se han cerrado tus otras sesiones.")
+}
+
+// checkCurrentPassword verifies the signed-in user's password for a sensitive
+// change. Failures are limited per user, so a stolen session cannot be used to
+// brute-force the password.
+func (h *WebH) checkCurrentPassword(r *http.Request, user *domain.User, password string) (ok, blocked bool) {
+	key := strconv.FormatInt(user.ID, 10)
+	if h.passwordFailures != nil && h.passwordFailures.Blocked(key) {
+		return false, true
+	}
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) == nil {
+		return true, false
+	}
+	if h.passwordFailures != nil {
+		h.passwordFailures.AllowKey(key)
+	}
+	h.audit(r, "user.password_check_failed", "user", key, user.Username, map[string]any{"path": r.URL.Path})
+	return false, false
+}
+
+func currentPasswordFailureMessage(blocked bool) string {
+	if blocked {
+		return "Demasiados intentos fallidos con la contraseña actual. Espera 15 minutos."
+	}
+	return "Contraseña actual incorrecta"
+}
+
+// redirectAfterOwnSecurityChange keeps the current browser signed in after a
+// change that revoked every session of the user, including this one.
+func (h *WebH) redirectAfterOwnSecurityChange(w http.ResponseWriter, r *http.Request, userID int64, message string) {
+	user, err := h.store.GetUser(r.Context(), userID)
+	if err == nil {
+		err = session.SetUserWithVersion(w, r, user.ID, user.Username, user.Role, user.SessionVersion)
+	}
+	if err != nil {
+		slog.Error("refresh session after security change", "user_id", userID, "err", err)
+		session.Clear(w, r)
+		redirectWithFlash(w, r, "/login", message+" Inicia sesión de nuevo.", false)
+		return
+	}
+	redirectWithFlash(w, r, "/profile", message, true)
 }
 
 func (h *WebH) Profile2FASetup(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +145,8 @@ func (h *WebH) Profile2FASetup(w http.ResponseWriter, r *http.Request) {
 	}
 	secret, err := totp.GenerateSecret()
 	if err != nil {
-		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
+		slog.Error("generate TOTP secret", "err", err)
+		redirectWithFlash(w, r, "/profile", "No se pudo preparar el 2FA", false)
 		return
 	}
 	if err := session.SetPendingTOTPSetup(w, r, secret); err != nil {
@@ -132,7 +179,8 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/profile?flash=No+hay+configuracion+2FA+pendiente", http.StatusSeeOther)
 		return
 	}
-	if !totp.Validate(r.FormValue("code"), secret, time.Now()) {
+	step, valid := totp.ValidateStep(r.FormValue("code"), secret, time.Now())
+	if !valid {
 		h.tmpl.Render(w, r, "profile_2fa_setup.html", map[string]any{
 			"Username":  username,
 			"Role":      user.Role,
@@ -144,12 +192,17 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.EnableUserTOTP(ctx, user.ID, secret); err != nil {
-		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
+		slog.Error("enable TOTP", "user_id", user.ID, "err", err)
+		redirectWithFlash(w, r, "/profile", "No se pudo activar el 2FA", false)
 		return
 	}
-	_ = session.ClearPendingTOTPSetup(w, r)
+	// The confirmation code must not also work for the next login.
+	if _, err := h.store.ClaimUserTOTPStep(ctx, user.ID, step); err != nil {
+		slog.Warn("record TOTP setup step", "user_id", user.ID, "err", err)
+	}
 	h.audit(r, "user.2fa_enable", "user", username, username, nil)
-	http.Redirect(w, r, "/profile?flash=2FA+activado&ok=1", http.StatusSeeOther)
+	// The refreshed session also drops the pending TOTP setup.
+	h.redirectAfterOwnSecurityChange(w, r, user.ID, "2FA activado. Se han cerrado tus otras sesiones.")
 }
 
 func (h *WebH) Profile2FADisable(w http.ResponseWriter, r *http.Request) {
@@ -160,16 +213,17 @@ func (h *WebH) Profile2FADisable(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(r.FormValue("current_password"))) != nil {
-		http.Redirect(w, r, "/profile?flash=Contrasena+actual+incorrecta", http.StatusSeeOther)
+	if ok, blocked := h.checkCurrentPassword(r, user, r.FormValue("current_password")); !ok {
+		redirectWithFlash(w, r, "/profile", currentPasswordFailureMessage(blocked), false)
 		return
 	}
 	if err := h.store.DisableUserTOTP(ctx, user.ID); err != nil {
-		http.Redirect(w, r, "/profile?flash="+err.Error(), http.StatusSeeOther)
+		slog.Error("disable TOTP", "user_id", user.ID, "err", err)
+		redirectWithFlash(w, r, "/profile", "No se pudo desactivar el 2FA", false)
 		return
 	}
 	h.audit(r, "user.2fa_disable", "user", username, username, nil)
-	http.Redirect(w, r, "/profile?flash=2FA+desactivado&ok=1", http.StatusSeeOther)
+	h.redirectAfterOwnSecurityChange(w, r, user.ID, "2FA desactivado. Se han cerrado tus otras sesiones.")
 }
 
 func qrCodeDataURI(uri string) template.URL {

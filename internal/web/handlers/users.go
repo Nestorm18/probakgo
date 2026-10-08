@@ -4,6 +4,9 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -12,7 +15,28 @@ import (
 	"probakgo/internal/session"
 )
 
-const minPasswordLength = 12
+const (
+	minPasswordLength = 12
+	maxUsernameLength = 64
+
+	invalidUsernameMessage = "El nombre de usuario admite hasta 64 caracteres, sin caracteres de control"
+	passwordTooLongMessage = "La contraseña no es válida (máximo 72 bytes)"
+)
+
+// normalizeUsername trims the name and reports whether it is short enough and
+// free of control characters.
+func normalizeUsername(raw string) (string, bool) {
+	name := strings.TrimSpace(raw)
+	if utf8.RuneCountInString(name) > maxUsernameLength {
+		return name, false
+	}
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return name, false
+		}
+	}
+	return name, true
+}
 
 func (h *WebH) Users(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -71,11 +95,15 @@ func (h *WebH) UserEditPage(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	back := formBackOrDefault(r, "/users")
-	uname := r.FormValue("username")
+	uname, validName := normalizeUsername(r.FormValue("username"))
 	pass := r.FormValue("password")
 	role := r.FormValue("role")
 	if uname == "" || pass == "" {
 		redirectWithFlash(w, r, back, "Usuario y contraseña requeridos", false)
+		return
+	}
+	if !validName {
+		redirectWithFlash(w, r, back, invalidUsernameMessage, false)
 		return
 	}
 	if len(pass) < minPasswordLength {
@@ -87,12 +115,13 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		redirectWithFlash(w, r, back, passwordTooLongMessage, false)
 		return
 	}
 	id, err := h.store.CreateUser(ctx, uname, string(hash), role)
 	if err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		slog.Error("create user", "err", err)
+		redirectWithFlash(w, r, back, "No se pudo crear el usuario; comprueba que el nombre no exista ya", false)
 		return
 	}
 	h.audit(r, "user.create", "user", strconv.FormatInt(id, 10), uname, map[string]any{"role": role})
@@ -105,9 +134,13 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	back := formBackOrDefault(r, "/users")
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	newUsername := r.FormValue("username")
+	newUsername, validName := normalizeUsername(r.FormValue("username"))
 	if newUsername == "" {
 		redirectWithFlash(w, r, back, "Nombre de usuario requerido", false)
+		return
+	}
+	if !validName {
+		redirectWithFlash(w, r, back, invalidUsernameMessage, false)
 		return
 	}
 	curUsername, _, _ := session.GetUser(r)
@@ -117,14 +150,15 @@ func (h *WebH) ChangeUsernamePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.UpdateUserUsername(ctx, id, newUsername); err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		slog.Error("rename user", "id", id, "err", err)
+		redirectWithFlash(w, r, back, "No se pudo cambiar el nombre; comprueba que no exista ya", false)
 		return
 	}
 	h.audit(r, "user.rename", "user", strconv.FormatInt(id, 10), newUsername, map[string]any{"old_username": u.Username, "new_username": newUsername})
 	// If changing own username, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
-		http.Redirect(w, r, "/login?flash=Nombre+de+usuario+cambió+a+"+newUsername+"+-+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		redirectWithFlash(w, r, "/login", "Nombre de usuario cambió a "+newUsername+" - inicia sesión de nuevo", false)
 		return
 	}
 	redirectWithFlash(w, r, back, "Nombre de usuario cambió a "+newUsername, true)
@@ -156,10 +190,14 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		redirectWithFlash(w, r, back, passwordTooLongMessage, false)
 		return
 	}
-	_ = h.store.UpdateUserPassword(ctx, id, string(hash))
+	if err := h.store.UpdateUserPassword(ctx, id, string(hash)); err != nil {
+		slog.Error("update user password", "id", id, "err", err)
+		redirectWithFlash(w, r, back, "No se pudo actualizar la contraseña", false)
+		return
+	}
 	h.audit(r, "user.password_change", "user", strconv.FormatInt(id, 10), u.Username, nil)
 	// If changing own password, logout
 	if u.Username == curUsername {
@@ -180,7 +218,8 @@ func (h *WebH) DisableUser2FAPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.DisableUserTOTP(ctx, id); err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		slog.Error("disable user TOTP", "id", id, "err", err)
+		redirectWithFlash(w, r, back, "No se pudo desactivar el 2FA", false)
 		return
 	}
 	h.audit(r, "user.2fa_admin_disable", "user", strconv.FormatInt(id, 10), u.Username, nil)
@@ -207,7 +246,11 @@ func (h *WebH) ChangeRolePost(w http.ResponseWriter, r *http.Request) {
 		redirectWithFlash(w, r, back, "No puedes cambiar tu propio rol", false)
 		return
 	}
-	_ = h.store.UpdateUserRole(ctx, id, role)
+	if err := h.store.UpdateUserRole(ctx, id, role); err != nil {
+		slog.Error("update user role", "id", id, "err", err)
+		redirectWithFlash(w, r, back, "No se pudo cambiar el rol", false)
+		return
+	}
 	h.audit(r, "user.role_change", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"old_role": u.Role, "new_role": role})
 	redirectWithFlash(w, r, back, "Rol actualizado", true)
 }
@@ -248,7 +291,11 @@ func (h *WebH) DeleteUserPost(w http.ResponseWriter, r *http.Request) {
 		redirectWithFlash(w, r, back, "No se puede eliminar un usuario admin", false)
 		return
 	}
-	_ = h.store.DeleteUser(ctx, id)
+	if err := h.store.DeleteUser(ctx, id); err != nil {
+		slog.Error("delete user", "id", id, "err", err)
+		redirectWithFlash(w, r, back, "No se pudo eliminar el usuario", false)
+		return
+	}
 	h.audit(r, "user.delete", "user", strconv.FormatInt(id, 10), u.Username, map[string]any{"role": u.Role})
 	redirectWithFlash(w, r, "/users", "Usuario eliminado", true)
 }

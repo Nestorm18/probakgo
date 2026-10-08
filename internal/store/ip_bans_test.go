@@ -2,7 +2,10 @@ package store
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 )
 
 func TestListLoginAttemptsPage(t *testing.T) {
@@ -38,5 +41,50 @@ func TestListLoginAttemptsPage(t *testing.T) {
 	}
 	if page2[0].ClientDetails != `{"timezone":"Europe/Madrid"}` {
 		t.Fatalf("client details: got %q", page2[0].ClientDetails)
+	}
+}
+
+func TestInsertLoginAttemptBoundsClientValues(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	username := strings.Repeat("ñ", maxLoginAttemptUsernameLength+50)
+	userAgent := strings.Repeat("a", 1<<20)
+	if err := st.InsertLoginAttempt(ctx, username, "10.0.0.1", userAgent, "", "failed", "invalid_credentials"); err != nil {
+		t.Fatalf("insert login attempt: %v", err)
+	}
+	attempts, err := st.ListLoginAttemptsPage(ctx, 1, 0)
+	if err != nil || len(attempts) != 1 {
+		t.Fatalf("list attempts: %v %+v", err, attempts)
+	}
+	if got := utf8.RuneCountInString(attempts[0].Username); got != maxLoginAttemptUsernameLength || !utf8.ValidString(attempts[0].Username) {
+		t.Fatalf("username length: got %d runes", got)
+	}
+	if got := len(attempts[0].UserAgent); got != maxLoginAttemptUserAgentLength {
+		t.Fatalf("user agent length: got %d", got)
+	}
+}
+
+func TestDeleteOldLoginAttempts(t *testing.T) {
+	st := openTestDB(t)
+	ctx := context.Background()
+
+	for _, username := range []string{"old", "recent"} {
+		if err := st.InsertLoginAttempt(ctx, username, "10.0.0.1", "agent", "", "failed", ""); err != nil {
+			t.Fatalf("insert %s: %v", username, err)
+		}
+	}
+	old := time.Now().UTC().AddDate(0, -4, 0).Format("2006-01-02 15:04:05")
+	if _, err := st.db.ExecContext(ctx, `UPDATE login_attempts SET attempted_at=? WHERE username='old'`, old); err != nil {
+		t.Fatalf("backdate attempt: %v", err)
+	}
+
+	deleted, err := st.DeleteOldLoginAttempts(ctx, time.Now().AddDate(0, -3, 0))
+	if err != nil || deleted != 1 {
+		t.Fatalf("delete old attempts: deleted=%d err=%v", deleted, err)
+	}
+	attempts, err := st.ListLoginAttemptsPage(ctx, 10, 0)
+	if err != nil || len(attempts) != 1 || attempts[0].Username != "recent" {
+		t.Fatalf("remaining attempts: %v %+v", err, attempts)
 	}
 }

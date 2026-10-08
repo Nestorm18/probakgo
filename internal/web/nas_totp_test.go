@@ -57,6 +57,11 @@ func TestNASActionsAcceptValidTOTPWithEncryptedSecret(t *testing.T) {
 	handler := RequireLogin(st)(RequireAdmin(RequireTOTPForSensitiveAction(st)(http.HandlerFunc(h.NASBackupSettingsPost))))
 	for _, action := range []string{"save", "test"} {
 		t.Run(action, func(t *testing.T) {
+			// Each subtest reuses the current code; forget the step accepted by
+			// the previous one, since a code is otherwise valid only once.
+			if _, err := database.Exec(`UPDATE users SET totp_last_step=0 WHERE id=?`, id); err != nil {
+				t.Fatal(err)
+			}
 			var counter [8]byte
 			binary.BigEndian.PutUint64(counter[:], uint64(time.Now().Unix()/30))
 			mac := hmac.New(sha1.New, []byte("12345678901234567890"))

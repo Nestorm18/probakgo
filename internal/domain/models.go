@@ -470,6 +470,7 @@ const (
 	AlertTypePVEStale          = "pve_stale"
 	AlertTypePVEHeartbeat      = "pve_heartbeat"
 	AlertTypePBSReportStale    = "pbs_report_stale"
+	AlertTypePBSHeartbeat      = "pbs_heartbeat"
 	AlertTypePVEMissingVM      = "pve_missing_vm"
 	AlertTypePVEUnknownVM      = "pve_unknown_vm"
 	AlertTypeSwap              = "swap"

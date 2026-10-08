@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"golang.org/x/crypto/bcrypt"
 
 	"probakgo/internal/service"
 	"probakgo/internal/session"
@@ -117,7 +116,8 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	}
 	k, err := h.store.CreateAPIKey(ctx, name, serverName, serverURL)
 	if err != nil {
-		redirectWithFlash(w, r, back, err.Error(), false)
+		slog.Error("create api key", "err", err)
+		redirectWithFlash(w, r, back, "No se pudo crear la clave", false)
 		return
 	}
 	h.audit(r, "api_key.create", "api_key", strconv.FormatInt(k.ID, 10), k.Name, map[string]any{
@@ -139,11 +139,17 @@ func (h *WebH) CreateAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) ToggleAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	k, _ := h.store.GetAPIKey(ctx, id)
-	_ = h.store.ToggleAPIKey(ctx, id)
-	if k != nil {
-		h.audit(r, "api_key.toggle", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"was_active": k.IsActive, "new_active": !k.IsActive})
+	k, err := h.store.GetAPIKey(ctx, id)
+	if err != nil {
+		redirectWithFlash(w, r, "/api-keys", "No se encontró la clave", false)
+		return
 	}
+	if err := h.store.ToggleAPIKey(ctx, id); err != nil {
+		slog.Error("toggle api key", "id", id, "err", err)
+		redirectWithFlash(w, r, "/api-keys", "No se pudo cambiar el estado de la clave", false)
+		return
+	}
+	h.audit(r, "api_key.toggle", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"was_active": k.IsActive, "new_active": !k.IsActive})
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
@@ -151,17 +157,24 @@ func (h *WebH) DeleteAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	k, err := h.store.GetAPIKey(ctx, id)
-	if err == nil && k.ServerName != "" {
+	if err != nil {
+		redirectWithFlash(w, r, "/api-keys", "No se encontró la clave", false)
+		return
+	}
+	if k.ServerName != "" {
 		if err := h.store.HardDeleteServerDataForAPIKey(ctx, id, k.ServerName); err != nil {
-			http.Redirect(w, r, "/api-keys?flash=Error+al+borrar+servidor:+"+err.Error(), http.StatusSeeOther)
+			slog.Error("hard delete server data for api key", "id", id, "err", err)
+			redirectWithFlash(w, r, "/api-keys", "Error al borrar los datos del servidor", false)
 			return
 		}
 		h.audit(r, "server.hard_delete", "server", "", k.ServerName, map[string]any{"api_key_id": id})
 	}
-	_ = h.store.DeleteAPIKey(ctx, id)
-	if err == nil {
-		h.audit(r, "api_key.delete", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"server_name": k.ServerName})
+	if err := h.store.DeleteAPIKey(ctx, id); err != nil {
+		slog.Error("delete api key", "id", id, "err", err)
+		redirectWithFlash(w, r, "/api-keys", "No se pudo borrar la clave", false)
+		return
 	}
+	h.audit(r, "api_key.delete", "api_key", strconv.FormatInt(id, 10), k.Name, map[string]any{"server_name": k.ServerName})
 	http.Redirect(w, r, "/api-keys", http.StatusSeeOther)
 }
 
@@ -209,11 +222,14 @@ func (h *WebH) RevealAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Usuario no válido"})
 		return
 	}
-	password := r.FormValue("password")
-	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
+	if ok, blocked := h.checkCurrentPassword(r, user, r.FormValue("password")); !ok {
+		status := http.StatusUnauthorized
+		if blocked {
+			status = http.StatusTooManyRequests
+		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Contraseña incorrecta"})
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": currentPasswordFailureMessage(blocked)})
 		return
 	}
 	k, err := h.store.GetAPIKey(ctx, id)
@@ -268,7 +284,8 @@ func (h *WebH) EditAPIKeyPost(w http.ResponseWriter, r *http.Request) {
 		name = serverName
 	}
 	if err := h.store.UpdateAPIKey(ctx, id, name, serverName, serverURL); err != nil {
-		http.Redirect(w, r, "/api-keys/"+chi.URLParam(r, "id")+"/edit?flash="+err.Error(), http.StatusSeeOther)
+		slog.Error("update api key", "id", id, "err", err)
+		redirectWithFlash(w, r, "/api-keys/"+strconv.FormatInt(id, 10)+"/edit", "No se pudo guardar la clave", false)
 		return
 	}
 	h.audit(r, "api_key.update", "api_key", strconv.FormatInt(id, 10), name, map[string]any{"server_name": serverName, "server_url": serverURL})

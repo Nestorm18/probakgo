@@ -40,8 +40,22 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Build and vet Windows client
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          go build -o /dev/null ./client-windows/
+          go vet ./client-windows/
+
       - name: Vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+      - name: Vulnerability scan for Windows client
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          GOOS=windows GOARCH=amd64 "$(go env GOPATH)/bin/govulncheck" ./client-windows/
 
       - name: Test and enforce coverage floor
         shell: bash

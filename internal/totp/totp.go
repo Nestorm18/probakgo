@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
+	"crypto/subtle"
 	"encoding/base32"
 	"encoding/binary"
 	"fmt"
@@ -41,21 +42,28 @@ func ProvisioningURI(username, secret string) string {
 }
 
 func Validate(code, secret string, now time.Time) bool {
+	_, ok := ValidateStep(code, secret, now)
+	return ok
+}
+
+// ValidateStep reports the time step the code belongs to, so callers can
+// refuse a code whose step was already used (replay protection).
+func ValidateStep(code, secret string, now time.Time) (int64, bool) {
 	code = strings.TrimSpace(code)
 	if len(code) != digits {
-		return false
+		return 0, false
 	}
 	key, err := base32NoPad.DecodeString(strings.ToUpper(strings.TrimSpace(secret)))
 	if err != nil {
-		return false
+		return 0, false
 	}
 	step := now.Unix() / period
 	for drift := int64(-1); drift <= 1; drift++ {
-		if generateCode(key, step+drift) == code {
-			return true
+		if subtle.ConstantTimeCompare([]byte(generateCode(key, step+drift)), []byte(code)) == 1 {
+			return step + drift, true
 		}
 	}
-	return false
+	return 0, false
 }
 
 func generateCode(key []byte, counter int64) string {

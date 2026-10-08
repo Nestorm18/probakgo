@@ -10,6 +10,7 @@ import (
 
 	"probakgo/internal/debug"
 	"probakgo/internal/domain"
+	"probakgo/internal/secretbox"
 )
 
 func (s *Store) GetAPIKeyByValue(ctx context.Context, key string) (*domain.APIKey, error) {
@@ -22,10 +23,15 @@ func (s *Store) GetAPIKeyByValue(ctx context.Context, key string) (*domain.APIKe
 			return k, err
 		}
 	}
+	// The plaintext lookup only serves rows not yet migrated. Stored ciphertext
+	// must never act as a credential, even without DATA_ENCRYPTION_KEY.
+	if secretbox.IsEncrypted(key) {
+		return nil, sql.ErrNoRows
+	}
 
-	debug.RecordQuery(ctx, `SELECT id, key, name, key_type, is_active, machine_id, last_used, server_name, server_url, created_at FROM api_keys WHERE key = ?`)
+	debug.RecordQuery(ctx, `SELECT id, key, name, key_type, is_active, machine_id, last_used, server_name, server_url, created_at FROM api_keys WHERE key = ? AND key NOT LIKE 'enc:%'`)
 	row := s.db.QueryRowContext(ctx, `SELECT id, key, name, key_type, is_active, machine_id, last_used, server_name, server_url, created_at
-		FROM api_keys WHERE key = ?`, key)
+		FROM api_keys WHERE key = ? AND key NOT LIKE 'enc:%'`, key)
 	k, err := s.scanAPIKey(row)
 	if err != nil || s.secrets == nil {
 		return k, err
@@ -47,6 +53,9 @@ func (s *Store) ListAPIKeys(ctx context.Context) ([]domain.APIKey, error) {
 	return s.ListAPIKeysPage(ctx, 0, 0, "")
 }
 
+// likeEscaper makes user input match literally in LIKE ... ESCAPE '\'.
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
 func (s *Store) ListAPIKeysPage(ctx context.Context, limit, offset int, query string) ([]domain.APIKey, error) {
 	if offset < 0 {
 		offset = 0
@@ -55,12 +64,18 @@ func (s *Store) ListAPIKeysPage(ctx context.Context, limit, offset int, query st
 	where := ""
 	args := []any{}
 	if query != "" {
-		like := "%" + strings.ToLower(query) + "%"
-		where = ` WHERE lower(name) LIKE ? OR lower(server_name) LIKE ? OR lower(machine_id) LIKE ? OR lower(server_url) LIKE ? OR lower(key) LIKE ?`
-		args = append(args, like, like, like, like, like)
-		if s.secrets != nil && strings.HasPrefix(query, "pbk-") {
-			where += ` OR key_hash = ?`
-			args = append(args, s.secrets.LookupHash(query))
+		like := "%" + likeEscaper.Replace(strings.ToLower(query)) + "%"
+		where = ` WHERE lower(name) LIKE ? ESCAPE '\' OR lower(server_name) LIKE ? ESCAPE '\' OR lower(machine_id) LIKE ? ESCAPE '\' OR lower(server_url) LIKE ? ESCAPE '\'`
+		args = append(args, like, like, like, like)
+		if s.secrets != nil {
+			// The key column holds ciphertext; only an exact key can match.
+			if strings.HasPrefix(query, "pbk-") {
+				where += ` OR key_hash = ?`
+				args = append(args, s.secrets.LookupHash(query))
+			}
+		} else {
+			where += ` OR lower(key) LIKE ? ESCAPE '\'`
+			args = append(args, like)
 		}
 		switch strings.ToLower(query) {
 		case "activa", "activo", "active":
@@ -128,25 +143,42 @@ func (s *Store) CreateAPIKey(ctx context.Context, name, serverName, serverURL st
 	return s.GetAPIKey(ctx, id)
 }
 
+// apiKeyLastUsedResolution avoids a database write on every API request.
+const apiKeyLastUsedResolution = time.Minute
+
 func (s *Store) UpdateAPIKeyLastUsed(ctx context.Context, id int64) error {
-	debug.RecordQuery(ctx, `UPDATE api_keys SET last_used=? WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET last_used=? WHERE id=?`, time.Now(), id)
+	now := time.Now()
+	debug.RecordQuery(ctx, `UPDATE api_keys SET last_used=? WHERE id=? AND (last_used IS NULL OR last_used < ?)`)
+	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET last_used=? WHERE id=? AND (last_used IS NULL OR last_used < ?)`,
+		now, id, now.Add(-apiKeyLastUsedResolution))
 	return err
 }
 
-func (s *Store) BindAPIKeyMachineID(ctx context.Context, id int64, machineID string) error {
-	debug.RecordQuery(ctx, `UPDATE api_keys SET machine_id=? WHERE id=?`)
-	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET machine_id=? WHERE id=?`, machineID, id)
-	return err
+// BindAPIKeyMachineID binds an unbound key. It reports false when another
+// request bound the key first, so callers must re-read the stored value.
+func (s *Store) BindAPIKeyMachineID(ctx context.Context, id int64, machineID string) (bool, error) {
+	debug.RecordQuery(ctx, `UPDATE api_keys SET machine_id=? WHERE id=? AND COALESCE(machine_id, '')=''`)
+	res, err := s.db.ExecContext(ctx, `UPDATE api_keys SET machine_id=? WHERE id=? AND COALESCE(machine_id, '')=''`, machineID, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
 
-func (s *Store) BindAPIKeyServerName(ctx context.Context, id int64, serverName string) error {
-	debug.RecordQuery(ctx, `UPDATE api_keys SET server_name=? WHERE id=?`)
-	_, err := s.db.ExecContext(ctx,
-		`UPDATE api_keys SET server_name=? WHERE id=?`,
+// BindAPIKeyServerName binds an unbound key. It reports false when another
+// request bound the key first, so callers must re-read the stored value.
+func (s *Store) BindAPIKeyServerName(ctx context.Context, id int64, serverName string) (bool, error) {
+	debug.RecordQuery(ctx, `UPDATE api_keys SET server_name=? WHERE id=? AND TRIM(COALESCE(server_name, ''))=''`)
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE api_keys SET server_name=? WHERE id=? AND TRIM(COALESCE(server_name, ''))=''`,
 		serverName, id,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
 }
 
 func (s *Store) UnbindAPIKeyServer(ctx context.Context, id int64) error {

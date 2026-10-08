@@ -23,8 +23,9 @@ El workflow `CI` se ejecuta en cada push y pull request:
 
 1. usa Go 1.26.6;
 2. lee la única versión desde `internal/version/version.go`;
-3. ejecuta `go build ./...`, `go vet ./...` y la suite con perfil de cobertura;
-4. exige al menos un 35 % de cobertura global.
+3. ejecuta `go build ./...` y `go vet ./...`, y compila y revisa con `go vet` el cliente Windows con `GOOS=windows`;
+4. ejecuta `govulncheck` sobre todo el módulo y sobre el cliente Windows;
+5. ejecuta la suite con perfil de cobertura y exige al menos un 35 % de cobertura global.
 
 Después de un push correcto a `master`, CI llama al workflow `Release` con:
 

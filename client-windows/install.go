@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"time"
+
+	"probakgo/internal/schedule"
 )
 
 const (
@@ -51,7 +53,7 @@ func installWindowsClient(cfg Config) error {
 	fmt.Println(".env written:", filepath.Join(dir, ".env"))
 	fmt.Println("Log:", logPath())
 	fmt.Println("Scheduled task installed: Probakgo Windows Report (every 5 min)")
-	fmt.Println("Scheduled task installed: Probakgo Windows Update (daily at 04:17)")
+	fmt.Printf("Scheduled task installed: Probakgo Windows Update (daily at %s)\n", updateTaskTime())
 	fmt.Println("Test:", exePath)
 	return nil
 }
@@ -80,7 +82,7 @@ func createUpdateScheduledTask(exePath string) error {
 		"/TN", updateTaskName,
 		"/TR", taskCmd,
 		"/SC", "DAILY",
-		"/ST", "04:17",
+		"/ST", updateTaskTime(),
 		"/RU", "SYSTEM",
 		"/RL", "HIGHEST",
 		"/F",
@@ -191,4 +193,10 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// updateTaskTime spreads update checks across the 04:00 hour per host, so the
+// clients of one site do not exhaust GitHub's anonymous rate limit together.
+func updateTaskTime() string {
+	return fmt.Sprintf("04:%02d", schedule.DailyMinute(schedule.HostSeed()+":probakgo-windows-update"))
 }

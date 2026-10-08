@@ -2,8 +2,10 @@ package webhandlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -71,10 +73,21 @@ func (h *WebH) downloadReleaseAsset(w http.ResponseWriter, r *http.Request, asse
 		return
 	}
 
+	extendDownloadDeadline(w)
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Content-Disposition", attachmentDisposition(filename))
 	if _, err := copyWithLimit(w, resp.Body, maxReleaseAssetBytes); err != nil {
 		return
+	}
+}
+
+// downloadWriteTimeout replaces the server-wide WriteTimeout for large files,
+// which would otherwise cut downloads over slow VPN links after 60 seconds.
+const downloadWriteTimeout = 30 * time.Minute
+
+func extendDownloadDeadline(w http.ResponseWriter) {
+	if err := http.NewResponseController(w).SetWriteDeadline(time.Now().Add(downloadWriteTimeout)); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		slog.Warn("extend download write deadline", "err", err)
 	}
 }
 

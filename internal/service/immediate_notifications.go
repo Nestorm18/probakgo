@@ -63,15 +63,16 @@ func sendImmediateCriticalAlerts(parent context.Context, st *store.Store, rep *R
 		return fmt.Errorf("load alert config: %w", err)
 	}
 	alertCfg.Report = rep
-	rawAlerts, err := RunAll(st, alertCfg)
-	if err != nil {
-		return fmt.Errorf("run alerts: %w", err)
+	rawAlerts, runErr := RunAll(st, alertCfg)
+	if runErr != nil && !IsPartialAlertsError(runErr) {
+		return fmt.Errorf("run alerts: %w", runErr)
 	}
-	if err := st.SyncAlertStates(ctx, rawAlerts); err != nil {
-		return fmt.Errorf("sync alert states: %w", err)
+	// A failed evaluator must not silence the alerts the others detected.
+	if err := SyncAlertStatesFor(ctx, st, rawAlerts, runErr); err != nil {
+		return errors.Join(runErr, fmt.Errorf("sync alert states: %w", err))
 	}
 	if !emailEnabled && push == nil && telegram == nil {
-		return nil
+		return runErr
 	}
 	alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
 	suppressed, _ := st.GetActiveSuppressions(ctx)
@@ -97,14 +98,14 @@ func sendImmediateCriticalAlerts(parent context.Context, st *store.Store, rep *R
 	}
 	telegramErr := dispatchTelegram(ctx, st, telegram, alerts, suppressed, now)
 	if emailConfigErr != nil {
-		return errors.Join(telegramErr, emailConfigErr)
+		return errors.Join(runErr, telegramErr, emailConfigErr)
 	}
 	if emailEnabled {
 		if err := dispatchImmediateEmail(ctx, st, cfg, recipients, alerts, suppressed, now); err != nil {
-			return errors.Join(telegramErr, err)
+			return errors.Join(runErr, telegramErr, err)
 		}
 	}
-	return telegramErr
+	return errors.Join(runErr, telegramErr)
 }
 
 func dispatchTelegram(ctx context.Context, st *store.Store, sender *TelegramSender, alerts []domain.Alert, suppressed map[string]time.Time, now time.Time) error {
@@ -163,12 +164,18 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	if err != nil {
 		return fmt.Errorf("check email batch: %w", err)
 	}
-	if !due {
+	if !due || immediateEmailBackoff.active(now) {
+		// Undelivered alerts stay pending and are retried after the backoff.
 		return nil
+	}
+	deliver := func(subject, html string) error {
+		err := sendSMTP(ctx, cfg, recipients, subject, html)
+		immediateEmailBackoff.record(err, time.Now())
+		return err
 	}
 	if cfg.AlertEmailBatchMinutes > 0 {
 		subject := fmt.Sprintf("Probakgo incidencias: %d activa(s), %d resuelta(s)", len(selected), len(resolved))
-		if err := sendSMTP(ctx, cfg, recipients, subject, renderAlertDigestEmail(selected, resolved, now)); err != nil {
+		if err := deliver(subject, renderAlertDigestEmail(selected, resolved, now)); err != nil {
 			return err
 		}
 		if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
@@ -180,7 +187,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 	} else {
 		if len(selected) > 0 {
 			subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
-			if err := sendSMTP(ctx, cfg, recipients, subject, renderImmediateCriticalEmail(selected, now)); err != nil {
+			if err := deliver(subject, renderImmediateCriticalEmail(selected, now)); err != nil {
 				return err
 			}
 			if err := st.MarkAlertCriticalEmailsSent(ctx, alertIDs(selected), now); err != nil {
@@ -189,7 +196,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 		}
 		if len(resolved) > 0 {
 			subject := fmt.Sprintf("Probakgo alerta resuelta: %d alerta(s)", len(resolved))
-			if err := sendSMTP(ctx, cfg, recipients, subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
+			if err := deliver(subject, renderResolvedCriticalEmail(resolved, now)); err != nil {
 				return err
 			}
 			if err := st.MarkAlertResolutionEmailsSent(ctx, alertIDs(resolved), now); err != nil {
@@ -198,6 +205,41 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 		}
 	}
 	return st.ClearAlertEmailBatch(ctx)
+}
+
+// smtpBackoff spaces out immediate-email retries after an SMTP failure. The
+// evaluator runs every minute and after every report, so without it a wrong
+// SMTP password is retried constantly and can get the account locked.
+type smtpBackoff struct {
+	mu    sync.Mutex
+	until time.Time
+	delay time.Duration
+}
+
+const (
+	smtpBackoffMin = time.Minute
+	smtpBackoffMax = 30 * time.Minute
+)
+
+var immediateEmailBackoff smtpBackoff
+
+func (b *smtpBackoff) active(now time.Time) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return now.Before(b.until)
+}
+
+// record doubles the wait after each consecutive failure, up to
+// smtpBackoffMax, and clears it after a successful delivery.
+func (b *smtpBackoff) record(err error, now time.Time) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if err == nil {
+		b.until, b.delay = time.Time{}, 0
+		return
+	}
+	b.delay = min(max(b.delay*2, smtpBackoffMin), smtpBackoffMax)
+	b.until = now.Add(b.delay)
 }
 
 func dispatchPush(parent context.Context, st *store.Store, sender *PushSender, alerts []domain.Alert, linkURL string, resolved bool) {

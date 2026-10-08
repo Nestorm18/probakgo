@@ -653,12 +653,12 @@ func (s *Store) DeleteOldPBSReports(ctx context.Context, cutoff time.Time) (int6
 			SELECT id FROM pbs_reports WHERE reported_at < ?)`,
 	}
 	for _, q := range steps {
-		if _, err := tx.ExecContext(ctx, q, cutoff); err != nil {
+		if _, err := tx.ExecContext(ctx, q, sqliteUTC(cutoff)); err != nil {
 			return 0, err
 		}
 	}
 
-	res, err := tx.ExecContext(ctx, `DELETE FROM pbs_reports WHERE reported_at < ?`, cutoff)
+	res, err := tx.ExecContext(ctx, `DELETE FROM pbs_reports WHERE reported_at < ?`, sqliteUTC(cutoff))
 	if err != nil {
 		return 0, err
 	}

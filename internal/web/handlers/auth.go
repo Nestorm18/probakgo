@@ -3,6 +3,8 @@ package webhandlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -16,16 +18,19 @@ import (
 )
 
 type WebH struct {
-	store     *store.Store
-	tmpl      *Templates
-	report    *service.ReportService
-	ban       *ratelimit.Banhammer
-	telegram  adminSecurityNotifier
-	startTime time.Time
+	store        *store.Store
+	tmpl         *Templates
+	report       *service.ReportService
+	ban          *ratelimit.Banhammer
+	telegram     adminSecurityNotifier
+	loginNotices loginNoticeThrottle
+	// passwordFailures limits current-password checks by signed-in users.
+	passwordFailures *ratelimit.Limiter
+	startTime        time.Time
 }
 
 func New(st *store.Store, tmpl *Templates, rep *service.ReportService) *WebH {
-	h := &WebH{store: st, tmpl: tmpl, report: rep, startTime: time.Now()}
+	h := &WebH{store: st, tmpl: tmpl, report: rep, passwordFailures: ratelimit.New(5, 15*time.Minute), startTime: time.Now()}
 	if sender := service.GetTelegramSender(); sender != nil {
 		h.telegram = sender
 	}
@@ -50,7 +55,7 @@ func (h *WebH) LoginPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	flash := r.URL.Query().Get("flash")
-	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": flash})
+	h.tmpl.Render(w, r, "login.html", map[string]any{"Error": flash, "Next": loginNext(r)})
 }
 
 func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
@@ -60,8 +65,8 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	if h.ban != nil {
 		if banned, _ := h.ban.IsBanned(ip); banned {
+			// The ban itself was already notified; repeated attempts are only logged.
 			h.recordLoginAttempt(r, username, ip, userAgent, "blocked", "ip_banned")
-			h.notifyAdminLoginFailed(username, ip, "IP bloqueada")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -71,25 +76,19 @@ func (h *WebH) LoginPost(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.store.GetUserByUsername(r.Context(), username)
 	if err != nil || !user.IsActive {
-		h.recordLoginAttempt(r, username, ip, userAgent, "failed", "invalid_credentials")
-		h.notifyAdminLoginFailed(username, ip, "Credenciales no válidas")
-		if h.ban != nil {
-			h.ban.RecordFailure(ip)
-		}
-		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos"})
+		// Spend the same bcrypt work so response time does not reveal accounts.
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash(), []byte(password))
+		h.loginFailed(r, username, ip, userAgent, "invalid_credentials", "Credenciales no válidas")
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos", "Next": loginNext(r)})
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
-		h.recordLoginAttempt(r, username, ip, userAgent, "failed", "invalid_credentials")
-		h.notifyAdminLoginFailed(username, ip, "Credenciales no válidas")
-		if h.ban != nil {
-			h.ban.RecordFailure(ip)
-		}
-		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos"})
+		h.loginFailed(r, username, ip, userAgent, "invalid_credentials", "Credenciales no válidas")
+		h.tmpl.Render(w, r, "login.html", map[string]any{"Error": "Usuario o contraseña incorrectos", "Next": loginNext(r)})
 		return
 	}
 
-	next := safeNext(r.URL.Query().Get("next"))
+	next := safeNext(r.FormValue("next"))
 	if redirect, ok := h.handleTOTPEnforcement(w, r, user); ok {
 		if redirect == "" {
 			return
@@ -158,7 +157,6 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	if h.ban != nil {
 		if banned, _ := h.ban.IsBanned(ip); banned {
 			h.recordLoginAttempt(r, user.Username, ip, userAgent, "blocked", "ip_banned")
-			h.notifyAdminLoginFailed(user.Username, ip, "IP bloqueada durante 2FA")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -168,15 +166,21 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Demasiados intentos 2FA. Inicia sesion de nuevo.", http.StatusTooManyRequests)
 		return
 	}
-	if !totp.Validate(r.FormValue("code"), user.TOTPSecret, time.Now()) {
-		h.recordLoginAttempt(r, user.Username, ip, userAgent, "failed", "invalid_totp")
-		h.notifyAdminLoginFailed(user.Username, ip, "Código 2FA incorrecto")
-		if h.ban != nil {
-			h.ban.RecordFailure(ip)
+	step, valid := totp.ValidateStep(r.FormValue("code"), user.TOTPSecret, time.Now())
+	if valid {
+		// A code works once: an observed or replayed code is rejected.
+		claimed, err := h.store.ClaimUserTOTPStep(r.Context(), user.ID, step)
+		if err != nil {
+			http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+			return
 		}
+		valid = claimed
+	}
+	if !valid {
+		h.loginFailed(r, user.Username, ip, userAgent, "invalid_totp", "Código 2FA incorrecto")
 		h.tmpl.Render(w, r, "login_2fa.html", map[string]any{
 			"Username": user.Username,
-			"Error":    "Codigo 2FA incorrecto",
+			"Error":    "Codigo 2FA incorrecto o ya utilizado",
 		})
 		return
 	}
@@ -196,6 +200,25 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	h.notifyAdminLoginSuccess(user.Username, ip)
 	http.Redirect(w, r, safeNext(next), http.StatusSeeOther)
 }
+
+// loginFailed records a failed attempt, escalates the IP ban and notifies
+// administrators within the failed-login notification throttle.
+func (h *WebH) loginFailed(r *http.Request, username, ip, userAgent, reason, notice string) {
+	h.recordLoginAttempt(r, username, ip, userAgent, "failed", reason)
+	banned := h.ban != nil && h.ban.RecordFailure(ip)
+	if banned {
+		notice += "; IP bloqueada"
+	}
+	h.notifyAdminLoginFailed(username, ip, notice, banned)
+}
+
+var dummyPasswordHash = sync.OnceValue(func() []byte {
+	hash, err := bcrypt.GenerateFromPassword([]byte("probakgo-timing-equalizer"), bcrypt.DefaultCost)
+	if err != nil {
+		return nil
+	}
+	return hash
+})
 
 func (h *WebH) Logout(w http.ResponseWriter, r *http.Request) {
 	session.Clear(w, r)
@@ -229,10 +252,23 @@ func formatRemaining(d time.Duration) string {
 }
 
 func safeNext(next string) string {
-	if len(next) == 0 || next[0] != '/' || (len(next) > 1 && next[1] == '/') || next == "/login" || next == "/login/2fa" {
+	next = SafeLocalPath(next)
+	if next == "" {
+		return "/"
+	}
+	if u, err := url.Parse(next); err != nil || u.Path == "/login" || u.Path == "/login/2fa" || u.Path == "/logout" {
 		return "/"
 	}
 	return next
+}
+
+// loginNext is the validated return path posted by the login form, or "" for
+// the dashboard.
+func loginNext(r *http.Request) string {
+	if next := safeNext(r.FormValue("next")); next != "/" {
+		return next
+	}
+	return ""
 }
 
 func (h *WebH) handleTOTPEnforcement(w http.ResponseWriter, r *http.Request, user *domain.User) (string, bool) {
@@ -259,9 +295,18 @@ func (h *WebH) handleTOTPEnforcement(w http.ResponseWriter, r *http.Request, use
 		startedAt = &now
 	}
 	if now.Sub(*startedAt) >= 72*time.Hour {
+		// Never lock out the last active administrator: keep asking for 2FA.
+		lastAdmin, err := h.store.IsLastActiveAdmin(r.Context(), user.ID)
+		if err != nil {
+			http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+			return "", true
+		}
+		if lastAdmin {
+			return "/profile?flash=Plazo+de+2FA+vencido.+Eres+el+unico+administrador+activo:+activa+2FA+ahora.", true
+		}
 		_ = h.store.SetUserActive(r.Context(), user.ID, false)
 		h.recordLoginAttempt(r, user.Username, ratelimit.ExtractIP(r), r.UserAgent(), "blocked", "totp_grace_expired")
-		h.notifyAdminLoginFailed(user.Username, ratelimit.ExtractIP(r), "Usuario desactivado por no configurar 2FA")
+		h.notifyAdminLoginFailed(user.Username, ratelimit.ExtractIP(r), "Usuario desactivado por no configurar 2FA", false)
 		h.tmpl.Render(w, r, "login.html", map[string]any{
 			"Error": "Usuario desactivado: 2FA no se activo dentro del plazo de 3 dias.",
 		})

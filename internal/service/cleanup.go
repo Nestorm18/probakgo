@@ -49,10 +49,19 @@ func runCleanup(parent context.Context, st *store.Store) {
 	if err != nil {
 		slog.Error("cleanup: delete Windows reports", "err", err)
 	}
+	logins, err := st.DeleteOldLoginAttempts(ctx, cutoff)
+	if err != nil {
+		slog.Error("cleanup: delete login attempts", "err", err)
+	}
+	alertEvents, alertStates, err := st.DeleteOldAlertHistory(ctx, cutoff)
+	if err != nil {
+		slog.Error("cleanup: delete alert history", "err", err)
+	}
 
-	if pve+pbs+windows > 0 {
+	if pve+pbs+windows+logins+alertEvents+alertStates > 0 {
 		slog.Info("cleanup: old reports deleted",
-			"pve_reports", pve, "pbs_reports", pbs, "windows_reports", windows,
+			"pve_reports", pve, "pbs_reports", pbs, "windows_reports", windows, "login_attempts", logins,
+			"alert_events", alertEvents, "resolved_alert_states", alertStates,
 			"cutoff", cutoff.Format("2006-01-02"),
 			"retention_months", cfg.RetentionMonths)
 	}

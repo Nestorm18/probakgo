@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"probakgo/internal/debug"
@@ -68,6 +69,7 @@ type Templates struct {
 	secure        bool
 	badgeCounts   func() (int, int)
 	settingsFlags func() (sensitiveTOTP, vpnOnlyAccess bool)
+	parsed        sync.Map // template name -> *template.Template
 }
 
 func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, badgeCounts func() (int, int), settingsFlags func() (bool, bool)) *Templates {
@@ -268,39 +270,41 @@ func (t *Templates) Render(w http.ResponseWriter, r *http.Request, name string, 
 		debug.RecordTemplateData(r.Context(), safeTemplateDebugData(m))
 	}
 
-	var tmpl *template.Template
-	var err error
-
-	if standaloneTemplates[name] {
-		tmpl, err = template.New("").Funcs(t.funcMap).
-			ParseFS(t.fs, "web/templates/"+name)
-		if err != nil {
-			renderTemplateError(w, r, name, "parse", err)
-			return
-		}
-		var buf bytes.Buffer
-		if err := tmpl.ExecuteTemplate(&buf, name, data); err != nil {
-			renderTemplateError(w, r, name, "exec", err)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(buf.Bytes())
-		return
-	}
-
-	tmpl, err = template.New("").Funcs(t.funcMap).
-		ParseFS(t.fs, "web/templates/base.html", "web/templates/"+name)
+	tmpl, err := t.parse(name)
 	if err != nil {
 		renderTemplateError(w, r, name, "parse", err)
 		return
 	}
+	entry := "base"
+	if standaloneTemplates[name] {
+		entry = name
+	}
 	var buf bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&buf, "base", data); err != nil {
+	if err := tmpl.ExecuteTemplate(&buf, entry, data); err != nil {
 		renderTemplateError(w, r, name, "exec", err)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(buf.Bytes())
+}
+
+// parse returns the template set for a page, parsing it only once: the
+// template files cannot change while the process runs, and parsed templates
+// are safe to execute concurrently.
+func (t *Templates) parse(name string) (*template.Template, error) {
+	if cached, ok := t.parsed.Load(name); ok {
+		return cached.(*template.Template), nil
+	}
+	files := []string{"web/templates/base.html", "web/templates/" + name}
+	if standaloneTemplates[name] {
+		files = files[1:]
+	}
+	tmpl, err := template.New("").Funcs(t.funcMap).ParseFS(t.fs, files...)
+	if err != nil {
+		return nil, err
+	}
+	actual, _ := t.parsed.LoadOrStore(name, tmpl)
+	return actual.(*template.Template), nil
 }
 
 func safeTemplateDebugData(data any) string {
