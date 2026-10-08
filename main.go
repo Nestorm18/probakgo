@@ -205,7 +205,7 @@ func main() {
 	}
 
 	apiSrv := api.NewServer(st, authSvc, reportSvc, cfg.TrustedProxies)
-	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, cfg.TrustedProxies, appversion.Version, cfg.Dev, loc)
+	webRouter, err := web.NewRouter(st, reportSvc, webFS, staticSub, cfg.SessionKey, cfg.SecureSession, cfg.TrustedOrigins, cfg.TrustedProxies, cfg.LoginTrustedCIDRs, appversion.Version, cfg.Dev, loc)
 	if err != nil {
 		slog.Error("build web router", "err", err)
 		os.Exit(1)

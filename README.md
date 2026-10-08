@@ -175,6 +175,7 @@ Get-Content C:\ProgramData\Probakgo\probakgo-windows-client.log -Tail 80
 | `TIMEZONE` | `Europe/Madrid` | Zona horaria del scheduler de email |
 | `SESSION_SECURE` | `false` | Debe ser `true` cuando el panel se sirve por HTTPS |
 | `TRUSTED_PROXY_CIDRS` | vacío | CIDR de proxies autorizados para `X-Forwarded-*` |
+| `LOGIN_TRUSTED_CIDRS` | vacío | Redes CIDR, separadas por comas, cuyos accesos fallidos nunca provocan un baneo; los proxies de `TRUSTED_PROXY_CIDRS` nunca quedan exentos |
 | `CSRF_TRUSTED_ORIGINS` | vacío | Orígenes completos adicionales, separados por comas |
 | `DEV` | `false` | Activa la barra de depuración |
 | `GITHUB_TOKEN` | vacío | Necesario para releases privadas |

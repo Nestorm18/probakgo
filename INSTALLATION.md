@@ -227,6 +227,12 @@ Recuperación con acceso al servidor:
 systemctl restart probakgo
 ```
 
+El baneo escala a 24 horas, 7 días y después permanente. Si varios administradores comparten una IP pública (oficina o VPN), declara esa red en `.env` para que nunca se banee; sus intentos fallidos se siguen registrando y limitando a 10 por minuto. Las IPs de `TRUSTED_PROXY_CIDRS` nunca quedan exentas, aunque estén dentro de esas redes: si el proxy dejara de enviar `X-Forwarded-For`, todo internet aparecería con su IP. Tras cambiarla, reinicia el servicio:
+
+```env
+LOGIN_TRUSTED_CIDRS=192.0.2.0/24,100.64.0.0/10
+```
+
 Los avisos de Telegram por accesos fallidos se limitan a uno cada 10 minutos por IP y a 10 por hora; el bloqueo de una IP se notifica una sola vez.
 
 ### API keys

@@ -43,6 +43,8 @@ type Banhammer struct {
 	maxFails int
 	window   time.Duration
 	banDurs  []time.Duration
+	trusted  []netip.Prefix // never banned; set once before serving
+	proxies  []netip.Prefix // reverse proxies; never exempt even when inside trusted
 }
 
 // NewBanhammer creates the banhammer. Call Load() right after to restore bans from DB.
@@ -59,6 +61,37 @@ func NewBanhammer(maxFails int, window time.Duration, store BanStore, banDurs ..
 	}
 	go b.cleanup()
 	return b
+}
+
+// SetTrustedNetworks exempts trusted networks from bans, for example an office
+// or VPN shared by several administrators. Reverse proxies stay bannable even
+// inside a trusted network: without forwarded headers every client would look
+// like the proxy. Call it before serving requests.
+func (b *Banhammer) SetTrustedNetworks(trusted, proxies []netip.Prefix) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.trusted = trusted
+	b.proxies = proxies
+}
+
+// isTrusted must be called with b.mu held.
+func (b *Banhammer) isTrusted(ip string) bool {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return false
+	}
+	addr = addr.Unmap()
+	for _, prefix := range b.proxies {
+		if prefix.Contains(addr) {
+			return false
+		}
+	}
+	for _, prefix := range b.trusted {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
 
 // Load reads all bans from the DB into memory. Call once at startup.
@@ -153,9 +186,12 @@ func (b *Banhammer) cleanupAt(now time.Time) {
 // IsBanned reports whether ip is currently banned.
 // remaining == -1 signals a permanent ban.
 func (b *Banhammer) IsBanned(ip string) (banned bool, remaining time.Duration) {
-	ip = BanKey(ip)
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.isTrusted(ip) {
+		return false, 0
+	}
+	ip = BanKey(ip)
 	s, ok := b.states[ip]
 	if !ok || s.banExpiry.IsZero() {
 		return false, 0
@@ -175,9 +211,13 @@ func (b *Banhammer) IsBanned(ip string) (banned bool, remaining time.Duration) {
 // RecordFailure registers a failed login for ip.
 // Returns true if the IP just got banned.
 func (b *Banhammer) RecordFailure(ip string) bool {
-	ip = BanKey(ip)
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.isTrusted(ip) {
+		slog.Info("failed login from trusted network; not counted for bans", "ip", ip)
+		return false
+	}
+	ip = BanKey(ip)
 	now := time.Now()
 	s := b.getOrCreate(ip)
 

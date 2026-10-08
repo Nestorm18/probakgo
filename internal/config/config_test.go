@@ -32,3 +32,19 @@ func TestValidateRejectsShortDataEncryptionKey(t *testing.T) {
 		t.Fatal("Validate accepted a short DATA_ENCRYPTION_KEY")
 	}
 }
+
+func TestValidateChecksLoginTrustedCIDRs(t *testing.T) {
+	cfg := &Config{
+		APIPort:           "36748",
+		Timezone:          "Europe/Madrid",
+		SessionKey:        "test-session-key-32-bytes-long!!",
+		LoginTrustedCIDRs: []string{"192.0.2.0/24", "2001:db8::/48"},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	cfg.LoginTrustedCIDRs = []string{"192.0.2.10"}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted an address without a prefix length")
+	}
+}

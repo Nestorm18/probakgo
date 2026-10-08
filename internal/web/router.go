@@ -4,9 +4,11 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"path"
 	"strings"
 	"time"
@@ -27,7 +29,7 @@ const maxWebRequestBodyBytes int64 = 1 << 20
 // NewRouter builds the web UI router.
 // templateFS is the full embedded FS (paths like web/templates/base.html).
 // staticFS is a sub-FS rooted at web/static (served under /static/).
-func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins, trustedProxies []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
+func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS, staticFS fs.FS, sessionKey string, secure bool, trustedOrigins, trustedProxies, loginTrustedCIDRs []string, version string, dev bool, loc *time.Location) (http.Handler, error) {
 	tmpl := webhandlers.NewTemplates(templateFS, version, loc, secure, func() (int, int) {
 		return service.ActiveAlertCounts(context.Background(), st, rep)
 	}, func() (bool, bool) {
@@ -45,6 +47,15 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		7*24*time.Hour,
 		0, // permanent
 	)
+	trustedNetworks, err := parsePrefixes(loginTrustedCIDRs)
+	if err != nil {
+		return nil, fmt.Errorf("invalid login trusted network: %w", err)
+	}
+	proxyNetworks, err := parsePrefixes(trustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("invalid trusted proxy network: %w", err)
+	}
+	ban.SetTrustedNetworks(trustedNetworks, proxyNetworks)
 	if err := ban.Load(); err != nil {
 		slog.Warn("failed to load ip bans from db", "err", err)
 	}
@@ -203,6 +214,18 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 		return nil, err
 	}
 	return protection.Handler(r), nil
+}
+
+func parsePrefixes(raw []string) ([]netip.Prefix, error) {
+	prefixes := make([]netip.Prefix, 0, len(raw))
+	for _, value := range raw {
+		prefix, err := netip.ParsePrefix(strings.TrimSpace(value))
+		if err != nil {
+			return nil, err
+		}
+		prefixes = append(prefixes, prefix.Masked())
+	}
+	return prefixes, nil
 }
 
 func limitWebRequestBody(maxBytes int64) func(http.Handler) http.Handler {

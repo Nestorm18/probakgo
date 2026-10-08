@@ -38,7 +38,7 @@ func backupEnvFrom(paths []string) ([]byte, error) {
 			}
 		}
 	}
-	for _, key := range []string{"DATABASE_PATH", "API_HOST", "API_PORT", "SESSION_KEY", "DATA_ENCRYPTION_KEY", "TIMEZONE", "SESSION_SECURE", "CSRF_TRUSTED_ORIGINS", "TRUSTED_PROXY_CIDRS", "DEV", "GITHUB_TOKEN"} {
+	for _, key := range []string{"DATABASE_PATH", "API_HOST", "API_PORT", "SESSION_KEY", "DATA_ENCRYPTION_KEY", "TIMEZONE", "SESSION_SECURE", "CSRF_TRUSTED_ORIGINS", "TRUSTED_PROXY_CIDRS", "LOGIN_TRUSTED_CIDRS", "DEV", "GITHUB_TOKEN"} {
 		if value, exists := os.LookupEnv(key); exists {
 			values[key] = value
 		}

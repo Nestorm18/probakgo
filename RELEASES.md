@@ -2,6 +2,10 @@
 
 Proceso actual para publicar servidor, cliente Proxmox y cliente Windows.
 
+## Cambios en 0.0.264
+
+- Nueva variable `LOGIN_TRUSTED_CIDRS`: redes de confianza (oficina, VPN) cuyos accesos fallidos nunca banean la IP. Se siguen registrando y limitando a 10 por minuto. Las IPs de `TRUSTED_PROXY_CIDRS` nunca quedan exentas, aunque estén dentro de esas redes. El baneo permanente automático se mantiene para el resto.
+
 ## Cambios en 0.0.263
 
 - Al detenerse, el servidor espera a las tareas en segundo plano (alertas, avisos de Telegram, copias al NAS) antes de cerrar SQLite. Una copia manual al NAS en curso se cancela y queda registrada como fallida.

@@ -22,23 +22,26 @@ type Config struct {
 	SecureSession  bool
 	TrustedOrigins []string
 	TrustedProxies []string
-	Dev            bool
+	// LoginTrustedCIDRs are networks whose failed logins never cause a ban.
+	LoginTrustedCIDRs []string
+	Dev               bool
 }
 
 const exampleSessionKey = "change-me-in-production-32bytes!"
 
 func Load() *Config {
 	return &Config{
-		DBPath:         getEnv("DATABASE_PATH", "probakgo_data.db"),
-		APIHost:        getEnv("API_HOST", "0.0.0.0"),
-		APIPort:        getEnv("API_PORT", "36748"),
-		SessionKey:     loadSessionKey(),
-		DataKey:        os.Getenv("DATA_ENCRYPTION_KEY"),
-		Timezone:       getEnv("TIMEZONE", "Europe/Madrid"),
-		SecureSession:  getEnv("SESSION_SECURE", "false") == "true",
-		TrustedOrigins: parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
-		TrustedProxies: parseTrustedOrigins(os.Getenv("TRUSTED_PROXY_CIDRS")),
-		Dev:            os.Getenv("DEV") == "true",
+		DBPath:            getEnv("DATABASE_PATH", "probakgo_data.db"),
+		APIHost:           getEnv("API_HOST", "0.0.0.0"),
+		APIPort:           getEnv("API_PORT", "36748"),
+		SessionKey:        loadSessionKey(),
+		DataKey:           os.Getenv("DATA_ENCRYPTION_KEY"),
+		Timezone:          getEnv("TIMEZONE", "Europe/Madrid"),
+		SecureSession:     getEnv("SESSION_SECURE", "false") == "true",
+		TrustedOrigins:    parseTrustedOrigins(os.Getenv("CSRF_TRUSTED_ORIGINS")),
+		TrustedProxies:    parseTrustedOrigins(os.Getenv("TRUSTED_PROXY_CIDRS")),
+		LoginTrustedCIDRs: parseTrustedOrigins(os.Getenv("LOGIN_TRUSTED_CIDRS")),
+		Dev:               os.Getenv("DEV") == "true",
 	}
 }
 
@@ -89,6 +92,11 @@ func (c *Config) Validate() error {
 	for _, raw := range c.TrustedProxies {
 		if _, err := netip.ParsePrefix(raw); err != nil {
 			return fmt.Errorf("invalid TRUSTED_PROXY_CIDRS entry %q: %w", raw, err)
+		}
+	}
+	for _, raw := range c.LoginTrustedCIDRs {
+		if _, err := netip.ParsePrefix(raw); err != nil {
+			return fmt.Errorf("invalid LOGIN_TRUSTED_CIDRS entry %q: %w", raw, err)
 		}
 	}
 	return nil
