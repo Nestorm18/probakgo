@@ -44,8 +44,26 @@ func RequireLogin(st *store.Store) func(http.Handler) http.Handler {
 				http.Redirect(w, r, "/login?flash=Tu+sesion+ha+sido+invalidada", http.StatusSeeOther)
 				return
 			}
+			// Sessions from before session IDs existed cannot be revoked, so they
+			// require a new login.
+			sid, hasSID := session.ID(r)
+			if !hasSID {
+				session.Clear(w, r)
+				http.Redirect(w, r, "/login?flash=Tu+sesion+ha+sido+invalidada", http.StatusSeeOther)
+				return
+			}
+			revoked, err := st.IsSessionRevoked(r.Context(), sid)
+			if err != nil {
+				http.Error(w, "Session store unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			if revoked {
+				session.Clear(w, r)
+				http.Redirect(w, r, "/login?flash=Tu+sesion+ha+sido+invalidada", http.StatusSeeOther)
+				return
+			}
 			if user.Role != sessionRole {
-				if err := session.SetUserWithVersion(w, r, user.ID, username, user.Role, user.SessionVersion); err != nil {
+				if err := session.RefreshRole(w, r, user.Role, user.SessionVersion); err != nil {
 					http.Error(w, "Session error", http.StatusInternalServerError)
 					return
 				}

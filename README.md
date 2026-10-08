@@ -200,7 +200,7 @@ El cliente Windows solo guarda `API_URL` y `API_KEY` en `C:\ProgramData\Probakgo
 
 | Binario | Comandos |
 |---|---|
-| `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>`, `enable-user <usuario>`, `unban <ip>` |
+| `probakgo` | `version`, `update`, `doctor`, `initial-password`, `unlock2fa <usuario>`, `enable-user <usuario>`, `reset-password <usuario>`, `unban <ip>` |
 | `probakgo-client` | `install`, `uninstall`, `update`, `heartbeat`, `sync-backups`, `doctor`, `version` |
 | `probakgo-windows-client.exe` | reporte por defecto, `install`, `update`, `heartbeat`, `doctor`, `version` |
 

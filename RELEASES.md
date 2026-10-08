@@ -2,6 +2,12 @@
 
 Proceso actual para publicar servidor, cliente Proxmox y cliente Windows.
 
+## Cambios de seguridad en 0.0.262
+
+- Cerrar sesión es un `POST` y revoca la sesión en el servidor: una copia de la cookie deja de servir, mientras las demás sesiones del usuario siguen activas.
+- Cada inicio de sesión recibe un identificador propio. Las sesiones abiertas con versiones anteriores no lo tienen, así que tras actualizar habrá que iniciar sesión de nuevo.
+- Nuevo subcomando `probakgo reset-password <usuario>`: genera una contraseña aleatoria, la muestra una sola vez, cierra las sesiones del usuario y lo registra en auditoría.
+
 ## Cambios de seguridad en 0.0.243
 
 - Las cookies se cifran y se ligan al ID del usuario. Las sesiones anteriores se invalidan al reiniciar con esta versión: será necesario iniciar sesión de nuevo.

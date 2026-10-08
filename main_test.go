@@ -126,3 +126,37 @@ func TestEnsureDefaultsReplacesStaleInitialPasswordFile(t *testing.T) {
 		t.Fatalf("default admin not created: %v %v", hasUsers, err)
 	}
 }
+
+func TestResetPasswordInStoreReplacesHashClosesSessionsAndAudits(t *testing.T) {
+	database, err := dbpkg.Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+	st := store.New(database)
+	ctx := context.Background()
+	uid, err := st.CreateUser(ctx, "admin", "old-hash", "admin")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := st.GetUser(ctx, uid)
+
+	if err := resetPasswordInStore(ctx, st, "admin", "new-hash"); err != nil {
+		t.Fatalf("resetPasswordInStore: %v", err)
+	}
+	after, _ := st.GetUser(ctx, uid)
+	if after.PasswordHash != "new-hash" {
+		t.Fatalf("password hash not replaced: %q", after.PasswordHash)
+	}
+	if after.SessionVersion <= before.SessionVersion {
+		t.Fatal("existing sessions were not revoked")
+	}
+	logs, err := st.ListAuditLogs(ctx, 10)
+	if err != nil || len(logs) != 1 || logs[0].Action != "user.password_reset" || logs[0].TargetName != "admin" {
+		t.Fatalf("audit log: %+v %v", logs, err)
+	}
+
+	if err := resetPasswordInStore(ctx, st, "missing", "hash"); err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("unknown user: got %v", err)
+	}
+}

@@ -419,6 +419,8 @@ code {
   justify-content: center;
   white-space: nowrap;
 }
+/* The logout form must not become an extra grid cell. */
+.sidebar-logout-form { display: contents; }
 .sidebar-icon-action {
   width: 38px;
   padding: 0 !important;

@@ -67,9 +67,11 @@
         <a href="/profile" class="btn btn-sm btn-secondary sidebar-profile-action" title="Perfil">
           <i class="bi bi-person me-1"></i>Perfil
         </a>
-        <a href="/logout" class="btn btn-sm btn-secondary sidebar-icon-action" title="Salir" aria-label="Cerrar sesion">
-          <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
-        </a>
+        <form method="post" action="/logout" class="sidebar-logout-form">
+          <button type="submit" class="btn btn-sm btn-secondary sidebar-icon-action" title="Salir" aria-label="Cerrar sesion">
+            <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
+          </button>
+        </form>
         <button class="theme-toggle sidebar-theme-toggle" id="themeToggle" type="button" title="Cambiar tema" aria-label="Cambiar tema">
           <i class="bi" id="themeIcon" aria-hidden="true"></i>
         </button>

@@ -2,6 +2,7 @@ package webhandlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sync"
@@ -220,7 +221,16 @@ var dummyPasswordHash = sync.OnceValue(func() []byte {
 	return hash
 })
 
+// Logout revokes the session ID server-side, so a copied cookie stops working
+// too, and then clears the cookie.
 func (h *WebH) Logout(w http.ResponseWriter, r *http.Request) {
+	if sid, ok := session.ID(r); ok {
+		if err := h.store.RevokeSession(r.Context(), sid, time.Now().Add(session.Lifetime)); err != nil {
+			slog.Error("logout: revoke session", "err", err)
+			http.Error(w, "Session store unavailable", http.StatusServiceUnavailable)
+			return
+		}
+	}
 	session.Clear(w, r)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }

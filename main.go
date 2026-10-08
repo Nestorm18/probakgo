@@ -29,6 +29,7 @@ import (
 	"probakgo/internal/api"
 	"probakgo/internal/config"
 	dbpkg "probakgo/internal/db"
+	"probakgo/internal/domain"
 	"probakgo/internal/ratelimit"
 	"probakgo/internal/schedule"
 	"probakgo/internal/selfupdate"
@@ -96,6 +97,18 @@ func main() {
 				os.Exit(1)
 			}
 			fmt.Printf("User %q enabled; the 2FA grace period starts again.\n", os.Args[2])
+			return
+		case "reset-password":
+			if len(os.Args) < 3 {
+				fmt.Fprintln(os.Stderr, "usage: probakgo reset-password <usuario>")
+				os.Exit(2)
+			}
+			pass, err := resetPassword(os.Args[2])
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "reset-password:", err)
+				os.Exit(1)
+			}
+			fmt.Printf("New password for %q (its sessions were closed; change it after logging in):\n%s\n", os.Args[2], pass)
 			return
 		case "unban":
 			if len(os.Args) < 3 {
@@ -531,6 +544,48 @@ func enableUser(username string) error {
 			return fmt.Errorf("user %q not found", username)
 		}
 		return nil
+	})
+}
+
+// resetPassword sets a new random password for username and returns it. The
+// password change also bumps session_version, closing the user's sessions.
+func resetPassword(username string) (string, error) {
+	pass, err := randomPassword()
+	if err != nil {
+		return "", err
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	err = withCLIStore(func(st *store.Store) error {
+		return resetPasswordInStore(context.Background(), st, username, string(hash))
+	})
+	if err != nil {
+		return "", err
+	}
+	return pass, nil
+}
+
+func resetPasswordInStore(ctx context.Context, st *store.Store, username, hash string) error {
+	user, err := st.GetUserByUsername(ctx, username)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("user %q not found", username)
+	}
+	if err != nil {
+		return err
+	}
+	if err := st.UpdateUserPassword(ctx, user.ID, hash); err != nil {
+		return err
+	}
+	return st.InsertAuditLog(ctx, domain.AuditLog{
+		ActorUsername: "cli",
+		ActorRole:     "system",
+		Action:        "user.password_reset",
+		TargetType:    "user",
+		TargetID:      strconv.FormatInt(user.ID, 10),
+		TargetName:    user.Username,
+		Metadata:      `{"via":"cli"}`,
 	})
 }
 

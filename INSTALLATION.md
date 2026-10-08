@@ -211,7 +211,7 @@ Cada usuario puede activar TOTP desde **Perfil**. El administrador puede:
 
 Al vencer el plazo, el usuario sin 2FA se desactiva, salvo que sea el único administrador activo: en ese caso se le sigue pidiendo activar 2FA para no bloquear el acceso.
 
-Una confirmación sensible es válida durante 10 minutos. Los cambios de contraseña, rol, estado o 2FA invalidan las sesiones existentes.
+Una confirmación sensible es válida durante 10 minutos. Los cambios de contraseña, rol, estado o 2FA invalidan las sesiones existentes. Cerrar sesión invalida esa sesión en el servidor, de modo que una copia de la cookie deja de servir.
 
 Recuperación con acceso al servidor:
 
@@ -220,6 +220,8 @@ Recuperación con acceso al servidor:
 /opt/probakgo/probakgo unlock2fa <usuario>
 # Reactiva un usuario desactivado y reinicia su plazo de 2FA
 /opt/probakgo/probakgo enable-user <usuario>
+# Genera una contraseña aleatoria, la muestra una vez y cierra las sesiones del usuario
+/opt/probakgo/probakgo reset-password <usuario>
 # Retira el bloqueo de una IP tras demasiados intentos fallidos (en IPv6 se bloquea su /64)
 /opt/probakgo/probakgo unban <ip>
 systemctl restart probakgo

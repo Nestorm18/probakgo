@@ -76,7 +76,7 @@ Release assets must stay in sync with workflows and download handlers:
 - `/api/health` is a readiness check: it returns `503` when SQLite or the migrated schema cannot be read.
 - Web pages include dashboard, alerts, PVE, PBS, Windows, users, API keys, profile, about and the settings hub.
 - Auth uses bcrypt, sessions and RBAC: `reader`, `editor`, `admin`.
-- TOTP 2FA can be enforced for editors/admins and for sensitive actions. Each TOTP code is accepted only once (`users.totp_last_step`). User security changes revoke the other sessions and keep the one that made the change. The last active admin is never disabled by 2FA enforcement; `probakgo enable-user`, `unlock2fa` and `unban` are the CLI recovery paths.
+- TOTP 2FA can be enforced for editors/admins and for sensitive actions. Each TOTP code is accepted only once (`users.totp_last_step`). User security changes revoke the other sessions and keep the one that made the change. Logout is a `POST` that lists the session ID in `revoked_sessions`, so copied cookies stop working; sessions without an ID require a new login. The last active admin is never disabled by 2FA enforcement; `probakgo enable-user`, `reset-password`, `unlock2fa` and `unban` are the CLI recovery paths.
 - API keys are `pbk-` client keys, bind to the first reporting Machine ID and can be revealed only after credential checks.
 - API keys, SMTP passwords, Telegram bot tokens and TOTP secrets are encrypted at rest with `DATA_ENCRYPTION_KEY`; API-key authentication uses a keyed lookup hash.
 - Settings under `/settings/*` cover system/security, email, Telegram, retention/database backup, alerts, IP bans, audit log and operational reset.
@@ -116,7 +116,7 @@ Release assets must stay in sync with workflows and download handlers:
 ## Database
 
 - Migrations are embedded in `internal/db/migrations/` and run automatically.
-- Current latest migration: `052_user_totp_last_step.up.sql`.
+- Current latest migration: `053_revoked_sessions.up.sql`.
 - New clients attach a stable `report_id`; the server deduplicates it per server. PVE, PBS and Windows report trees must be stored atomically.
 - Nullable SQLite text fields must scan into `sql.NullString`, not `string`.
 - Tests should use the real migration path via `openTestDB(t)` / `openTestStore(t)`.

@@ -1,7 +1,9 @@
 package session
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"time"
 
@@ -9,6 +11,9 @@ import (
 )
 
 const sessionName = "probakgo"
+
+// Lifetime is how long a login session cookie stays valid.
+const Lifetime = 7 * 24 * time.Hour
 
 var store *sessions.CookieStore
 
@@ -19,12 +24,12 @@ func Init(key string, secure bool) {
 	store = sessions.NewCookieStore(authKey[:], encKey[:])
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   86400 * 7,
+		MaxAge:   int(Lifetime / time.Second),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   secure,
 	}
-	store.MaxAge(86400 * 7)
+	store.MaxAge(int(Lifetime / time.Second))
 	resetChallenges()
 }
 
@@ -49,14 +54,46 @@ func SetUser(w http.ResponseWriter, r *http.Request, userID int64, username, rol
 	return SetUserWithVersion(w, r, userID, username, role, 1)
 }
 
+// SetUserWithVersion starts a login session with a new random session ID, so
+// a logout can revoke this session without affecting the user's others.
 func SetUserWithVersion(w http.ResponseWriter, r *http.Request, userID int64, username, role string, version int) error {
+	var raw [32]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return err
+	}
 	sess, _ := getSession(r)
 	sess.Values = make(map[any]any)
+	sess.Values["sid"] = hex.EncodeToString(raw[:])
 	sess.Values["user_id"] = userID
 	sess.Values["username"] = username
 	sess.Values["role"] = role
 	sess.Values["session_version"] = version
 	return sess.Save(r, w)
+}
+
+// RefreshRole updates the role and version of the current session and keeps
+// its session ID.
+func RefreshRole(w http.ResponseWriter, r *http.Request, role string, version int) error {
+	sess, err := getSession(r)
+	if err != nil {
+		return err
+	}
+	sess.Values["role"] = role
+	sess.Values["session_version"] = version
+	return sess.Save(r, w)
+}
+
+// ID returns the session ID assigned at login.
+func ID(r *http.Request) (string, bool) {
+	if store == nil {
+		return "", false
+	}
+	sess, err := getSession(r)
+	if err != nil {
+		return "", false
+	}
+	sid, ok := sess.Values["sid"].(string)
+	return sid, ok && sid != ""
 }
 
 func UserID(r *http.Request) (int64, bool) {

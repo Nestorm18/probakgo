@@ -81,7 +81,8 @@ func NewRouter(st *store.Store, rep *service.ReportService, templateFS embed.FS,
 	r.With(loginLimiter.Middleware).Post("/login", h.LoginPost)
 	r.Get("/login/2fa", h.Login2FAPage)
 	r.With(loginLimiter.Middleware).Post("/login/2fa", h.Login2FAPost)
-	r.Get("/logout", h.Logout)
+	// POST only: a cross-site link or image must not end the session.
+	r.Post("/logout", h.Logout)
 
 	r.Group(func(r chi.Router) {
 		r.Use(RequireLogin(st))
