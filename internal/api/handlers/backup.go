@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -13,18 +12,28 @@ import (
 
 func (h *H) GetBackupConfig(w http.ResponseWriter, r *http.Request) {
 	server := strings.TrimSpace(chi.URLParam(r, "server"))
-	if !h.requireKeyServer(w, r, server) {
+	k, ok := apictx.APIKey(r.Context())
+	if !ok {
+		errJSON(w, http.StatusUnauthorized, "invalid or inactive API key")
 		return
 	}
-	serverID, err := h.pveServerIDForKey(r, server)
-	if err != nil {
-		internalErr(w, "resolve pve server", err)
+	if !keyMayReadServer(w, k, server) {
 		return
 	}
-	configs, err := h.store.ListVMBackupConfigsForServerOrName(r.Context(), "pve", serverID, server)
+	// A read must not bind the key or create a PVE server; until the first
+	// write or report there is simply no configuration.
+	serverID, found, err := h.store.FindPVEServerForAPIKey(r.Context(), k.ID, server, k.MachineID)
 	if err != nil {
-		internalErr(w, "list vm backup configs", err)
+		internalErr(w, "find pve server", err)
 		return
+	}
+	var configs []domain.VMBackupConfig
+	if found {
+		configs, err = h.store.ListVMBackupConfigsForServerOrName(r.Context(), "pve", serverID, server)
+		if err != nil {
+			internalErr(w, "list vm backup configs", err)
+			return
+		}
 	}
 	resp := make([]domain.VMBackupConfigResponse, 0, len(configs))
 	for _, c := range configs {
@@ -46,7 +55,7 @@ func (h *H) UpdateBackupInventory(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		HasVMs bool `json:"has_vms"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
@@ -68,12 +77,12 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req domain.CreateVMBackupConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if req.VMID == "" {
-		errJSON(w, http.StatusBadRequest, "vm_id is required")
+	if !validVMID(req.VMID) {
+		errJSON(w, http.StatusBadRequest, "vm_id must be a Proxmox VM ID")
 		return
 	}
 	id, err := h.store.CreateVMBackupConfigForServer(r.Context(), "pve", serverID, server, req)
@@ -88,6 +97,10 @@ func (h *H) CreateVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
+	if !validVMID(vmid) {
+		errJSON(w, http.StatusBadRequest, "vmid must be a Proxmox VM ID")
+		return
+	}
 	if !h.requireKeyServer(w, r, server) {
 		return
 	}
@@ -97,7 +110,7 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req domain.CreateVMBackupConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeJSONBody(r, &req); err != nil {
 		errJSON(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
@@ -112,6 +125,10 @@ func (h *H) UpdateVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
+	if !validVMID(vmid) {
+		errJSON(w, http.StatusBadRequest, "vmid must be a Proxmox VM ID")
+		return
+	}
 	if !h.requireKeyServer(w, r, server) {
 		return
 	}
@@ -130,6 +147,10 @@ func (h *H) DeleteVMConfig(w http.ResponseWriter, r *http.Request) {
 func (h *H) ToggleVMExclude(w http.ResponseWriter, r *http.Request) {
 	server := strings.TrimSpace(chi.URLParam(r, "server"))
 	vmid := chi.URLParam(r, "vmid")
+	if !validVMID(vmid) {
+		errJSON(w, http.StatusBadRequest, "vmid must be a Proxmox VM ID")
+		return
+	}
 	if !h.requireKeyServer(w, r, server) {
 		return
 	}

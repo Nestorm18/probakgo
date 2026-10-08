@@ -11,7 +11,7 @@ import (
 // StartAlertScheduler detects expired heartbeats even when no client sends a
 // report. It also retries failed deliveries after transient network failures.
 func StartAlertScheduler(ctx context.Context, st *store.Store, rep *ReportService) {
-	go runAlertScheduler(ctx, st, rep, time.Minute)
+	Go(func(context.Context) { runAlertScheduler(ctx, st, rep, time.Minute) })
 }
 
 func runAlertScheduler(ctx context.Context, st *store.Store, rep *ReportService, interval time.Duration) {

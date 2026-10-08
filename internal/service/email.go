@@ -830,7 +830,7 @@ func parseRecipients(raw string) []string {
 
 // StartEmailScheduler runs in a goroutine and fires SendDailyReport each day at the configured send_time.
 func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportService) {
-	go func() {
+	Go(func(context.Context) {
 		for {
 			cfg, err := st.GetEmailConfig(context.Background())
 			if err != nil || !cfg.IsEnabled {
@@ -862,7 +862,7 @@ func StartEmailScheduler(ctx context.Context, st *store.Store, rep *ReportServic
 			case <-time.After(time.Minute):
 			}
 		}
-	}()
+	})
 }
 
 func emailFmtBytes(b int64) string { return domain.FormatBytes(b) }

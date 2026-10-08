@@ -147,6 +147,15 @@ func main() {
 
 	loc, _ := time.LoadLocation(cfg.Timezone)
 
+	// Registered before the deferred closes, so a failing server exits only
+	// after the database is closed.
+	exitCode := 0
+	defer func() {
+		if exitCode != 0 {
+			os.Exit(exitCode)
+		}
+	}()
+
 	db, err := dbpkg.Open(cfg.DBPath)
 	if err != nil {
 		slog.Error("open database", "err", err)
@@ -228,21 +237,41 @@ func main() {
 	ensureUpdateCron()
 	slog.Info("probakgo started", "addr", "http://"+addr, "version", appversion.Version)
 
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "err", err)
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	select {
+	case <-quit:
+	case err := <-serverErr:
+		slog.Error("server error", "err", err)
+		exitCode = 1
+	}
 	slog.Info("shutting down...")
-	appCancel()
-	shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutCancel()
-	_ = srv.Shutdown(shutCtx)
+	shutdown(srv, appCancel)
+}
+
+// shutdown stops HTTP requests first, then the schedulers, and waits for
+// background work so the database is closed only when nothing uses it. Both
+// waits fit within systemd's default 90 s stop timeout.
+func shutdown(srv *http.Server, stopSchedulers context.CancelFunc) {
+	httpCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer httpCancel()
+	if err := srv.Shutdown(httpCtx); err != nil {
+		slog.Warn("HTTP shutdown", "err", err)
+	}
+	stopSchedulers()
+	// Immediate alert delivery can take up to 45 s.
+	bgCtx, bgCancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer bgCancel()
+	if err := service.WaitBackground(bgCtx); err != nil {
+		slog.Warn("background work still running at shutdown", "err", err)
+	}
 }
 
 func loadEnv() {

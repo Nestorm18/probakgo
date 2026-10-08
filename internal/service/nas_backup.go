@@ -294,13 +294,17 @@ func StartManualNASBackup(ctx context.Context, st *store.Store) error {
 	if err != nil || !claimed {
 		return errors.New("no se pudo iniciar la copia al NAS")
 	}
-	started = true
-	go func() {
+	// Shutdown cancels the copy; performNASBackup still records the outcome.
+	started = Go(func(bgCtx context.Context) {
 		defer nasBackupLock.Unlock()
-		jobCtx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		jobCtx, cancel := context.WithTimeout(bgCtx, 10*time.Minute)
 		defer cancel()
 		performNASBackup(jobCtx, st, *c, attempt)
-	}()
+	})
+	if !started {
+		_ = st.FinishNASBackupResult(ctx, attempt, false, "el servicio se estaba deteniendo")
+		return errors.New("el servicio se está deteniendo")
+	}
 	return nil
 }
 
@@ -322,7 +326,7 @@ func performNASBackup(ctx context.Context, st *store.Store, c domain.NASBackupCo
 
 // Daily in the configured application timezone. A missed run is caught up at startup.
 func StartNASBackupScheduler(ctx context.Context, st *store.Store, loc *time.Location) {
-	go func() {
+	Go(func(context.Context) {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -336,5 +340,5 @@ func StartNASBackupScheduler(ctx context.Context, st *store.Store, loc *time.Loc
 			case <-ticker.C:
 			}
 		}
-	}()
+	})
 }

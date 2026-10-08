@@ -10,7 +10,7 @@ import (
 
 // StartCleanupScheduler runs report retention cleanup once at startup and then every 24 hours.
 func StartCleanupScheduler(ctx context.Context, st *store.Store) {
-	go func() {
+	Go(func(context.Context) {
 		runCleanup(ctx, st)
 		for {
 			select {
@@ -20,7 +20,7 @@ func StartCleanupScheduler(ctx context.Context, st *store.Store) {
 				runCleanup(ctx, st)
 			}
 		}
-	}()
+	})
 }
 
 func runCleanup(parent context.Context, st *store.Store) {

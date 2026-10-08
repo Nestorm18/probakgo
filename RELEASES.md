@@ -2,6 +2,11 @@
 
 Proceso actual para publicar servidor, cliente Proxmox y cliente Windows.
 
+## Cambios en 0.0.263
+
+- Al detenerse, el servidor espera a las tareas en segundo plano (alertas, avisos de Telegram, copias al NAS) antes de cerrar SQLite. Una copia manual al NAS en curso se cancela y queda registrada como fallida.
+- Las consultas `GET` del API ya no vinculan la API key ni crean servidores PVE. Los endpoints de backup-config rechazan VMIDs que no sean de Proxmox (100-999999999) y JSON con varios valores.
+
 ## Cambios de seguridad en 0.0.262
 
 - Cerrar sesión es un `POST` y revoca la sesión en el servidor: una copia de la cookie deja de servir, mientras las demás sesiones del usuario siguen activas.

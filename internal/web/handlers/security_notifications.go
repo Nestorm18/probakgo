@@ -7,6 +7,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"probakgo/internal/service"
 )
 
 type adminSecurityNotifier interface {
@@ -106,13 +108,14 @@ func (h *WebH) notifyAdminSecurity(message, linkURL string) {
 		return
 	}
 	notifier := h.telegram
-	go func() {
+	// Tracked so shutdown waits for it; its own timeout lets it finish.
+	service.Go(func(context.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		if err := notifier.SendAdminSecurityNotification(ctx, message, linkURL); err != nil {
 			slog.Warn("send Telegram admin security notification", "err", err)
 		}
-	}()
+	})
 }
 
 func securityField(value string) string {

@@ -63,9 +63,14 @@ func (h *H) sendImmediateCriticalAlerts() {
 
 func (h *H) runAlertQueue() {
 	for range h.alertQueue {
+		done, ok := service.Track()
+		if !ok {
+			return
+		}
 		if err := service.SendImmediateCriticalAlerts(h.store, h.report); err != nil {
 			slog.Warn("send immediate critical alerts", "err", err)
 		}
+		done()
 	}
 }
 

@@ -73,6 +73,8 @@ Release assets must stay in sync with workflows and download handlers:
 ## Server
 
 - API endpoints include PVE, PBS and Windows reports, heartbeat, backup config, API keys and downloads.
+- API `GET` endpoints are read-only: they never bind an API key or create servers. Backup-config writes accept only Proxmox VM IDs (100-999999999).
+- Shutdown stops HTTP first, then the schedulers, and waits for background work tracked with `service.Go`/`service.Track` before closing SQLite. Start new background goroutines through them.
 - `/api/health` is a readiness check: it returns `503` when SQLite or the migrated schema cannot be read.
 - Web pages include dashboard, alerts, PVE, PBS, Windows, users, API keys, profile, about and the settings hub.
 - Auth uses bcrypt, sessions and RBAC: `reader`, `editor`, `admin`.

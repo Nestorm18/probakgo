@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -54,12 +55,18 @@ func (h *H) ListPVEReports(w http.ResponseWriter, r *http.Request) {
 		errJSON(w, http.StatusNotFound, "server not found")
 		return
 	}
-	k, _ := apictx.APIKey(r.Context())
-	if sv.APIKeyID != 0 && k != nil && sv.APIKeyID != k.ID {
+	k, ok := apictx.APIKey(r.Context())
+	if !ok {
+		errJSON(w, http.StatusUnauthorized, "invalid or inactive API key")
+		return
+	}
+	// A legacy server without a key is readable only by a key already bound
+	// to its name; reads never bind the key.
+	if sv.APIKeyID != k.ID && (sv.APIKeyID != 0 || strings.TrimSpace(k.ServerName) == "") {
 		errJSON(w, http.StatusForbidden, "API key is not bound to this server")
 		return
 	}
-	if !h.requireKeyServer(w, r, sv.Name) {
+	if !keyMayReadServer(w, k, sv.Name) {
 		return
 	}
 	limit := 30

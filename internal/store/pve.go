@@ -114,6 +114,24 @@ func (s *Store) ResolvePVEServerForAPIKey(ctx context.Context, apiKeyID int64, n
 	return res.LastInsertId()
 }
 
+// FindPVEServerForAPIKey is the read-only form of ResolvePVEServerForAPIKey:
+// it finds the key's server, or an unbound legacy server with the same name
+// and machine ID, without binding or creating anything.
+func (s *Store) FindPVEServerForAPIKey(ctx context.Context, apiKeyID int64, name, machineID string) (int64, bool, error) {
+	debug.RecordQuery(ctx, `SELECT id FROM pve_servers WHERE is_deleted = 0 AND (api_key_id = ? OR (name = ? AND machine_id = ? AND api_key_id IS NULL)) ORDER BY api_key_id IS NULL LIMIT 1`)
+	var id int64
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM pve_servers
+		WHERE is_deleted = 0 AND (api_key_id = ? OR (name = ? AND machine_id = ? AND api_key_id IS NULL))
+		ORDER BY api_key_id IS NULL LIMIT 1`, apiKeyID, name, machineID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	return id, true, nil
+}
+
 func (s *Store) SetPVEBackupInventory(ctx context.Context, serverID int64, hasVMs bool) error {
 	debug.RecordQuery(ctx, `UPDATE pve_servers SET backup_inventory_known=1, has_backup_vms=?, updated_at=CURRENT_TIMESTAMP WHERE id=? AND is_deleted=0`)
 	res, err := s.db.ExecContext(ctx,
