@@ -112,7 +112,7 @@ func (h *WebH) SystemSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"enforce_totp_non_readers":       cfg.EnforceTOTPNonReaders,
 		"sensitive_actions_require_totp": cfg.SensitiveActionsRequireTOTP,
 	})
-	http.Redirect(w, r, "/settings/system?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/system?flash=Configuraci%C3%B3n+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) EmailSettings(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +201,7 @@ func (h *WebH) EmailSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"critical_alerts_enabled":   cfg.CriticalAlertsEnabled,
 		"alert_email_batch_minutes": cfg.AlertEmailBatchMinutes,
 	})
-	http.Redirect(w, r, "/settings/email?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/email?flash=Configuraci%C3%B3n+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) MaintenanceSettings(w http.ResponseWriter, r *http.Request) {
@@ -278,7 +278,7 @@ func (h *WebH) MaintenanceSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"retention_months":  cfg.RetentionMonths,
 		"retention_enabled": cfg.RetentionEnabled,
 	})
-	http.Redirect(w, r, "/settings/maintenance?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/maintenance?flash=Configuraci%C3%B3n+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) MaintenanceDatabaseDownload(w http.ResponseWriter, r *http.Request) {
@@ -330,7 +330,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	alertDiskStr := r.FormValue("alert_disk_pct")
 	alertDisk, err := strconv.Atoi(alertDiskStr)
 	if alertDiskStr != "" && err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+no+valido", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+no+v%C3%A1lido", http.StatusSeeOther)
 		return
 	}
 	if alertDisk < 0 || alertDisk > 99 {
@@ -339,7 +339,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	windowsDiskStr := r.FormValue("alert_windows_disk_pct")
 	windowsDisk, err := strconv.Atoi(windowsDiskStr)
 	if windowsDiskStr != "" && err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+Windows+no+valido", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+porcentaje+de+disco+Windows+no+v%C3%A1lido", http.StatusSeeOther)
 		return
 	}
 	if windowsDisk < 0 || windowsDisk > 99 {
@@ -353,7 +353,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	if pbsStaleStr != "" {
 		n, err := strconv.Atoi(pbsStaleStr)
 		if err != nil {
-			http.Redirect(w, r, "/settings/alerts?flash=Valor+de+horas+PBS+no+valido", http.StatusSeeOther)
+			http.Redirect(w, r, "/settings/alerts?flash=Valor+de+horas+PBS+no+v%C3%A1lido", http.StatusSeeOther)
 			return
 		}
 		pbsStaleHours = n
@@ -364,7 +364,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 	pveHeartbeatStr := r.FormValue("alert_pve_heartbeat_minutes")
 	pveHeartbeatMinutes, err := strconv.Atoi(pveHeartbeatStr)
 	if pveHeartbeatStr != "" && err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+minutos+de+conexion+PVE+no+valido", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/alerts?flash=Valor+de+minutos+de+conexi%C3%B3n+PVE+no+v%C3%A1lido", http.StatusSeeOther)
 		return
 	}
 	if pveHeartbeatMinutes < 0 {
@@ -375,7 +375,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		pveExpectedFinishTime = domain.DefaultPVEExpectedFinishTime(existing.SendTime)
 	}
 	if _, err := time.Parse("15:04", pveExpectedFinishTime); err != nil {
-		http.Redirect(w, r, "/settings/alerts?flash=Hora+limite+PVE+no+valida", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/alerts?flash=Hora+l%C3%ADmite+PVE+no+v%C3%A1lida", http.StatusSeeOther)
 		return
 	}
 
@@ -422,7 +422,7 @@ func (h *WebH) AlertsSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"alert_pve_expected_finish_time": cfg.AlertPVEExpectedFinishTime,
 		"alert_pve_heartbeat_minutes":    cfg.AlertPVEHeartbeatMinutes,
 	})
-	http.Redirect(w, r, "/settings/alerts?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/alerts?flash=Configuraci%C3%B3n+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) ResetSettings(w http.ResponseWriter, r *http.Request) {
@@ -449,7 +449,7 @@ func (h *WebH) ResetDatabasePost(w http.ResponseWriter, r *http.Request) {
 	passConfirm := r.FormValue("password_confirm")
 
 	if pass != passConfirm {
-		http.Redirect(w, r, "/settings/reset?flash=Las+contrasenas+no+coinciden", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/reset?flash=Las+contrase%C3%B1as+no+coinciden", http.StatusSeeOther)
 		return
 	}
 	if ok, blocked := h.checkCurrentPassword(r, user, pass); !ok {
@@ -478,13 +478,13 @@ func (h *WebH) EmailTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := service.SendDailyReportTest(h.store, rep); err != nil {
-		http.Redirect(w, r, "/settings/email?flash=Error:+"+err.Error(), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/email?flash=Error%3A+"+err.Error(), http.StatusSeeOther)
 		return
 	}
 	if err := service.SendCriticalAlertTestEmail(h.store); err != nil {
-		http.Redirect(w, r, "/settings/email?flash=Error+en+alerta+de+prueba:+"+err.Error(), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/email?flash=Error+en+alerta+de+prueba%3A+"+err.Error(), http.StatusSeeOther)
 		return
 	}
 	h.audit(r, "settings.email_test", "settings", "email", "Email", nil)
-	http.Redirect(w, r, "/settings/email?flash=Emails+de+prueba+enviados:+reporte+y+alerta&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/email?flash=Emails+de+prueba+enviados%3A+reporte+y+alerta&ok=1", http.StatusSeeOther)
 }

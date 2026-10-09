@@ -176,7 +176,7 @@ func (r *ReportService) IsStaleForServer(ctx context.Context, reportedAt time.Ti
 			// This day's backup window hasn't closed yet - keep looking back
 			continue
 		}
-		return reportedAt.Before(dayStart), "no se ha recibido reporte del ultimo dia de backup"
+		return reportedAt.Before(dayStart), "no se ha recibido reporte del último día de backup"
 	}
 	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 }
@@ -251,7 +251,7 @@ func (r *ReportService) isStaleForConfigsAt(reportedAt time.Time, configs []doma
 		if now.Before(cutoff) {
 			continue
 		}
-		return reportedAt.Before(dayStart), "no se ha recibido reporte del ultimo dia de backup"
+		return reportedAt.Before(dayStart), "no se ha recibido reporte del último día de backup"
 	}
 	return r.IsStale(reportedAt), "No se ha recibido el reporte de hoy"
 }

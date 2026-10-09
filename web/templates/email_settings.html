@@ -8,7 +8,7 @@
 
     <div class="card">
       <div class="card-header">
-        <i class="bi bi-envelope me-2" style="color:var(--clr-accent)"></i>Envío de correo
+        <i class="bi bi-envelope me-2 tx-accent"></i>Envío de correo
       </div>
       <div class="card-body">
         <form method="POST" action="/settings/email">
@@ -42,7 +42,7 @@
             <div class="col-12">
               <div class="check-toggle-wrap">
                 <input class="form-check-input m-0" type="checkbox" name="is_enabled" id="emailEnabled" {{if .Config.IsEnabled}}checked{{end}}>
-                <label class="form-check-label m-0" for="emailEnabled" style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                <label class="form-check-label m-0 fs-md cursor-pointer tx-secondary" for="emailEnabled">
                   Habilitar envío de reportes diarios
                 </label>
               </div>
@@ -50,7 +50,7 @@
             <div class="col-12">
               <div class="check-toggle-wrap">
                 <input class="form-check-input m-0" type="checkbox" name="critical_alerts_enabled" id="criticalAlertsEnabled" {{if .Config.CriticalAlertsEnabled}}checked{{end}}>
-                <label class="form-check-label m-0" for="criticalAlertsEnabled" style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                <label class="form-check-label m-0 fs-md cursor-pointer tx-secondary" for="criticalAlertsEnabled">
                   Enviar alertas críticas y resoluciones
                 </label>
               </div>

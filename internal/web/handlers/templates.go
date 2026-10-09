@@ -87,6 +87,59 @@ func NewTemplates(fs fs.FS, version string, loc *time.Location, secure bool, bad
 	}
 }
 
+// storageStatusView translates a Proxmox storage or datastore state for display.
+type storageStatusView struct {
+	Label    string
+	CSSClass string
+	Raw      string
+}
+
+// mountStatus maps PVE storage states and PBS datastore mount states to
+// Spanish labels; unknown values are shown verbatim as a warning.
+func mountStatus(raw string) *storageStatusView {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "":
+		return nil
+	case "available", "online", "active":
+		return &storageStatusView{Label: "Disponible", CSSClass: "ok", Raw: raw}
+	case "nonremovable":
+		return &storageStatusView{Label: "Disco fijo", CSSClass: "ok", Raw: raw}
+	case "mounted":
+		return &storageStatusView{Label: "Montado", CSSClass: "ok", Raw: raw}
+	case "notmounted":
+		return &storageStatusView{Label: "No montado", CSSClass: "bad", Raw: raw}
+	case "inactive", "disabled":
+		return &storageStatusView{Label: "Inactivo", CSSClass: "warn", Raw: raw}
+	default:
+		return &storageStatusView{Label: raw, CSSClass: "warn", Raw: raw}
+	}
+}
+
+// usageLevel returns the colour token for a usage percentage: danger at the
+// critical disk level (95%), warn from the alert threshold, ok otherwise.
+func usageLevel(pct, threshold int) string {
+	switch {
+	case pct >= 95:
+		return "danger"
+	case threshold > 0 && pct >= threshold:
+		return "warn"
+	default:
+		return "ok"
+	}
+}
+
+// serverTypeIcon returns the Bootstrap icon used for a server type across the UI.
+func serverTypeIcon(serverType string) string {
+	switch serverType {
+	case "pbs":
+		return "bi-archive"
+	case "windows":
+		return "bi-windows"
+	default:
+		return "bi-server"
+	}
+}
+
 func makeFuncMap(loc *time.Location, releaseVersion string) template.FuncMap {
 	if loc == nil {
 		loc = time.Local
@@ -105,6 +158,9 @@ func makeFuncMap(loc *time.Location, releaseVersion string) template.FuncMap {
 				return "–"
 			}
 		},
+		"serverTypeIcon":      serverTypeIcon,
+		"mountStatus":         mountStatus,
+		"usageLevel":          usageLevel,
 		"formatBytes":         domain.FormatBytes,
 		"backupStatusOK":      domain.PVEBackupStatusOK,
 		"backupStatusWarning": domain.PVEBackupStatusWarning,

@@ -19,13 +19,13 @@
   {{if .SearchQuery}}
   <a href="/api-keys" class="btn btn-sm btn-secondary">Limpiar</a>
   {{end}}
-  <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)">
+  <span class="fs-xs tx-muted" id="filterCount">
     {{if .SearchQuery}}{{len .Keys}} resultado{{if ne (len .Keys) 1}}s{{end}}{{end}}
   </span>
 </div>
 
 <div class="card">
-  <div class="card-body p-0" style="overflow-x:auto">
+  <div class="card-body p-0 overflow-x-auto">
     <table class="table table-hover mb-0" style="min-width:900px">
       <thead>
         <tr>
@@ -41,20 +41,20 @@
       {{range .Keys}}
       <tr {{if not .IsActive}}style="opacity:.5"{{end}}>
         <td>
-          <div class="fw-semibold" style="color:var(--txt-primary)">{{.Name}}</div>
-          {{if .ServerName}}<div style="font-size:.73rem;color:var(--txt-muted)">{{.ServerName}}</div>{{end}}
+          <div class="fw-semibold tx-primary">{{.Name}}</div>
+          {{if .ServerName}}<div class="fs-2xs tx-muted">{{.ServerName}}</div>{{end}}
         </td>
         <td><code>{{.KeyPreview}}</code></td>
-        <td style="font-size:.82rem">
+        <td class="fs-sm">
           {{if .MachineID}}
-            <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i>
+            <i class="bi bi-shield-lock me-1 tx-ok"></i>
             <code title="{{.MachineID}}">{{slice .MachineID 0 8}}…</code>
           {{else}}
-            <span style="color:var(--txt-muted)">-</span>
+            <span class="tx-muted">-</span>
           {{end}}
         </td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">
-          {{if .LastUsed}}{{formatTime .LastUsed}}{{else}}<span style="color:var(--txt-muted)">nunca</span>{{end}}
+        <td class="fs-sm tx-secondary">
+          {{if .LastUsed}}{{formatTime .LastUsed}}{{else}}<span class="tx-muted">nunca</span>{{end}}
         </td>
         <td>
           {{if .IsActive}}<span class="status-pill ok">Activa</span>
@@ -96,7 +96,7 @@
         {{end}}
       </tr>
       {{else}}
-      <tr><td colspan="{{if isAdmin $.Role}}6{{else}}5{{end}}" class="text-center py-5" style="color:var(--txt-muted)">Sin API keys registradas</td></tr>
+      <tr><td colspan="{{if isAdmin $.Role}}6{{else}}5{{end}}" class="text-center py-5 tx-muted">Sin API keys registradas</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -110,7 +110,7 @@
     {{else}}
     <button class="btn btn-sm btn-secondary" disabled><i class="bi bi-chevron-left me-1"></i>Anterior</button>
     {{end}}
-    <span style="font-size:.78rem;color:var(--txt-muted)">Página {{.KeysPage}} · 25 keys por página</span>
+    <span class="fs-xs tx-muted">Página {{.KeysPage}} · 25 keys por página</span>
     {{if .KeysHasNext}}
     <a class="btn btn-sm btn-secondary" href="/api-keys?page={{.KeysNextPage}}{{if .SearchQuery}}&q={{$q}}{{end}}">
       Siguiente<i class="bi bi-chevron-right ms-1"></i>
@@ -127,15 +127,15 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title"><i class="bi bi-eye me-2" style="color:var(--clr-accent)"></i>Ver clave completa</h5>
+        <h5 class="modal-title"><i class="bi bi-eye me-2 tx-accent"></i>Ver clave completa</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
         <div id="revealKeyDisplay" class="d-none mb-3">
           <label class="form-label">Clave API</label>
           <div class="input-group">
-            <input type="text" id="revealKeyValue" class="form-control" readonly
-                   style="font-family:'DM Mono',monospace;font-size:.8rem">
+            <input type="text" id="revealKeyValue" class="form-control mono fs-sm" aria-label="API key completa" readonly
+                  >
             <button type="button" class="btn btn-outline-secondary" id="revealCopyBtn" title="Copiar">
               <i class="bi bi-clipboard"></i>
             </button>
@@ -156,7 +156,7 @@
             </div>
             {{end}}
           {{end}}
-          <div id="revealError" class="text-danger mt-2 d-none" style="font-size:.82rem"></div>
+          <div id="revealError" class="text-danger mt-2 d-none fs-sm"></div>
         </div>
       </div>
       <div class="modal-footer">

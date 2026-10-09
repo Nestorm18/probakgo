@@ -69,7 +69,7 @@ func (h *WebH) downloadReleaseAsset(w http.ResponseWriter, r *http.Request, asse
 		return
 	}
 	if resp.ContentLength > maxReleaseAssetBytes {
-		http.Error(w, "el asset de GitHub supera el tamano permitido", http.StatusBadGateway)
+		http.Error(w, "el asset de GitHub supera el tamaño permitido", http.StatusBadGateway)
 		return
 	}
 

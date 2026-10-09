@@ -1,6 +1,7 @@
-{{block "page_title" .}}Proxmox BS - Probakgo{{end}}
+{{block "page_title" .}}Proxmox Backup Server - Probakgo{{end}}
 {{block "page_heading" .}}Proxmox Backup Server{{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
 
 <div class="server-health-strip mb-3">
   <div class="server-health-item">
@@ -16,7 +17,7 @@
     <strong>{{.HealthSummary.WithAlerts}}</strong>
   </div>
   <div class="server-health-item warn">
-    <span>Crit./Avisos</span>
+    <span>Críticas / avisos</span>
     <strong>{{.HealthSummary.Critical}}/{{.HealthSummary.Warning}}</strong>
   </div>
 </div>
@@ -30,11 +31,16 @@
     <button type="button" class="btn btn-secondary active" data-health-filter="all">Todos</button>
     <button type="button" class="btn btn-secondary" data-health-filter="alerts">Con avisos</button>
   </div>
-  <span id="filterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
+  <span class="fs-xs tx-muted" id="filterCount"></span>
   <div class="server-list-toolbar-actions">
     <a href="/servers/pbs.xlsx" class="btn btn-sm btn-primary" title="Descargar informe Excel de almacenamiento y tareas"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Informe Excel</a>
-    <a href="/servers/pbs.csv" class="btn btn-sm btn-secondary" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
-    <a href="/servers/pbs.json" class="btn btn-sm btn-secondary" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
+    <div class="dropdown">
+      <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-download me-1" aria-hidden="true"></i>Exportar</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="/servers/pbs.csv"><i class="bi bi-filetype-csv me-2" aria-hidden="true"></i>CSV</a></li>
+        <li><a class="dropdown-item" href="/servers/pbs.json"><i class="bi bi-braces me-2" aria-hidden="true"></i>JSON</a></li>
+      </ul>
+    </div>
   </div>
 </div>
 
@@ -43,13 +49,13 @@
     <table class="table table-hover mb-0 pbs-server-table">
       <thead>
         <tr>
-          <th data-sort="0" aria-sort="none"><button type="button" class="sort-button">Servidor <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="1" aria-sort="none"><button type="button" class="sort-button">Dirección <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="2" aria-sort="none"><button type="button" class="sort-button">Cliente <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="3" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Swap <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="4" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Último reporte <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="5" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Datastores <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
-          <th data-sort="6" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Estado <i class="bi sort-icon" style="font-size:.7rem;color:var(--txt-muted)" aria-hidden="true"></i></button></th>
+          <th data-sort="0" aria-sort="none"><button type="button" class="sort-button">Servidor <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="1" aria-sort="none"><button type="button" class="sort-button">Dirección <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="2" aria-sort="none"><button type="button" class="sort-button">Cliente <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="3" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Swap <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="4" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Último reporte <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="5" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Datastores <i class="bi sort-icon" aria-hidden="true"></i></button></th>
+          <th data-sort="6" data-sort-type="number" aria-sort="none"><button type="button" class="sort-button">Estado <i class="bi sort-icon" aria-hidden="true"></i></button></th>
           <th></th>
         </tr>
       </thead>
@@ -57,36 +63,36 @@
       {{range .Rows}}
       <tr data-has-alerts="{{if .Health.HasAlerts}}1{{else}}0{{end}}">
         <td data-sort-value="{{.Server.DisplayName}}" data-label="Servidor">
-          <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none" style="color:var(--txt-primary)">
+          <a href="/servers/pbs/{{.Server.ID}}" class="fw-semibold text-decoration-none tx-primary">
             {{.Server.DisplayName}}
           </a>
           <span class="status-pill {{.Health.CSSClass}} ms-1" title="{{.Health.Title}}">{{.Health.Label}}</span>
           {{if .ServerURL}}
-          <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1" title="Abrir interfaz Proxmox" style="color:var(--txt-muted);font-size:.8rem"><i class="bi bi-box-arrow-up-right"></i></a>
+          <a href="{{.ServerURL}}" target="_blank" rel="noopener" class="ms-1 tx-muted fs-sm" title="Abrir interfaz Proxmox"><i class="bi bi-box-arrow-up-right"></i></a>
           {{end}}
           {{if .Server.MachineID}}
-          <i class="bi bi-shield-lock ms-1" style="color:var(--clr-ok);font-size:.8rem" title="Machine ID vinculado"></i>
+          <i class="bi bi-shield-lock ms-1 tx-ok fs-sm" title="Machine ID vinculado"></i>
           {{end}}
         </td>
         <td data-sort-value="{{.Server.IP}}" data-label="Dirección">
-          <div style="font-size:.82rem;color:var(--txt-primary);font-family:'DM Mono',monospace">{{.Server.IP}}</div>
-          <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Server.PublicIP}}</div>
+          <div class="fs-sm tx-primary mono">{{.Server.IP}}</div>
+          <div class="fs-2xs tx-muted mono">{{.Server.PublicIP}}</div>
         </td>
         <td data-sort-value="{{.Server.ClientVersion}}" data-label="Cliente">
-          {{if clientVersionOutdated .Server.ClientVersion}}<span class="status-pill warn" title="Version anterior a {{$.Version}}">{{.Server.ClientVersion}}</span>
+          {{if clientVersionOutdated .Server.ClientVersion}}<span class="status-pill warn" title="Versión anterior a {{$.Version}}">{{.Server.ClientVersion}}</span>
           {{else if clientVersionCurrent .Server.ClientVersion}}<span class="status-pill ok" title="Cliente actualizado">{{.Server.ClientVersion}}</span>
           {{else}}<code>{{.Server.ClientVersion}}</code>{{end}}
         </td>
-        <td data-sort-value="{{if .Swap.Enabled}}{{.Swap.Used}}{{else}}-1{{end}}" data-label="Swap">{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
-        <td data-sort-value="{{if .LastReport}}{{.LastReport.Unix}}{{else}}0{{end}}" data-label="Reporte" style="font-size:.82rem;color:var(--txt-secondary)">
-          {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+        <td data-sort-value="{{if .Swap.Enabled}}{{.Swap.Used}}{{else}}-1{{end}}" data-label="Swap">{{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{else}}<span class="tx-muted">-</span>{{end}}</td>
+        <td class="fs-sm tx-secondary" data-sort-value="{{if .LastReport}}{{.LastReport.Unix}}{{else}}0{{end}}" data-label="Reporte">
+          {{if .LastReport}}<span title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{else}}<span class="tx-muted">–</span>{{end}}
         </td>
-        <td data-sort-value="{{.StoreUsage}}" data-label="Datastores" style="font-size:.82rem">
+        <td class="fs-sm" data-sort-value="{{.StoreUsage}}" data-label="Datastores">
           {{range .Stores}}
           <div class="mb-1">
             <div class="d-flex align-items-center gap-2 flex-wrap">
               <span style="color:var(--txt-primary);font-weight:500">{{.StoreName}}</span>
-              <span style="color:var(--txt-muted)">{{formatBytes .Used}} / {{formatBytes .Total}}</span>
+              <span class="tx-muted">{{formatBytes .Used}} / {{formatBytes .Total}}</span>
               {{if .BadgeLabel}}
                 <span class="status-pill {{.BadgeClass}}" title="{{.BadgeTitle}}">{{.BadgeLabel}}</span>
               {{end}}
@@ -97,9 +103,9 @@
           </div>
           {{end}}
           {{range .Tasks}}
-          <div class="mb-1 d-flex align-items-center gap-2 flex-wrap" style="font-size:.72rem">
-            <span style="color:var(--txt-secondary)"><i class="bi {{if eq .Title "Garbage collection"}}bi-recycle{{else}}bi-arrow-left-right{{end}} me-1"></i>{{.Title}}</span>
-            {{if .Detail}}<span style="color:var(--txt-muted)">{{.Detail}}</span>{{end}}
+          <div class="mb-1 d-flex align-items-center gap-2 flex-wrap fs-2xs">
+            <span class="tx-secondary"><i class="bi {{if eq .Title "Garbage collection"}}bi-recycle{{else}}bi-arrow-left-right{{end}} me-1"></i>{{.Title}}</span>
+            {{if .Detail}}<span class="tx-muted">{{.Detail}}</span>{{end}}
             <span class="status-pill {{.CSSClass}}" title="{{.StatusTitle}}">{{.Status}}</span>
           </div>
           {{end}}
@@ -109,12 +115,12 @@
           {{else if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
-        <td class="text-end" data-label="Acciones" style="white-space:nowrap">
-          <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary me-1" title="Ver detalle"><i class="bi bi-eye"></i></a>
+        <td class="text-end text-nowrap" data-label="Acciones">
+          <a href="/servers/pbs/{{.Server.ID}}" class="btn btn-sm btn-outline-secondary me-1" title="Ver detalle" aria-label="Ver detalle"><i class="bi bi-eye" aria-hidden="true"></i></a>
           {{if $.Role}}{{if canEdit $.Role}}
           <button class="btn btn-sm btn-outline-secondary pbs-alert-cfg-btn position-relative"
-                  aria-label="Configurar alertas del servidor"
-                  title="{{if .AlertOverrides.Has}}{{.AlertOverrides.Title}}{{else}}Alertas{{end}}"
+                  aria-label="Ajustes de alertas y mantenimiento"
+                  title="{{if .AlertOverrides.Has}}{{.AlertOverrides.Title}}{{else}}Ajustes de alertas y mantenimiento{{end}}"
                   data-server-id="{{.Server.ID}}"
                   data-server-name="{{.Server.DisplayName}}"
                   data-disk-pct="{{if .AlertConfig.DiskPct}}{{deref .AlertConfig.DiskPct}}{{end}}"
@@ -125,7 +131,7 @@
                   data-maintenance-active="{{if .Maintenance.Active}}1{{else}}0{{end}}"
                   data-maintenance-until="{{if .Maintenance.Active}}{{formatTime .Maintenance.Until}}{{end}}"
                   data-maintenance-reason="{{.Maintenance.Reason}}">
-            <i class="bi bi-bell"></i>
+            <i class="bi bi-sliders" aria-hidden="true"></i>
             {{if .AlertOverrides.Has}}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill" style="background:var(--clr-accent);font-size:.58rem;line-height:1;padding:.18rem .32rem">{{.AlertOverrides.Count}}</span>{{end}}
           </button>
           {{end}}{{end}}
@@ -134,13 +140,13 @@
       {{else}}
       <tr class="empty-state-row"><td colspan="8">
         <div class="p-4">
-          <div class="text-center mb-3" style="color:var(--txt-muted)"><i class="bi bi-archive" style="font-size:2rem"></i></div>
-          <p class="text-center fw-semibold mb-3" style="color:var(--txt-primary)">Sin servidores PBS registrados</p>
-          <p class="text-center mb-3" style="font-size:.83rem;color:var(--txt-muted)">El servidor se registra automáticamente cuando el cliente envía su primer reporte.<br>Crea una API key y sigue estos pasos en el nodo Proxmox Backup Server:</p>
+          <div class="text-center mb-3 tx-muted"><i class="bi bi-archive" style="font-size:2rem"></i></div>
+          <p class="text-center fw-semibold mb-3 tx-primary">Sin servidores PBS registrados</p>
+          <p class="text-center mb-3 fs-sm tx-muted">El servidor se registra automáticamente cuando el cliente envía su primer reporte.<br>Crea una API key y sigue estos pasos en el nodo Proxmox Backup Server:</p>
           <div class="d-flex flex-column gap-2 mx-auto" style="max-width:520px">
-            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary);overflow-x:auto">wget [URL-del-servidor]/static/client/probakgo-client_linux_amd64 -O /tmp/probakgo-client</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
-            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary)">chmod +x /tmp/probakgo-client</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
-            <div style="position:relative"><pre class="step-code" style="background:var(--body-bg);border:1px solid var(--card-border);border-radius:.5rem;padding:.5rem 2.2rem .5rem .7rem;font-size:.75rem;margin:0;color:var(--txt-primary)">/tmp/probakgo-client install --api-url http://tu-servidor:36748 --api-key pbk-...</pre><button class="copy-step-btn" style="position:absolute;top:.3rem;right:.3rem;background:none;border:none;cursor:pointer;color:var(--txt-muted)"><i class="bi bi-clipboard" style="font-size:.8rem"></i></button></div>
+            <div class="position-relative"><pre class="step-code">wget [URL-del-servidor]/static/client/probakgo-client_linux_amd64 -O /tmp/probakgo-client</pre><button class="copy-step-btn"><i class="bi bi-clipboard fs-sm"></i></button></div>
+            <div class="position-relative"><pre class="step-code">chmod +x /tmp/probakgo-client</pre><button class="copy-step-btn"><i class="bi bi-clipboard fs-sm"></i></button></div>
+            <div class="position-relative"><pre class="step-code">/tmp/probakgo-client install --api-url http://tu-servidor:36748 --api-key pbk-...</pre><button class="copy-step-btn"><i class="bi bi-clipboard fs-sm"></i></button></div>
           </div>
           <div class="text-center mt-3"><a href="/api-keys" class="btn btn-sm btn-primary"><i class="bi bi-key me-1"></i>Crear API Key</a></div>
         </div>
@@ -157,7 +163,7 @@
     <div class="modal-content">
       <div class="modal-header border-0 pb-1">
         <h6 class="modal-title fw-semibold">
-          <i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas - <span id="pbsAlertCfgName"></span>
+          <i class="bi bi-bell me-2 tx-accent"></i>Alertas - <span id="pbsAlertCfgName"></span>
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
@@ -174,15 +180,15 @@
               <div class="form-text">Silencia todas las alertas de este servidor durante el mantenimiento.</div>
               <div class="row g-2 mt-2">
                 <div class="col-5">
-                  <select id="pbsMaintenanceHours" name="maintenance_hours" class="form-select form-select-sm">
+                  <select id="pbsMaintenanceHours" name="maintenance_hours" class="form-select form-select-sm" aria-label="Duración del mantenimiento">
                     <option value="keep">Mantener actual</option>
                     <option value="1">1 hora</option>
                     <option value="4">4 horas</option>
                     <option value="12">12 horas</option>
-                    <option value="24" selected>1 dia</option>
-                    <option value="72">3 dias</option>
-                    <option value="168">7 dias</option>
-                    <option value="720">30 dias</option>
+                    <option value="24" selected>1 día</option>
+                    <option value="72">3 días</option>
+                    <option value="168">7 días</option>
+                    <option value="720">30 días</option>
                   </select>
                 </div>
                 <div class="col-7">
@@ -258,6 +264,11 @@
     });
     const total = tbody.querySelectorAll('tr:not(.empty-state-row)').length;
     countEl.textContent = (q || healthFilter !== 'all') ? `${visible} de ${total}` : '';
+    const params = new URLSearchParams(window.location.search);
+    if (q) params.set('filter', input.value); else params.delete('filter');
+    if (healthFilter === 'alerts') params.set('health', 'alerts'); else params.delete('health');
+    const qs = params.toString();
+    history.replaceState(history.state, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
   };
   input.addEventListener('input', applyFilters);
   toggleButtons.forEach(btn => {
@@ -267,8 +278,11 @@
       applyFilters();
     });
   });
-  input.value = new URLSearchParams(window.location.search).get('filter') || '';
-  if (input.value) applyFilters();
+  const params = new URLSearchParams(window.location.search);
+  input.value = params.get('filter') || '';
+  if (params.get('health') === 'alerts') {
+    document.querySelector('[data-health-filter="alerts"]')?.click();
+  } else if (input.value) applyFilters();
 })();
 
 // Sort

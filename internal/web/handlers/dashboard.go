@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"time"
 
@@ -48,7 +49,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 	pveConfigs, _ := h.store.ListPVEVMBackupConfigsByServer(ctx)
 	pveAlertConfigs, _ := h.store.ListPVEAlertConfigs(ctx)
 
-	var pveOK, pveStale, pveBackupErrorCount, pveMaintenance int
+	var pveOK, pveStale, pveBackupErrorCount, pveWithAlerts, pveMaintenance int
 	var pveStaleIDs []int64
 	var pveRows []map[string]any
 	for _, sv := range pveServers {
@@ -61,15 +62,23 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		hasBackupError := backupSeverity == domain.AlertSeverityCritical
 		hasBackupWarning := backupSeverity == domain.AlertSeverityWarning
 		maint := maintenanceByServer(maintenance, "pve", sv.ID)
+		health := buildServerHealth(alertSummary.ByServer[dashboardServerKey("pve", sv.ID)])
+		rank := dashboardRankOK
 		if maint.Active {
 			pveMaintenance++
+			rank = dashboardRankMaintenance
 		} else if isStale {
 			if _, silenced := suppressed[fmt.Sprintf("pve_stale:pve:%d", sv.ID)]; !silenced {
 				pveStale++
 				pveStaleIDs = append(pveStaleIDs, sv.ID)
 			}
+			rank = dashboardRankCritical
 		} else if hasBackupError {
 			pveBackupErrorCount++
+			rank = dashboardRankCritical
+		} else if health.HasAlerts {
+			pveWithAlerts++
+			rank = dashboardHealthRank(health)
 		} else {
 			pveOK++
 		}
@@ -77,6 +86,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"Server": sv, "IsStale": isStale,
 			"HasBackupError": hasBackupError, "HasBackupWarning": hasBackupWarning,
 			"Swap": buildSwapView(false, 0, 0), "Maintenance": maint,
+			"Health": health, "Rank": rank,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
@@ -108,7 +118,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var pbsOK, pbsStale, pbsMaintenance int
+	var pbsOK, pbsStale, pbsWithAlerts, pbsMaintenance int
 	var pbsStaleIDs []int64
 	var pbsRows []map[string]any
 	for _, sv := range pbsServers {
@@ -116,15 +126,24 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		isStale := rep == nil || rep.IsStale
 		maint := maintenanceByServer(maintenance, "pbs", sv.ID)
 		fillLabel, fillClass := "Llenado OK", "ok"
+		health := buildServerHealth(alertSummary.ByServer[dashboardServerKey("pbs", sv.ID)])
+		rank := dashboardRankOK
 		if maint.Active {
 			pbsMaintenance++
+			rank = dashboardRankMaintenance
 		} else if isStale {
 			if _, silenced := suppressed[fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID)]; !silenced {
 				pbsStale++
 				pbsStaleIDs = append(pbsStaleIDs, sv.ID)
 			}
+			rank = dashboardRankCritical
 		} else {
-			pbsOK++
+			if health.HasAlerts {
+				pbsWithAlerts++
+				rank = dashboardHealthRank(health)
+			} else {
+				pbsOK++
+			}
 			fillLabel, fillClass = pbsFillBadge(pbsStores[rep.ID])
 		}
 		row := map[string]any{
@@ -134,6 +153,8 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"FillClass":   fillClass,
 			"Swap":        buildSwapView(false, 0, 0),
 			"Maintenance": maint,
+			"Health":      health,
+			"Rank":        rank,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
@@ -171,7 +192,7 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	windowsHeartbeats, _ := h.store.ListServerHeartbeatsByType(ctx, "windows")
-	var windowsOK, windowsOffline, windowsDiskAlerts int
+	var windowsOK, windowsOffline, windowsDiskAlerts, windowsWithAlerts int
 	var windowsMaintenance int
 	var windowsRows []map[string]any
 	for _, sv := range windowsServers {
@@ -188,12 +209,20 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		diskAlert := windowsHasDiskAlert(disks, serverDiskThreshold)
 		missingVolumeAlert := alertSummary.WindowsMissingVolume[sv.ID]
 		maint := maintenanceByServer(maintenance, "windows", sv.ID)
+		health := buildServerHealth(alertSummary.ByServer[dashboardServerKey("windows", sv.ID)])
+		rank := dashboardRankOK
 		if maint.Active {
 			windowsMaintenance++
+			rank = dashboardRankMaintenance
 		} else if !heartbeat.Online {
 			windowsOffline++
+			rank = dashboardRankCritical
 		} else if diskAlert || missingVolumeAlert {
 			windowsDiskAlerts++
+			rank = dashboardRankCritical
+		} else if health.HasAlerts {
+			windowsWithAlerts++
+			rank = dashboardHealthRank(health)
 		} else {
 			windowsOK++
 		}
@@ -207,6 +236,8 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 			"HasDiskAlert": diskAlert || missingVolumeAlert,
 			"DiskSummary":  diskSummary,
 			"Maintenance":  maint,
+			"Health":       health,
+			"Rank":         rank,
 		}
 		if rep != nil {
 			row["LastReport"] = rep.ReportedAt
@@ -214,30 +245,101 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		windowsRows = append(windowsRows, row)
 	}
 
+	sortDashboardRows(pveRows)
+	sortDashboardRows(pbsRows)
+	sortDashboardRows(windowsRows)
+
+	platforms := []dashboardPlatform{
+		{
+			Key: "pve", Title: "Proxmox VE", Icon: serverTypeIcon("pve"), ListURL: "/servers/pve", Rows: pveRows,
+			Stats: []dashboardStat{
+				{Label: "Operativos", Value: pveOK, Level: "ok", URL: "/servers/pve"},
+				{Label: "Backup error", Value: pveBackupErrorCount, Level: "bad", URL: "/servers/pve?health=alerts"},
+				{Label: "Con avisos", Value: pveWithAlerts, Level: "warn", URL: "/servers/pve?health=alerts"},
+				{Label: "Sin reporte", Value: pveStale, Level: "bad", URL: dashboardStatusURL("pve", pveStaleIDs, "Sin reporte")},
+				{Label: "Mantenimiento", Value: pveMaintenance, Level: "info", URL: "/servers/pve?filter=" + url.QueryEscape("Mantenimiento"), Optional: true},
+			},
+		},
+		{
+			Key: "pbs", Title: "Proxmox Backup", Icon: serverTypeIcon("pbs"), ListURL: "/servers/pbs", Rows: pbsRows,
+			Stats: []dashboardStat{
+				{Label: "Operativos", Value: pbsOK, Level: "ok", URL: "/servers/pbs"},
+				{Label: "Con avisos", Value: pbsWithAlerts, Level: "warn", URL: "/servers/pbs?health=alerts"},
+				{Label: "Sin reporte", Value: pbsStale, Level: "bad", URL: dashboardStatusURL("pbs", pbsStaleIDs, "Sin reporte")},
+				{Label: "Mantenimiento", Value: pbsMaintenance, Level: "info", URL: "/servers/pbs?filter=" + url.QueryEscape("Mantenimiento"), Optional: true},
+			},
+		},
+		{
+			Key: "windows", Title: "Windows", Icon: serverTypeIcon("windows"), ListURL: "/servers/windows", Rows: windowsRows,
+			Stats: []dashboardStat{
+				{Label: "Operativos", Value: windowsOK, Level: "ok", URL: "/servers/windows"},
+				{Label: "Disco", Value: windowsDiskAlerts, Level: "bad", URL: "/servers/windows?health=alerts"},
+				{Label: "Con avisos", Value: windowsWithAlerts, Level: "warn", URL: "/servers/windows?health=alerts"},
+				{Label: "Offline", Value: windowsOffline, Level: "bad", URL: "/servers/windows?filter=Offline"},
+				{Label: "Mantenimiento", Value: windowsMaintenance, Level: "info", URL: "/servers/windows?filter=" + url.QueryEscape("Mantenimiento"), Optional: true},
+			},
+		},
+	}
+
 	h.tmpl.Render(w, r, "dashboard.html", map[string]any{
 		"Username":           username,
 		"Role":               role,
 		"AlertCritical":      alertSummary.Critical,
 		"AlertWarning":       alertSummary.Warning,
-		"PVERows":            pveRows,
-		"PBSRows":            pbsRows,
-		"WindowsRows":        windowsRows,
-		"PVEOk":              pveOK,
-		"PVEStale":           pveStale,
-		"PVEStaleURL":        dashboardStatusURL("pve", pveStaleIDs, "Sin reporte"),
-		"PVEBackupErrors":    pveBackupErrorCount,
+		"Platforms":          platforms,
+		"ServerTotal":        len(pveRows) + len(pbsRows) + len(windowsRows),
 		"PVEMaintenance":     pveMaintenance,
-		"PBSOk":              pbsOK,
-		"PBSStale":           pbsStale,
-		"PBSStaleURL":        dashboardStatusURL("pbs", pbsStaleIDs, "Sin reporte"),
 		"PBSMaintenance":     pbsMaintenance,
-		"WindowsOK":          windowsOK,
-		"WindowsOffline":     windowsOffline,
-		"WindowsDiskAlerts":  windowsDiskAlerts,
 		"WindowsMaintenance": windowsMaintenance,
 		"MaintenanceTotal":   pveMaintenance + pbsMaintenance + windowsMaintenance,
 		"MaintenanceURL":     dashboardMaintenanceURL(maintenance),
 	})
+}
+
+// dashboardStat is one counter inside a dashboard platform card. Problem
+// counters only take their colour when they are non-zero.
+type dashboardStat struct {
+	Label    string
+	Value    int
+	Level    string
+	URL      string
+	Optional bool // hidden while zero
+}
+
+type dashboardPlatform struct {
+	Key     string
+	Title   string
+	Icon    string
+	ListURL string
+	Stats   []dashboardStat
+	Rows    []map[string]any
+}
+
+// Dashboard rows are ordered by urgency so problems are visible without scrolling.
+const (
+	dashboardRankCritical = iota
+	dashboardRankWarning
+	dashboardRankMaintenance
+	dashboardRankOK
+)
+
+func dashboardHealthRank(health serverHealthView) int {
+	if health.Critical > 0 {
+		return dashboardRankCritical
+	}
+	return dashboardRankWarning
+}
+
+func sortDashboardRows(rows []map[string]any) {
+	sort.SliceStable(rows, func(i, j int) bool {
+		ri, _ := rows[i]["Rank"].(int)
+		rj, _ := rows[j]["Rank"].(int)
+		return ri < rj
+	})
+}
+
+func dashboardServerKey(serverType string, serverID int64) string {
+	return serverType + ":" + strconv.FormatInt(serverID, 10)
 }
 
 func dashboardStatusURL(serverType string, serverIDs []int64, filter string) string {
@@ -268,6 +370,7 @@ func dashboardMaintenanceURL(maintenance map[string]domain.ServerMaintenance) st
 }
 
 type dashboardAlertSummary struct {
+	ByServer             map[string]serverHealthView
 	PVEBackupSeverity    map[int64]string
 	WindowsMissingVolume map[int64]bool
 	Critical             int
@@ -276,6 +379,7 @@ type dashboardAlertSummary struct {
 
 func summarizeDashboardAlerts(alerts []domain.Alert, suppressed map[string]time.Time, maintenance map[string]domain.ServerMaintenance) dashboardAlertSummary {
 	summary := dashboardAlertSummary{
+		ByServer:             make(map[string]serverHealthView),
 		PVEBackupSeverity:    make(map[int64]string),
 		WindowsMissingVolume: make(map[int64]bool),
 	}
@@ -283,11 +387,17 @@ func summarizeDashboardAlerts(alerts []domain.Alert, suppressed map[string]time.
 		if _, ok := suppressed[alert.ID]; ok || maintenanceByServer(maintenance, alert.ServerType, alert.ServerID).Active {
 			continue
 		}
+		key := dashboardServerKey(alert.ServerType, alert.ServerID)
+		health := summary.ByServer[key]
+		health.Total++
 		if alert.Severity == domain.AlertSeverityCritical {
 			summary.Critical++
+			health.Critical++
 		} else {
 			summary.Warning++
+			health.Warning++
 		}
+		summary.ByServer[key] = health
 		if alert.ServerType == "pve" && alert.Type == domain.AlertTypeBackupError {
 			current := summary.PVEBackupSeverity[alert.ServerID]
 			if alert.Severity == domain.AlertSeverityCritical || current == "" {

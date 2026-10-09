@@ -1,26 +1,27 @@
 {{block "page_title" .}}Alertas - Probakgo{{end}}
 {{block "page_heading" .}}Alertas{{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
 
 <!-- Summary bar -->
 <div class="alerts-toolbar">
   <div class="alerts-toolbar-row">
   {{if .AlertCritical}}
   <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-danger) 30%,transparent)">
-    <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
-    <span style="font-weight:600;color:var(--clr-danger)">{{.AlertCritical}} crítica{{if gt .AlertCritical 1}}s{{end}}</span>
+    <i class="bi bi-exclamation-octagon-fill tx-danger"></i>
+    <span class="fw-semibold tx-danger">{{.AlertCritical}} crítica{{if gt .AlertCritical 1}}s{{end}}</span>
   </div>
   {{end}}
   {{if .AlertWarning}}
   <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-warn) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-warn) 30%,transparent)">
-    <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
-    <span style="font-weight:600;color:var(--clr-warn)">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>
+    <i class="bi bi-exclamation-triangle-fill tx-warn"></i>
+    <span class="fw-semibold tx-warn">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>
   </div>
   {{end}}
   {{if and (eq .AlertCritical 0) (eq .AlertWarning 0)}}
   <div class="d-flex align-items-center gap-2 px-3 py-2 rounded" style="background:color-mix(in srgb,var(--clr-ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--clr-ok) 30%,transparent)">
-    <i class="bi bi-check-circle-fill" style="color:var(--clr-ok)"></i>
-    <span style="font-weight:600;color:var(--clr-ok)">Sin alertas activas</span>
+    <i class="bi bi-check-circle-fill tx-ok"></i>
+    <span class="fw-semibold tx-ok">Sin alertas activas</span>
   </div>
   {{end}}
 
@@ -31,19 +32,24 @@
     <button type="button" class="btn btn-sm btn-secondary d-none" id="browserNotifyBtn" title="Activar notificaciones del navegador">
       <i class="bi bi-bell"></i><span class="ms-1">Notificaciones</span>
     </button>
-    <a href="/alerts.csv" class="btn btn-sm btn-secondary d-inline-flex align-items-center" title="Descargar CSV"><i class="bi bi-download me-1"></i>CSV</a>
-    <a href="/alerts.json" class="btn btn-sm btn-secondary d-inline-flex align-items-center" title="Descargar JSON"><i class="bi bi-braces me-1"></i>JSON</a>
+    <div class="dropdown">
+      <button type="button" class="btn btn-sm btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-download me-1" aria-hidden="true"></i>Exportar</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="/alerts.csv"><i class="bi bi-filetype-csv me-2" aria-hidden="true"></i>CSV</a></li>
+        <li><a class="dropdown-item" href="/alerts.json"><i class="bi bi-braces me-2" aria-hidden="true"></i>JSON</a></li>
+      </ul>
+    </div>
   </div>
   </div>
   <div class="alerts-toolbar-filters">
     <i class="bi bi-funnel" aria-hidden="true"></i>
     <form method="get" action="/alerts" class="d-flex gap-2 flex-wrap">
-      <select name="severity" class="form-select form-select-sm js-auto-submit" style="width:auto">
+      <select name="severity" class="form-select form-select-sm js-auto-submit w-auto" aria-label="Filtrar por severidad">
         <option value="" {{if eq .FilterSeverity ""}}selected{{end}}>Todas las severidades</option>
         <option value="critical" {{if eq .FilterSeverity "critical"}}selected{{end}}>Crítica</option>
         <option value="warning" {{if eq .FilterSeverity "warning"}}selected{{end}}>Advertencia</option>
       </select>
-      <select name="server" class="form-select form-select-sm js-auto-submit" style="width:auto">
+      <select name="server" class="form-select form-select-sm js-auto-submit w-auto" aria-label="Filtrar por servidor">
         <option value="" {{if eq .FilterServer ""}}selected{{end}}>Todos los servidores</option>
         {{range .ServerNames}}
         <option value="{{.}}" {{if eq . $.FilterServer}}selected{{end}}>{{.}}</option>
@@ -63,7 +69,7 @@
     {{range .AlertGroups}}
     <div class="alert-group-header px-4 py-2 d-flex align-items-center justify-content-between gap-2 flex-wrap">
       <div class="d-flex align-items-center gap-2 min-w-0">
-        <i class="bi bi-server" style="color:var(--clr-accent)"></i>
+        <i class="bi {{serverTypeIcon .ServerType}} tx-accent" aria-hidden="true"></i>
         <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="text-decoration-none" style="font-weight:700;font-size:.88rem;color:var(--txt-primary)" title="Ver servidor">{{.ServerName}}</a>
         {{if eq .ServerType "pve"}}
           <span class="badge compact-badge pve">PVE</span>
@@ -88,21 +94,21 @@
                 data-alert-id="{{range $i, $a := .Alerts}}{{if $i}},{{end}}{{$a.ID}}{{end}}"
                 data-alert-title="Todas las alertas"
                 data-server-name="{{.ServerName}}">
-          <i class="bi bi-bell-slash"></i>
+          <i class="bi bi-bell-slash me-1" aria-hidden="true"></i>Suprimir todas
         </button>
         {{end}}{{end}}
       </div>
     </div>
     {{range .Alerts}}
-    <div class="alert-row d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
+    <div class="alert-row alert-row-active d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color)">
       <div style="flex-shrink:0;width:1.1rem;text-align:center">
         {{if eq .Severity "critical"}}
-          <i class="bi bi-exclamation-octagon-fill" style="color:var(--clr-danger)"></i>
+          <i class="bi bi-exclamation-octagon-fill tx-danger"></i>
         {{else}}
-          <i class="bi bi-exclamation-triangle-fill" style="color:var(--clr-warn)"></i>
+          <i class="bi bi-exclamation-triangle-fill tx-warn"></i>
         {{end}}
       </div>
-      <a href="/alerts/detail?alert_id={{.ID | urlquery}}" class="flex-grow-1 min-w-0 text-decoration-none" style="cursor:pointer" title="Ver detalle de alerta">
+      <a href="/alerts/detail?alert_id={{.ID | urlquery}}" class="flex-grow-1 min-w-0 text-decoration-none cursor-pointer" title="Ver detalle de alerta">
         <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
           <span style="font-weight:600;font-size:.88rem;color:var(--txt-primary)">{{.Title}}</span>
           {{if eq .Severity "critical"}}
@@ -111,34 +117,25 @@
             <span class="badge compact-badge warning">advertencia</span>
           {{end}}
         </div>
-        <div style="font-size:.8rem;color:var(--txt-secondary)">{{.Message}}</div>
-        <div class="d-flex gap-3 mt-1 flex-wrap" style="font-size:.75rem;color:var(--txt-muted)">
+        <div class="fs-sm tx-secondary">{{.Message}}</div>
+        <div class="d-flex gap-3 mt-1 flex-wrap fs-xs tx-muted">
           {{if .StoreName}}<span><i class="bi bi-hdd me-1"></i>{{.StoreName}}</span>{{end}}
           {{if .VMName}}<span><i class="bi bi-pc me-1"></i>{{.VMName}}</span>{{end}}
-          {{if .Value}}<span>Valor: <strong style="color:var(--txt-primary)">{{.Value}}</strong></span>{{end}}
+          {{if .Value}}<span>Valor: <strong class="tx-primary">{{.Value}}</strong></span>{{end}}
           {{if .Threshold}}<span>Umbral: {{.Threshold}}</span>{{end}}
         </div>
       </a>
-      <div class="d-flex gap-2 align-items-center" style="flex-shrink:0">
-        {{if eq .ServerType "pve"}}
-          <span class="badge compact-badge pve">PVE</span>
-        {{else if eq .ServerType "pbs"}}
-          <span class="badge compact-badge pbs">PBS</span>
-        {{else}}
-          <span class="badge compact-badge windows">Windows</span>
-        {{end}}
-        <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="btn btn-sm btn-outline-secondary" title="Ver servidor"><i class="bi bi-server"></i></a>
-        {{if $.Role}}{{if canEdit $.Role}}
+      {{if $.Role}}{{if canEdit $.Role}}
+      <div class="alert-row-actions d-flex gap-2 align-items-center" style="flex-shrink:0">
         <button class="btn btn-sm btn-outline-secondary suppress-open-btn"
-                aria-label="Suprimir alerta"
-                title="Suprimir temporalmente"
+                title="Suprimir temporalmente esta alerta"
                 data-alert-id="{{.ID}}"
                 data-alert-title="{{.Title}}"
                 data-server-name="{{.ServerName}}">
-          <i class="bi bi-bell-slash"></i>
+          <i class="bi bi-bell-slash me-1" aria-hidden="true"></i>Suprimir
         </button>
-        {{end}}{{end}}
       </div>
+      {{end}}{{end}}
     </div>
     {{end}}
     {{end}}
@@ -146,8 +143,8 @@
 </div>
 {{else}}
 <div class="card mb-4">
-  <div class="card-body text-center py-5" style="color:var(--txt-muted)">
-    <i class="bi bi-check-circle fs-2 mb-2 d-block" style="color:var(--clr-ok)"></i>
+  <div class="card-body text-center py-5 tx-muted">
+    <i class="bi bi-check-circle fs-2 mb-2 d-block tx-ok"></i>
     <div style="font-size:.9rem">No hay alertas{{if or .FilterSeverity .FilterServer}} con los filtros actuales{{end}}</div>
   </div>
 </div>
@@ -165,7 +162,7 @@
       {{range .SuppressedGroups}}
       <div class="alert-group-header px-4 py-2 d-flex align-items-center justify-content-between gap-2 flex-wrap" style="opacity:.75">
         <div class="d-flex align-items-center gap-2 min-w-0">
-          <i class="bi bi-server" style="color:var(--clr-accent)"></i>
+          <i class="bi {{serverTypeIcon .ServerType}} tx-accent" aria-hidden="true"></i>
           <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="text-decoration-none" style="font-weight:700;font-size:.88rem;color:var(--txt-primary)" title="Ver servidor">{{.ServerName}}</a>
           {{if eq .ServerType "pve"}}
             <span class="badge compact-badge pve">PVE</span>
@@ -194,8 +191,8 @@
       {{range .Rows}}
       <div class="alert-row d-flex align-items-center gap-3 px-4 py-3" style="border-bottom:1px solid var(--border-color);opacity:.6">
         <div class="flex-grow-1 min-w-0">
-          <a href="/alerts/detail?alert_id={{.Alert.ID | urlquery}}" class="text-decoration-none" style="font-weight:600;font-size:.85rem;color:var(--txt-primary)">{{.Alert.Title}}</a>
-          <div style="font-size:.78rem;color:var(--txt-secondary)">{{.Alert.Message}}</div>
+          <a href="/alerts/detail?alert_id={{.Alert.ID | urlquery}}" class="text-decoration-none fw-semibold fs-md tx-primary">{{.Alert.Title}}</a>
+          <div class="fs-xs tx-secondary">{{.Alert.Message}}</div>
           <div style="font-size:.73rem;color:var(--txt-muted);margin-top:.25rem">
             <i class="bi bi-server me-1"></i>
             {{if and .Alert.ServerType (gt .Alert.ServerID 0)}}
@@ -224,9 +221,9 @@
 {{if .AlertEvents}}
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-    <i class="bi bi-clock-history" style="color:var(--clr-accent)"></i>
+    <i class="bi bi-clock-history tx-accent"></i>
     <span>Historial de alertas</span>
-    <span class="status-pill muted ms-auto">Pagina {{.HistoryPagination.Page}} de {{.HistoryPagination.TotalPages}}</span>
+    {{if gt .HistoryPagination.TotalPages 1}}<span class="status-pill muted ms-auto">Página {{.HistoryPagination.Page}} de {{.HistoryPagination.TotalPages}}</span>{{end}}
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -242,22 +239,22 @@
       <tbody>
       {{range .AlertEvents}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .CreatedAt}}</td>
+        <td class="fs-sm tx-muted text-nowrap">{{formatTime .CreatedAt}}</td>
         <td>
-          {{if eq .EventType "appeared"}}<span class="status-pill bad">Aparece</span>
+          {{if eq .EventType "appeared"}}<span class="status-pill {{if eq .Severity "critical"}}bad{{else}}warn{{end}}">Aparece</span>
           {{else if eq .EventType "resolved"}}<span class="status-pill ok">Resuelta</span>
           {{else if eq .EventType "suppressed"}}<span class="status-pill muted">Suprimida</span>
           {{else if eq .EventType "unsuppressed"}}<span class="status-pill warn">Reactivada</span>
           {{else}}<span class="status-pill muted">{{.EventType}}</span>{{end}}
         </td>
-        <td style="font-size:.82rem">
+        <td class="fs-sm">
           {{if and .ServerType (gt .ServerID 0)}}
-            <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="text-decoration-none" title="Ver servidor"><i class="bi bi-server me-1"></i>{{.ServerName}}</a>
+            <a href="/servers/{{.ServerType}}/{{.ServerID}}" class="text-decoration-none" title="Ver servidor"><i class="bi {{serverTypeIcon .ServerType}} me-1" aria-hidden="true"></i>{{.ServerName}}</a>
           {{else}}
             {{.ServerName}}
           {{end}}
         </td>
-        <td style="font-size:.82rem"><a href="/alerts/detail?alert_id={{.AlertID | urlquery}}" class="text-decoration-none">{{.Title}}</a></td>
+        <td class="fs-sm"><a href="/alerts/detail?alert_id={{.AlertID | urlquery}}" class="text-decoration-none">{{.Title}}</a></td>
         <td class="text-truncate" style="max-width:480px;font-size:.78rem;color:var(--txt-muted)" title="{{if .Note}}{{.Note}} · {{end}}{{.Message}}">
           {{if .Note}}{{.Note}} · {{end}}{{.Message}}
         </td>
@@ -266,9 +263,10 @@
       </tbody>
     </table>
   </div>
+  {{if gt .HistoryPagination.TotalPages 1}}
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <div style="font-size:.78rem;color:var(--txt-muted)">Pagina {{.HistoryPagination.Page}} de {{.HistoryPagination.TotalPages}} - {{.HistoryPagination.TotalItems}} eventos</div>
-    <nav aria-label="Paginacion historial de alertas">
+    <div class="fs-xs tx-muted">Página {{.HistoryPagination.Page}} de {{.HistoryPagination.TotalPages}} · {{.HistoryPagination.TotalItems}} eventos</div>
+    <nav aria-label="Paginación historial de alertas">
       <ul class="pagination pagination-sm mb-0">
         <li class="page-item {{if not .HistoryPagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/alerts?{{.HistoryPagination.Query}}&history_page={{.HistoryPagination.PrevPage}}">Anterior</a></li>
         {{range .HistoryPagination.Pages}}
@@ -278,6 +276,7 @@
       </ul>
     </nav>
   </div>
+  {{end}}
 </div>
 {{end}}
 
@@ -293,9 +292,9 @@
         {{.CSRFField}}
         <input type="hidden" id="suppressAlertId" name="alert_id">
         <div class="modal-body pt-1">
-          <p id="suppressAlertDesc" class="mb-3" style="font-size:.85rem;color:var(--txt-secondary)"></p>
+          <p id="suppressAlertDesc" class="mb-3 fs-md tx-secondary"></p>
           <div class="mb-3">
-            <label class="form-label" style="font-size:.82rem">Suprimir durante</label>
+            <label class="form-label fs-sm">Suprimir durante</label>
             <select name="hours" class="form-select form-select-sm">
               <option value="12" selected>12 horas</option>
               <option value="24">1 día</option>
@@ -309,7 +308,7 @@
             </select>
           </div>
           <div>
-            <label class="form-label" style="font-size:.82rem">Motivo <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <label class="form-label fs-sm">Motivo <span class="tx-muted">(opcional)</span></label>
             <input type="text" name="reason" class="form-control form-control-sm" placeholder="Mantenimiento programado...">
           </div>
         </div>

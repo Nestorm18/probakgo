@@ -4,32 +4,34 @@
 <a href="/servers/windows" class="btn btn-sm btn-secondary me-1"><i class="bi bi-arrow-left me-1"></i>Volver</a>
 {{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
+{{with .Status}}{{template "server_status_strip" .}}{{end}}
 
 <div class="detail-info-grid mb-4">
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">IP Local</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">{{.Server.IP}}</div>
+      <div class="info-tile-value mono fs-sm">{{.Server.IP}}</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
-      <div class="info-tile-label">IP Publica</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">
-        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}
+      <div class="info-tile-label">IP Pública</div>
+      <div class="info-tile-value mono fs-sm">
+        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span class="tx-muted">-</span>{{end}}
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
-      <div class="info-tile-label">Version cliente</div>
+      <div class="info-tile-label">Versión cliente</div>
       <div class="info-tile-value"><code>{{if .Server.ClientVersion}}{{.Server.ClientVersion}}{{else}}-{{end}}</code></div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
-      <div class="info-tile-label">Conexion</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-label">Conexión</div>
+      <div class="info-tile-value fs-sm">
         {{if .Heartbeat.Online}}<span class="status-pill ok" title="{{.Heartbeat.Label}}">Online</span>
         {{else if .Heartbeat.Seen}}<span class="status-pill bad" title="{{.Heartbeat.Label}}">Offline</span>
         {{else}}<span class="status-pill warn">Sin heartbeat</span>{{end}}
@@ -39,10 +41,10 @@
   <div class="col-12 col-lg-6">
     <div class="info-tile h-100">
       <div class="info-tile-label">Machine ID</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-value fs-sm">
         {{if .Server.MachineID}}
-          <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i><code>{{.Server.MachineID}}</code>
-        {{else}}<span style="color:var(--txt-muted)">Sin vincular</span>{{end}}
+          <i class="bi bi-shield-lock me-1 tx-ok"></i><code>{{.Server.MachineID}}</code>
+        {{else}}<span class="tx-muted">Sin vincular</span>{{end}}
       </div>
     </div>
   </div>
@@ -50,7 +52,7 @@
 
 <div class="card mb-4">
   <div class="card-header">
-    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Discos (ultimo reporte)
+    <i class="bi bi-hdd me-2 tx-accent"></i>Discos (último reporte)
   </div>
   <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0" style="min-width:760px">
@@ -69,15 +71,15 @@
       {{range .Disks}}
       <tr>
         <td style="font-family:'DM Mono',monospace;color:var(--txt-primary);font-weight:500">{{.Name}}</td>
-        <td>{{if .Label}}{{.Label}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
-        <td style="color:var(--txt-muted)">{{.FileSystem}}</td>
+        <td>{{if .Label}}{{.Label}}{{else}}<span class="tx-muted">-</span>{{end}}</td>
+        <td class="tx-muted">{{.FileSystem}}</td>
         <td>{{formatBytes .Used}}</td>
         <td>{{formatBytes .Free}}</td>
         <td>{{formatBytes .Total}}</td>
         <td><span class="status-pill {{.BadgeClass}}" title="{{.Title}}">{{.BadgeLabel}}</span></td>
       </tr>
       {{else}}
-      <tr><td colspan="7" class="text-center p-4" style="color:var(--txt-muted)">Sin discos en el ultimo reporte</td></tr>
+      <tr><td colspan="7" class="text-center p-4 tx-muted">Sin discos en el último reporte</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -86,14 +88,14 @@
 
 <div class="card mb-4">
   <div class="card-header">
-    <i class="bi bi-graph-up me-2" style="color:var(--clr-accent)"></i>Uso de espacio en el tiempo
-    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Ultimos {{.DiskChartDays}} dias</span>
+    <i class="bi bi-graph-up me-2 tx-accent"></i>Uso de espacio en el tiempo
+    <span class="fs-xs tx-muted ms-2">Últimos {{.DiskChartDays}} días</span>
   </div>
   <div class="card-body">
     {{if .DiskChartData}}
     <div style="height:260px"><canvas id="windowsDiskChart"></canvas></div>
     {{else}}
-    <div class="text-center py-4" style="color:var(--txt-muted);font-size:.85rem">Sin historial suficiente para mostrar grafico</div>
+    <div class="text-center py-4 tx-muted fs-md">Sin historial suficiente para mostrar gráfico</div>
     {{end}}
   </div>
 </div>
@@ -101,18 +103,18 @@
 {{if .Role}}{{if canEdit .Role}}
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-    <span><i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Alertas Windows</span>
+    <span><i class="bi bi-bell me-2 tx-accent"></i>Alertas Windows</span>
     <form method="post" action="/alerts/suppress" class="d-flex align-items-center gap-2 flex-wrap m-0" data-totp-skip>
       {{.CSRFField}}
       <input type="hidden" name="alert_id" value="{{.AllAlertIDs}}">
       <input type="hidden" name="back" value="{{.BackURL}}">
       <input type="hidden" name="reason" value="Silenciado desde Windows">
-      <select name="hours" class="form-select form-select-sm" style="width:auto">
+      <select name="hours" class="form-select form-select-sm w-auto">
         <option value="12" selected>12 horas</option>
-        <option value="24">1 dia</option>
-        <option value="72">3 dias</option>
-        <option value="168">7 dias</option>
-        <option value="720">30 dias</option>
+        <option value="24">1 día</option>
+        <option value="72">3 días</option>
+        <option value="168">7 días</option>
+        <option value="720">30 días</option>
       </select>
       <button type="submit" class="btn btn-sm btn-outline-secondary">
         <i class="bi bi-bell-slash me-1"></i>Silenciar todas
@@ -126,14 +128,14 @@
           <th>Alerta</th>
           <th>Detalle</th>
           <th>Estado</th>
-          <th class="text-end">Accion</th>
+          <th class="text-end">Acción</th>
         </tr>
       </thead>
       <tbody>
       {{range .AlertControls}}
       <tr>
-        <td style="font-weight:600;color:var(--txt-primary)">{{.Title}}</td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Detail}}</td>
+        <td class="fw-semibold tx-primary">{{.Title}}</td>
+        <td class="fs-sm tx-secondary">{{.Detail}}</td>
         <td>
           {{if .Suppressed}}
             <span class="status-pill muted" title="{{formatTime .Until}}">Silenciada</span>
@@ -142,7 +144,7 @@
             <span class="status-pill ok">Activa</span>
           {{end}}
         </td>
-        <td class="text-end" style="white-space:nowrap">
+        <td class="text-end text-nowrap">
           {{if .Suppressed}}
           <form method="post" action="/alerts/unsuppress" class="m-0" data-totp-skip>
             {{$.CSRFField}}
@@ -158,12 +160,12 @@
             <input type="hidden" name="alert_id" value="{{.ID}}">
             <input type="hidden" name="back" value="{{$.BackURL}}">
             <input type="hidden" name="reason" value="Silenciado desde Windows">
-            <select name="hours" class="form-select form-select-sm" style="width:auto">
+            <select name="hours" class="form-select form-select-sm w-auto">
               <option value="12" selected>12 horas</option>
-              <option value="24">1 dia</option>
-              <option value="72">3 dias</option>
-              <option value="168">7 dias</option>
-              <option value="720">30 dias</option>
+              <option value="24">1 día</option>
+              <option value="72">3 días</option>
+              <option value="168">7 días</option>
+              <option value="720">30 días</option>
             </select>
             <button type="submit" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-bell-slash me-1"></i>Silenciar
@@ -181,8 +183,8 @@
 
 <div class="card">
   <div class="card-header">
-    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
-    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
+    <i class="bi bi-clock-history me-2 tx-accent"></i>Historial de reportes
+    <span class="fs-xs tx-muted ms-2">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
   </div>
   <div class="card-body p-0" style="overflow-x:auto;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0" style="min-width:520px">
@@ -195,17 +197,18 @@
       <tbody>
       {{range .Reports}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+        <td class="fs-sm tx-secondary">{{formatTime .ReportedAt}}</td>
         <td>{{if .IsStale}}<span class="status-pill bad">Sin reporte</span>{{else}}<span class="status-pill ok">Recibido</span>{{end}}</td>
       </tr>
       {{else}}
-      <tr><td colspan="2" class="text-center p-4" style="color:var(--txt-muted)">Sin reportes</td></tr>
+      <tr><td colspan="2" class="text-center p-4 tx-muted">Sin reportes</td></tr>
       {{end}}
       </tbody>
     </table>
   </div>
+  {{if gt .Pagination.TotalPages 1}}
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <div style="font-size:.78rem;color:var(--txt-muted)">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    <div class="fs-xs tx-muted">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
     <nav aria-label="Paginación historial Windows">
       <ul class="pagination pagination-sm mb-0">
         <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/windows/{{.Server.ID}}?page={{.Pagination.PrevPage}}">Anterior</a></li>
@@ -216,6 +219,7 @@
       </ul>
     </nav>
   </div>
+  {{end}}
 </div>
 
 {{end}}

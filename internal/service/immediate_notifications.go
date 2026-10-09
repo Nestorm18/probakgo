@@ -186,7 +186,7 @@ func dispatchImmediateEmail(ctx context.Context, st *store.Store, cfg *domain.Em
 		}
 	} else {
 		if len(selected) > 0 {
-			subject := fmt.Sprintf("Probakgo alerta critica: %d alerta(s) activa(s)", len(selected))
+			subject := fmt.Sprintf("Probakgo alerta crítica: %d alerta(s) activa(s)", len(selected))
 			if err := deliver(subject, renderImmediateCriticalEmail(selected, now)); err != nil {
 				return err
 			}

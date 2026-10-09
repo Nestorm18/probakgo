@@ -177,14 +177,14 @@ func SendCriticalAlertTestEmail(st *store.Store) error {
 		ServerType: "pve",
 		Type:       domain.AlertTypeBackupError,
 		Severity:   domain.AlertSeverityCritical,
-		Title:      "Alerta critica de prueba",
-		Message:    "Este correo verifica el diseño de las alertas criticas. No corresponde a un fallo real.",
+		Title:      "Alerta crítica de prueba",
+		Message:    "Este correo verifica el diseño de las alertas críticas. No corresponde a un fallo real.",
 		Value:      "PRUEBA",
 		Threshold:  "CRITICA",
 		DetectedAt: now,
 	}
 
-	return sendSMTP(ctx, cfg, recipients, "[PRUEBA] Probakgo alerta critica", renderImmediateCriticalEmail([]domain.Alert{alert}, now))
+	return sendSMTP(ctx, cfg, recipients, "[PRUEBA] Probakgo alerta crítica", renderImmediateCriticalEmail([]domain.Alert{alert}, now))
 }
 
 func shouldSendImmediateCriticalEmail(a domain.Alert) bool {
@@ -214,7 +214,7 @@ func renderImmediateCriticalEmail(alerts []domain.Alert, now time.Time) string {
 	b.WriteString(`<table role="presentation" width="100%" cellpadding="18" cellspacing="0" style="background-color:#fff5f5;border-left:4px solid #dc3545;border-radius:4px;margin-bottom:22px;">`)
 	b.WriteString(`<tr><td>`)
 	b.WriteString(`<h2 style="margin:0 0 8px 0;font-size:19px;color:#842029;">`)
-	b.WriteString(template.HTMLEscapeString(fmt.Sprintf("%d alerta(s) critica(s) activa(s)", len(alerts))))
+	b.WriteString(template.HTMLEscapeString(fmt.Sprintf("%d alerta(s) crítica(s) activa(s)", len(alerts))))
 	b.WriteString(`</h2>`)
 	b.WriteString(`<p style="margin:0;color:#664d03;font-size:14px;">Revisa estos servidores cuanto antes. Las alertas suprimidas o en mantenimiento no se incluyen en este aviso.</p>`)
 	b.WriteString(`</td></tr></table>`)
@@ -436,9 +436,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 		if activeMissing > 0 {
 			if activeMissing == 1 {
-				row.StaleReason = "1 VM activa sin backup en el ultimo job"
+				row.StaleReason = "1 VM activa sin backup en el último job"
 			} else {
-				row.StaleReason = fmt.Sprintf("%d VMs activas sin backup en el ultimo job", activeMissing)
+				row.StaleReason = fmt.Sprintf("%d VMs activas sin backup en el último job", activeMissing)
 			}
 			pveIssues = append(pveIssues, row)
 		} else {

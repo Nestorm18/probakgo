@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"html/template"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -92,7 +94,9 @@ type paginationView struct {
 	PrevPage   int
 	NextPage   int
 	Pages      []int
-	Query      string
+	// Query is built server-side from escaped values, so templates may
+	// embed it in an href without escaping its "=" and "&" separators.
+	Query template.URL
 }
 
 func buildPagination(page, totalItems, pageSize int, query string) paginationView {
@@ -137,7 +141,7 @@ func buildPagination(page, totalItems, pageSize int, query string) paginationVie
 		PrevPage:   page - 1,
 		NextPage:   page + 1,
 		Pages:      pages,
-		Query:      query,
+		Query:      template.URL(query),
 	}
 }
 
@@ -236,7 +240,7 @@ func buildPBSAlertOverrideView(cfg domain.PBSAlertConfig) alertOverrideView {
 		}
 	}
 	if !cfg.VerifyAlert {
-		parts = append(parts, "Verificacion desactivada")
+		parts = append(parts, "Verificación desactivada")
 	}
 	if cfg.SwapAlert != nil {
 		if *cfg.SwapAlert == 0 {
@@ -324,7 +328,7 @@ func buildServerHealth(count serverHealthView) serverHealthView {
 		}
 		count.CSSClass = "warn"
 	}
-	count.Title = fmt.Sprintf("%d alerta(s) activa(s): %d critica(s), %d aviso(s)", count.Total, count.Critical, count.Warning)
+	count.Title = fmt.Sprintf("%d alerta(s) activa(s): %d crítica(s), %d aviso(s)", count.Total, count.Critical, count.Warning)
 	return count
 }
 
@@ -368,6 +372,37 @@ func (h *WebH) visibleAlertsForServerLists(ctx context.Context) []domain.Alert {
 		return nil
 	}
 	return alerts
+}
+
+// serverStatusView is the summary strip shown at the top of server detail pages.
+type serverStatusView struct {
+	Health     serverHealthView
+	Alerts     []domain.Alert
+	AlertsURL  string
+	LastReport *time.Time
+}
+
+func (h *WebH) serverStatus(ctx context.Context, serverType string, serverID int64, serverName string, lastReport *time.Time) serverStatusView {
+	var alerts []domain.Alert
+	for _, alert := range h.visibleAlertsForServerLists(ctx) {
+		if alert.ServerType == serverType && alert.ServerID == serverID {
+			alerts = append(alerts, alert)
+		}
+	}
+	sort.SliceStable(alerts, func(i, j int) bool {
+		return alerts[i].Severity == domain.AlertSeverityCritical && alerts[j].Severity != domain.AlertSeverityCritical
+	})
+	health := buildServerHealth(alertCountsByServer(alerts, serverType)[serverID])
+	maintenance, _ := h.store.GetActiveServerMaintenances(ctx)
+	if maint := maintenanceByServer(maintenance, serverType, serverID); maint.Active {
+		health = buildMaintenanceHealth(maint)
+	}
+	return serverStatusView{
+		Health:     health,
+		Alerts:     alerts,
+		AlertsURL:  "/alerts?server=" + url.QueryEscape(serverName),
+		LastReport: lastReport,
+	}
 }
 
 func currentPVESwapView(report *domain.PVEReport, heartbeat *domain.ServerHeartbeat) swapView {
@@ -682,10 +717,16 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 		vmAlertMap[c.VMID] = c
 	}
 
+	var lastReportAt *time.Time
+	if latestReport != nil {
+		lastReportAt = &latestReport.ReportedAt
+	}
+
 	h.tmpl.Render(w, r, "server_pve_detail.html", map[string]any{
 		"Username":        username,
 		"Role":            role,
 		"Server":          sv,
+		"Status":          h.serverStatus(ctx, "pve", sv.ID, sv.DisplayName, lastReportAt),
 		"ServerURL":       serverURL,
 		"Reports":         reports,
 		"Pagination":      pagination,
@@ -708,14 +749,14 @@ func (h *WebH) PVEServerDetail(w http.ResponseWriter, r *http.Request) {
 
 func buildHeartbeatView(hb domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
 	if hb.ID == 0 {
-		return heartbeatView{Label: "Sin datos", CSSClass: "muted", Threshold: thresholdMinutes}
+		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
 	}
 	return buildHeartbeatViewPtr(&hb, thresholdMinutes)
 }
 
 func buildHeartbeatViewPtr(hb *domain.ServerHeartbeat, thresholdMinutes int) heartbeatView {
 	if hb == nil || hb.ID == 0 {
-		return heartbeatView{Label: "Sin datos", CSSClass: "muted", Threshold: thresholdMinutes}
+		return heartbeatView{Label: "Sin heartbeat", CSSClass: "muted", Threshold: thresholdMinutes}
 	}
 	online := true
 	if thresholdMinutes > 0 {
@@ -932,19 +973,32 @@ func (h *WebH) PBSServerDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	alertCfg, _ := h.store.GetPBSAlertConfig(ctx, id)
+	diskThreshold := 85
+	if emailCfg, _ := h.store.GetEmailConfig(ctx); emailCfg != nil {
+		diskThreshold = emailCfg.AlertDiskPct
+	}
+	if alertCfg.DiskPct != nil {
+		diskThreshold = *alertCfg.DiskPct
+	}
+	var lastReportAt *time.Time
+	if len(latestReports) > 0 {
+		lastReportAt = &latestReports[0].ReportedAt
+	}
 
 	h.tmpl.Render(w, r, "server_pbs_detail.html", map[string]any{
-		"Username":    username,
-		"Role":        role,
-		"Server":      sv,
-		"Reports":     reports,
-		"Pagination":  pagination,
-		"Stores":      storeDetails,
-		"Tasks":       taskDetails,
-		"Swap":        latestPBSSwapView(latestReports),
-		"AlertConfig": alertCfg,
-		"Flash":       r.URL.Query().Get("flash"),
-		"FlashOK":     r.URL.Query().Get("ok") == "1",
+		"Username":      username,
+		"Role":          role,
+		"Server":        sv,
+		"Status":        h.serverStatus(ctx, "pbs", sv.ID, sv.DisplayName, lastReportAt),
+		"Reports":       reports,
+		"Pagination":    pagination,
+		"Stores":        storeDetails,
+		"Tasks":         taskDetails,
+		"Swap":          latestPBSSwapView(latestReports),
+		"AlertConfig":   alertCfg,
+		"DiskThreshold": diskThreshold,
+		"Flash":         r.URL.Query().Get("flash"),
+		"FlashOK":       r.URL.Query().Get("ok") == "1",
 	})
 }
 
@@ -1075,6 +1129,7 @@ func (h *WebH) WindowsServerDetail(w http.ResponseWriter, r *http.Request) {
 		"Username":      username,
 		"Role":          role,
 		"Server":        sv,
+		"Status":        h.serverStatus(ctx, "windows", sv.ID, sv.DisplayName, windowsReportTime(latestReport)),
 		"Reports":       reports,
 		"Pagination":    pagination,
 		"DiskChartData": diskChartData,

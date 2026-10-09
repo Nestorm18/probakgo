@@ -4,7 +4,7 @@
 
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center gap-2">
-    <i class="bi bi-person-check" style="color:var(--clr-accent)"></i>
+    <i class="bi bi-person-check tx-accent"></i>
     Últimos accesos
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
@@ -21,15 +21,15 @@
       <tbody>
       {{range .Users}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-primary)">{{.Username}}</td>
+        <td class="fs-sm tx-primary">{{.Username}}</td>
         <td><span class="badge bg-secondary">{{.Role}}</span></td>
         <td>{{if .IsActive}}<span class="status-pill ok">Activo</span>{{else}}<span class="status-pill muted">Inactivo</span>{{end}}</td>
-        <td style="font-size:.82rem;color:var(--txt-muted)">{{if .LastLoginAt}}{{formatTime .LastLoginAt}}{{else}}-{{end}}</td>
-        <td>{{if .LastLoginIP}}<code style="font-size:.78rem">{{.LastLoginIP}}</code>{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}</td>
+        <td class="fs-sm tx-muted">{{if .LastLoginAt}}{{formatTime .LastLoginAt}}{{else}}-{{end}}</td>
+        <td>{{if .LastLoginIP}}<code class="fs-xs">{{.LastLoginIP}}</code>{{else}}<span class="tx-muted">-</span>{{end}}</td>
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="text-center py-4" style="color:var(--txt-muted)">Sin usuarios</td>
+        <td colspan="5" class="text-center py-4 tx-muted">Sin usuarios</td>
       </tr>
       {{end}}
       </tbody>
@@ -39,7 +39,7 @@
 
 <div class="card">
   <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-    <i class="bi bi-journal-text" style="color:var(--clr-accent)"></i>
+    <i class="bi bi-journal-text tx-accent"></i>
     <span>Cambios administrativos recientes</span>
     <span class="status-pill muted ms-auto">Página {{.AuditPage}}</span>
   </div>
@@ -50,7 +50,7 @@
           <th>Fecha</th>
           <th>Usuario</th>
           <th>IP</th>
-          <th>Accion</th>
+          <th>Acción</th>
           <th>Objetivo</th>
           <th>Metadata</th>
         </tr>
@@ -58,17 +58,17 @@
       <tbody>
       {{range .Rows}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .CreatedAt}}</td>
-        <td style="font-size:.82rem">
-          {{if .ActorUsername}}{{.ActorUsername}}{{else}}<span style="color:var(--txt-muted)">-</span>{{end}}
+        <td class="fs-sm tx-muted text-nowrap">{{formatTime .CreatedAt}}</td>
+        <td class="fs-sm">
+          {{if .ActorUsername}}{{.ActorUsername}}{{else}}<span class="tx-muted">-</span>{{end}}
           {{if .ActorRole}}<span class="badge bg-secondary ms-1">{{.ActorRole}}</span>{{end}}
         </td>
-        <td><code style="font-size:.78rem">{{.ActorIP}}</code></td>
+        <td><code class="fs-xs">{{.ActorIP}}</code></td>
         <td><span class="status-pill muted">{{.Action}}</span></td>
-        <td style="font-size:.82rem">
-          {{if .TargetType}}<span style="color:var(--txt-muted)">{{.TargetType}}</span>{{end}}
+        <td class="fs-sm">
+          {{if .TargetType}}<span class="tx-muted">{{.TargetType}}</span>{{end}}
           {{if .TargetName}}<span>{{.TargetName}}</span>{{end}}
-          {{if .TargetID}}<code style="font-size:.72rem">{{.TargetID}}</code>{{end}}
+          {{if .TargetID}}<code class="fs-2xs">{{.TargetID}}</code>{{end}}
         </td>
         <td class="text-truncate" style="max-width:420px;font-size:.78rem;color:var(--txt-muted)" title="{{.Metadata}}">
           {{.Metadata}}
@@ -76,7 +76,7 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">
+        <td colspan="6" class="text-center py-5 tx-muted">
           <i class="bi bi-journal-text me-2"></i>No hay eventos registrados
         </td>
       </tr>
@@ -92,7 +92,7 @@
     {{else}}
     <button class="btn btn-sm btn-secondary" disabled><i class="bi bi-chevron-left me-1"></i>Anterior</button>
     {{end}}
-    <span style="font-size:.78rem;color:var(--txt-muted)">25 eventos por página</span>
+    <span class="fs-xs tx-muted">25 eventos por página</span>
     {{if .AuditHasNext}}
     <a class="btn btn-sm btn-secondary" href="/settings/audit-log?page={{.AuditNextPage}}">
       Siguiente<i class="bi bi-chevron-right ms-1"></i>

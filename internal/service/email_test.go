@@ -447,7 +447,7 @@ func TestRenderImmediateCriticalEmail_UsesReportStyle(t *testing.T) {
 
 	for _, want := range []string{
 		"Probakgo alerta critica",
-		"1 alerta(s) critica(s) activa(s)",
+		"1 alerta(s) crítica(s) activa(s)",
 		"pve-prod",
 		"Backup fallido",
 		"El ultimo job termino con error",

@@ -52,7 +52,7 @@ func (h *WebH) TelegramSettingsPost(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	existing, err := h.store.GetTelegramConfig(ctx)
 	if err != nil {
-		redirectTelegramSettingsError(w, r, "No se pudo leer la configuracion")
+		redirectTelegramSettingsError(w, r, "No se pudo leer la configuración")
 		return
 	}
 	token := strings.TrimSpace(r.FormValue("bot_token"))
@@ -91,7 +91,7 @@ func (h *WebH) TelegramSettingsPost(w http.ResponseWriter, r *http.Request) {
 		"bot_changed":   tokenChanged,
 		"is_enabled":    cfg.IsEnabled,
 	})
-	http.Redirect(w, r, "/settings/telegram?flash=Configuracion+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/telegram?flash=Configuraci%C3%B3n+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) ProfileTelegramPair(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +109,7 @@ func (h *WebH) ProfileTelegramPair(w http.ResponseWriter, r *http.Request) {
 	}
 	code, ok := session.GetTelegramPairing(r, user.ID, time.Now())
 	if !ok {
-		redirectTelegramProfileError(w, r, "El codigo de vinculacion ha caducado; recarga el perfil")
+		redirectTelegramProfileError(w, r, "El código de vinculación ha caducado; recarga el perfil")
 		return
 	}
 	chat, err := h.telegramSender().FindPairingChat(ctx, cfg.BotToken, code)
@@ -155,7 +155,7 @@ func (h *WebH) ProfileTelegramTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "profile.telegram_test", "user", strconv.FormatInt(user.ID, 10), user.Username, nil)
-	http.Redirect(w, r, "/profile?flash=Notificacion+de+prueba+enviada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/profile?flash=Notificaci%C3%B3n+de+prueba+enviada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) ProfileTelegramDelete(w http.ResponseWriter, r *http.Request) {
@@ -178,7 +178,7 @@ func (h *WebH) ProfileTelegramDelete(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) UserTelegramDelete(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil || id <= 0 {
-		redirectWithFlash(w, r, "/users", "Usuario no valido", false)
+		redirectWithFlash(w, r, "/users", "Usuario no válido", false)
 		return
 	}
 	user, err := h.store.GetUser(r.Context(), id)
@@ -201,12 +201,12 @@ func (h *WebH) TelegramTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.audit(r, "settings.telegram_test", "settings", "telegram", "Telegram", nil)
-	http.Redirect(w, r, "/settings/telegram?flash=Notificacion+de+prueba+enviada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/telegram?flash=Notificaci%C3%B3n+de+prueba+enviada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) TelegramDelete(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("confirm") != "delete" {
-		redirectTelegramSettingsError(w, r, "Confirma la eliminacion de la configuracion")
+		redirectTelegramSettingsError(w, r, "Confirma la eliminación de la configuración")
 		return
 	}
 	if err := h.store.DeleteTelegramConfig(r.Context()); err != nil {
@@ -215,7 +215,7 @@ func (h *WebH) TelegramDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = session.ClearTelegramPairing(w, r)
 	h.audit(r, "settings.telegram_delete", "settings", "telegram", "Telegram", nil)
-	http.Redirect(w, r, "/settings/telegram?flash=Configuracion+de+Telegram+eliminada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/telegram?flash=Configuraci%C3%B3n+de+Telegram+eliminada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) telegramPairingURL(w http.ResponseWriter, r *http.Request, userID int64, cfg *domain.TelegramConfig) string {

@@ -37,7 +37,7 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := r.FormValue("expected_finish_time"); v != "" {
 		if _, err := time.Parse("15:04", v); err != nil {
-			http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Hora+limite+no+valida", http.StatusSeeOther)
+			http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Hora+l%C3%ADmite+no+v%C3%A1lida", http.StatusSeeOther)
 			return
 		}
 		cfg.ExpectedFinishTime = &v
@@ -63,10 +63,10 @@ func (h *WebH) PVEAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"maintenance_on": maintenance,
 	})
 	if r.FormValue("back") == "list" {
-		http.Redirect(w, r, "/servers/pve?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
+		http.Redirect(w, r, "/servers/pve?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) WindowsAlertConfigPost(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +81,7 @@ func (h *WebH) WindowsAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 	if v := r.FormValue("disk_pct"); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil || n < 0 || n > 99 {
-			http.Redirect(w, r, "/servers/windows?flash=Porcentaje+de+disco+Windows+no+valido", http.StatusSeeOther)
+			http.Redirect(w, r, "/servers/windows?flash=Porcentaje+de+disco+Windows+no+v%C3%A1lido", http.StatusSeeOther)
 			return
 		}
 		cfg.DiskPct = &n
@@ -98,10 +98,10 @@ func (h *WebH) WindowsAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"maintenance_on": maintenance,
 	})
 	if r.FormValue("back") == "list" {
-		http.Redirect(w, r, "/servers/windows?flash=Configuracion+de+alertas+guardada&ok=1", http.StatusSeeOther)
+		http.Redirect(w, r, "/servers/windows?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/servers/windows/"+strconv.FormatInt(id, 10)+"?flash=Configuracion+de+alertas+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/servers/windows/"+strconv.FormatInt(id, 10)+"?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +146,7 @@ func (h *WebH) PVEVMAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 			"min_size_mb": cfg.MinSizeMB,
 		})
 	}
-	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+VM+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/servers/pve/"+strconv.FormatInt(id, 10)+"?flash=Configuraci%C3%B3n+de+VM+guardada&ok=1", http.StatusSeeOther)
 }
 
 func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
@@ -197,8 +197,8 @@ func (h *WebH) PBSAlertConfigPost(w http.ResponseWriter, r *http.Request) {
 		"maintenance_on":  maintenance,
 	})
 	if r.FormValue("back") == "list" {
-		http.Redirect(w, r, "/servers/pbs?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
+		http.Redirect(w, r, "/servers/pbs?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/servers/pbs/"+strconv.FormatInt(id, 10)+"?flash=Configuración+de+alertas+guardada&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/servers/pbs/"+strconv.FormatInt(id, 10)+"?flash=Configuraci%C3%B3n+de+alertas+guardada&ok=1", http.StatusSeeOther)
 }

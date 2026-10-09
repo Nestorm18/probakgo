@@ -694,7 +694,7 @@ func TestEvalPBSDisk_OverThreshold(t *testing.T) {
 	if !hasAlert(alerts, domain.AlertTypeDisk, "pbs1") {
 		t.Error("expected disk alert for pbs1")
 	}
-	if len(alerts) != 1 || !strings.Contains(alerts[0].Message, "estimacion: 9 dias") {
+	if len(alerts) != 1 || !strings.Contains(alerts[0].Message, "estimación: 9 días") {
 		t.Fatalf("expected disk alert to include fill estimation, got %+v", alerts)
 	}
 }

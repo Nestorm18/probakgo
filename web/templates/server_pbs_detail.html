@@ -13,6 +13,8 @@
 </div>
 {{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
+{{with .Status}}{{template "server_status_strip" .}}{{end}}
 
 
 <!-- Info tiles -->
@@ -20,14 +22,14 @@
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">IP Local</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">{{.Server.IP}}</div>
+      <div class="info-tile-value mono fs-sm">{{.Server.IP}}</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">IP Pública</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">
-        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+      <div class="info-tile-value mono fs-sm">
+        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span class="tx-muted">–</span>{{end}}
       </div>
     </div>
   </div>
@@ -40,17 +42,17 @@
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">Machine ID</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-value fs-sm">
         {{if .Server.MachineID}}
-          <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i><code>{{.Server.MachineID}}</code>
-        {{else}}<span style="color:var(--txt-muted)">Sin vincular</span>{{end}}
+          <i class="bi bi-shield-lock me-1 tx-ok"></i><code>{{.Server.MachineID}}</code>
+        {{else}}<span class="tx-muted">Sin vincular</span>{{end}}
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">Swap</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-value fs-sm">
         <span class="status-pill {{.Swap.CSSClass}}" title="{{.Swap.Title}}">{{.Swap.Label}}</span>
         {{if .Swap.Enabled}}
         <div style="font-size:.72rem;color:var(--txt-muted);margin-top:.25rem">{{formatBytes .Swap.Used}} / {{formatBytes .Swap.Total}}</div>
@@ -62,16 +64,16 @@
 
 {{if .Tasks}}
 <div class="card mb-4">
-  <div class="card-header"><i class="bi bi-arrow-left-right me-2" style="color:var(--clr-accent)"></i>Sincronizaciones y mantenimiento (ultimo reporte)</div>
-  <div class="card-body p-0" style="overflow-x:auto">
-    <table class="table table-sm mb-0" style="font-size:.8rem">
-      <thead><tr><th>Tipo</th><th>Origen / datastore</th><th>Estado</th><th>Finalizo</th></tr></thead>
+  <div class="card-header"><i class="bi bi-arrow-left-right me-2 tx-accent"></i>Sincronizaciones y mantenimiento (último reporte)</div>
+  <div class="card-body p-0 overflow-x-auto">
+    <table class="table table-sm mb-0 fs-sm">
+      <thead><tr><th>Tipo</th><th>Origen / datastore</th><th>Estado</th><th>Finalizó</th></tr></thead>
       <tbody>{{range .Tasks}}
         <tr>
           <td><i class="bi {{if eq .Title "Garbage collection"}}bi-recycle{{else}}bi-arrow-left-right{{end}} me-1"></i>{{.Title}}</td>
-          <td style="color:var(--txt-secondary)">{{.Detail}}</td>
+          <td class="tx-secondary">{{.Detail}}</td>
           <td><span class="status-pill {{.CSSClass}}" title="{{.StatusTitle}}">{{.Status}}</span></td>
-          <td style="color:var(--txt-muted)">{{if .EndedAt}}{{formatTime .EndedAt}}{{else}}-{{end}}</td>
+          <td class="tx-muted">{{if .EndedAt}}{{formatTime .EndedAt}}{{else}}-{{end}}</td>
         </tr>
       {{end}}</tbody>
     </table>
@@ -81,57 +83,55 @@
 {{if .Stores}}
 <div class="mb-4">
   <div style="font-size:.72rem;font-weight:600;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.75rem">
-    <i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Datastores (último reporte)
+    <i class="bi bi-archive me-2 tx-accent"></i>Datastores (último reporte)
   </div>
   {{range .Stores}}
   <div class="card mb-3">
     <div class="card-header d-flex align-items-center justify-content-between">
-      <span><i class="bi bi-hdd me-2" style="color:var(--txt-secondary)"></i>{{.Store.Store}}</span>
-      <span style="font-size:.78rem;color:var(--txt-muted)">{{formatBytes .Store.Used}} / {{formatBytes .Store.Total}}</span>
+      <span><i class="bi bi-hdd me-2 tx-secondary"></i>{{.Store.Store}}</span>
+      <span class="fs-xs tx-muted">{{formatBytes .Store.Used}} / {{formatBytes .Store.Total}}</span>
     </div>
     <div class="card-body">
       <!-- Barra de uso -->
       <div style="margin-bottom:1rem">
         <div style="height:5px;background:var(--card-border);border-radius:3px;overflow:hidden;margin-bottom:.4rem">
-          <div style="height:100%;width:{{pct .Store.Used .Store.Total}}%;background:{{if gt (pct .Store.Used .Store.Total) 85}}var(--clr-danger){{else if gt (pct .Store.Used .Store.Total) 70}}var(--clr-warn){{else}}var(--clr-ok){{end}};border-radius:3px;transition:width .3s"></div>
+          <div style="height:100%;width:{{pct .Store.Used .Store.Total}}%;background:var(--clr-{{usageLevel (pct .Store.Used .Store.Total) $.DiskThreshold}});border-radius:3px;transition:width .3s"></div>
         </div>
-        <div style="font-size:.72rem;color:var(--txt-muted)">{{pct .Store.Used .Store.Total}}% utilizado</div>
+        <div class="fs-2xs tx-muted">{{pct .Store.Used .Store.Total}}% utilizado{{if $.DiskThreshold}} · umbral de alerta {{$.DiskThreshold}}%{{end}}</div>
       </div>
       <div class="row g-3">
         <div class="col-4">
-          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Usado</div>
-          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Used}}</div>
+          <div class="fs-2xs tx-muted text-uppercase ls-wide mb-1">Usado</div>
+          <div class="fw-semibold tx-primary fs-md">{{formatBytes .Store.Used}}</div>
         </div>
         <div class="col-4">
-          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Disponible</div>
-          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Avail}}</div>
+          <div class="fs-2xs tx-muted text-uppercase ls-wide mb-1">Disponible</div>
+          <div class="fw-semibold tx-primary fs-md">{{formatBytes .Store.Avail}}</div>
         </div>
         <div class="col-4">
-          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">Total</div>
-          <div class="fw-semibold" style="color:var(--txt-primary);font-size:.875rem">{{formatBytes .Store.Total}}</div>
+          <div class="fs-2xs tx-muted text-uppercase ls-wide mb-1">Total</div>
+          <div class="fw-semibold tx-primary fs-md">{{formatBytes .Store.Total}}</div>
         </div>
         <div class="col-12 col-md-6">
-          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">
+          <div class="fs-2xs tx-muted text-uppercase ls-wide mb-1">
             <i class="bi bi-calendar-x me-1"></i>Llenado estimado
           </div>
-          <div class="fw-semibold" style="font-size:.875rem">
+          <div class="fw-semibold fs-md">
             {{if isPast .Store.EstimatedFullDate}}
-              <span style="color:var(--clr-ok)"><i class="bi bi-check-circle me-1"></i>Sin riesgo de llenado</span>
+              <span class="tx-ok"><i class="bi bi-check-circle me-1"></i>Sin riesgo de llenado</span>
             {{else if .Store.EstimatedFullDate}}
-              <span style="color:var(--clr-warn)">{{formatUnixTime .Store.EstimatedFullDate}}</span>
+              <span class="tx-warn">{{formatUnixTime .Store.EstimatedFullDate}}</span>
             {{else}}
-              <span style="color:var(--txt-muted)">–</span>
+              <span class="tx-muted">–</span>
             {{end}}
           </div>
         </div>
         <div class="col-12 col-md-6">
-          <div style="font-size:.68rem;color:var(--txt-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem">
+          <div class="fs-2xs tx-muted text-uppercase ls-wide mb-1">
             <i class="bi bi-hdd-stack me-1"></i>Estado montaje
           </div>
-          <div class="fw-semibold" style="font-size:.875rem">
-            {{if eq .Store.MountStatus "available"}}<span style="color:var(--clr-ok)">Disponible</span>
-            {{else if .Store.MountStatus}}<span style="color:var(--clr-warn)">{{.Store.MountStatus}}</span>
-            {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          <div class="fw-semibold fs-md">
+            {{with mountStatus .Store.MountStatus}}<span class="status-pill {{.CSSClass}}" title="{{.Raw}}">{{.Label}}</span>{{else}}<span class="tx-muted">–</span>{{end}}
           </div>
         </div>
       </div>
@@ -141,7 +141,7 @@
           <i class="bi bi-box-seam me-1"></i>Grupos de backup ({{len .Snapshots}})
         </summary>
         <div style="overflow-x:auto;margin-top:.75rem">
-          <table class="table table-sm mb-0" style="font-size:.78rem">
+          <table class="table table-sm mb-0 fs-xs">
             <thead>
               <tr>
                 <th>Tipo</th>
@@ -157,16 +157,16 @@
             {{range .Snapshots}}
             <tr>
               <td><span class="badge" style="font-size:.7rem;background:var(--card-border);color:var(--txt-secondary)">{{.BackupType}}</span></td>
-              <td style="font-family:'DM Mono',monospace">{{.BackupID}}</td>
+              <td class="mono">{{.BackupID}}</td>
               <td>{{formatUnixTime .LastBackup}}</td>
-              <td style="color:var(--txt-secondary)">{{.BackupCount}}</td>
-              <td style="color:var(--txt-secondary)">{{formatBytes .Size}}</td>
+              <td class="tx-secondary">{{.BackupCount}}</td>
+              <td class="tx-secondary">{{formatBytes .Size}}</td>
               <td>
-                {{if eq .VerificationState "ok"}}<span style="color:var(--clr-ok)"><i class="bi bi-patch-check me-1"></i>ok</span>
-                {{else if .VerificationState}}<span style="color:var(--clr-warn)">{{.VerificationState}}</span>
-                {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+                {{if eq .VerificationState "ok"}}<span class="tx-ok"><i class="bi bi-patch-check me-1"></i>ok</span>
+                {{else if .VerificationState}}<span class="tx-warn">{{.VerificationState}}</span>
+                {{else}}<span class="tx-muted">–</span>{{end}}
               </td>
-              <td style="color:var(--txt-muted);font-size:.72rem">{{.Owner}}</td>
+              <td class="tx-muted fs-2xs">{{.Owner}}</td>
             </tr>
             {{end}}
             </tbody>
@@ -180,21 +180,21 @@
           <i class="bi bi-recycle me-1"></i>Estado Garbage Collector
         </summary>
         <div class="row g-2 mt-2">
-          <div class="col-6 col-md-3" style="font-size:.78rem">
-            <span style="color:var(--txt-muted)">Disk bytes:</span>
-            <div style="color:var(--txt-secondary)">{{formatBytes .GC.DiskBytes}}</div>
+          <div class="col-6 col-md-3 fs-xs">
+            <span class="tx-muted">Disk bytes:</span>
+            <div class="tx-secondary">{{formatBytes .GC.DiskBytes}}</div>
           </div>
-          <div class="col-6 col-md-3" style="font-size:.78rem">
-            <span style="color:var(--txt-muted)">Index data:</span>
-            <div style="color:var(--txt-secondary)">{{formatBytes .GC.IndexDataBytes}}</div>
+          <div class="col-6 col-md-3 fs-xs">
+            <span class="tx-muted">Index data:</span>
+            <div class="tx-secondary">{{formatBytes .GC.IndexDataBytes}}</div>
           </div>
-          <div class="col-6 col-md-3" style="font-size:.78rem">
-            <span style="color:var(--txt-muted)">Pendiente:</span>
-            <div style="color:var(--txt-secondary)">{{formatBytes .GC.PendingBytes}}</div>
+          <div class="col-6 col-md-3 fs-xs">
+            <span class="tx-muted">Pendiente:</span>
+            <div class="tx-secondary">{{formatBytes .GC.PendingBytes}}</div>
           </div>
-          <div class="col-6 col-md-3" style="font-size:.78rem">
-            <span style="color:var(--txt-muted)">Eliminado:</span>
-            <div style="color:var(--txt-secondary)">{{formatBytes .GC.RemovedBytes}}</div>
+          <div class="col-6 col-md-3 fs-xs">
+            <span class="tx-muted">Eliminado:</span>
+            <div class="tx-secondary">{{formatBytes .GC.RemovedBytes}}</div>
           </div>
         </div>
       </details>
@@ -207,8 +207,8 @@
 
 <div class="card">
   <div class="card-header">
-    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
-    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
+    <i class="bi bi-clock-history me-2 tx-accent"></i>Historial de reportes
+    <span class="fs-xs tx-muted ms-2">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -221,20 +221,21 @@
       <tbody>
       {{range .Reports}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+        <td class="fs-sm tx-secondary">{{formatTime .ReportedAt}}</td>
         <td>
           {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
           {{else}}<span class="status-pill ok">Activo</span>{{end}}
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="2" class="text-center py-4" style="color:var(--txt-muted)">Sin reportes</td></tr>
+      <tr><td colspan="2" class="text-center py-4 tx-muted">Sin reportes</td></tr>
       {{end}}
       </tbody>
     </table>
   </div>
+  {{if gt .Pagination.TotalPages 1}}
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <div style="font-size:.78rem;color:var(--txt-muted)">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    <div class="fs-xs tx-muted">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
     <nav aria-label="Paginación historial PBS">
       <ul class="pagination pagination-sm mb-0">
         <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/pbs/{{.Server.ID}}?page={{.Pagination.PrevPage}}">Anterior</a></li>
@@ -245,6 +246,7 @@
       </ul>
     </nav>
   </div>
+  {{end}}
 </div>
 
 {{end}}

@@ -6,7 +6,7 @@
   <div class="col-lg-5 d-flex flex-column gap-3">
     <section class="card">
       <div class="card-header profile-card-header">
-        <span><i class="bi bi-person-circle me-2" style="color:var(--clr-accent)"></i>Cuenta</span>
+        <span><i class="bi bi-person-circle me-2 tx-accent"></i>Cuenta</span>
         {{if eq .User.Role "admin"}}<span class="status-pill warn">Administrador</span>
         {{else if eq .User.Role "editor"}}<span class="status-pill ok">Editor</span>
         {{else}}<span class="status-pill muted">Lector</span>{{end}}
@@ -41,7 +41,7 @@
 
     <section class="card">
       <div class="card-header profile-card-header">
-        <span><i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Seguridad</span>
+        <span><i class="bi bi-shield-lock me-2 tx-accent"></i>Seguridad</span>
         {{if .User.TOTPEnabled}}<span class="status-pill ok">2FA activo</span>
         {{else}}<span class="status-pill muted">2FA desactivado</span>{{end}}
       </div>
@@ -104,7 +104,7 @@
   <div class="col-lg-7">
     <section class="card">
       <div class="card-header profile-card-header">
-        <span><i class="bi bi-bell me-2" style="color:var(--clr-accent)"></i>Mis notificaciones</span>
+        <span><i class="bi bi-bell me-2 tx-accent"></i>Mis notificaciones</span>
         <span class="profile-secondary">Canales personales</span>
       </div>
       <div class="card-body p-0">

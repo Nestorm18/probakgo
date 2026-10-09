@@ -164,7 +164,7 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 	}
 	if !session.AllowPending2FAAttempt(r) {
 		_ = session.ClearPending2FA(w, r)
-		http.Error(w, "Demasiados intentos 2FA. Inicia sesion de nuevo.", http.StatusTooManyRequests)
+		http.Error(w, "Demasiados intentos 2FA. Inicia sesión de nuevo.", http.StatusTooManyRequests)
 		return
 	}
 	step, valid := totp.ValidateStep(r.FormValue("code"), user.TOTPSecret, time.Now())
@@ -181,7 +181,7 @@ func (h *WebH) Login2FAPost(w http.ResponseWriter, r *http.Request) {
 		h.loginFailed(r, user.Username, ip, userAgent, "invalid_totp", "Código 2FA incorrecto")
 		h.tmpl.Render(w, r, "login_2fa.html", map[string]any{
 			"Username": user.Username,
-			"Error":    "Codigo 2FA incorrecto o ya utilizado",
+			"Error":    "Código 2FA incorrecto o ya utilizado",
 		})
 		return
 	}
@@ -312,15 +312,15 @@ func (h *WebH) handleTOTPEnforcement(w http.ResponseWriter, r *http.Request, use
 			return "", true
 		}
 		if lastAdmin {
-			return "/profile?flash=Plazo+de+2FA+vencido.+Eres+el+unico+administrador+activo:+activa+2FA+ahora.", true
+			return "/profile?flash=Plazo+de+2FA+vencido.+Eres+el+%C3%BAnico+administrador+activo%3A+activa+2FA+ahora.", true
 		}
 		_ = h.store.SetUserActive(r.Context(), user.ID, false)
 		h.recordLoginAttempt(r, user.Username, ratelimit.ExtractIP(r), r.UserAgent(), "blocked", "totp_grace_expired")
 		h.notifyAdminLoginFailed(user.Username, ratelimit.ExtractIP(r), "Usuario desactivado por no configurar 2FA", false)
 		h.tmpl.Render(w, r, "login.html", map[string]any{
-			"Error": "Usuario desactivado: 2FA no se activo dentro del plazo de 3 dias.",
+			"Error": "Usuario desactivado: 2FA no se activó dentro del plazo de 3 días.",
 		})
 		return "", true
 	}
-	return "/profile?flash=Activa+2FA+en+tu+usuario.+Tienes+3+dias+desde+el+primer+aviso.&ok=1", true
+	return "/profile?flash=Activa+2FA+en+tu+usuario.+Tienes+3+d%C3%ADas+desde+el+primer+aviso.&ok=1", true
 }

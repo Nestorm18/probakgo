@@ -71,7 +71,7 @@ func TestBuildPushPayload_MultipleAlerts(t *testing.T) {
 	if err := json.Unmarshal(payload, &p); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if !strings.Contains(p.Title, "critica") {
+	if !strings.Contains(p.Title, "crítica") {
 		t.Fatalf("expected title to mention critical count, got %q", p.Title)
 	}
 	if !strings.Contains(p.Body, "2 alerta(s)") {

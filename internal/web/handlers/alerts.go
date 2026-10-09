@@ -492,9 +492,9 @@ func alertTitleFromID(alertID string) string {
 	case domain.AlertTypePBSStale:
 		return "Snapshot sin actualizar"
 	case domain.AlertTypePBSVerify:
-		return "Verificacion fallida"
+		return "Verificación fallida"
 	case domain.AlertTypePBSSyncFailed:
-		return "Sincronizacion remota fallida"
+		return "Sincronización remota fallida"
 	case domain.AlertTypePBSGCFailed:
 		return "Garbage collection fallida"
 	case domain.AlertTypePVEStale:

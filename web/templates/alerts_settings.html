@@ -1,5 +1,5 @@
 {{block "page_title" .}}Alertas - Probakgo{{end}}
-{{block "page_heading" .}}Alertas Automaticas{{end}}
+{{block "page_heading" .}}Alertas Automáticas{{end}}
 {{block "page_content" .}}
 
 <form method="POST" action="/settings/alerts">
@@ -8,7 +8,7 @@
     <div class="col-lg-6">
       <div class="card h-100 alert-settings-card">
         <div class="card-header">
-          <i class="bi bi-device-hdd me-2" style="color:var(--clr-accent)"></i>Almacenamiento y backups
+          <i class="bi bi-device-hdd me-2 tx-accent"></i>Almacenamiento y backups
         </div>
         <div class="card-body">
           <p class="text-secondary small">Umbrales generales para capacidad y resultado de las copias.</p>
@@ -38,7 +38,7 @@
                 <input class="form-check-input m-0" type="checkbox" name="alert_backup_err"
                        id="alertBackup" {{if .Config.AlertBackupErr}}checked{{end}}>
                 <label class="form-check-label m-0" for="alertBackup">
-                  Alerta cuando el ultimo backup falle
+                  Alerta cuando el último backup falle
                 </label>
               </div>
             </div>
@@ -50,7 +50,7 @@
     <div class="col-lg-6">
       <div class="card h-100 alert-settings-card">
         <div class="card-header">
-          <i class="bi bi-activity me-2" style="color:var(--clr-accent)"></i>Conexión y reportes PVE
+          <i class="bi bi-activity me-2 tx-accent"></i>Conexión y reportes PVE
         </div>
         <div class="card-body">
           <p class="text-secondary small">Controla la disponibilidad del servidor y cuándo debe haber terminado su reporte nocturno.</p>
@@ -78,7 +78,7 @@
 
     <div class="col-12">
       <button type="submit" class="btn btn-primary">
-        <i class="bi bi-floppy me-1"></i>Guardar configuracion
+        <i class="bi bi-floppy me-1"></i>Guardar configuración
       </button>
     </div>
   </div>

@@ -205,7 +205,7 @@ func (s *TelegramSender) SendTest(ctx context.Context) error {
 	}
 	var deliveryErr error
 	for _, destination := range destinations {
-		if err := s.sendMessage(ctx, cfg, destination, "✅ Probakgo: notificacion de prueba\n\nLa vinculacion con Telegram funciona correctamente.", "/alerts"); err != nil {
+		if err := s.sendMessage(ctx, cfg, destination, "✅ Probakgo: notificación de prueba\n\nLa vinculación con Telegram funciona correctamente.", "/alerts"); err != nil {
 			deliveryErr = errors.Join(deliveryErr, fmt.Errorf("%s: %w", destination.DisplayName(), err))
 		}
 	}
@@ -224,7 +224,7 @@ func (s *TelegramSender) SendTestToDestination(ctx context.Context, destination 
 	if err := ValidateTelegramChatID(destination.ChatID); err != nil {
 		return err
 	}
-	deliveryErr := s.sendMessage(ctx, cfg, destination, "✅ Probakgo: notificacion de prueba\n\nTu cuenta de Telegram esta vinculada correctamente.", "/alerts")
+	deliveryErr := s.sendMessage(ctx, cfg, destination, "✅ Probakgo: notificación de prueba\n\nTu cuenta de Telegram está vinculada correctamente.", "/alerts")
 	s.recordDelivery(deliveryErr)
 	return deliveryErr
 }
@@ -362,7 +362,7 @@ func (s *TelegramSender) recordDelivery(deliveryErr error) {
 }
 
 func buildTelegramAlertMessage(alerts []domain.Alert, resolved bool) string {
-	header := fmt.Sprintf("🚨 Probakgo: %d alerta(s) critica(s)", len(alerts))
+	header := fmt.Sprintf("🚨 Probakgo: %d alerta(s) crítica(s)", len(alerts))
 	if resolved {
 		header = fmt.Sprintf("✅ Probakgo: %d alerta(s) resuelta(s)", len(alerts))
 	}
@@ -402,7 +402,7 @@ func buildTelegramAlertMessage(alerts []domain.Alert, resolved bool) string {
 		}
 		candidate := entry.String()
 		if utf8.RuneCountInString(b.String())+utf8.RuneCountInString(candidate) > 3800 {
-			b.WriteString(fmt.Sprintf("\n\n… y %d alerta(s) mas", len(alerts)-i))
+			b.WriteString(fmt.Sprintf("\n\n… y %d alerta(s) más", len(alerts)-i))
 			break
 		}
 		b.WriteString(candidate)

@@ -61,7 +61,7 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 	confirm := r.FormValue("password_confirm")
 
 	if newPass == "" {
-		http.Redirect(w, r, "/profile?flash=La+nueva+contrasena+no+puede+estar+vacia", http.StatusSeeOther)
+		http.Redirect(w, r, "/profile?flash=La+nueva+contrase%C3%B1a+no+puede+estar+vac%C3%ADa", http.StatusSeeOther)
 		return
 	}
 	if ok, blocked := h.checkCurrentPassword(r, user, currentPass); !ok {
@@ -69,11 +69,11 @@ func (h *WebH) ProfilePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if newPass != confirm {
-		http.Redirect(w, r, "/profile?flash=Las+nuevas+contrasenas+no+coinciden", http.StatusSeeOther)
+		http.Redirect(w, r, "/profile?flash=Las+nuevas+contrase%C3%B1as+no+coinciden", http.StatusSeeOther)
 		return
 	}
 	if len(newPass) < minPasswordLength {
-		http.Redirect(w, r, "/profile?flash=La+contrasena+debe+tener+al+menos+12+caracteres", http.StatusSeeOther)
+		http.Redirect(w, r, "/profile?flash=La+contrase%C3%B1a+debe+tener+al+menos+12+caracteres", http.StatusSeeOther)
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(newPass), bcrypt.DefaultCost)
@@ -176,7 +176,7 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 	secret, ok := session.GetPendingTOTPSetup(r)
 	if !ok {
-		http.Redirect(w, r, "/profile?flash=No+hay+configuracion+2FA+pendiente", http.StatusSeeOther)
+		http.Redirect(w, r, "/profile?flash=No+hay+configuraci%C3%B3n+2FA+pendiente", http.StatusSeeOther)
 		return
 	}
 	step, valid := totp.ValidateStep(r.FormValue("code"), secret, time.Now())
@@ -187,7 +187,7 @@ func (h *WebH) Profile2FAConfirm(w http.ResponseWriter, r *http.Request) {
 			"Secret":    secret,
 			"URI":       totp.ProvisioningURI(username, secret),
 			"QRDataURI": qrCodeDataURI(totp.ProvisioningURI(username, secret)),
-			"Error":     "Codigo 2FA incorrecto",
+			"Error":     "Código 2FA incorrecto",
 		})
 		return
 	}

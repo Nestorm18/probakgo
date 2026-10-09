@@ -59,11 +59,11 @@ func (h *WebH) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 
 	var body pushSubscriptionPayload
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 8<<10)).Decode(&body); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "JSON invalido")
+		writeJSONError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
 	if body.Endpoint == "" || body.Keys.P256DH == "" || body.Keys.Auth == "" {
-		writeJSONError(w, http.StatusBadRequest, "suscripcion incompleta")
+		writeJSONError(w, http.StatusBadRequest, "suscripción incompleta")
 		return
 	}
 
@@ -76,10 +76,10 @@ func (h *WebH) PushSubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := h.store.AddPushSubscription(r.Context(), sub); err != nil {
 		if errors.Is(err, store.ErrInvalidPushSubscription) {
-			writeJSONError(w, http.StatusBadRequest, "suscripcion invalida")
+			writeJSONError(w, http.StatusBadRequest, "suscripción inválida")
 			return
 		}
-		writeJSONError(w, http.StatusInternalServerError, "no se pudo guardar la suscripcion")
+		writeJSONError(w, http.StatusInternalServerError, "no se pudo guardar la suscripción")
 		return
 	}
 	h.audit(r, "push.subscribe", "user", username, username, nil)
@@ -104,7 +104,7 @@ func (h *WebH) PushUnsubscribe(w http.ResponseWriter, r *http.Request) {
 		Endpoint string `json:"endpoint"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<10)).Decode(&body); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "JSON invalido")
+		writeJSONError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
 	endpoint := strings.TrimSpace(body.Endpoint)
@@ -171,7 +171,7 @@ func (h *WebH) PushTest(w http.ResponseWriter, r *http.Request) {
 		Endpoint string `json:"endpoint"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 2<<10)).Decode(&body); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "JSON invalido")
+		writeJSONError(w, http.StatusBadRequest, "JSON inválido")
 		return
 	}
 	endpoint := strings.TrimSpace(body.Endpoint)
@@ -197,13 +197,13 @@ func (h *WebH) PushTest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if target == nil {
-		writeJSONError(w, http.StatusNotFound, "suscripcion no encontrada")
+		writeJSONError(w, http.StatusNotFound, "suscripción no encontrada")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	if err := sender.SendTest(ctx, *target, "/profile"); err != nil {
-		writeJSONError(w, http.StatusBadGateway, "el servicio push rechazo el envio")
+		writeJSONError(w, http.StatusBadGateway, "el servicio push rechazó el envío")
 		return
 	}
 	serveJSON(w, map[string]string{"status": "sent"})

@@ -16,16 +16,16 @@ func (h *WebH) EnableSessionSecurePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if netutil.RequestScheme(r) != "https" {
-		http.Redirect(w, r, "/settings/system?flash=Entra+por+HTTPS+para+activar+SESSION_SECURE+automaticamente", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/system?flash=Entra+por+HTTPS+para+activar+SESSION_SECURE+autom%C3%A1ticamente", http.StatusSeeOther)
 		return
 	}
 	path, err := setServerEnvValue("SESSION_SECURE", "true")
 	if err != nil {
-		http.Redirect(w, r, "/settings/system?flash=Error+actualizando+.env:+"+urlFlash(err.Error()), http.StatusSeeOther)
+		http.Redirect(w, r, "/settings/system?flash=Error+actualizando+.env%3A+"+urlFlash(err.Error()), http.StatusSeeOther)
 		return
 	}
 	h.audit(r, "settings.session_secure_enable", "settings", "system", "SESSION_SECURE", map[string]any{"env_path": path})
-	http.Redirect(w, r, "/settings/system?flash=SESSION_SECURE=true+guardado.+Reinicia+probakgo+para+aplicarlo&ok=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/system?flash=SESSION_SECURE%3Dtrue+guardado.+Reinicia+probakgo+para+aplicarlo&ok=1", http.StatusSeeOther)
 }
 
 func setServerEnvValue(key, value string) (string, error) {

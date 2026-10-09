@@ -107,7 +107,7 @@ func (h *WebH) CreateUserPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(pass) < minPasswordLength {
-		redirectWithFlash(w, r, back, "La contrasena debe tener al menos 12 caracteres", false)
+		redirectWithFlash(w, r, back, "La contraseña debe tener al menos 12 caracteres", false)
 		return
 	}
 	if role != "admin" && role != "editor" && role != "reader" {
@@ -179,7 +179,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(pass) < minPasswordLength {
-		redirectWithFlash(w, r, back, "La contrasena debe tener al menos 12 caracteres", false)
+		redirectWithFlash(w, r, back, "La contraseña debe tener al menos 12 caracteres", false)
 		return
 	}
 	curUsername, _, _ := session.GetUser(r)
@@ -202,7 +202,7 @@ func (h *WebH) ChangePasswordPost(w http.ResponseWriter, r *http.Request) {
 	// If changing own password, logout
 	if u.Username == curUsername {
 		session.Clear(w, r)
-		http.Redirect(w, r, "/login?flash=Contraseña+actualizada+-+inicia+sesión+de+nuevo", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?flash=Contrase%C3%B1a+actualizada+-+inicia+sesi%C3%B3n+de+nuevo", http.StatusSeeOther)
 		return
 	}
 	redirectWithFlash(w, r, back, "Contraseña actualizada", true)

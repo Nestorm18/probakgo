@@ -38,12 +38,12 @@ func (h *WebH) About(w http.ResponseWriter, r *http.Request) {
 func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
 	latest, err := selfupdate.LatestTag("Nestorm18/probakgo")
 	if err != nil {
-		redirectFlash(w, r, "No se pudo comprobar la version online: "+err.Error(), false)
+		redirectFlash(w, r, "No se pudo comprobar la versión online: "+err.Error(), false)
 		return
 	}
 	newer, ok := selfupdate.IsNewer(latest, h.tmpl.version)
 	if !ok {
-		redirectFlash(w, r, "No se pudo comparar la version local con la online", false)
+		redirectFlash(w, r, "No se pudo comparar la versión local con la online", false)
 		return
 	}
 	if !newer {
@@ -72,7 +72,7 @@ func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
 		if logFile != nil {
 			_ = logFile.Close()
 		}
-		redirectFlash(w, r, "No se pudo iniciar la actualizacion", false)
+		redirectFlash(w, r, "No se pudo iniciar la actualización", false)
 		return
 	}
 	go func() {
@@ -84,7 +84,7 @@ func (h *WebH) AboutUpdatePost(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	h.audit(r, "system.update_start", "system", "probakgo", "Actualización", map[string]any{"from": h.tmpl.version, "to": latest})
-	redirectFlash(w, r, "Hay una nueva version ("+latest+"). Actualizacion iniciada; el servicio se reiniciara al instalarla.", true)
+	redirectFlash(w, r, "Hay una nueva versión ("+latest+"). Actualización iniciada; el servicio se reiniciará al instalarla.", true)
 }
 
 func redirectFlash(w http.ResponseWriter, r *http.Request, msg string, ok bool) {

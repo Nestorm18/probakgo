@@ -8,7 +8,7 @@
 
     <div class="card">
       <div class="card-header">
-        <i class="bi bi-trash3 me-2" style="color:var(--clr-accent)"></i>Retención de reportes
+        <i class="bi bi-trash3 me-2 tx-accent"></i>Retención de reportes
       </div>
       <div class="card-body">
         <form method="POST" action="/settings/maintenance">
@@ -27,8 +27,8 @@
               <div class="check-toggle-wrap">
                 <input class="form-check-input m-0" type="checkbox" name="retention_enabled"
                        id="retEnabled" {{if .Config.RetentionEnabled}}checked{{end}}>
-                <label class="form-check-label m-0" for="retEnabled"
-                       style="font-size:.85rem;cursor:pointer;color:var(--txt-secondary)">
+                <label class="form-check-label m-0 fs-md cursor-pointer tx-secondary" for="retEnabled"
+                      >
                   Limpieza automática activada
                 </label>
               </div>
@@ -45,10 +45,10 @@
 
     <div class="card mt-3">
       <div class="card-header">
-        <i class="bi bi-database-down me-2" style="color:var(--clr-accent)"></i>Copia de base de datos
+        <i class="bi bi-database-down me-2 tx-accent"></i>Copia de base de datos
       </div>
       <div class="card-body">
-        <form method="POST" action="/settings/maintenance/database/download" class="d-inline">
+        <form method="POST" action="/settings/maintenance/database/download" class="d-inline" data-download>
           {{ .CSRFField }}
           <button type="submit" class="btn btn-secondary">
             <i class="bi bi-download me-1"></i>Descargar copia de seguridad
@@ -60,7 +60,7 @@
     <form method="POST" action="/settings/maintenance/nas" class="card mt-3">
       {{ .CSRFField }}
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-hdd-network me-2" style="color:var(--clr-accent)"></i>Copias automáticas al NAS</span>
+        <span><i class="bi bi-hdd-network me-2 tx-accent"></i>Copias automáticas al NAS</span>
         <span class="badge {{if .NAS.Enabled}}bg-success{{else}}bg-secondary{{end}}">{{if .NAS.Enabled}}Activadas{{else}}Desactivadas{{end}}</span>
       </div>
       <div class="card-body">

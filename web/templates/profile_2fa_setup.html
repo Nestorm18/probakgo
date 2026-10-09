@@ -6,7 +6,7 @@
   <div class="col-lg-7">
     <div class="card">
       <div class="card-header">
-        <i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Configurar aplicación TOTP
+        <i class="bi bi-shield-lock me-2 tx-accent"></i>Configurar aplicación TOTP
       </div>
       <div class="card-body">
         {{if .Error}}
@@ -22,12 +22,12 @@
         <div class="mb-3">
           <label class="form-label">Clave de configuración</label>
           <div class="input-group">
-            <input class="form-control" value="{{.Secret}}" readonly style="font-family:'DM Mono',monospace">
+            <input class="form-control mono" value="{{.Secret}}" readonly>
           </div>
         </div>
         <div class="mb-4">
           <label class="form-label">URI otpauth</label>
-          <textarea class="form-control" readonly rows="3" style="font-family:'DM Mono',monospace;font-size:.78rem">{{.URI}}</textarea>
+          <textarea class="form-control mono fs-xs" readonly rows="3">{{.URI}}</textarea>
         </div>
         <form method="POST" action="/profile/2fa/confirm">
           {{ .CSRFField }}

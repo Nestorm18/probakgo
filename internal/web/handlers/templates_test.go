@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -236,6 +237,49 @@ func TestAlertSuppressionSkipsSensitiveTOTPPrompt(t *testing.T) {
 	}
 	if !strings.Contains(body, "Suprimir todas las alertas de este servidor") {
 		t.Fatalf("server-wide suppression action is missing:\n%s", body)
+	}
+}
+
+func TestAlertHistoryPaginationKeepsFilters(t *testing.T) {
+	session.Init("test-session-key-32-bytes-long!!", false)
+
+	tmpl := NewTemplates(os.DirFS("../../.."), "test", time.UTC, true, func() (int, int) { return 0, 0 }, func() (bool, bool) { return false, false })
+	data := templateFixtures(time.Now())["alerts.html"]
+	data["HistoryPagination"] = buildPagination(1, 60, 25, "severity=warning&server="+url.QueryEscape("pve 1"))
+	req := httptest.NewRequest(http.MethodGet, "/alerts", nil)
+	rr := httptest.NewRecorder()
+
+	tmpl.Render(rr, req, "alerts.html", data)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, `href="/alerts?severity=warning&amp;server=pve&#43;1&history_page=2"`) {
+		t.Fatalf("history pagination lost its filters:\n%s", body)
+	}
+
+	data["HistoryPagination"] = buildPagination(1, 3, 25, "severity=&server=")
+	rr = httptest.NewRecorder()
+	tmpl.Render(rr, req, "alerts.html", data)
+	if strings.Contains(rr.Body.String(), "history_page=") {
+		t.Fatal("single-page history should not render pagination links")
+	}
+}
+
+func TestMountStatusAndUsageLevel(t *testing.T) {
+	for raw, want := range map[string]string{"available": "Disponible", "nonremovable": "Disco fijo", "notmounted": "No montado", "weird": "weird"} {
+		if got := mountStatus(raw); got == nil || got.Label != want {
+			t.Fatalf("mountStatus(%q) = %+v, want label %q", raw, got, want)
+		}
+	}
+	if mountStatus("") != nil {
+		t.Fatal("empty mount status should render as a dash")
+	}
+	for _, tc := range []struct {
+		pct, threshold int
+		want           string
+	}{{50, 85, "ok"}, {85, 85, "warn"}, {91, 85, "warn"}, {95, 85, "danger"}, {91, 0, "ok"}} {
+		if got := usageLevel(tc.pct, tc.threshold); got != tc.want {
+			t.Fatalf("usageLevel(%d, %d) = %q, want %q", tc.pct, tc.threshold, got, tc.want)
+		}
 	}
 }
 
@@ -687,21 +731,21 @@ func templateFixtures(now time.Time) map[string]map[string]any {
 			"Configs":    []domain.VMBackupConfig{},
 		}),
 		"dashboard.html": base(map[string]any{
-			"PVEOk":              1,
-			"PVEBackupErrors":    0,
-			"PVEStale":           0,
-			"PBSOk":              1,
-			"PBSStale":           0,
+			"ServerTotal":        3,
 			"PBSMaintenance":     0,
-			"WindowsOK":          1,
-			"WindowsDiskAlerts":  0,
-			"WindowsOffline":     0,
 			"WindowsMaintenance": 0,
 			"PVEMaintenance":     0,
 			"MaintenanceTotal":   0,
-			"PVERows":            []map[string]any{},
-			"PBSRows":            []map[string]any{},
-			"WindowsRows":        []map[string]any{},
+			"Platforms": []dashboardPlatform{
+				{Key: "pve", Title: "Proxmox VE", Icon: "bi-server", ListURL: "/servers/pve",
+					Stats: []dashboardStat{{Label: "Operativos", Value: 1, Level: "ok", URL: "/servers/pve"}, {Label: "Mantenimiento", Level: "info", URL: "/servers/pve", Optional: true}},
+					Rows:  []map[string]any{{"Server": pveServer, "Maintenance": maintenanceView{}, "Swap": buildSwapView(false, 0, 0), "Health": buildServerHealth(serverHealthView{Total: 1, Warning: 1}), "LastReport": now}}},
+				{Key: "pbs", Title: "Proxmox Backup Server", Icon: "bi-archive", ListURL: "/servers/pbs",
+					Stats: []dashboardStat{{Label: "Con avisos", Value: 0, Level: "warn", URL: "/servers/pbs"}},
+					Rows:  []map[string]any{{"Server": pbsServer, "Maintenance": maintenanceView{}, "Swap": buildSwapView(false, 0, 0), "Health": buildServerHealth(serverHealthView{}), "FillLabel": "Lleno en 10d", "FillClass": "bad"}}},
+				{Key: "windows", Title: "Windows", Icon: "bi-windows", ListURL: "/servers/windows",
+					Rows: []map[string]any{{"Server": windowsServer, "Maintenance": maintenanceView{}, "Heartbeat": heartbeatView{Seen: true, Online: true, Label: "Online", CSSClass: "ok"}, "Health": buildServerHealth(serverHealthView{}), "DiskSummary": "C: 40%"}}},
+			},
 		}),
 		"email_settings.html": base(map[string]any{"Config": emailConfig}),
 		"ip_bans.html": base(map[string]any{

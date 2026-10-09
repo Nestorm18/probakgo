@@ -8,7 +8,7 @@
 {{block "page_content" .}}
 
 <div class="card">
-  <div class="card-body p-0" style="overflow-x:auto">
+  <div class="card-body p-0 overflow-x-auto">
     <table class="table table-hover mb-0" style="min-width:760px">
       <thead>
         <tr>
@@ -24,9 +24,9 @@
       {{range .Users}}
       <tr {{if not .IsActive}}style="opacity:.5"{{end}}>
         <td>
-          <div class="fw-semibold" style="color:var(--txt-primary)">{{.Username}}</div>
+          <div class="fw-semibold tx-primary">{{.Username}}</div>
           {{if .LastLoginAt}}
-          <div style="font-size:.73rem;color:var(--txt-muted)">Último acceso {{formatTime .LastLoginAt}}</div>
+          <div class="fs-2xs tx-muted">Último acceso {{formatTime .LastLoginAt}}</div>
           {{end}}
         </td>
         <td>
@@ -42,7 +42,7 @@
           {{if .IsActive}}<span class="status-pill ok">Activo</span>
           {{else}}<span class="status-pill bad">Inactivo</span>{{end}}
         </td>
-        <td style="font-size:.82rem;color:var(--txt-muted)">{{formatTime .CreatedAt}}</td>
+        <td class="fs-sm tx-muted">{{formatTime .CreatedAt}}</td>
         <td class="text-end">
           <a href="/users/{{.ID}}/edit" class="btn btn-sm btn-outline-secondary" title="Editar">
             <i class="bi bi-pencil"></i>
@@ -50,17 +50,17 @@
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="6" class="text-center py-5" style="color:var(--txt-muted)">Sin usuarios registrados</td></tr>
+      <tr><td colspan="6" class="text-center py-5 tx-muted">Sin usuarios registrados</td></tr>
       {{end}}
       </tbody>
     </table>
   </div>
 </div>
 
-<div class="mt-3 d-flex gap-3 flex-wrap" style="font-size:.78rem;color:var(--txt-muted)">
-  <span><span class="status-pill warn" style="font-size:.7rem">Administrador</span> Gestión completa</span>
-  <span><span class="status-pill ok" style="font-size:.7rem">Editor</span> Gestión de backup configs</span>
-  <span><span class="status-pill muted" style="font-size:.7rem">Lector</span> Solo lectura</span>
+<div class="mt-3 d-flex gap-3 flex-wrap fs-xs tx-muted">
+  <span><span class="status-pill warn fs-2xs">Administrador</span> Gestión completa</span>
+  <span><span class="status-pill ok fs-2xs">Editor</span> Gestión de backup configs</span>
+  <span><span class="status-pill muted fs-2xs">Lector</span> Solo lectura</span>
 </div>
 
 {{end}}

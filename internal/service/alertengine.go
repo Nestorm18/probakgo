@@ -417,7 +417,7 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 				Type:       domain.AlertTypeBackupError,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Backup fallido",
-				Message:    fmt.Sprintf("Ultimo job: %s", status),
+				Message:    fmt.Sprintf("Último job: %s", status),
 				DetectedAt: time.Now(),
 			})
 			continue
@@ -458,7 +458,7 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 				Type:       domain.AlertTypeBackupError,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Backup fallido",
-				Message:    fmt.Sprintf("Ultimo job: %s", status),
+				Message:    fmt.Sprintf("Último job: %s", status),
 				DetectedAt: time.Now(),
 			})
 		}
@@ -769,7 +769,7 @@ func evalPBSReportStale(st *store.Store, cfg AlertConfigs) ([]domain.Alert, erro
 			Type:       domain.AlertTypePBSReportStale,
 			Severity:   domain.AlertSeverityCritical,
 			Title:      "Sin reporte",
-			Message:    fmt.Sprintf("Ultimo reporte hace %s (umbral %dh)", alertFmtAge(age), staleHours),
+			Message:    fmt.Sprintf("Último reporte hace %s (umbral %dh)", alertFmtAge(age), staleHours),
 			Value:      alertFmtAge(age),
 			Threshold:  fmt.Sprintf("%dh", staleHours),
 			DetectedAt: time.Now(),
@@ -971,7 +971,7 @@ func pbsTaskFailureAlert(task domain.PBSTask) (alertType, title, message, storeN
 	if datastore == "" {
 		datastore = task.Store
 	}
-	return domain.AlertTypePBSSyncFailed, "Sincronizacion remota fallida",
+	return domain.AlertTypePBSSyncFailed, "Sincronización remota fallida",
 		fmt.Sprintf("Sync remote %q datastore %q fallida: %s", remote, datastore, task.Status), storeName
 }
 
@@ -1147,7 +1147,7 @@ func evalWindowsMissingVolume(st *store.Store, cfg AlertConfigs) ([]domain.Alert
 				Type:       domain.AlertTypeWindowsVolumeGone,
 				Severity:   domain.AlertSeverityCritical,
 				Title:      "Volumen no detectado",
-				Message:    fmt.Sprintf("%s aparecia en el reporte anterior y no aparece en el ultimo reporte", name),
+				Message:    fmt.Sprintf("%s aparecía en el reporte anterior y no aparece en el último reporte", name),
 				Value:      name,
 				DetectedAt: time.Now(),
 			})
@@ -1367,11 +1367,11 @@ func pbsDiskMessage(pct int, used, total int64, estimatedFullDate int64, now tim
 	}
 	fullTime := time.Unix(estimatedFullDate, 0)
 	if !fullTime.After(now) {
-		return msg + "; estimacion de llenado vencida"
+		return msg + "; estimación de llenado vencida"
 	}
 	daysLeft := int(fullTime.Sub(now).Hours() / 24)
 	if daysLeft < 1 {
-		return msg + "; estimacion: menos de 1 dia"
+		return msg + "; estimación: menos de 1 día"
 	}
-	return fmt.Sprintf("%s; estimacion: %d dias", msg, daysLeft)
+	return fmt.Sprintf("%s; estimación: %d días", msg, daysLeft)
 }

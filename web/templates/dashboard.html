@@ -1,19 +1,20 @@
 {{block "page_title" .}}Dashboard - Probakgo{{end}}
 {{block "page_heading" .}}Dashboard{{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
 
 {{if or (gt .AlertCritical 0) (gt .AlertWarning 0)}}
 <a href="/alerts" class="text-decoration-none">
   <div class="card mb-4 d-flex flex-row align-items-center gap-3 px-4 py-3" style="border-left:3px solid {{if gt .AlertCritical 0}}var(--clr-danger){{else}}var(--clr-warn){{end}}">
     <i class="bi bi-bell-fill fs-5" style="color:{{if gt .AlertCritical 0}}var(--clr-danger){{else}}var(--clr-warn){{end}}"></i>
     <div class="flex-grow-1">
-      <span style="font-weight:600;color:var(--txt-primary)">Alertas activas</span>
-      <span class="ms-3" style="font-size:.82rem;color:var(--txt-secondary)">
+      <span class="fw-semibold tx-primary">Alertas activas</span>
+      <span class="ms-3 fs-sm tx-secondary">
         {{if gt .AlertCritical 0}}<span class="badge" style="background:var(--clr-danger)">{{.AlertCritical}} crítica{{if gt .AlertCritical 1}}s{{end}}</span>{{end}}
         {{if gt .AlertWarning 0}}<span class="badge ms-1" style="background:var(--clr-warn)">{{.AlertWarning}} advertencia{{if gt .AlertWarning 1}}s{{end}}</span>{{end}}
       </span>
     </div>
-    <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.8rem"></i>
+    <i class="bi bi-chevron-right tx-muted fs-sm"></i>
   </div>
 </a>
 {{end}}
@@ -21,216 +22,101 @@
 {{if gt .MaintenanceTotal 0}}
 <a href="{{.MaintenanceURL}}" class="text-decoration-none">
 <div class="card mb-4 d-flex flex-row align-items-center gap-3 px-4 py-3" style="border-left:3px solid var(--clr-accent)">
-  <i class="bi bi-tools fs-5" style="color:var(--clr-accent)"></i>
+  <i class="bi bi-tools fs-5 tx-accent"></i>
   <div class="flex-grow-1">
-    <span style="font-weight:600;color:var(--txt-primary)">Modo mantenimiento activo</span>
-    <span class="ms-3" style="font-size:.82rem;color:var(--txt-secondary)">
+    <span class="fw-semibold tx-primary">Modo mantenimiento activo</span>
+    <span class="ms-3 fs-sm tx-secondary">
       <span class="badge" style="background:var(--clr-accent)">{{.MaintenanceTotal}} servidor{{if gt .MaintenanceTotal 1}}es{{end}}</span>
-      {{if gt .PVEMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">PVE {{.PVEMaintenance}}</span>{{end}}
-      {{if gt .PBSMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">PBS {{.PBSMaintenance}}</span>{{end}}
-      {{if gt .WindowsMaintenance 0}}<span class="status-pill info ms-1" style="font-size:.68rem">Windows {{.WindowsMaintenance}}</span>{{end}}
+      {{if gt .PVEMaintenance 0}}<span class="status-pill info ms-1 fs-2xs">PVE {{.PVEMaintenance}}</span>{{end}}
+      {{if gt .PBSMaintenance 0}}<span class="status-pill info ms-1 fs-2xs">PBS {{.PBSMaintenance}}</span>{{end}}
+      {{if gt .WindowsMaintenance 0}}<span class="status-pill info ms-1 fs-2xs">Windows {{.WindowsMaintenance}}</span>{{end}}
     </span>
   </div>
-  <i class="bi bi-chevron-right" style="color:var(--txt-muted);font-size:.8rem"></i>
+  <i class="bi bi-chevron-right tx-muted fs-sm"></i>
 </div>
 </a>
 {{end}}
 
-<!-- Stat cards -->
-<div class="row g-3 mb-4 dashboard-stat-grid">
-  <div class="col-6 col-md-3">
-    <div class="stat-card h-100">
-      <div class="stat-icon ok"><i class="bi bi-check-circle-fill"></i></div>
-      <div>
-        <div class="stat-value">{{.PVEOk}}</div>
-        <div class="stat-label">PVE Operativos</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <a href="/alerts" class="text-decoration-none d-block h-100">
-      <div class="stat-card h-100">
-        <div class="stat-icon {{if gt .PVEBackupErrors 0}}bad{{else}}ok{{end}}"><i class="bi bi-x-octagon-fill"></i></div>
-        <div>
-          <div class="stat-value">{{.PVEBackupErrors}}</div>
-          <div class="stat-label">PVE Backup error</div>
-        </div>
-      </div>
-    </a>
-  </div>
-  <div class="col-6 col-md-3">
-    {{if .PVEStaleURL}}<a href="{{.PVEStaleURL}}" class="text-decoration-none d-block h-100">{{end}}
-    <div class="stat-card h-100">
-      <div class="stat-icon {{if gt .PVEStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-circle-fill"></i></div>
-      <div>
-        <div class="stat-value">{{.PVEStale}}</div>
-        <div class="stat-label">PVE Sin reporte</div>
-      </div>
-    </div>
-    {{if .PVEStaleURL}}</a>{{end}}
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card h-100">
-      <div class="stat-icon ok"><i class="bi bi-archive-fill"></i></div>
-      <div>
-        <div class="stat-value">{{.PBSOk}}</div>
-        <div class="stat-label">PBS Operativos</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    {{if .PBSStaleURL}}<a href="{{.PBSStaleURL}}" class="text-decoration-none d-block h-100">{{end}}
-    <div class="stat-card h-100">
-      <div class="stat-icon {{if gt .PBSStale 0}}bad{{else}}ok{{end}}"><i class="bi bi-exclamation-triangle-fill"></i></div>
-      <div>
-        <div class="stat-value">{{.PBSStale}}</div>
-        <div class="stat-label">PBS Sin reporte</div>
-      </div>
-    </div>
-    {{if .PBSStaleURL}}</a>{{end}}
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card h-100">
-      <div class="stat-icon ok"><i class="bi bi-windows"></i></div>
-      <div>
-        <div class="stat-value">{{.WindowsOK}}</div>
-        <div class="stat-label">Windows OK</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card h-100">
-      <div class="stat-icon {{if gt .WindowsDiskAlerts 0}}bad{{else}}ok{{end}}"><i class="bi bi-hdd-fill"></i></div>
-      <div>
-        <div class="stat-value">{{.WindowsDiskAlerts}}</div>
-        <div class="stat-label">Windows Disco</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-6 col-md-3">
-    <div class="stat-card h-100">
-      <div class="stat-icon {{if gt .WindowsOffline 0}}bad{{else}}ok{{end}}"><i class="bi bi-wifi-off"></i></div>
-      <div>
-        <div class="stat-value">{{.WindowsOffline}}</div>
-        <div class="stat-label">Windows Offline</div>
-      </div>
-    </div>
+{{if eq .ServerTotal 0}}
+<div class="card">
+  <div class="card-body text-center py-5">
+    <i class="bi bi-hdd-rack fs-1 d-block mb-3 tx-muted" aria-hidden="true"></i>
+    <p class="fw-semibold mb-2 tx-primary">Aún no hay servidores monitorizados</p>
+    <p class="mb-3 mx-auto" style="font-size:.85rem;color:var(--txt-muted);max-width:440px">Crea una API key e instala el cliente en un nodo Proxmox o Windows. El servidor aparecerá aquí con su primer reporte.</p>
+    {{if canEdit .Role}}<a href="/api-keys/new" class="btn btn-sm btn-primary"><i class="bi bi-key me-1" aria-hidden="true"></i>Crear API key</a>{{else}}<a href="/api-keys" class="btn btn-sm btn-secondary"><i class="bi bi-key me-1" aria-hidden="true"></i>Ver API keys</a>{{end}}
   </div>
 </div>
-
-<!-- Server lists -->
-<div id="dashboard-servers" class="d-flex align-items-center gap-2 mb-3">
-  <div class="input-group input-group-sm filter-search" style="max-width:320px">
-    <span class="input-group-text"><i class="bi bi-search"></i></span>
-    <input type="text" id="dashboardServerFilter" class="form-control form-control-sm" placeholder="Filtrar por cliente o empresa...">
+{{else}}
+<div id="dashboard-servers" class="dashboard-filter d-flex align-items-center gap-2 mb-3">
+  <div class="input-group input-group-sm filter-search">
+    <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+    <input type="search" id="dashboardServerFilter" class="form-control form-control-sm" placeholder="Filtrar por cliente o empresa..." aria-label="Filtrar servidores">
   </div>
-  <span id="dashboardFilterCount" style="font-size:.78rem;color:var(--txt-muted)"></span>
+  <span class="fs-xs tx-muted" id="dashboardFilterCount"></span>
 </div>
 
 <div class="dashboard-server-grid">
+  {{range $p := .Platforms}}{{if $p.Rows}}
   <div class="dashboard-server-panel">
-    <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-server me-2" style="color:var(--clr-accent)"></i>Proxmox VE</span>
-        <a href="/servers/pve" class="btn btn-sm btn-secondary">Ver todos</a>
+    <div class="card dashboard-platform">
+      <div class="card-header d-flex align-items-center justify-content-between gap-2">
+        <span class="min-w-0"><i class="bi {{$p.Icon}} me-2 tx-accent" aria-hidden="true"></i>{{$p.Title}} <span class="dashboard-platform-total">{{len $p.Rows}}</span></span>
+        <a href="{{$p.ListURL}}" class="btn btn-sm btn-secondary">Ver todos</a>
       </div>
-      <div class="dashboard-server-list">
-        {{range .PVERows}}
-        <a href="/servers/pve/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
-          <div class="server-row-icon">
-            <i class="bi bi-server"></i>
-          </div>
-          <div class="flex-grow-1 min-w-0">
-            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Server.DisplayName}}</div>
-            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
-          </div>
-          <div class="dashboard-server-row-meta">
-            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
-            {{else if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
-            {{else if .HasBackupError}}<span class="status-pill bad" style="font-size:.68rem">Backup error</span>
-            {{else if .HasBackupWarning}}<span class="status-pill warn" style="font-size:.68rem">Backup con advertencias</span>
-            {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>{{end}}
-            {{if .Swap.Enabled}}<span class="status-pill warn" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
-            {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
-          </div>
-          <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>
+      <div class="dashboard-platform-stats">
+        {{range $p.Stats}}{{if or .Value (not .Optional)}}
+        <a href="{{.URL}}" class="dashboard-stat {{if .Value}}{{.Level}}{{else}}zero{{end}}">
+          <strong>{{.Value}}</strong><span>{{.Label}}</span>
         </a>
-        {{else}}
-        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
-        {{end}}
-      </div>
-    </div>
-  </div>
-  <div class="dashboard-server-panel">
-    <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Proxmox BS</span>
-        <a href="/servers/pbs" class="btn btn-sm btn-secondary">Ver todos</a>
+        {{end}}{{end}}
       </div>
       <div class="dashboard-server-list">
-        {{range .PBSRows}}
-        <a href="/servers/pbs/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
+        {{range $p.Rows}}
+        <a href="/servers/{{$p.Key}}/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
           <div class="server-row-icon">
-            <i class="bi bi-archive"></i>
+            <i class="bi {{$p.Icon}}" aria-hidden="true"></i>
           </div>
           <div class="flex-grow-1 min-w-0">
-            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Server.DisplayName}}</div>
-            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
+            <div class="fw-semibold text-truncate tx-primary fs-md">{{.Server.DisplayName}}</div>
+            <div class="tx-muted fs-xs mono">{{.Server.IP}}</div>
           </div>
           <div class="dashboard-server-row-meta">
-            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
-            {{else if .IsStale}}<span class="status-pill bad" style="font-size:.68rem">Sin reporte</span>
-            {{else}}<span class="status-pill ok" style="font-size:.68rem">Activo</span>
-            <span class="status-pill {{.FillClass}}" style="font-size:.68rem">{{.FillLabel}}</span>{{end}}
-            {{if .HasTaskFailure}}<span class="status-pill bad" style="font-size:.68rem">{{.TaskLabel}}</span>
-            {{else if .TaskLabel}}<span class="status-pill {{.TaskClass}}" style="font-size:.68rem">{{.TaskLabel}}</span>{{end}}
-            {{if .Swap.Enabled}}<span class="status-pill warn" style="font-size:.68rem" title="{{.Swap.Title}}">swap</span>{{end}}
-            {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
-          </div>
-          <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>
-        </a>
-        {{else}}
-        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
-        {{end}}
-      </div>
-    </div>
-  </div>
-  <div class="dashboard-server-panel">
-    <div class="card">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-windows me-2" style="color:var(--clr-accent)"></i>Windows</span>
-        <a href="/servers/windows" class="btn btn-sm btn-secondary">Ver todos</a>
-      </div>
-      <div class="dashboard-server-list">
-        {{range .WindowsRows}}
-        <a href="/servers/windows/{{.Server.ID}}" class="server-row text-decoration-none dashboard-server-row">
-          <div class="server-row-icon">
-            <i class="bi bi-windows"></i>
-          </div>
-          <div class="flex-grow-1 min-w-0">
-            <div class="fw-semibold" style="color:var(--txt-primary);font-size:.85rem">{{.Server.DisplayName}}</div>
-            <div style="color:var(--txt-muted);font-size:.75rem;font-family:'DM Mono',monospace">{{.Server.IP}}</div>
-          </div>
-          <div class="dashboard-server-row-meta">
-            {{if .Maintenance.Active}}<span class="status-pill info" style="font-size:.68rem" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+            {{if .Maintenance.Active}}<span class="status-pill info" title="Hasta {{formatTime .Maintenance.Until}}">Mantenimiento</span>
+            {{else if eq $p.Key "pve"}}
+              {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+              {{else if .HasBackupError}}<span class="status-pill bad">Backup error</span>
+              {{else if .HasBackupWarning}}<span class="status-pill warn">Backup con advertencias</span>
+              {{else if .Health.HasAlerts}}<span class="status-pill {{.Health.CSSClass}}" title="{{.Health.Title}}">{{.Health.Label}}</span>
+              {{else}}<span class="status-pill ok">Activo</span>{{end}}
+              {{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{end}}
+            {{else if eq $p.Key "pbs"}}
+              {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
+              {{else}}
+                {{if .Health.HasAlerts}}<span class="status-pill {{.Health.CSSClass}}" title="{{.Health.Title}}">{{.Health.Label}}</span>
+                {{else}}<span class="status-pill ok">Activo</span>{{end}}
+                {{if ne .FillClass "ok"}}<span class="status-pill {{.FillClass}}">{{.FillLabel}}</span>{{end}}
+              {{end}}
+              {{if .HasTaskFailure}}<span class="status-pill bad">{{.TaskLabel}}</span>{{end}}
+              {{if .Swap.Enabled}}<span class="status-pill warn" title="{{.Swap.Title}}">swap</span>{{end}}
             {{else}}
-            {{if .Heartbeat.Online}}<span class="status-pill ok" style="font-size:.68rem">Online</span>
-            {{else if .Heartbeat.Seen}}<span class="status-pill bad" style="font-size:.68rem">Offline</span>
-            {{else}}<span class="status-pill warn" style="font-size:.68rem">Sin heartbeat</span>{{end}}
-            {{if .HasDiskAlert}}<span class="status-pill bad" style="font-size:.68rem">{{.DiskSummary}}</span>
-            {{else}}<span class="status-pill ok" style="font-size:.68rem">{{.DiskSummary}}</span>{{end}}
+              {{if .Heartbeat.Online}}<span class="status-pill ok">Online</span>
+              {{else if .Heartbeat.Seen}}<span class="status-pill bad">Offline</span>
+              {{else}}<span class="status-pill warn">Sin heartbeat</span>{{end}}
+              {{if .HasDiskAlert}}<span class="status-pill bad">{{.DiskSummary}}</span>
+              {{else}}{{if .Health.HasAlerts}}<span class="status-pill {{.Health.CSSClass}}" title="{{.Health.Title}}">{{.Health.Label}}</span>{{end}}
+              <span class="status-pill muted">{{.DiskSummary}}</span>{{end}}
             {{end}}
-            {{if .LastReport}}<span style="font-size:.72rem;color:var(--txt-muted)" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
+            {{if .LastReport}}<span class="dashboard-row-time" title="{{formatTime .LastReport}}">{{formatTimeAgo .LastReport}}</span>{{end}}
           </div>
-          <i class="bi bi-chevron-right ms-1" style="color:var(--txt-muted);font-size:.75rem"></i>
+          <i class="bi bi-chevron-right ms-1 tx-muted fs-xs" aria-hidden="true"></i>
         </a>
-        {{else}}
-        <div class="p-4 text-center" style="color:var(--txt-muted);font-size:.85rem">Sin servidores registrados</div>
         {{end}}
       </div>
     </div>
   </div>
+  {{end}}{{end}}
 </div>
+{{end}}
 {{end}}
 {{block "page_scripts" .}}
 <script nonce="{{.CSPNonce}}">
@@ -247,7 +133,14 @@
       row.style.display = match ? '' : 'none';
       if (match) visible++;
     });
+    document.querySelectorAll('.dashboard-server-panel').forEach(panel => {
+      panel.hidden = !!q && !panel.querySelector('.dashboard-server-row:not([style*="none"])');
+    });
     countEl.textContent = q ? `${visible} de ${rows.length}` : '';
+    const params = new URLSearchParams(window.location.search);
+    if (q) params.set('filter', input.value); else params.delete('filter');
+    const qs = params.toString();
+    history.replaceState(history.state, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
   };
   input.addEventListener('input', applyFilter);
   input.value = new URLSearchParams(window.location.search).get('filter') || '';

@@ -13,7 +13,7 @@
         <form method="POST">
           {{ .CSRFField }}
           <div class="mb-3">
-            <label class="form-label">VM ID <span style="color:var(--clr-danger)">*</span></label>
+            <label class="form-label">VM ID <span class="tx-danger">*</span></label>
             {{if eq .Action "edit"}}
             <input type="text" class="form-control" name="vm_id" value="{{if .VM}}{{.VM.VMID}}{{end}}" readonly style="opacity:.7">
             {{else}}

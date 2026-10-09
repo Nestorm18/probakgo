@@ -4,13 +4,15 @@
 <a href="/servers/pve" class="btn btn-sm btn-secondary me-1"><i class="bi bi-arrow-left me-1"></i>Volver</a>
 {{if .ServerURL}}<a href="{{.ServerURL}}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary me-1"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir Proxmox</a>{{end}}
 <a href="/servers/pve/{{.Server.ID}}/reports" class="btn btn-sm btn-secondary me-1 d-none d-sm-inline-flex"><i class="bi bi-bar-chart me-1"></i>Reportes</a>
-{{if canEdit .Role}}<a href="/backup-config/{{.Server.ID}}" class="btn btn-sm btn-primary"><i class="bi bi-calendar-check me-1"></i>Backup Config</a>{{end}}
+{{if canEdit .Role}}<a href="/backup-config/{{.Server.ID}}" class="btn btn-sm btn-primary"><i class="bi bi-calendar-check me-1" aria-hidden="true"></i>Configurar backups</a>{{end}}
 <div class="dropdown d-sm-none">
-  <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Mas acciones"><i class="bi bi-three-dots-vertical"></i></button>
+  <button class="btn btn-sm btn-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Más acciones"><i class="bi bi-three-dots-vertical"></i></button>
   <ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="/servers/pve/{{.Server.ID}}/reports"><i class="bi bi-bar-chart me-2"></i>Reportes</a></li></ul>
 </div>
 {{end}}
 {{block "page_content" .}}
+<div data-auto-refresh="60" hidden></div>
+{{with .Status}}{{template "server_status_strip" .}}{{end}}
 
 
 <!-- Info tiles -->
@@ -18,14 +20,14 @@
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">IP Local</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">{{.Server.IP}}</div>
+      <div class="info-tile-value mono fs-sm">{{.Server.IP}}</div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">IP Pública</div>
-      <div class="info-tile-value" style="font-family:'DM Mono',monospace;font-size:.82rem">
-        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+      <div class="info-tile-value mono fs-sm">
+        {{if .Server.PublicIP}}{{.Server.PublicIP}}{{else}}<span class="tx-muted">–</span>{{end}}
       </div>
     </div>
   </div>
@@ -49,17 +51,17 @@
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">Machine ID</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-value fs-sm">
         {{if .Server.MachineID}}
-          <i class="bi bi-shield-lock me-1" style="color:var(--clr-ok)"></i><code>{{.Server.MachineID}}</code>
-        {{else}}<span style="color:var(--txt-muted)">Sin vincular</span>{{end}}
+          <i class="bi bi-shield-lock me-1 tx-ok"></i><code>{{.Server.MachineID}}</code>
+        {{else}}<span class="tx-muted">Sin vincular</span>{{end}}
       </div>
     </div>
   </div>
   <div class="col-6 col-lg-3">
     <div class="info-tile h-100">
       <div class="info-tile-label">Swap</div>
-      <div class="info-tile-value" style="font-size:.82rem">
+      <div class="info-tile-value fs-sm">
         <span class="status-pill {{.Swap.CSSClass}}" title="{{.Swap.Title}}">{{.Swap.Label}}</span>
         {{if .Swap.Enabled}}
         <div style="font-size:.72rem;color:var(--txt-muted);margin-top:.25rem">{{formatBytes .Swap.Used}} / {{formatBytes .Swap.Total}}</div>
@@ -71,7 +73,7 @@
 
 <div class="card mb-4">
   <div class="card-header d-flex align-items-center justify-content-between">
-    <span><i class="bi bi-archive me-2" style="color:var(--clr-accent)"></i>Último job de backup</span>
+    <span><i class="bi bi-archive me-2 tx-accent"></i>Último job de backup</span>
     {{if .BackupJobStart}}<span style="font-size:.75rem;color:var(--txt-muted);font-weight:400">{{formatUnixTime .BackupJobStart}}</span>{{end}}
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
@@ -89,9 +91,9 @@
       <tbody>
       {{range .BackupRows}}
       <tr>
-        <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary)">{{.VMIDText}}</td>
+        <td class="mono fs-sm tx-secondary">{{.VMIDText}}</td>
         <td style="font-weight:500">
-          {{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          {{if .VMName}}{{.VMName}}{{else}}<span class="tx-muted">–</span>{{end}}
           {{if and (not .IsMissing) (not (index $.ConfiguredVMIDs .VMIDText))}}<span class="status-pill info ms-1" style="font-size:.65rem" title="Esta VM no está en el backup config">No configurada</span>{{end}}
         </td>
         <td>
@@ -109,16 +111,16 @@
           {{end}}
         </td>
         {{if .IsMissing}}
-        <td colspan="3" style="color:var(--txt-muted);font-size:.82rem">Sin tarea de backup en el último job</td>
+        <td class="tx-muted fs-sm" colspan="3">Sin tarea de backup en el último job</td>
         {{else}}
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td class="fs-sm tx-secondary">{{formatDuration .Duration}}</td>
+        <td class="fs-sm tx-secondary">{{if .Size}}{{formatBytes .Size}}{{else}}<span class="tx-muted">–</span>{{end}}</td>
         <td style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace;word-break:break-all;max-width:260px">{{.Filename}}</td>
         {{end}}
       </tr>
       {{end}}
       {{if eq (len .BackupRows) 0}}
-      <tr><td colspan="6" class="text-center py-4" style="color:var(--txt-muted)">Sin datos de tareas</td></tr>
+      <tr><td colspan="6" class="text-center py-4 tx-muted">Sin datos de tareas</td></tr>
       {{end}}
       </tbody>
     </table>
@@ -128,7 +130,7 @@
 {{if and (canEdit .Role) .BackupTasks}}
 <div class="card mb-4">
   <div class="card-header">
-    <i class="bi bi-bell-slash me-2" style="color:var(--clr-accent)"></i>Alertas por VM
+    <i class="bi bi-bell-slash me-2 tx-accent"></i>Alertas por VM
     <span style="font-size:.72rem;color:var(--txt-muted);font-weight:400;margin-left:.5rem">Ajustes por VM del último job - Si dejas Heredar y sin tamaño mínimo, se elimina la regla personalizada</span>
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
@@ -145,21 +147,21 @@
       {{$vmcfg := index $.VMAlertConfigs .VMID}}
       <tr>
         <td style="font-family:'DM Mono',monospace;font-size:.82rem;color:var(--txt-secondary);vertical-align:middle">{{.VMID}}</td>
-        <td style="font-weight:500;vertical-align:middle">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td style="font-weight:500;vertical-align:middle">{{if .VMName}}{{.VMName}}{{else}}<span class="tx-muted">–</span>{{end}}</td>
         <td colspan="3">
           <form method="POST" action="/servers/pve/{{$.Server.ID}}/alerts/vm" class="d-flex align-items-center gap-2 flex-wrap" data-totp-skip>
             {{$.CSRFField}}
             <input type="hidden" name="vmid" value="{{.VMID}}">
             <div class="d-flex align-items-center gap-1">
-              <label class="form-label mb-0" style="font-size:.78rem;color:var(--txt-secondary);white-space:nowrap">Backup fallido:</label>
-              <select name="backup_err" class="form-select form-select-sm" style="width:auto">
+              <label class="form-label mb-0 fs-xs tx-secondary text-nowrap">Backup fallido:</label>
+              <select name="backup_err" class="form-select form-select-sm w-auto">
                 <option value="">Heredar</option>
                 <option value="1" {{if $vmcfg.BackupErr}}{{if eq (deref $vmcfg.BackupErr) 1}}selected{{end}}{{end}}>Alertar</option>
                 <option value="0" {{if $vmcfg.BackupErr}}{{if eq (deref $vmcfg.BackupErr) 0}}selected{{end}}{{end}}>Ignorar</option>
               </select>
             </div>
             <div class="d-flex align-items-center gap-1">
-              <label class="form-label mb-0" style="font-size:.78rem;color:var(--txt-secondary);white-space:nowrap">Tamaño mín.:</label>
+              <label class="form-label mb-0 fs-xs tx-secondary text-nowrap">Tamaño mín.:</label>
               <input type="number" name="min_size_mb" class="form-control form-control-sm" style="width:90px"
                      placeholder="MB" min="1"
                      {{if $vmcfg.MinSizeMB}}value="{{deref $vmcfg.MinSizeMB}}"{{end}}>
@@ -179,7 +181,7 @@
 <div class="card mb-4">
   <div class="card-header">Copias disponibles por VM</div>
   <div class="card-body p-0 table-responsive">
-    <table class="table table-hover mb-0">
+    <table class="table table-hover mb-0 no-stack">
       <thead><tr><th>VMID</th><th>Nombre</th><th>PBS</th><th>vzdump</th><th>Total de copias</th></tr></thead>
       <tbody>
       {{range .VMCopies}}
@@ -195,7 +197,7 @@
 {{if .Storages}}
 <div class="card mb-4">
   <div class="card-header">
-    <i class="bi bi-hdd me-2" style="color:var(--clr-accent)"></i>Almacenamientos (último reporte)
+    <i class="bi bi-hdd me-2 tx-accent"></i>Almacenamientos (último reporte)
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -211,15 +213,14 @@
       {{range .Storages}}
       <tr>
         <td>
-          <div class="fw-semibold" style="color:var(--txt-primary)">{{.Storage.Storage}}</div>
-          <div style="font-size:.73rem;color:var(--txt-muted);font-family:'DM Mono',monospace">{{.Storage.Path}}</div>
+          <div class="fw-semibold tx-primary">{{.Storage.Storage}}</div>
+          <div class="fs-2xs tx-muted mono">{{.Storage.Path}}</div>
         </td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Storage.Type}}</td>
+        <td class="fs-sm tx-secondary">{{.Storage.Type}}</td>
         <td>
-          {{if or (eq .Storage.Status "available") (eq .Storage.Status "online")}}<span class="status-pill ok">{{.Storage.Status}}</span>
-          {{else}}<span class="status-pill warn">{{.Storage.Status}}</span>{{end}}
+          {{with mountStatus .Storage.Status}}<span class="status-pill {{.CSSClass}}" title="{{.Raw}}">{{.Label}}</span>{{else}}<span class="tx-muted">–</span>{{end}}
         </td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{len .Content}}</td>
+        <td class="fs-sm tx-secondary">{{len .Content}}</td>
       </tr>
       {{end}}
       </tbody>
@@ -231,7 +232,7 @@
 {{if .JobHistory}}
 <div class="card mb-4">
   <div class="card-header">
-    <i class="bi bi-calendar3 me-2" style="color:var(--clr-accent)"></i>Historial de jobs (últimos 5 días)
+    <i class="bi bi-calendar3 me-2 tx-accent"></i>Historial de jobs (últimos 5 días)
   </div>
   <div class="list-group list-group-flush" style="border-radius:0 0 .75rem .75rem;overflow:hidden">
     {{range $i, $job := .JobHistory}}
@@ -239,7 +240,7 @@
       <button class="btn w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
               style="background:none;border:none;border-radius:0;color:var(--txt-primary)"
               data-bs-toggle="collapse" data-bs-target="#job-hist-{{$i}}">
-        <span style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime $job.Report.ReportedAt}}</span>
+        <span class="fs-sm tx-secondary">{{formatTime $job.Report.ReportedAt}}</span>
         {{if $job.AllOK}}<span class="status-pill ok">OK</span>
         {{else if $job.HasWarnings}}<span class="status-pill warn">ADVERTENCIA</span>
         {{else}}<span class="status-pill bad">ERROR</span>{{end}}
@@ -252,15 +253,15 @@
           <tbody>
           {{range $job.Tasks}}
           <tr>
-            <td style="font-family:'DM Mono',monospace;color:var(--txt-muted)">{{.VMID}}</td>
-            <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+            <td class="mono tx-muted">{{.VMID}}</td>
+            <td style="font-weight:500">{{if .VMName}}{{.VMName}}{{else}}<span class="tx-muted">–</span>{{end}}</td>
             <td>
               {{if backupStatusOK .Status}}<span class="status-pill ok">OK</span>
               {{else if backupStatusWarning .Status}}<span class="status-pill warn" title="{{.Status}}">{{.Status}}</span>
               {{else}}<span class="status-pill bad" title="{{.Status}}">{{.Status}}</span>{{end}}
             </td>
-            <td style="color:var(--txt-secondary)">{{formatDuration .Duration}}</td>
-            <td style="color:var(--txt-secondary)">{{if .Size}}{{formatBytes .Size}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+            <td class="tx-secondary">{{formatDuration .Duration}}</td>
+            <td class="tx-secondary">{{if .Size}}{{formatBytes .Size}}{{else}}<span class="tx-muted">–</span>{{end}}</td>
           </tr>
           {{end}}
           </tbody>
@@ -274,8 +275,8 @@
 
 <div class="card">
   <div class="card-header">
-    <i class="bi bi-clock-history me-2" style="color:var(--clr-accent)"></i>Historial de reportes
-    <span style="font-size:.78rem;color:var(--txt-muted);margin-left:.5rem">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
+    <i class="bi bi-clock-history me-2 tx-accent"></i>Historial de reportes
+    <span class="fs-xs tx-muted ms-2">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}} · {{.Pagination.TotalItems}} reportes</span>
   </div>
   <div class="card-body p-0" style="overflow:hidden;border-radius:0 0 .75rem .75rem">
     <table class="table table-hover mb-0">
@@ -289,12 +290,12 @@
       <tbody>
       {{range .Reports}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .ReportedAt}}</td>
+        <td class="fs-sm tx-secondary">{{formatTime .ReportedAt}}</td>
         <td>
           {{if backupStatusOK .BackupStatus}}<span class="status-pill ok">OK</span>
           {{else if backupStatusWarning .BackupStatus}}<span class="status-pill warn">{{.BackupStatus}}</span>
           {{else if .BackupStatus}}<span class="status-pill bad">{{.BackupStatus}}</span>
-          {{else}}<span style="color:var(--txt-muted)">–</span>{{end}}
+          {{else}}<span class="tx-muted">–</span>{{end}}
         </td>
         <td>
           {{if .IsStale}}<span class="status-pill bad">Sin reporte</span>
@@ -302,13 +303,14 @@
         </td>
       </tr>
       {{else}}
-      <tr><td colspan="3" class="text-center py-4" style="color:var(--txt-muted)">Sin reportes</td></tr>
+      <tr><td colspan="3" class="text-center py-4 tx-muted">Sin reportes</td></tr>
       {{end}}
       </tbody>
     </table>
   </div>
+  {{if gt .Pagination.TotalPages 1}}
   <div class="card-footer d-flex align-items-center justify-content-between flex-wrap gap-2">
-    <div style="font-size:.78rem;color:var(--txt-muted)">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
+    <div class="fs-xs tx-muted">Página {{.Pagination.Page}} de {{.Pagination.TotalPages}}</div>
     <nav aria-label="Paginación historial PVE">
       <ul class="pagination pagination-sm mb-0">
         <li class="page-item {{if not .Pagination.HasPrev}}disabled{{end}}"><a class="page-link" href="/servers/pve/{{.Server.ID}}?page={{.Pagination.PrevPage}}">Anterior</a></li>
@@ -319,6 +321,7 @@
       </ul>
     </nav>
   </div>
+  {{end}}
 </div>
 
 {{end}}

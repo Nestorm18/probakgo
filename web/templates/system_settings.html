@@ -7,16 +7,16 @@
 
 <div id="production-checklist" class="card mb-3">
   <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-    <i class="bi bi-clipboard2-check" style="color:var(--clr-accent)"></i>
-    <span>Checklist produccion</span>
+    <i class="bi bi-clipboard2-check tx-accent"></i>
+    <span>Checklist producción</span>
     {{if .ProductionChecklist.Ready}}
       <span class="status-pill ok ms-auto">Listo</span>
     {{else}}
-      {{if .ProductionChecklist.Bad}}<span class="status-pill bad ms-auto">{{.ProductionChecklist.Bad}} critico{{if ne .ProductionChecklist.Bad 1}}s{{end}}</span>{{end}}
+      {{if .ProductionChecklist.Bad}}<span class="status-pill bad ms-auto">{{.ProductionChecklist.Bad}} crítico{{if ne .ProductionChecklist.Bad 1}}s{{end}}</span>{{end}}
       {{if .ProductionChecklist.Warnings}}<span class="status-pill warn {{if eq .ProductionChecklist.Bad 0}}ms-auto{{end}}">{{.ProductionChecklist.Warnings}} revisar</span>{{end}}
     {{end}}
   </div>
-  <div class="card-body p-0" style="overflow-x:auto">
+  <div class="card-body p-0 overflow-x-auto">
     <table class="table table-hover mb-0">
       <thead>
         <tr>
@@ -31,13 +31,13 @@
         <tr>
           <td>
             <div class="d-flex align-items-center gap-2">
-              <i class="bi {{.Icon}}" style="color:var(--clr-accent)"></i>
-              <span class="fw-semibold" style="color:var(--txt-primary)">{{.Title}}</span>
+              <i class="bi {{.Icon}} tx-accent"></i>
+              <span class="fw-semibold tx-primary">{{.Title}}</span>
             </div>
           </td>
           <td><span class="status-pill {{.CSSClass}}">{{.Status}}</span></td>
-          <td style="font-size:.82rem;color:var(--txt-secondary)">{{.Detail}}</td>
-          <td class="text-end" style="white-space:nowrap">
+          <td class="fs-sm tx-secondary">{{.Detail}}</td>
+          <td class="text-end text-nowrap">
             {{if .ActionPost}}
               <form method="post" action="{{.ActionPost}}" class="d-inline">
                 {{$.CSRFField}}
@@ -58,7 +58,7 @@
     <div class="col-12 col-lg-7">
       <div class="card">
         <div class="card-header">
-          <i class="bi bi-globe2 me-2" style="color:var(--clr-accent)"></i>URL pública de Probakgo
+          <i class="bi bi-globe2 me-2 tx-accent"></i>URL pública de Probakgo
         </div>
         <div class="card-body">
 		  <div class="mb-3">
@@ -66,7 +66,7 @@
 			  <input type="checkbox" name="vpn_only_access" value="on" class="form-check-input" id="vpn_only_access" {{if .Config.VPNOnlyAccess}}checked{{end}}>
 			  <label class="form-check-label" for="vpn_only_access">Acceso exclusivo por VPN privada</label>
 			</div>
-			<div class="form-text">Activalo solo si Probakgo no esta publicado en el router y el panel se abre exclusivamente por NetBird, WireGuard u otra VPN cifrada.</div>
+			<div class="form-text">Actívalo solo si Probakgo no esta publicado en el router y el panel se abre exclusivamente por NetBird, WireGuard u otra VPN cifrada.</div>
 		  </div>
           <div class="mb-3">
             <label class="form-label">URL para instalación de clientes</label>
@@ -80,7 +80,7 @@
     <div class="col-12 col-lg-7">
       <div class="card">
         <div class="card-header">
-          <i class="bi bi-shield-lock me-2" style="color:var(--clr-accent)"></i>Seguridad de usuarios
+          <i class="bi bi-shield-lock me-2 tx-accent"></i>Seguridad de usuarios
         </div>
         <div class="card-body">
           <div class="mb-3">

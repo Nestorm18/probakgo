@@ -5,7 +5,7 @@
 
 <div class="card">
   <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-    <i class="bi bi-shield-x" style="color:var(--clr-danger)"></i>
+    <i class="bi bi-shield-x tx-danger"></i>
     <span>IPs bloqueadas actualmente</span>
     <span class="status-pill muted ms-auto">Página {{.BansPage}}</span>
   </div>
@@ -35,12 +35,12 @@
         </td>
         <td>
           {{if .BanExpiry}}
-            <span style="font-size:.82rem;color:var(--txt-secondary)">{{formatTime .BanExpiry}}</span>
+            <span class="fs-sm tx-secondary">{{formatTime .BanExpiry}}</span>
           {{else}}
             <span class="status-pill bad">Permanente</span>
           {{end}}
         </td>
-        <td style="font-size:.82rem;color:var(--txt-muted)">{{formatTime .BannedAt}}</td>
+        <td class="fs-sm tx-muted">{{formatTime .BannedAt}}</td>
         <td class="text-end">
           <form method="POST" action="/settings/ip-bans/unban" class="d-inline">
             {{ $.CSRFField }}
@@ -53,8 +53,8 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="text-center py-5" style="color:var(--txt-muted)">
-          <i class="bi bi-shield-check me-2" style="color:var(--clr-ok)"></i>No hay IPs baneadas
+        <td colspan="5" class="text-center py-5 tx-muted">
+          <i class="bi bi-shield-check me-2 tx-ok"></i>No hay IPs baneadas
         </td>
       </tr>
       {{end}}
@@ -69,7 +69,7 @@
     {{else}}
     <button class="btn btn-sm btn-secondary" disabled><i class="bi bi-chevron-left me-1"></i>Anterior</button>
     {{end}}
-    <span style="font-size:.78rem;color:var(--txt-muted)">25 IPs por página</span>
+    <span class="fs-xs tx-muted">25 IPs por página</span>
     {{if .BansHasNext}}
     <a class="btn btn-sm btn-secondary" href="/settings/ip-bans?bans_page={{.BansNextPage}}&attempts_page={{.AttemptsPage}}">
       Siguiente<i class="bi bi-chevron-right ms-1"></i>
@@ -80,14 +80,14 @@
   </div>
 </div>
 
-<div class="mt-3" style="font-size:.78rem;color:var(--txt-muted)">
+<div class="mt-3 fs-xs tx-muted">
   <i class="bi bi-info-circle me-1"></i>
   3 intentos fallidos en 30 min → ban 24h · siguiente ofensa → 7 días · 3ª en adelante → permanente
 </div>
 
 <div class="card mt-4">
   <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-    <i class="bi bi-clock-history" style="color:var(--clr-accent)"></i>
+    <i class="bi bi-clock-history tx-accent"></i>
     <span>Intentos de inicio de sesión</span>
     <span class="status-pill muted ms-auto">Página {{.AttemptsPage}}</span>
   </div>
@@ -105,9 +105,9 @@
       <tbody>
       {{range .LoginAttempts}}
       <tr>
-        <td style="font-size:.82rem;color:var(--txt-muted);white-space:nowrap">{{formatTime .AttemptedAt}}</td>
-        <td><code style="font-size:.82rem">{{.IP}}</code></td>
-        <td style="font-size:.82rem;color:var(--txt-secondary)">{{if .Username}}{{.Username}}{{else}}<span style="color:var(--txt-muted)">–</span>{{end}}</td>
+        <td class="fs-sm tx-muted text-nowrap">{{formatTime .AttemptedAt}}</td>
+        <td><code class="fs-sm">{{.IP}}</code></td>
+        <td class="fs-sm tx-secondary">{{if .Username}}{{.Username}}{{else}}<span class="tx-muted">–</span>{{end}}</td>
         <td>
           {{if eq .Result "success"}}
             <span class="status-pill ok">Correcto</span>
@@ -122,11 +122,11 @@
             <summary class="text-truncate" title="{{.ClientSummary}}" style="cursor:pointer;max-width:390px">{{.ClientSummary}}</summary>
             <dl class="mb-0 mt-2" style="display:grid;grid-template-columns:max-content minmax(0,1fr);gap:.3rem .7rem;line-height:1.35">
               {{range .ClientFields}}
-              <dt style="font-weight:600;color:var(--txt-secondary)">{{.Label}}</dt>
+              <dt class="fw-semibold tx-secondary">{{.Label}}</dt>
               <dd class="mb-0 text-break">{{.Value}}</dd>
               {{end}}
               {{if .UserAgent}}
-              <dt style="font-weight:600;color:var(--txt-secondary)">User-Agent</dt>
+              <dt class="fw-semibold tx-secondary">User-Agent</dt>
               <dd class="mb-0 text-break">{{.UserAgent}}</dd>
               {{end}}
             </dl>
@@ -135,7 +135,7 @@
       </tr>
       {{else}}
       <tr>
-        <td colspan="5" class="text-center py-5" style="color:var(--txt-muted)">
+        <td colspan="5" class="text-center py-5 tx-muted">
           <i class="bi bi-clock-history me-2"></i>No hay intentos registrados
         </td>
       </tr>
@@ -151,7 +151,7 @@
     {{else}}
     <button class="btn btn-sm btn-secondary" disabled><i class="bi bi-chevron-left me-1"></i>Anterior</button>
     {{end}}
-    <span style="font-size:.78rem;color:var(--txt-muted)">25 intentos por página</span>
+    <span class="fs-xs tx-muted">25 intentos por página</span>
     {{if .AttemptsHasNext}}
     <a class="btn btn-sm btn-secondary" href="/settings/ip-bans?bans_page={{.BansPage}}&attempts_page={{.AttemptsNextPage}}">
       Siguiente<i class="bi bi-chevron-right ms-1"></i>

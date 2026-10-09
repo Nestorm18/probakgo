@@ -17,23 +17,23 @@
           <input type="hidden" name="back" value="/api-keys/new">
 
           <div class="mb-3">
-            <label class="form-label">Hostname del servidor <span style="color:var(--clr-danger)">*</span></label>
-            <input type="text" name="server_name" class="form-control" required placeholder="pbs">
+            <label class="form-label">Hostname del servidor <span class="tx-danger">*</span></label>
+            <input type="text" name="server_name" class="form-control" required placeholder="Ej.: pbs01">
             <div class="form-text">Debe coincidir con el hostname que enviará el cliente.</div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Alias visible <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="text" name="name" class="form-control" placeholder="pbs-empresa">
+            <label class="form-label">Alias visible <span class="tx-muted">(opcional)</span></label>
+            <input type="text" name="name" class="form-control" placeholder="Ej.: PBS Empresa S.L.">
           </div>
 
           <div class="mb-3">
-            <label class="form-label">URL Proxmox <span style="color:var(--txt-muted)">(opcional)</span></label>
-            <input type="url" name="server_url" class="form-control" placeholder="https://192.168.1.10:8006">
+            <label class="form-label">URL Proxmox <span class="tx-muted">(opcional)</span></label>
+            <input type="url" name="server_url" class="form-control" placeholder="Ej.: https://192.168.1.10:8006">
           </div>
 
           <div class="mb-4">
-            <label class="form-label">Token GitHub para instalación <span style="color:var(--txt-muted)">(opcional)</span></label>
+            <label class="form-label">Token GitHub para instalación <span class="tx-muted">(opcional)</span></label>
             <input type="password" name="github_token" class="form-control" placeholder="ghp_...">
             <div class="form-text">Solo se usa para generar el comando de instalación; no se guarda.</div>
           </div>

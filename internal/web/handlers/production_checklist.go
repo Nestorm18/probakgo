@@ -53,19 +53,19 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 	case cfg != nil && cfg.VPNOnlyAccess:
 		add(checklistOK("Acceso por VPN privada", "HTTP esta aceptado porque el panel se ha declarado accesible solo por VPN.", "bi-shield-check"))
 	case publicURLScheme == "https":
-		add(checklistOK("HTTPS configurado", "La URL publica configurada usa HTTPS.", "bi-shield-check"))
+		add(checklistOK("HTTPS configurado", "La URL pública configurada usa HTTPS.", "bi-shield-check"))
 	case publicHost:
-		add(checklistBad("HTTPS no detectado", "El acceso actual parece publico y usa HTTP.", "bi-exclamation-triangle", "/settings/system", "Configurar URL/HTTPS"))
+		add(checklistBad("HTTPS no detectado", "El acceso actual parece público y usa HTTP.", "bi-exclamation-triangle", "/settings/system", "Configurar URL/HTTPS"))
 	default:
 		add(checklistWarn("HTTPS no detectado", "HTTP solo deberia usarse en LAN o por NetBird/VPN.", "bi-shield-exclamation", "/settings/system", "Revisar acceso"))
 	}
 
 	if h.tmpl != nil && h.tmpl.secure {
-		add(checklistOK("SESSION_SECURE=true", "La cookie de sesion se marca como segura.", "bi-cookie"))
+		add(checklistOK("SESSION_SECURE=true", "La cookie de sesión se marca como segura.", "bi-cookie"))
 	} else if cfg != nil && cfg.VPNOnlyAccess && scheme != "https" {
-		add(checklistOK("Sesion protegida por VPN", "SESSION_SECURE=false es necesario mientras el panel se use por HTTP dentro de la VPN.", "bi-cookie"))
+		add(checklistOK("Sesión protegida por VPN", "SESSION_SECURE=false es necesario mientras el panel se use por HTTP dentro de la VPN.", "bi-cookie"))
 	} else {
-		item := checklistBad("SESSION_SECURE=false", "Activalo si hay HTTPS delante para proteger la cookie.", "bi-cookie", "/settings/system", "Ver sistema")
+		item := checklistBad("SESSION_SECURE=false", "Actívalo si hay HTTPS delante para proteger la cookie.", "bi-cookie", "/settings/system", "Ver sistema")
 		if scheme == "https" {
 			item.Detail = "HTTPS detectado. Puedes guardar SESSION_SECURE=true en .env y reiniciar el servicio."
 			item.ActionURL = ""
@@ -84,7 +84,7 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 	if cfg != nil && cfg.SensitiveActionsRequireTOTP {
 		add(checklistOK("2FA en operaciones sensibles", "Cambios sensibles requieren 2FA activo.", "bi-fingerprint"))
 	} else {
-		add(checklistBad("Operaciones sensibles sin 2FA", "API keys, usuarios y configuracion deberian requerir 2FA.", "bi-fingerprint", "/settings/system", "Activar proteccion"))
+		add(checklistBad("Operaciones sensibles sin 2FA", "API keys, usuarios y configuración deberían requerir 2FA.", "bi-fingerprint", "/settings/system", "Activar proteccion"))
 	}
 
 	missingTOTP := h.countPrivilegedUsersWithoutTOTP(r)
@@ -96,28 +96,28 @@ func (h *WebH) buildProductionChecklist(r *http.Request, cfg *domain.EmailConfig
 
 	if cfg != nil && cfg.PublicAPIURL != "" {
 		if publicURLScheme == "https" {
-			add(checklistOK("URL publica configurada", cfg.PublicAPIURL, "bi-globe2"))
+			add(checklistOK("URL pública configurada", cfg.PublicAPIURL, "bi-globe2"))
 		} else if cfg.VPNOnlyAccess {
 			add(checklistOK("URL VPN configurada", cfg.PublicAPIURL, "bi-diagram-3"))
 		} else {
-			add(checklistWarn("URL publica sin HTTPS", cfg.PublicAPIURL, "bi-globe2", "/settings/system", "Revisar URL"))
+			add(checklistWarn("URL pública sin HTTPS", cfg.PublicAPIURL, "bi-globe2", "/settings/system", "Revisar URL"))
 		}
 	} else {
-		add(checklistWarn("URL publica no configurada", "Los instaladores usaran la URL actual del navegador.", "bi-globe2", "/settings/system", "Configurar URL"))
+		add(checklistWarn("URL pública no configurada", "Los instaladores usarán la URL actual del navegador.", "bi-globe2", "/settings/system", "Configurar URL"))
 	}
 
 	version := ""
 	if h.tmpl != nil {
 		version = h.tmpl.version
 	}
-	add(checklistOK("Version cargada", "v"+version, "bi-tag"))
+	add(checklistOK("Versión cargada", "v"+version, "bi-tag"))
 
 	add(h.emailChecklistItem(r, cfg))
 
 	if cfg != nil && cfg.RetentionEnabled && cfg.RetentionMonths > 0 {
-		add(checklistOK("Retencion activa", fmt.Sprintf("Reportes historicos: %d mes(es).", cfg.RetentionMonths), "bi-hourglass-split"))
+		add(checklistOK("Retención activa", fmt.Sprintf("Reportes históricos: %d mes(es).", cfg.RetentionMonths), "bi-hourglass-split"))
 	} else {
-		add(checklistWarn("Retencion desactivada", "La base de datos conservara reportes historicos sin limite.", "bi-hourglass-split", "/settings/maintenance", "Configurar retencion"))
+		add(checklistWarn("Retención desactivada", "La base de datos conservará reportes históricos sin límite.", "bi-hourglass-split", "/settings/maintenance", "Configurar retención"))
 	}
 
 	view.Ready = view.Bad == 0
@@ -150,22 +150,22 @@ func (h *WebH) emailChecklistItem(r *http.Request, cfg *domain.EmailConfig) prod
 	}
 	status, err := h.store.GetEmailDeliveryStatus(r.Context())
 	if err != nil {
-		return checklistWarn("Email sin estado", "No se pudo leer el estado del ultimo envio.", "bi-envelope-exclamation", "/settings/email", "Probar email")
+		return checklistWarn("Email sin estado", "No se pudo leer el estado del último envío.", "bi-envelope-exclamation", "/settings/email", "Probar email")
 	}
 	if status == nil || status.LastAttemptAt == nil {
-		return checklistWarn("Email sin prueba registrada", "Envia un email de prueba para confirmar la configuracion.", "bi-envelope-exclamation", "/settings/email", "Probar email")
+		return checklistWarn("Email sin prueba registrada", "Envía un email de prueba para confirmar la configuración.", "bi-envelope-exclamation", "/settings/email", "Probar email")
 	}
 	if status.LastError != "" && (status.LastSuccessAt == nil || status.LastAttemptAt.After(*status.LastSuccessAt)) {
-		return checklistBad("Ultimo email fallo", status.LastError, "bi-envelope-x", "/settings/email", "Revisar email")
+		return checklistBad("Último email falló", status.LastError, "bi-envelope-x", "/settings/email", "Revisar email")
 	}
 	if status.LastSuccessAt == nil {
-		return checklistWarn("Email sin OK registrado", "Todavia no hay un envio correcto registrado.", "bi-envelope-exclamation", "/settings/email", "Probar email")
+		return checklistWarn("Email sin OK registrado", "Todavía no hay un envío correcto registrado.", "bi-envelope-exclamation", "/settings/email", "Probar email")
 	}
 	age := time.Since(*status.LastSuccessAt)
 	if age > 48*time.Hour {
-		return checklistWarn("Ultimo email OK antiguo", "Ultimo envio correcto: "+h.formatChecklistTime(*status.LastSuccessAt), "bi-envelope-check", "/settings/email", "Probar email")
+		return checklistWarn("Último email OK antiguo", "Último envío correcto: "+h.formatChecklistTime(*status.LastSuccessAt), "bi-envelope-check", "/settings/email", "Probar email")
 	}
-	return checklistOK("Ultimo email OK", "Ultimo envio correcto: "+h.formatChecklistTime(*status.LastSuccessAt), "bi-envelope-check")
+	return checklistOK("Último email OK", "Último envío correcto: "+h.formatChecklistTime(*status.LastSuccessAt), "bi-envelope-check")
 }
 
 func publicURLScheme(cfg *domain.EmailConfig) string {

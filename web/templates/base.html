@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{.CSRFToken}}">
   <title>{{block "page_title" .}}Probakgo{{end}}</title>
-  <script nonce="{{.CSPNonce}}">(function(){var t=localStorage.getItem('theme')||'light';document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-bs-theme',t);})();</script>
+  <script nonce="{{.CSPNonce}}">(function(){var t=localStorage.getItem('theme')||(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-bs-theme',t);})();</script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" integrity="sha384-XGjxtQfXaH2tnPFa9x+ruJTuLE3Aa6LhHSWRr1XeTyhezb4abCG4ccI5AkVDxqC+" crossorigin="anonymous">
   <link rel="stylesheet" href="/static/css/style.css">
@@ -16,6 +16,7 @@
   <meta name="theme-color" content="#1e3a8a">
 </head>
 <body>
+<a class="skip-link" href="#mainContent">Saltar al contenido</a>
 <div id="wrapper">
 
   <!-- Sidebar -->
@@ -34,7 +35,7 @@
         <li><a class="nav-link {{if eq .Active "dashboard"}}active{{end}}" href="/"><i class="bi bi-speedometer2"></i>Dashboard</a></li>
         <li><a class="nav-link {{if eq .Active "alerts-view"}}active{{end}}" href="/alerts" id="alertsNavLink"><i class="bi bi-bell"></i>Alertas<span id="alertCriticalBadge" class="badge ms-auto" style="background:var(--clr-danger);font-size:.65rem;{{if .AlertCritical}}{{else}}display:none{{end}}">{{.AlertCritical}}</span><span id="alertWarningBadge" class="badge {{if .AlertCritical}}ms-1{{else}}ms-auto{{end}}" style="background:var(--clr-warn);font-size:.65rem;{{if .AlertWarning}}{{else}}display:none{{end}}">{{.AlertWarning}}</span></a></li>
         <li><a class="nav-link {{if eq .Active "pve"}}active{{end}}" href="/servers/pve"><i class="bi bi-server"></i>Proxmox VE</a></li>
-        <li><a class="nav-link {{if eq .Active "pbs"}}active{{end}}" href="/servers/pbs"><i class="bi bi-archive"></i>Proxmox BS</a></li>
+        <li><a class="nav-link {{if eq .Active "pbs"}}active{{end}}" href="/servers/pbs"><i class="bi bi-archive"></i>Proxmox Backup</a></li>
         <li><a class="nav-link {{if eq .Active "windows"}}active{{end}}" href="/servers/windows"><i class="bi bi-windows"></i>Windows</a></li>
       </ul>
 
@@ -68,7 +69,7 @@
           <i class="bi bi-person me-1"></i>Perfil
         </a>
         <form method="post" action="/logout" class="sidebar-logout-form">
-          <button type="submit" class="btn btn-sm btn-secondary sidebar-icon-action" title="Salir" aria-label="Cerrar sesion">
+          <button type="submit" class="btn btn-sm btn-secondary sidebar-icon-action" title="Salir" aria-label="Cerrar sesión">
             <i class="bi bi-box-arrow-right" aria-hidden="true"></i>
           </button>
         </form>
@@ -82,19 +83,24 @@
   <!-- Main -->
   <div class="main-content">
     <header class="page-header">
-      <button class="btn btn-sm btn-secondary d-lg-none me-1" id="sidebarToggle" type="button" aria-label="Abrir menu de navegacion" aria-controls="sidebar" aria-expanded="false">
+      <button class="btn btn-sm btn-secondary d-lg-none me-1" id="sidebarToggle" type="button" aria-label="Abrir menú de navegación" aria-controls="sidebar" aria-expanded="false">
         <i class="bi bi-list"></i>
       </button>
       <h1>{{block "page_heading" .}}{{end}}</h1>
+      <a href="/alerts" class="btn btn-sm btn-secondary d-lg-none header-alerts-btn" id="headerAlertsBtn" aria-label="Alertas activas: {{.AlertCritical}} críticas, {{.AlertWarning}} advertencias">
+        <i class="bi bi-bell" aria-hidden="true"></i>
+        <span id="headerAlertBadge" class="badge rounded-pill" style="background:{{if .AlertCritical}}var(--clr-danger){{else}}var(--clr-warn){{end}};{{if or .AlertCritical .AlertWarning}}{{else}}display:none{{end}}">{{if .AlertCritical}}{{.AlertCritical}}{{else}}{{.AlertWarning}}{{end}}</span>
+      </a>
       <div class="page-actions ms-auto d-flex gap-2 align-items-center">
         {{block "page_actions" .}}{{end}}
       </div>
     </header>
-    <main class="page-body">
+    <main class="page-body" id="mainContent" tabindex="-1">
       {{if .Flash}}
-      <div class="alert {{if .FlashOK}}alert-success{{else}}alert-danger{{end}} d-flex align-items-center gap-2 mb-3" role="alert">
-        {{if .FlashOK}}<i class="bi bi-check-circle-fill"></i>{{else}}<i class="bi bi-exclamation-triangle-fill"></i>{{end}}
+      <div class="alert {{if .FlashOK}}alert-success{{else}}alert-danger{{end}} alert-dismissible fade show d-flex align-items-center gap-2 mb-3" role="{{if .FlashOK}}status{{else}}alert{{end}}" id="flashMessage"{{if .FlashOK}} data-autohide="8000"{{end}}>
+        {{if .FlashOK}}<i class="bi bi-check-circle-fill" aria-hidden="true"></i>{{else}}<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>{{end}}
         <span>{{.Flash}}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar mensaje"></button>
       </div>
       {{end}}
       {{if .ShowSessionSecureWarning}}
@@ -115,6 +121,8 @@
 
 </div>
 
+<div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop" hidden></div>
+
 <div class="toast-container position-fixed top-0 end-0 p-3" id="alertToastContainer" style="z-index:1080"></div>
 
 <!-- Confirm modal (shared across all pages) -->
@@ -123,7 +131,7 @@
     <div class="modal-content">
       <div class="modal-header border-0 pb-1">
         <h6 class="modal-title fw-semibold">
-          <i class="bi bi-exclamation-triangle-fill me-2" style="color:var(--clr-danger)"></i>Confirmar acción
+          <i class="bi bi-exclamation-triangle-fill me-2 tx-danger"></i>Confirmar acción
         </h6>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
@@ -143,7 +151,7 @@
   <div class="pbk-dialog" role="dialog" aria-modal="true" aria-labelledby="pbkDialogTitle" aria-describedby="pbkDialogMessage">
     <button type="button" class="pbk-dialog-close" id="pbkDialogClose" aria-label="Cerrar"><i class="bi bi-x-lg"></i></button>
     <div class="pbk-dialog-icon" id="pbkDialogIcon"><i class="bi bi-exclamation-triangle-fill"></i></div>
-    <div class="pbk-dialog-title" id="pbkDialogTitle">Confirmar accion</div>
+    <div class="pbk-dialog-title" id="pbkDialogTitle">Confirmar acción</div>
     <div class="pbk-dialog-message" id="pbkDialogMessage"></div>
     <input class="form-control pbk-dialog-input" id="pbkDialogInput" autocomplete="one-time-code" inputmode="numeric" hidden>
     <div class="pbk-dialog-actions">
@@ -155,22 +163,175 @@
 
 <script nonce="{{.CSPNonce}}" src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 <script nonce="{{.CSPNonce}}">
-  // Sidebar toggle
+  // Sidebar toggle (off-canvas below 992px, with backdrop, Escape and scroll lock)
   const sidebar = document.getElementById('sidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+  function setSidebar(open) {
+    sidebar.classList.toggle('show', open);
+    sidebarBackdrop.hidden = !open;
+    document.body.classList.toggle('sidebar-open', open);
+    sidebarToggle?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
   sidebarToggle?.addEventListener('click', () => {
-    sidebar.classList.toggle('show');
-    sidebarToggle.setAttribute('aria-expanded', sidebar.classList.contains('show') ? 'true' : 'false');
+    const open = !sidebar.classList.contains('show');
+    setSidebar(open);
+    if (open) (sidebar.querySelector('.nav-link.active') || sidebar.querySelector('.nav-link'))?.focus();
   });
-  document.addEventListener('click', e => {
-    if (window.innerWidth < 992 && !sidebar.contains(e.target) && !e.target.closest('#sidebarToggle'))
-      sidebar.classList.remove('show');
-    if (!sidebar.classList.contains('show')) sidebarToggle?.setAttribute('aria-expanded', 'false');
+  sidebarBackdrop.addEventListener('click', () => setSidebar(false));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && sidebar.classList.contains('show')) {
+      setSidebar(false);
+      sidebarToggle?.focus();
+    }
   });
+  window.matchMedia('(min-width: 992px)').addEventListener('change', e => { if (e.matches) setSidebar(false); });
+
+  // Mobile: narrow tables shrink to the screen; wide ones (5+ columns) render each
+  // row as a card, labelling every cell with its column header.
+  document.querySelectorAll('.page-body table.table').forEach(table => {
+    if (table.classList.contains('pbs-server-table')) return;
+    const heads = Array.from(table.querySelectorAll(':scope > thead > tr:first-child > th')).map(th => th.textContent.trim());
+    if (heads.length < 5 || table.classList.contains('no-stack')) {
+      table.classList.add('table-fit');
+      return;
+    }
+    table.classList.add('table-stack');
+    table.querySelectorAll(':scope > tbody > tr').forEach(tr => {
+      let col = 0;
+      Array.from(tr.children).forEach(td => {
+        if (!td.hasAttribute('data-label') && heads[col]) td.dataset.label = heads[col];
+        col += td.colSpan || 1;
+      });
+    });
+  });
+  // Accessible names: link each visible form label to the control that follows
+  // it, name unlabeled fields after their placeholder, and give icon-only
+  // buttons/links their tooltip as aria-label.
+  (function () {
+    let seq = 0;
+    const controlSel = 'input:not([type="hidden"]), select, textarea';
+    document.querySelectorAll('label:not([for])').forEach(label => {
+      if (label.querySelector(controlSel)) return;
+      const scope = label.parentElement;
+      if (!scope) return;
+      const control = Array.from(scope.querySelectorAll(controlSel)).find(el =>
+        label.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
+      if (!control || control.labels?.length || control.hasAttribute('aria-label')) return;
+      if (!control.id) control.id = 'pbk-field-' + (++seq);
+      label.htmlFor = control.id;
+    });
+    document.querySelectorAll(controlSel).forEach(el => {
+      if (el.labels?.length || el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby')) return;
+      if (el.placeholder) el.setAttribute('aria-label', el.placeholder);
+    });
+    document.querySelectorAll('button, a.btn').forEach(el => {
+      if (el.hasAttribute('aria-label') || el.textContent.trim()) return;
+      const name = el.getAttribute('title') || el.dataset.bsOriginalTitle;
+      if (name) el.setAttribute('aria-label', name);
+    });
+  })();
+
   document.querySelectorAll('.copy-step-btn').forEach(btn => {
     btn.setAttribute('aria-label', 'Copiar comando');
     if (!btn.title) btn.title = 'Copiar comando';
   });
+  // Submit feedback: the pressed button shows a spinner and the form ignores
+  // repeated submits until the page changes. Downloads (data-download) do not
+  // navigate, so they are released after a short delay.
+  (function () {
+    function release(form) {
+      delete form.dataset.submitting;
+      form.querySelectorAll('.is-loading').forEach(btn => {
+        btn.classList.remove('is-loading');
+        btn.removeAttribute('aria-busy');
+      });
+    }
+    document.addEventListener('submit', e => {
+      const form = e.target;
+      if (!(form instanceof HTMLFormElement) || form.hasAttribute('data-no-loading')) return;
+      if (form.dataset.submitting === '1') {
+        e.preventDefault();
+        return;
+      }
+      const submitter = e.submitter;
+      // Wait until every other submit handler ran: some cancel the submission.
+      setTimeout(() => {
+        if (e.defaultPrevented) return;
+        form.dataset.submitting = '1';
+        const btn = submitter || form.querySelector('button[type="submit"], button:not([type])');
+        if (btn) {
+          btn.classList.add('is-loading');
+          btn.setAttribute('aria-busy', 'true');
+        }
+        const download = form.hasAttribute('data-download') || form.target === '_blank';
+        setTimeout(() => release(form), download ? 2000 : 15000);
+      }, 0);
+    });
+    window.addEventListener('pageshow', () => document.querySelectorAll('form[data-submitting]').forEach(release));
+  })();
+
+  // Live monitoring pages (data-auto-refresh="seconds") reload while the tab is
+  // visible and the user is idle, so states and "hace X" never go stale.
+  (function () {
+    const marker = document.querySelector('[data-auto-refresh]');
+    if (!marker) return;
+    const every = Math.max(30, Number(marker.dataset.autoRefresh) || 60) * 1000;
+    const loadedAt = Date.now();
+    let lastActivity = Date.now();
+    let dirty = false;
+    ['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(type =>
+      document.addEventListener(type, () => { lastActivity = Date.now(); }, { capture: true, passive: true }));
+    document.addEventListener('input', e => { if (e.target.closest('form')) dirty = true; }, true);
+
+    const actions = document.querySelector('.page-actions');
+    if (actions) {
+      const time = new Date(loadedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm btn-secondary page-refresh d-none d-md-inline-flex align-items-center';
+      btn.title = 'Datos de las ' + time + '. Se actualizan cada ' + Math.round(every / 1000) + ' s; pulsa para actualizar ahora.';
+      btn.setAttribute('aria-label', 'Actualizar datos (última actualización ' + time + ')');
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1" aria-hidden="true"></i><span></span>';
+      btn.querySelector('span').textContent = time;
+      btn.addEventListener('click', () => location.reload());
+      actions.prepend(btn);
+    }
+
+    function busy() {
+      if (document.hidden || dirty) return true;
+      if (Date.now() - lastActivity < 20000) return true;
+      if (document.querySelector('.modal.show, .dropdown-menu.show, .pbk-dialog-backdrop.show, .sidebar.show, .toast.show')) return true;
+      const active = document.activeElement;
+      if (active && active.matches('input, textarea, select, [contenteditable="true"]')) return true;
+      return String(window.getSelection ? window.getSelection() : '').trim() !== '';
+    }
+    function tick() {
+      if (Date.now() - loadedAt >= every && !busy()) location.reload();
+    }
+    setInterval(tick, 5000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+  })();
+
+  // Flash messages travel in the URL; drop them so a reload or a shared link
+  // does not show the message again. Success messages fade out on their own.
+  (function () {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('flash') || url.searchParams.has('ok')) {
+      url.searchParams.delete('flash');
+      url.searchParams.delete('ok');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+    const flash = document.getElementById('flashMessage');
+    const delay = Number(flash?.dataset.autohide || 0);
+    if (flash && delay > 0) {
+      setTimeout(() => {
+        if (!flash.isConnected || flash.matches(':hover, :focus-within')) return;
+        bootstrap.Alert.getOrCreateInstance(flash).close();
+      }, delay);
+    }
+  })();
+
   document.querySelectorAll('.js-auto-submit').forEach(field => {
     field.addEventListener('change', () => field.form?.requestSubmit());
   });
@@ -182,7 +343,10 @@
     document.documentElement.setAttribute('data-bs-theme', t);
     themeIcon.className = t === 'dark' ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
   }
-  applyTheme(localStorage.getItem('theme') || 'light');
+  applyTheme(localStorage.getItem('theme') || (window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
+  window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', e => {
+    if (!localStorage.getItem('theme')) applyTheme(e.matches ? 'dark' : 'light');
+  });
   document.getElementById('themeToggle').addEventListener('click', () => {
     const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     localStorage.setItem('theme', next);
@@ -217,7 +381,7 @@
     function open(opts) {
       if (resolver) finish(null);
       lastFocus = document.activeElement;
-      title.textContent = opts.title || 'Confirmar accion';
+      title.textContent = opts.title || 'Confirmar acción';
       message.textContent = opts.message || '';
       ok.textContent = opts.okText || 'Aceptar';
       ok.className = 'btn btn-sm ' + (opts.okClass || 'btn-primary');
@@ -226,6 +390,7 @@
       input.hidden = !opts.input;
       input.value = '';
       input.placeholder = opts.placeholder || '';
+      input.setAttribute('aria-label', opts.placeholder || opts.title || 'Valor');
       input.type = opts.inputType || 'text';
       root.removeAttribute('hidden');
       requestAnimationFrame(() => root.classList.add('show'));
@@ -258,7 +423,7 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     const ok = await pbkDialog.danger({
-      title: btn.dataset.confirmTitle || 'Confirmar accion',
+      title: btn.dataset.confirmTitle || 'Confirmar acción',
       message: btn.dataset.confirm,
       okText: btn.dataset.confirmOk || 'Eliminar'
     });
@@ -319,9 +484,9 @@
     try {
       const restoreModal = await releaseModalFocusForDialog(form);
       const code = await pbkDialog.code({
-        title: 'Confirmacion 2FA',
-        message: 'Introduce el codigo 2FA para confirmar esta operacion.',
-        placeholder: 'Codigo 2FA'
+        title: 'Confirmación 2FA',
+        message: 'Introduce el código 2FA para confirmar esta operación.',
+        placeholder: 'Código 2FA'
       });
       if (!code) {
         restoreModal();
@@ -364,6 +529,8 @@
     const statusURL = '/alerts/status.json';
     const criticalBadge = document.getElementById('alertCriticalBadge');
     const warningBadge = document.getElementById('alertWarningBadge');
+    const headerBadge = document.getElementById('headerAlertBadge');
+    const headerBtn = document.getElementById('headerAlertsBtn');
     const notifyBtn = document.getElementById('browserNotifyBtn');
     const soundBtn = document.getElementById('alertSoundBtn');
     const toastContainer = document.getElementById('alertToastContainer');
@@ -459,7 +626,7 @@
       el.innerHTML = '<div class="d-flex"><div class="toast-body"><a class="alert-toast-server d-inline-flex align-items-center text-white text-decoration-none" title="Ver servidor"><i class="bi bi-server me-1"></i><strong></strong></a><div></div></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div>';
       el.querySelector('strong').textContent = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
       el.querySelector('.alert-toast-server').href = alertServerURL(alert);
-      el.querySelector('.toast-body div').textContent = alert.message || 'Nueva alerta critica';
+      el.querySelector('.toast-body div').textContent = alert.message || 'Nueva alerta crítica';
       toastContainer.appendChild(el);
       const toast = bootstrap.Toast.getOrCreateInstance(el, { delay: 12000 });
       el.addEventListener('hidden.bs.toast', () => el.remove());
@@ -486,7 +653,7 @@
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
       const title = alert.title + (alert.server_name ? ' · ' + alert.server_name : '');
       const n = new Notification(title, {
-        body: alert.message || 'Nueva alerta critica en Probakgo',
+        body: alert.message || 'Nueva alerta crítica en Probakgo',
         tag: alert.id,
         renotify: false
       });
@@ -519,7 +686,7 @@
         } catch (_) {
         }
         updateSoundButton();
-        showInfoToast('Sonido desactivado', 'Probakgo no reproducira sonido para nuevas alertas.');
+        showInfoToast('Sonido desactivado', 'Probakgo no reproducirá sonido para nuevas alertas.');
         return;
       }
       if (await unlockAlertSound()) {
@@ -529,7 +696,7 @@
         } catch (_) {
         }
         updateSoundButton();
-        showInfoToast('Sonido activado', 'Probakgo reproducira un aviso corto con nuevas alertas criticas.');
+        showInfoToast('Sonido activado', 'Probakgo reproducirá un aviso corto con nuevas alertas críticas.');
       }
     });
     updateSoundButton();
@@ -544,12 +711,12 @@
         return;
       }
       if (Notification.permission === 'denied') {
-        showInfoToast('Notificaciones bloqueadas', 'Activalas desde los permisos del sitio en el navegador.');
+        showInfoToast('Notificaciones bloqueadas', 'Actívalas desde los permisos del sitio en el navegador.');
         return;
       }
       const permission = await Notification.requestPermission();
       if (permission === 'granted') {
-        showInfoToast('Notificaciones activadas', 'Probakgo avisara cuando aparezcan nuevas alertas criticas.');
+        showInfoToast('Notificaciones activadas', 'Probakgo avisará cuando aparezcan nuevas alertas críticas.');
       }
       updateNotifyButton();
     });
@@ -562,6 +729,13 @@
         const data = await res.json();
         updateBadge(criticalBadge, data.critical || 0, true);
         updateBadge(warningBadge, data.warning || 0, !(data.critical > 0));
+        if (headerBadge) {
+          const critical = data.critical || 0, warning = data.warning || 0;
+          headerBadge.textContent = critical || warning || '';
+          headerBadge.style.display = critical + warning > 0 ? '' : 'none';
+          headerBadge.style.background = critical > 0 ? 'var(--clr-danger)' : 'var(--clr-warn)';
+          headerBtn?.setAttribute('aria-label', `Alertas activas: ${critical} críticas, ${warning} advertencias`);
+        }
 
         const activeIDs = new Set();
         for (const alert of data.alerts || []) {
@@ -730,7 +904,7 @@
     async function ensurePermission() {
       if (Notification.permission === 'granted') return true;
       if (Notification.permission === 'denied') {
-        showPushToast('Notificaciones bloqueadas', 'Activalas desde los permisos del sitio en el navegador.', 'danger');
+        showPushToast('Notificaciones bloqueadas', 'Actívalas desde los permisos del sitio en el navegador.', 'danger');
         return false;
       }
       const result = await Notification.requestPermission();
@@ -743,7 +917,7 @@
       const reg = await navigator.serviceWorker.ready;
       const keyRes = await fetch('/push/vapid-public-key', { credentials: 'same-origin' });
       if (!keyRes.ok) {
-        showPushToast('Push no configurado', 'El servidor todavia no tiene claves VAPID. Intentalo mas tarde.', 'danger');
+        showPushToast('Push no configurado', 'El servidor todavía no tiene claves VAPID. Inténtalo más tarde.', 'danger');
         return;
       }
       const { vapid_public_key } = await keyRes.json();
@@ -773,7 +947,7 @@
       pushLinked = true;
       setPushButtonState('on', 'Notificaciones activas en este navegador');
       await loadSubscriptions();
-      showPushToast('Push activado', 'Enviando notificacion de prueba...', 'primary');
+      showPushToast('Push activado', 'Enviando notificación de prueba...', 'primary');
       // Fire a test notification so the user sees the toast right away.
       try { await testPush(sub.endpoint, true); } catch (_) { /* best effort */ }
     }
@@ -798,7 +972,7 @@
       pushLinked = false;
       setPushButtonState('off', 'Activar para recibir alertas en el escritorio');
       await loadSubscriptions();
-      showPushToast('Push desactivado', 'Este navegador dejara de recibir alertas.', 'primary');
+      showPushToast('Push desactivado', 'Este navegador dejará de recibir alertas.', 'primary');
     }
 
     async function testPush(endpoint, silent) {
@@ -830,7 +1004,7 @@
             await subscribePush();
           }
         } catch (err) {
-          showPushToast('No se pudo cambiar la suscripcion', err.message || 'Error desconocido', 'danger');
+          showPushToast('No se pudo cambiar la suscripción', err.message || 'Error desconocido', 'danger');
         } finally {
           pushBtn.disabled = false;
         }
@@ -848,4 +1022,31 @@
 {{block "page_scripts" .}}{{end}}
 </body>
 </html>
+{{end}}
+
+{{define "server_status_strip"}}
+<section class="server-status-strip {{.Health.CSSClass}} mb-4" aria-label="Estado del servidor">
+  <div class="server-status-main">
+    <span class="status-pill {{.Health.CSSClass}}" title="{{.Health.Title}}">{{.Health.Label}}</span>
+    {{if .LastReport}}
+    <span class="server-status-meta" title="{{formatTime .LastReport}}"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Último reporte {{formatTimeAgo .LastReport}}</span>
+    {{else}}
+    <span class="server-status-meta"><i class="bi bi-clock-history me-1" aria-hidden="true"></i>Sin reportes recibidos</span>
+    {{end}}
+    {{if .Alerts}}<a href="{{.AlertsURL}}" class="server-status-link">Ver en alertas<i class="bi bi-chevron-right ms-1" aria-hidden="true"></i></a>{{end}}
+  </div>
+  {{if .Alerts}}
+  <ul class="server-status-alerts">
+    {{range .Alerts}}
+    <li>
+      {{if eq .Severity "critical"}}<i class="bi bi-exclamation-octagon-fill tx-danger" aria-label="Crítica"></i>{{else}}<i class="bi bi-exclamation-triangle-fill tx-warn" aria-label="Advertencia"></i>{{end}}
+      <div class="min-w-0">
+        <a href="/alerts/detail?alert_id={{.ID | urlquery}}" class="server-status-alert-title">{{.Title}}{{if .StoreName}} · {{.StoreName}}{{end}}{{if .VMName}} · {{.VMName}}{{end}}</a>
+        <div class="server-status-alert-msg">{{.Message}}</div>
+      </div>
+    </li>
+    {{end}}
+  </ul>
+  {{end}}
+</section>
 {{end}}

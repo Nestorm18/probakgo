@@ -21,9 +21,16 @@
           </div>
           <div class="card-body settings-hub-card-body">
             <p>URL pública, acceso VPN, sesiones y política de verificación 2FA.</p>
+            {{if not .ProductionChecklist.Ready}}
+            <ul class="settings-hub-issues">
+              {{range .ProductionChecklist.Items}}{{if ne .CSSClass "ok"}}
+              <li class="{{.CSSClass}}"><i class="bi {{if eq .CSSClass "bad"}}bi-x-circle-fill{{else}}bi-exclamation-circle-fill{{end}}" aria-hidden="true"></i>{{.Title}}</li>
+              {{end}}{{end}}
+            </ul>
+            {{end}}
           </div>
           <div class="card-footer settings-hub-card-footer">
-            <span>{{if and .Config .Config.PublicAPIURL}}{{.Config.PublicAPIURL}}{{else}}Usando la URL actual{{end}}</span>
+            <span>{{if not .ProductionChecklist.Ready}}Revisar la lista de producción{{else if and .Config .Config.PublicAPIURL}}{{.Config.PublicAPIURL}}{{else}}Usando la URL actual{{end}}</span>
             <i class="bi bi-chevron-right" aria-hidden="true"></i>
           </div>
         </article>
@@ -34,7 +41,7 @@
       <a href="/settings/email" class="settings-hub-link">
         <article class="card h-100 settings-hub-card">
           <div class="card-header settings-hub-card-header">
-            <span class="settings-hub-title"><i class="bi bi-envelope-fill settings-hub-icon" style="color:var(--clr-accent)"></i>Email</span>
+            <span class="settings-hub-title"><i class="bi bi-envelope-fill settings-hub-icon tx-accent"></i>Email</span>
             {{if and .Config .Config.IsEnabled}}<span class="status-pill ok">Activo</span>
             {{else}}<span class="status-pill muted">Desactivado</span>{{end}}
           </div>
@@ -82,7 +89,7 @@
       <a href="/settings/maintenance" class="settings-hub-link">
         <article class="card h-100 settings-hub-card">
           <div class="card-header settings-hub-card-header">
-            <span class="settings-hub-title"><i class="bi bi-database-gear settings-hub-icon" style="color:var(--clr-warn)"></i>Mantenimiento</span>
+            <span class="settings-hub-title"><i class="bi bi-database-gear settings-hub-icon tx-warn"></i>Mantenimiento</span>
             {{if and .Config .Config.RetentionEnabled}}<span class="status-pill ok">Activo</span>
             {{else}}<span class="status-pill muted">Sin límite</span>{{end}}
           </div>
@@ -99,7 +106,7 @@
       <a href="/settings/alerts" class="settings-hub-link">
         <article class="card h-100 settings-hub-card">
           <div class="card-header settings-hub-card-header">
-            <span class="settings-hub-title"><i class="bi bi-bell-fill settings-hub-icon" style="color:var(--clr-danger)"></i>Alertas</span>
+            <span class="settings-hub-title"><i class="bi bi-bell-fill settings-hub-icon tx-danger"></i>Alertas</span>
             {{if and .Config .Config.AlertBackupErr}}<span class="status-pill ok">Activas</span>
             {{else}}<span class="status-pill warn">Revisar</span>{{end}}
           </div>
@@ -150,7 +157,7 @@
       <a href="/settings/reset" class="settings-hub-link">
         <article class="card h-100 settings-hub-card settings-hub-card-danger">
           <div class="card-header settings-hub-card-header">
-            <span class="settings-hub-title"><i class="bi bi-database-x settings-hub-icon" style="color:var(--clr-danger)"></i>Reiniciar BD</span>
+            <span class="settings-hub-title"><i class="bi bi-database-x settings-hub-icon tx-danger"></i>Reiniciar BD</span>
             <span class="status-pill bad">Destructivo</span>
           </div>
           <div class="card-body settings-hub-card-body"><p>Elimina todos los datos operativos conservando usuarios y auditoría.</p></div>

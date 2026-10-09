@@ -189,7 +189,7 @@ func (p *PushSender) SendTest(ctx context.Context, sub store.PushSubscription, l
 	}
 	payload := buildPushPayload([]domain.Alert{{
 		ID:         "test:push",
-		Title:      "Probakgo: notificacion de prueba",
+		Title:      "Probakgo: notificación de prueba",
 		Message:    "Si ves este mensaje, las alertas del escritorio funcionan correctamente.",
 		Severity:   "info",
 		DetectedAt: time.Now(),
@@ -283,7 +283,7 @@ func buildPushPayload(alerts []domain.Alert, linkURL string, resolved bool) []by
 			}
 		}
 		if critical > 0 {
-			title = fmt.Sprintf("%d alerta(s) critica(s)", critical)
+			title = fmt.Sprintf("%d alerta(s) crítica(s)", critical)
 		} else {
 			title = fmt.Sprintf("%d alerta(s) activa(s)", len(alerts))
 		}
@@ -298,7 +298,7 @@ func buildPushPayload(alerts []domain.Alert, linkURL string, resolved bool) []by
 			body = "Alerta resuelta: " + alerts[0].Title
 		} else {
 			title = fmt.Sprintf("%d alerta(s) resuelta(s)", len(alerts))
-			body = "Las condiciones criticas han vuelto a la normalidad"
+			body = "Las condiciones críticas han vuelto a la normalidad"
 		}
 	}
 	tag := ""

@@ -23,11 +23,11 @@
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-6">
-            <div style="font-size:.78rem;color:var(--txt-muted)">Creado</div>
+            <div class="fs-xs tx-muted">Creado</div>
             <div>{{formatTime .User.CreatedAt}}</div>
           </div>
           <div class="col-md-6">
-            <div style="font-size:.78rem;color:var(--txt-muted)">Último acceso</div>
+            <div class="fs-xs tx-muted">Último acceso</div>
             <div>{{if .User.LastLoginAt}}{{formatTime .User.LastLoginAt}}{{else}}nunca{{end}}{{if .User.LastLoginIP}} · {{.User.LastLoginIP}}{{end}}</div>
           </div>
         </div>
@@ -53,7 +53,7 @@
       <div class="card-header"><strong><i class="bi bi-person-gear me-2"></i>Rol</strong></div>
       <div class="card-body">
         {{if and (eq .User.Username .CurrentUsername) (eq .User.Role "admin")}}
-        <p class="mb-0" style="color:var(--txt-muted)">No puedes cambiar tu propio rol de administrador.</p>
+        <p class="mb-0 tx-muted">No puedes cambiar tu propio rol de administrador.</p>
         {{else}}
         <form method="POST" action="/users/{{.User.ID}}/role">
           {{ .CSRFField }}
@@ -138,7 +138,7 @@
         </form>
 
         {{if and (eq .User.Username .CurrentUsername) (eq .User.Role "admin")}}
-        <p class="mb-0" style="font-size:.85rem;color:var(--txt-muted)">No puedes desactivar tu propio usuario administrador.</p>
+        <p class="mb-0 fs-md tx-muted">No puedes desactivar tu propio usuario administrador.</p>
         {{else}}
         <form method="POST" action="/users/{{.User.ID}}/toggle">
           {{ .CSRFField }}
