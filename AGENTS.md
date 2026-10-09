@@ -31,7 +31,7 @@ web/static/      - CSS/JS
 
 ## Builds
 
-The module and CI currently use Go 1.26.6.
+The module and CI currently use Go 1.26.9.
 
 ```bash
 go build -o probakgo .

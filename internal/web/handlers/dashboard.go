@@ -64,8 +64,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		if maint.Active {
 			pveMaintenance++
 		} else if isStale {
-			pveStale++
-			pveStaleIDs = append(pveStaleIDs, sv.ID)
+			if _, silenced := suppressed[fmt.Sprintf("pve_stale:pve:%d", sv.ID)]; !silenced {
+				pveStale++
+				pveStaleIDs = append(pveStaleIDs, sv.ID)
+			}
 		} else if hasBackupError {
 			pveBackupErrorCount++
 		} else {
@@ -117,8 +119,10 @@ func (h *WebH) Dashboard(w http.ResponseWriter, r *http.Request) {
 		if maint.Active {
 			pbsMaintenance++
 		} else if isStale {
-			pbsStale++
-			pbsStaleIDs = append(pbsStaleIDs, sv.ID)
+			if _, silenced := suppressed[fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID)]; !silenced {
+				pbsStale++
+				pbsStaleIDs = append(pbsStaleIDs, sv.ID)
+			}
 		} else {
 			pbsOK++
 			fillLabel, fillClass = pbsFillBadge(pbsStores[rep.ID])

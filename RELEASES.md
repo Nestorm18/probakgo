@@ -36,7 +36,7 @@ La comprobación de firmas con la atestación real, sin ejecutar binarios, se pu
 
 El workflow `CI` se ejecuta en cada push y pull request:
 
-1. usa Go 1.26.6;
+1. usa Go 1.26.9;
 2. lee la única versión desde `internal/version/version.go`;
 3. ejecuta `go build ./...` y `go vet ./...`, y compila y revisa con `go vet` el cliente Windows con `GOOS=windows`;
 4. ejecuta `govulncheck` sobre todo el módulo y sobre el cliente Windows;

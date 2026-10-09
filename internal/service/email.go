@@ -322,6 +322,7 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 	if err != nil {
 		return emailData{}, err
 	}
+	suppressed, _ := st.GetActiveSuppressions(ctx)
 	pveConfigs, _ := st.ListPVEVMBackupConfigsByServer(ctx)
 	pveAlertConfigs, _ := st.ListPVEAlertConfigs(ctx)
 	pveReports, _ := st.GetLatestPVEReports(ctx)
@@ -377,10 +378,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			pveOk = append(pveOk, row)
 			continue
 		}
+		_, staleSilenced := suppressed[fmt.Sprintf("pve_stale:pve:%d", sv.ID)]
 		r := pveReports[sv.ID]
 		if r == nil {
-			row.StaleReason = "no se han recibido reportes"
-			pveIssues = append(pveIssues, row)
+			if !staleSilenced {
+				row.StaleReason = "no se han recibido reportes"
+				pveIssues = append(pveIssues, row)
+			}
 			continue
 		}
 
@@ -400,6 +404,9 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		}
 
 		if isStale {
+			if staleSilenced {
+				continue
+			}
 			row.StaleReason = staleReason
 			row.VMTasks = staleVMRows(configs, tasks)
 			for i := range row.VMTasks {
@@ -445,10 +452,13 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 			continue
 		}
 		row := serverRow{Name: sv.DisplayName, IP: sv.IP}
+		_, staleSilenced := suppressed[fmt.Sprintf("pbs_report_stale:pbs:%d", sv.ID)]
 		r := pbsReports[sv.ID]
 		if r == nil {
-			row.StaleReason = "no se han recibido reportes"
-			pbsIssues = append(pbsIssues, row)
+			if !staleSilenced {
+				row.StaleReason = "no se han recibido reportes"
+				pbsIssues = append(pbsIssues, row)
+			}
 			continue
 		}
 		for _, ds := range pbsStores[r.ID] {
@@ -473,7 +483,12 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 				taskFailures = append(taskFailures, message)
 			}
 		}
-		if rep.IsStale(r.ReportedAt) {
+		if (rep.IsStale(r.ReportedAt) || r.IsStale) && staleSilenced {
+			if len(taskFailures) > 0 {
+				row.StaleReason = strings.Join(taskFailures, "; ")
+				pbsIssues = append(pbsIssues, row)
+			}
+		} else if rep.IsStale(r.ReportedAt) {
 			row.StaleReason = "No se ha recibido el reporte de hoy"
 			pbsIssues = append(pbsIssues, row)
 		} else if r.IsStale {
@@ -495,7 +510,6 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		alertCfg.Report = rep
 		if rawAlerts, err := RunAll(st, alertCfg); err == nil || IsPartialAlertsError(err) {
 			alerts := FilterMaintenanceAlerts(ctx, st, rawAlerts)
-			suppressed, _ := st.GetActiveSuppressions(ctx)
 			for _, a := range alerts {
 				if _, ok := suppressed[a.ID]; ok {
 					continue

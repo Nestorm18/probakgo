@@ -405,19 +405,18 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 		tasks := cfg.Data.PVETasks[rep.ID]
 		if len(tasks) == 0 {
 			status := strings.TrimSpace(rep.BackupStatus)
-			if status == "" || domain.PVEBackupStatusOK(status) {
+			if !pveBackupStatusAlertable(status) {
 				continue
 			}
 			if !resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
 				continue
 			}
-			severity, title := pveBackupAlertPresentation(status)
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				Type:       domain.AlertTypeBackupError,
-				Severity:   severity,
-				Title:      title,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Backup fallido",
 				Message:    fmt.Sprintf("Ultimo job: %s", status),
 				DetectedAt: time.Now(),
 			})
@@ -425,7 +424,7 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 		}
 		hasTaskFailure := false
 		for _, t := range tasks {
-			if domain.PVEBackupStatusOK(t.Status) {
+			if !pveBackupStatusAlertable(t.Status) {
 				continue
 			}
 			hasTaskFailure = true
@@ -440,27 +439,25 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			if name == "" {
 				name = fmt.Sprintf("VM %d", t.VMID)
 			}
-			severity, title := pveBackupAlertPresentation(t.Status)
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d:%d", sv.ID, t.VMID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				VMID: t.VMID, VMName: name,
 				Type:       domain.AlertTypeBackupError,
-				Severity:   severity,
-				Title:      title,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Backup fallido",
 				Message:    fmt.Sprintf("%s: %s", name, t.Status),
 				DetectedAt: time.Now(),
 			})
 		}
 		status := strings.TrimSpace(rep.BackupStatus)
-		if !hasTaskFailure && status != "" && !domain.PVEBackupStatusOK(status) && resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
-			severity, title := pveBackupAlertPresentation(status)
+		if !hasTaskFailure && pveBackupStatusAlertable(status) && resolveBackupErr(svCfg, nil, cfg.GlobalBackupErr) {
 			alerts = append(alerts, domain.Alert{
 				ID:         fmt.Sprintf("backup_error:pve:%d", sv.ID),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pve",
 				Type:       domain.AlertTypeBackupError,
-				Severity:   severity,
-				Title:      title,
+				Severity:   domain.AlertSeverityCritical,
+				Title:      "Backup fallido",
 				Message:    fmt.Sprintf("Ultimo job: %s", status),
 				DetectedAt: time.Now(),
 			})
@@ -469,11 +466,11 @@ func evalPVEBackupErrors(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 	return alerts, nil
 }
 
-func pveBackupAlertPresentation(status string) (severity, title string) {
-	if domain.PVEBackupStatusWarning(status) {
-		return domain.AlertSeverityWarning, "Backup con advertencias"
-	}
-	return domain.AlertSeverityCritical, "Backup fallido"
+// pveBackupStatusAlertable reports whether a vzdump status is a real failure.
+// Proxmox WARNINGS still produce a usable backup, so they stay informational.
+func pveBackupStatusAlertable(status string) bool {
+	status = strings.TrimSpace(status)
+	return status != "" && !domain.PVEBackupStatusOK(status) && !domain.PVEBackupStatusWarning(status)
 }
 
 func evalPVEBackupSize(st *store.Store, cfg AlertConfigs) ([]domain.Alert, error) {

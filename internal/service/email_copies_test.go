@@ -57,3 +57,33 @@ func TestBuildEmailDataCountsRetainedCopies(t *testing.T) {
 		t.Fatal("email must show the copy count after size")
 	}
 }
+
+func TestBuildEmailDataSkipsSilencedStaleServers(t *testing.T) {
+	_, st := openTestStore(t)
+	ctx := t.Context()
+	pveID, err := st.UpsertPVEServer(ctx, "pve-silenced", "10.0.0.2", "", "test", "pve-silenced-machine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pbsID, err := st.UpsertPBSServer(ctx, "pbs-silenced", "10.0.0.3", "", "test", "pbs-silenced-machine")
+	if err != nil {
+		t.Fatal(err)
+	}
+	until := time.Now().Add(24 * time.Hour)
+	for _, id := range []string{fmt.Sprintf("pve_stale:pve:%d", pveID), fmt.Sprintf("pbs_report_stale:pbs:%d", pbsID)} {
+		if err := st.UpsertAlertSuppression(ctx, id, until, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg, err := st.GetEmailConfig(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := buildEmailData(ctx, st, NewReport(st, time.UTC), cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(data.PVEIssues) != 0 || len(data.PBSIssues) != 0 || data.TotalIssues != 0 {
+		t.Fatalf("silenced stale servers must not be reported: pve=%+v pbs=%+v total=%d", data.PVEIssues, data.PBSIssues, data.TotalIssues)
+	}
+}
