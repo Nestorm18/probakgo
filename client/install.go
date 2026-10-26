@@ -111,8 +111,8 @@ const heartbeatTimerUnit = `[Unit]
 Description=Run Probakgo client heartbeat every 5 minutes
 
 [Timer]
-OnBootSec=1min
-OnUnitActiveSec=5min
+OnCalendar=*:0/5
+RandomizedDelaySec=30s
 AccuracySec=30s
 Persistent=true
 Unit=probakgo-client-heartbeat.service
@@ -412,6 +412,11 @@ func installHeartbeatTimer() {
 		fmt.Printf("WARN: could not enable heartbeat timer: %v\n", err)
 		return
 	}
+	// Restart so an already active timer recomputes its next elapse from the new unit.
+	if err := exec.Command("systemctl", "restart", "probakgo-client-heartbeat.timer").Run(); err != nil {
+		fmt.Printf("WARN: could not restart heartbeat timer: %v\n", err)
+		return
+	}
 	fmt.Println("Heartbeat timer installed: probakgo-client-heartbeat.timer (every 5 min)")
 }
 
@@ -427,10 +432,21 @@ func ensureHeartbeatTimerInstalled() {
 	if err != nil || self != binaryPath {
 		return
 	}
-	if _, err := os.Stat(heartbeatTimerPath); err == nil {
+	if heartbeatUnitsCurrent(heartbeatServicePath, heartbeatTimerPath) {
 		return
 	}
 	installHeartbeatTimer()
+}
+
+// heartbeatUnitsCurrent reports whether both heartbeat units exist with the
+// expected content, so outdated timers are rewritten on update.
+func heartbeatUnitsCurrent(servicePath, timerPath string) bool {
+	service, err := os.ReadFile(servicePath)
+	if err != nil || string(service) != heartbeatServiceUnit {
+		return false
+	}
+	timer, err := os.ReadFile(timerPath)
+	return err == nil && string(timer) == heartbeatTimerUnit
 }
 
 func ensureVzdumpHookInstalled() {
