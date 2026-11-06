@@ -938,7 +938,7 @@ func evalPBSTaskFailures(st *store.Store, cfg AlertConfigs) ([]domain.Alert, err
 			}
 			alertType, title, message, storeName := pbsTaskFailureAlert(task)
 			alerts = append(alerts, domain.Alert{
-				ID:         fmt.Sprintf("%s:pbs:%d:%s", alertType, sv.ID, pbsTaskAlertKey(task)),
+				ID:         pbsTaskAlertID(alertType, sv.ID, task),
 				ServerName: sv.DisplayName, ServerID: sv.ID, ServerType: "pbs",
 				StoreName:  storeName,
 				Type:       alertType,
@@ -973,6 +973,10 @@ func pbsTaskFailureAlert(task domain.PBSTask) (alertType, title, message, storeN
 	}
 	return domain.AlertTypePBSSyncFailed, "Sincronización remota fallida",
 		fmt.Sprintf("Sync remote %q datastore %q fallida: %s", remote, datastore, task.Status), storeName
+}
+
+func pbsTaskAlertID(alertType string, serverID int64, task domain.PBSTask) string {
+	return fmt.Sprintf("%s:pbs:%d:%s", alertType, serverID, pbsTaskAlertKey(task))
 }
 
 func pbsTaskAlertKey(task domain.PBSTask) string {

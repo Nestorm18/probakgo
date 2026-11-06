@@ -631,6 +631,58 @@ func TestBuildEmailData_MissingActiveVMsMakePVEIssue(t *testing.T) {
 	}
 }
 
+func TestBuildEmailData_SuppressedPBSTaskFailureExcluded(t *testing.T) {
+	ctx := context.Background()
+	_, st := openTestStore(t)
+	svc := NewReport(st, time.UTC)
+
+	serverID, _ := st.UpsertPBSServer(ctx, "pbs-sync", "10.0.0.2", "", "1.0", "")
+	reportID, _ := st.InsertPBSReport(ctx, serverID)
+	for _, task := range []domain.PBSTaskPayload{
+		{TaskType: "sync", JobID: "home:a", Remote: "casa", RemoteStore: "synology", Status: "ERROR: timeout"},
+		{TaskType: "gc", Store: "synology", Status: "ERROR: disk"},
+	} {
+		if err := st.InsertPBSTask(ctx, reportID, task); err != nil {
+			t.Fatalf("insert PBS task: %v", err)
+		}
+	}
+	suppress := func(id string) {
+		t.Helper()
+		if err := st.UpsertAlertSuppression(ctx, id, time.Now().Add(time.Hour), ""); err != nil {
+			t.Fatalf("UpsertAlertSuppression: %v", err)
+		}
+	}
+	cfg, _ := st.GetEmailConfig(ctx)
+	build := func() emailData {
+		t.Helper()
+		data, err := buildEmailData(ctx, st, svc, cfg)
+		if err != nil {
+			t.Fatalf("buildEmailData: %v", err)
+		}
+		return data
+	}
+
+	// Suppressing one failure must not hide the other.
+	suppress(fmt.Sprintf("%s:pbs:%d:home_a", domain.AlertTypePBSSyncFailed, serverID))
+	data := build()
+	if len(data.PBSIssues) != 1 || strings.Contains(data.PBSIssues[0].StaleReason, "Sync remote") ||
+		!strings.Contains(data.PBSIssues[0].StaleReason, "Garbage collection") {
+		t.Fatalf("want only the GC failure reported, got %+v", data.PBSIssues)
+	}
+
+	gcAlerts, err := evalPBSTaskFailures(st, AlertConfigs{})
+	if err != nil {
+		t.Fatalf("evalPBSTaskFailures: %v", err)
+	}
+	for _, a := range gcAlerts {
+		suppress(a.ID)
+	}
+	data = build()
+	if len(data.PBSIssues) != 0 || data.TotalIssues != 0 || len(data.PBSOk) != 1 {
+		t.Fatalf("suppressed failures must not be reported: issues=%+v ok=%d total=%d", data.PBSIssues, len(data.PBSOk), data.TotalIssues)
+	}
+}
+
 func TestBuildEmailData_PBSTaskFailureMakesPBSIssue(t *testing.T) {
 	ctx := context.Background()
 	_, st := openTestStore(t)

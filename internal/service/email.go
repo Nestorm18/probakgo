@@ -479,7 +479,10 @@ func buildEmailData(ctx context.Context, st *store.Store, rep *ReportService, cf
 		for _, task := range tasks {
 			row.PBSTasks = append(row.PBSTasks, emailPBSTaskRow(task))
 			if domain.PBSTaskFailed(task) {
-				_, _, message, _ := pbsTaskFailureAlert(task)
+				alertType, _, message, _ := pbsTaskFailureAlert(task)
+				if _, silenced := suppressed[pbsTaskAlertID(alertType, sv.ID, task)]; silenced {
+					continue
+				}
 				taskFailures = append(taskFailures, message)
 			}
 		}
