@@ -78,8 +78,8 @@
           <div class="col-md-6"><label class="form-label" for="nasTime">Hora de la copia diaria</label><input class="form-control" type="time" id="nasTime" name="nas_time" value="{{.NAS.SendTime}}"><div class="form-text">Zona horaria del servidor: {{.ServerTimezone}}. Si el servicio arranca después de esa hora, ejecutará la copia pendiente del día.</div></div>
         </div>
         <div class="mt-3 small">
-          <p class="mb-1">Último intento: {{if .NAS.LastAttempt}}{{.NAS.LastAttempt}}{{else}}Sin intentos{{end}}</p>
-          <p class="mb-1">Última copia correcta: {{if .NAS.LastSuccess}}{{.NAS.LastSuccess}}{{else}}Sin copias{{end}}</p>
+          {{if and .NAS.LastAttempt (ne .NAS.LastAttempt .NAS.LastSuccess)}}<p class="mb-1">Último intento: {{formatTimestamp .NAS.LastAttempt}}</p>{{end}}
+          <p class="mb-1">Última copia correcta: {{if .NAS.LastSuccess}}{{formatTimestamp .NAS.LastSuccess}}{{else}}Sin copias{{end}}</p>
           {{if .NAS.LastError}}<p class="text-warning mb-1">{{.NAS.LastError}}</p>{{end}}
         </div>
       </div>

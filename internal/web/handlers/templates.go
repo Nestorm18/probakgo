@@ -145,6 +145,13 @@ func makeFuncMap(loc *time.Location, releaseVersion string) template.FuncMap {
 		loc = time.Local
 	}
 	return template.FuncMap{
+		"formatTimestamp": func(value string) string {
+			t, err := time.Parse(time.RFC3339, value)
+			if err != nil {
+				return "–"
+			}
+			return t.In(loc).Format("2006-01-02 15:04:05")
+		},
 		"formatTime": func(v any) string {
 			switch t := v.(type) {
 			case *time.Time:

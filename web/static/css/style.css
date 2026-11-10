@@ -290,7 +290,6 @@ body {
   font-size: .9rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
-  transition: background .2s, color .2s;
 }
 
 a { color: var(--clr-accent); text-decoration: none; }

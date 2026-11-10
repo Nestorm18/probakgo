@@ -2,6 +2,24 @@
 
 Trabajo pendiente real después de la revisión de la versión 0.0.191. Lo ya implementado se documenta en el código, los tests y las guías.
 
+## Correcciones pendientes (revisión de la versión 0.0.269)
+
+Confirmadas con tests temporales:
+
+- Un backup nocturno perdido no se detecta si el job anterior terminó pasada la medianoche. `isStaleForConfigsAt` (`internal/service/report.go`) compara la hora de llegada del reporte con las 00:00 del día de backup, así que el reporte del job anterior tapa la ausencia; un fallo aislado no se detecta nunca. Valorar comparar con la hora de inicio del job (`backup_starttime`).
+- Borrar una API key desvinculada deja servidores huérfanos. `DeleteAPIKeyPost` (`internal/web/handlers/apikeys.go`) solo borra los datos del servidor si la key tiene `server_name`, y «Desvincular» lo vacía. El servidor PVE/PBS queda con un `api_key_id` inexistente, sigue generando alertas y no se puede eliminar desde la interfaz. Llamar siempre a `HardDeleteServerDataForAPIKey`.
+- Reactivar desde la web a un usuario desactivado por 2FA no sirve. `ToggleUser` (`internal/store/user.go`) no reinicia `totp_grace_started_at`, así que el siguiente login lo desactiva otra vez; solo funciona `probakgo enable-user`.
+
+Detectadas leyendo el código, sin test:
+
+- Informe diario por email: `StartEmailScheduler` calcula la hora una vez y duerme hasta entonces. Un cambio de `send_time` no se aplica hasta después del siguiente envío (puede salir a la hora antigua o dos veces el mismo día) y un envío perdido por reinicio no se recupera.
+- Volumen Windows desaparecido: `evalWindowsMissingVolume` compara solo los dos últimos reportes, así que a los 5 minutos la alerta se resuelve sola y envía el aviso de resolución aunque el volumen siga sin aparecer.
+- `evalPVEMissingVM` y `missingVMRows` calculan el día del job con la zona horaria del sistema en lugar de `TIMEZONE`. Si difieren, un job que empieza entre las 00:00 y las 02:00 se asigna al día anterior y salen falsas «VM sin backup».
+- El borrado de un servidor (`hardDelete*ByID`) no limpia `alert_states`, así que después se envían avisos de «alerta resuelta» de un servidor que ya no existe.
+- Un login correcto sin 2FA pone a cero los fallos de la IP (`ClearFailures` en `LoginPost`). Alternando con su propio login, alguien con cuenta puede probar contraseñas de otros sin llegar al bloqueo.
+- Los POST de ajustes de `internal/web/handlers/email.go` ignoran el error de `GetEmailConfig`; si la lectura falla, guardan valores por defecto y desactivan umbrales y políticas de 2FA.
+- El fixture de `maintenance_settings.html` en `templates_test.go` no rellena `LastAttempt`/`LastSuccess`, así que `formatTimestamp` no se ejecuta en ningún test.
+
 ## Seguridad y despliegue
 
 - Configurar en GitHub los *required reviewers* del entorno `release`. El workflow ya usa ese entorno, pero la aprobación es una política externa al repositorio.
